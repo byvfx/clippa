@@ -34,7 +34,19 @@ def test_halves_rank_inside_each_stream():
     rows += [row("b/s01", 5, heat=1), row("b/s02", 9, heat=2)]  # under MIN_HALVES: left out
     h = lift.halves(rows, "heat")
     # a by heat: 10, 20 | (7, the middle) | 300, 400; the hotter half lost
-    assert h == {"streams": 1, "top": 30, "bottom": 700, "top_won": 0}
+    assert h == {"streams": 1, "top": 30, "top_n": 2, "bottom": 700, "bottom_n": 2, "top_won": 0}
+
+
+def test_halves_leave_ties_across_the_middle_out():
+    tied = [row(f"a/v0{i}", v, kind="short", score=6) for i, v in enumerate([1, 2, 3, 4])]
+    assert lift.halves(tied, "score")["streams"] == 0             # all tied: no top, no bottom
+    rows = [row(f"b/v0{i}", v, kind="short", score=s) for i, (s, v) in enumerate([(7, 90), (6, 1), (6, 2), (6, 3), (5, 10)])]
+    assert lift.halves(rows, "score") == {"streams": 1, "top": 90, "top_n": 1, "bottom": 10, "bottom_n": 1,
+                                          "top_won": 1}
+    # uneven halves (one tie on the bottom side) compare per upload, not in total
+    rows = [row(f"c/v0{i}", v, kind="short", score=s) for i, (s, v) in enumerate([(9, 50), (8, 50), (7, 60), (2, 1), (2, 1), (2, 1)])]
+    h = lift.halves(rows, "score")
+    assert (h["top_n"], h["bottom_n"], h["top_won"]) == (3, 3, 1)
 
 
 def test_by_value_medians_per_whole_score():
@@ -85,12 +97,12 @@ def test_table_groups_and_rankers():
     assert shorts["rankers"][0]["spearman"] == 1.0
     seg = next(g for g in groups if g["show"] == "c404")
     assert [r["ranker"] for r in seg["rankers"]] == ["heat"] and seg["rankers"][0]["n"] == 1
-    assert {g["show"] for g in groups} == {"kino", "c404", "all"}
+    assert {g["show"] for g in groups} == {"kino", "c404"}          # never a pooled "all" row
     assert [g["show"] for g in lift.table(rows, show="c404")] == ["c404"]
     assert {g["kind"] for g in lift.table(rows, kind="short")} == {"short"}
     md = lift.markdown(groups)
     assert "| kino | short | 5 |" in md and "+1.00" in md and "5 → 1 (n=1)" in md
-    assert lift.markdown([]).startswith("No uploads")
+    assert lift.markdown([]).startswith("No uploads with 7-day numbers here")
 
 
 @pytest.fixture
@@ -152,11 +164,33 @@ def test_cli_lift(share, capsys):
     groups = json.loads(capsys.readouterr().out)
     assert [g["kind"] for g in groups] == ["segment"] and groups[0]["uploads"] == 3
     args = cli.build_parser().parse_args(["--show", "c404", "analytics", "--lift"])
-    assert args.show == "c404"                       # the global --show isn't overwritten by the sub-flag
+    assert args.show == "c404" and args.lift_show is None   # the global --show stays the global one
+    share["shows"]["kino"] = {"overrides": {}}
     cli.cmd_analytics(share, cli.build_parser().parse_args(["analytics", "--lift", "--show", "kino"]))
     assert "| kino | short | 1 |" in capsys.readouterr().out
-    with pytest.raises(ClipperError, match="go with --lift"):
-        cli.cmd_analytics(share, cli.build_parser().parse_args(["analytics", "--json"]))
+    for argv, match in [(["analytics", "--json"], "go with --lift"),
+                        (["analytics", "--show", "kino"], "go with --lift"),  # never a quiet YouTube refresh
+                        (["analytics", "--lift", "--report"], "leave out --report"),
+                        (["analytics", "--lift", "--show", "nope"], r"no \[shows.nope\]")]:
+        with pytest.raises(ClipperError, match=match):
+            cli.cmd_analytics(share, cli.build_parser().parse_args(argv))
+
+
+def test_a_broken_stream_file_leaves_that_stream_out(share, capsys):
+    (share["paths"]["streams"] / "kick-1" / "segments.json").write_text("{not json", encoding="utf-8")
+    rows = {r["key"]: r for r in lift.rows(share)}
+    assert rows["kick-1/s01_dsp"]["heat"] is None and "kick-1 left out" in capsys.readouterr().err
+
+
+def test_heat_is_read_only_where_something_ranks_by_it(share, monkeypatch):
+    seen = []
+    real = lift.stream_facts
+    monkeypatch.setattr(lift, "stream_facts", lambda sdir, heat=True: seen.append((sdir.name, heat)) or real(sdir, heat))
+    lift.rows(share)
+    assert sorted(seen) == [("gone-2", True), ("kick-1", True)]
+    seen.clear()
+    lift.topic_record(share, "kino")
+    assert all(not h for _, h in seen)
 
 
 def test_report_ends_with_lift_only_when_asked(share):

@@ -23,6 +23,7 @@ them in particular but is all there is.
 """
 from __future__ import annotations
 
+import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -32,7 +33,7 @@ from .states import split_key
 
 KINDS = ("short", "clip", "segment", "compilation")
 RANKERS = ("score", "heat", "topic")
-D7_DAYS = 8            # analytics.run fetches a video's 7-day numbers once it is 8 days old
+D7_DAYS = 8            # analytics.run fetches a video's 7-day numbers once it is this many days old
 MIN_SPEARMAN = 5       # fewer values than this: no correlation shown
 MIN_HALVES = 4         # ranked uploads a stream needs before its halves count
 
@@ -73,24 +74,31 @@ def median(xs: list[float]) -> float:
 
 
 def halves(rows: list[dict], ranker: str) -> dict:
-    """Inside each stream with MIN_HALVES+ ranked uploads: the views of the better-ranked half
-    against the other half (the middle one left out of an odd count), summed, and in how many
-    streams the top half won."""
+    """Inside each stream with MIN_HALVES+ ranked uploads: the uploads ranked above the middle
+    against those below it, by rank, so uploads tied across the middle (six Shorts all scored 6)
+    count in neither half; a stream with nothing on one side is left out. Totals of views and
+    uploads per half over the streams, and in how many streams the top half drew more views per
+    upload."""
     by_stream: dict[str, list[dict]] = {}
     for r in rows:
         if r.get(ranker) is not None:
             by_stream.setdefault(r["stream"], []).append(r)
-    out = {"streams": 0, "top": 0, "bottom": 0, "top_won": 0}
+    out = {"streams": 0, "top": 0, "top_n": 0, "bottom": 0, "bottom_n": 0, "top_won": 0}
     for group in by_stream.values():
         if len(group) < MIN_HALVES:
             continue
-        group = sorted(group, key=lambda r: (-r[ranker], r["key"]))
-        h = len(group) // 2
-        top, bottom = sum(r["views"] for r in group[:h]), sum(r["views"] for r in group[-h:])
+        rk = ranks([r[ranker] for r in group])
+        mid = (len(group) + 1) / 2
+        top = [r["views"] for r, x in zip(group, rk, strict=True) if x > mid]
+        bottom = [r["views"] for r, x in zip(group, rk, strict=True) if x < mid]
+        if not top or not bottom:
+            continue
         out["streams"] += 1
-        out["top"] += top
-        out["bottom"] += bottom
-        out["top_won"] += top > bottom
+        out["top"] += sum(top)
+        out["top_n"] += len(top)
+        out["bottom"] += sum(bottom)
+        out["bottom_n"] += len(bottom)
+        out["top_won"] += sum(top) / len(top) > sum(bottom) / len(bottom)
     return out
 
 
@@ -142,14 +150,13 @@ def topic_records(rows: list[dict], show: str, before: datetime | None = None) -
 
 
 def table(rows: list[dict], show: str | None = None, kind: str | None = None) -> list[dict]:
-    """One group per (show, kind), plus "all" shows per kind when there are several; each with
-    its uploads, median views and a line per ranker that has any values."""
+    """One group per (show, kind), each with its uploads, median views and a line per ranker
+    that has any values. No group pools the shows: one show's uploads draw ten times another's,
+    so a pooled correlation would mostly measure which show an upload is from."""
     rows = [r for r in rows if (not show or r["show"] == show) and (not kind or r["kind"] == kind)]
-    shows = sorted({r["show"] for r in rows})
-    groups = [(s, k) for k in KINDS for s in ([*shows, "all"] if len(shows) > 1 else shows)]
     out = []
-    for s, k in groups:
-        g = [r for r in rows if r["kind"] == k and (s == "all" or r["show"] == s)]
+    for k, s in [(k, s) for k in KINDS for s in sorted({r["show"] for r in rows})]:
+        g = [r for r in rows if r["kind"] == k and r["show"] == s]
         if not g:
             continue
         line = {"show": s, "kind": k, "uploads": len(g), "median_views": median([r["views"] for r in g]),
@@ -170,8 +177,9 @@ def table(rows: list[dict], show: str | None = None, kind: str | None = None) ->
 def markdown(groups: list[dict]) -> str:
     """The table for a terminal or the monthly report."""
     if not groups:
-        return "No uploads with 7-day numbers yet: run clipper analytics."
-    lines = ["| show | kind | uploads | median | ranker | n | Spearman | top half vs bottom (streams, top won) |",
+        return ("No uploads with 7-day numbers here (`clipper analytics` fetches them once a video "
+                f"is {D7_DAYS} days old).")
+    lines = ["| show | kind | uploads | median | ranker | n | Spearman | views per upload, top half vs bottom (streams, top won) |",
              "|---|---|---:|---:|---|---:|---:|---|"]
     scores = []
     for g in groups:
@@ -184,10 +192,11 @@ def markdown(groups: list[dict]) -> str:
                 lines.append(head + "| (none) | | | |")
                 continue
             h = r["halves"]
-            half = f"{h['top']:,} vs {h['bottom']:,} ({h['streams']}, {h['top_won']})" if h["streams"] else ""
+            half = (f"{h['top'] / h['top_n']:,.0f} vs {h['bottom'] / h['bottom_n']:,.0f} "
+                    f"({h['streams']}, {h['top_won']})" if h["streams"] else "")
             rho = "" if r["spearman"] is None else f"{r['spearman']:+.2f}"
             lines.append(head + f"| {r['ranker']} | {r['n']} | {rho} | {half} |")
-            if r.get("by_value") and g["show"] != "all":
+            if r.get("by_value"):
                 scores.append(f"- {g['show']} {g['kind']}: " + ", ".join(
                     f"{v['value']} → {v['median']:g} (n={v['n']})" for v in r["by_value"]))
     out = ["\n".join(lines)]
@@ -212,14 +221,16 @@ def stream_facts(sdir: Path, heat: bool = True) -> dict:
     compilations' segments. Empty for a stream that's gone (pruned or never here)."""
     from .schedule import segment_heat
 
-    meta = jsonstate.read(sdir / "meta.json", {}) or {}
-    started = meta.get("started_at")
-    seg = (jsonstate.read(sdir / "segments.json", {}) or {}) if heat else {}
     try:
+        meta = jsonstate.read(sdir / "meta.json", {}) or {}
+        seg = (jsonstate.read(sdir / "segments.json", {}) or {}) if heat else {}
         values = segment_heat(sdir, seg.get("segments", [])) if heat else {}
-    except (OSError, ValueError):  # a signals.parquet that can't be read: no heat, the rest stands
-        values = {}
-    return {"started": when(started) if started else None, "heat": values,
+        started = when(meta["started_at"]) if meta.get("started_at") else None
+    except (OSError, ValueError, KeyError, TypeError) as e:  # one broken stream file: that stream is unknown
+        print(f"lift: {sdir.name} left out of heat and stream times ({type(e).__name__}: {str(e)[:120]})",
+              file=sys.stderr)
+        return {"started": None, "heat": {}, "comps": {}}
+    return {"started": started, "heat": values,
             "comps": {c["file"].removesuffix(".mp4"): c["segments"] for c in seg.get("compilations", [])}}
 
 
@@ -240,14 +251,17 @@ def rows(cfg: dict, heat: bool = True) -> list[dict]:
 
     cfg = base(cfg)
     streams = Path(cfg["paths"]["streams"])
+    have = [r for r in load(cfg).values()
+            if r.get("d7") and not r.get("missing") and r.get("kind") in KINDS]
+    hot = {split_key(r["key"])[0] for r in have if r["kind"] in ("segment", "compilation")} if heat else set()
     facts: dict[str, dict] = {}
     out = []
-    for r in load(cfg).values():
-        d7 = r.get("d7") or {}
-        if not d7 or r.get("missing") or r.get("kind") not in KINDS:
-            continue
+    for r in have:
+        d7 = r["d7"]
         sid, key = split_key(r["key"])
-        f = facts.get(sid) or facts.setdefault(sid, stream_facts(streams / sid, heat))
+        if sid not in facts:  # signals only for streams with something heat ranks
+            facts[sid] = stream_facts(streams / sid, sid in hot)
+        f = facts[sid]
         published = when(r["publish_at"])
         try:
             score = float(r["score"]) if r.get("score") not in (None, "") else None

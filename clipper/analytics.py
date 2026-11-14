@@ -30,6 +30,7 @@ from pathlib import Path
 
 from . import jsonstate
 from .config import base, for_stream
+from .lift import D7_DAYS, median
 from .states import split_key
 
 ANALYTICS_SCOPE = "https://www.googleapis.com/auth/yt-analytics.readonly"
@@ -114,7 +115,7 @@ def run(cfg: dict, sign_in: bool = False) -> dict:
             if rec.get("d7") or vid not in by_id:
                 continue
             pub = datetime.fromisoformat(rec["publish_at"]).astimezone(UTC).date()
-            if (now.date() - pub).days < 8:  # Analytics lags ~2 days; wait for a full week
+            if (now.date() - pub).days < D7_DAYS:  # Analytics lags ~2 days; wait for a full week
                 continue
             r = ya.reports().query(
                 ids="channel==MINE", startDate=pub.isoformat(),
@@ -215,19 +216,13 @@ def fetch_channel(cfg: dict, ya, now: datetime) -> dict:
     return out
 
 
-def _median(xs: list[float]) -> float:
-    xs = sorted(xs)
-    n = len(xs)
-    return 0.0 if not n else xs[n // 2] if n % 2 else (xs[n // 2 - 1] + xs[n // 2]) / 2
-
-
 def _group(rows: list[dict], key) -> list[dict]:
     """Per group of videos with 7-day numbers: count, median and total 7-day views, mean %
     watched; biggest median first."""
     groups: dict[str, list[dict]] = {}
     for r in rows:
         groups.setdefault(key(r) or "(none)", []).append(r)
-    out = [{"key": k, "n": len(g), "median_views": round(_median([r["d7"]["views"] for r in g]), 1),
+    out = [{"key": k, "n": len(g), "median_views": round(median([r["d7"]["views"] for r in g]), 1),
             "views": sum(r["d7"]["views"] for r in g),
             "pct": round(sum(r["d7"].get("averageViewPercentage", 0) for r in g) / len(g), 1)}
            for k, g in groups.items()]
