@@ -8,6 +8,11 @@ current state; the version is `clipper --version` (set in `clipper/__init__.py` 
 
 ### 2026-11
 
+- 11-14: `clipper analytics --lift [--show] [--kind] [--json]` checks what clipper ranks uploads by
+  against their 7-day views (#258 A, no model): the Score column, the segments' chat heat and the
+  topic's earlier uploads, as Spearman's correlation and each stream's top half against its bottom
+  half. `clipper analytics --report` ends with the same table. `lift.topic_record` is the per-topic
+  track record a segment score prompt will read (#258 B).
 - 11-14: `clipper clipart find|add|list|keep|drop`, a clip art library beside the b-roll one:
   Wikimedia Commons drawings and pictures, The Met's and the Cleveland Museum of Art's CC0 works,
   emoji and icons through Iconify (Fluent Emoji, Noto, Tabler, Phosphor; logo sets never), and

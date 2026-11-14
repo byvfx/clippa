@@ -941,10 +941,18 @@ def cmd_completion(cfg: dict, args: argparse.Namespace) -> None:
 def cmd_analytics(cfg: dict, args: argparse.Namespace) -> None:
     from . import analytics
 
+    if args.lift:
+        from . import lift
+
+        groups = lift.table(lift.rows(cfg), show=getattr(args, "show", None), kind=args.kind)
+        print_json(groups) if args.json else print(lift.markdown(groups))
+        return
+    if args.json or args.kind:
+        raise ClipperError("--json and --kind go with --lift")
     if args.report:
         if args.refresh:
             analytics.run(cfg)
-        rep = analytics.report(cfg, args.month or "")
+        rep = analytics.report(cfg, args.month or "", lift=True)
         print(analytics.report_markdown(rep))
         print(f"-> {analytics.write_report(cfg, rep)}")
     else:
@@ -1480,6 +1488,11 @@ def add_review(sub) -> None:
                    help="the month's report -> reports/analytics/<month>.md + .csv")
     p.add_argument("--month", help="with --report: YYYY-MM (default: this month)")
     p.add_argument("--refresh", action="store_true", help="with --report: refresh analytics.json first")
+    p.add_argument("--lift", action="store_true",
+                   help="what predicts views: score, chat heat and topic history against 7-day views (no model)")
+    p.add_argument("--show", default=argparse.SUPPRESS, metavar="KEY", help="with --lift: one show")
+    p.add_argument("--kind", choices=["short", "clip", "segment", "compilation"], help="with --lift: one kind")
+    p.add_argument("--json", action="store_true", help="with --lift: print JSON")
     p.set_defaults(fn=cmd_analytics)
 
 
