@@ -115,7 +115,19 @@ def _by(who: str) -> str:
     return f" ({who})" if who else ""
 
 
+def _touched(item: Item, what: str, who: str) -> None:
+    """A person acted on it: review_auto leaves it to a person from now on (an automatic
+    approval, who "auto", doesn't count). Never fails the action itself."""
+    from . import review_auto
+
+    try:
+        review_auto.touch(item.stream_dir, item.key, what, who)
+    except (OSError, ValueError) as e:   # a lock timeout, a broken auto.json
+        print(f"{item.ref}: couldn't note the action for auto-approval: {e}", file=sys.stderr)
+
+
 def approve(cfg: dict, item: Item, comment: str = "", who: str = "") -> dict:
+    _touched(item, "approve", who)
     _status(cfg, item, "approved", comment or f"Approved{_by(who)}")
     return refresh(cfg, item)
 
@@ -123,6 +135,7 @@ def approve(cfg: dict, item: Item, comment: str = "", who: str = "") -> dict:
 def reject(cfg: dict, item: Item, reason: str, who: str = "") -> dict:
     if not reason.strip():
         raise ClipperError("reject needs a reason (it becomes a scoring example)")
+    _touched(item, "reject", who)
     _status(cfg, item, "rejected", reason.strip())
     return refresh(cfg, item)
 
@@ -130,11 +143,13 @@ def reject(cfg: dict, item: Item, reason: str, who: str = "") -> dict:
 def changes(cfg: dict, item: Item, what: str, who: str = "") -> dict:
     if not what.strip():
         raise ClipperError("say what to change")
+    _touched(item, "changes", who)
     _status(cfg, item, "retake", what.strip())
     return refresh(cfg, item)
 
 
 def reopen(cfg: dict, item: Item, who: str = "") -> dict:
+    _touched(item, "reopen", who)
     _status(cfg, item, "wfa", f"Reopened for review{_by(who)}")
     return refresh(cfg, item)
 
@@ -143,11 +158,13 @@ def restore(cfg: dict, item: Item, status_short: str, who: str = "") -> dict:
     """Put the task back to an earlier status (the war room's undo). The comment is a
     clipper note, so the decision's reason stays the earlier comment (a retake isn't
     planned again, a reject keeps its scoring example)."""
+    _touched(item, "undo", who)
     _status(cfg, item, status_short, f"{review.NOTE_PREFIX} Undo: back to {status_short}{_by(who)}")
     return refresh(cfg, item)
 
 
 def hold(cfg: dict, item: Item, on: bool = True, who: str = "") -> dict:
+    _touched(item, "hold", who)
     _columns(cfg, item, {"Hold": "true" if on else "false"},
              f"Hold {'on' if on else 'off'}{_by(who)}")
     return refresh(cfg, item)
@@ -161,6 +178,7 @@ def pin(cfg: dict, item: Item, when: str, who: str = "") -> dict:
     sc = cfg["schedule"]
     if when and not parse_when(when, ZoneInfo(sc["timezone"]), "00:00"):
         raise ClipperError(f"Publish at must be YYYY-MM-DD HH:MM or YYYY-MM-DD, not {when!r}")
+    _touched(item, "pin", who)
     _columns(cfg, item, {"Publish at": when},
              (f"Publish at {when}" if when else "Unpinned") + _by(who))
     return refresh(cfg, item)
@@ -285,6 +303,7 @@ def edit_meta(cfg: dict, item: Item, values: dict[str, str], who: str = "") -> d
     for name, v in values.items():
         label = META[name][1]
         notes.append(f"{label} edited" if "\n" in v or len(v) > 120 else f"{label}: {v}")
+    _touched(item, "edit", who)
     _columns(cfg, item, values, "; ".join(notes) + _by(who))
     return refresh(cfg, item)
 
@@ -298,6 +317,7 @@ def thumbtext(cfg: dict, item: Item, text: str, who: str = "") -> dict:
     thumbs = jsonstate.read(item.stream_dir / "thumbnails.json", {})
     if video_key(item.stream_dir / item.state["file"].replace("\\", "/")) not in thumbs:
         raise ClipperError(f"{item.ref} has no thumbnail yet; run clipper thumbs first")
+    _touched(item, "thumbnail text", who)
     _columns(cfg, item, {review.THUMB_COL: text}, f"Thumbnail text: {text}{_by(who)}")
     return refresh(cfg, item)
 
@@ -423,6 +443,10 @@ def describe(cfg: dict, sdir: Path, gazu=None, links: bool = True) -> dict[str, 
         outputs = {}
     meta = jsonstate.read(sdir / "meta.json", {})
     checks = review_check.load(sdir)
+    from . import review_auto
+
+    autos = (review_auto.verdicts(cfg, sdir, state=state, decisions=decisions, checks=checks)
+             if cfg["review"]["auto_approve"] else {})
     ls = review.Listing()
     out = {}
     for key, st in state.items():
@@ -463,6 +487,8 @@ def describe(cfg: dict, sdir: Path, gazu=None, links: bool = True) -> dict[str, 
             "file": sdir / st["file"].replace("\\", "/"), "preview": sdir / "review" / f"{key}.mp4",
             "revision": st.get("revision"), "synced_at": r.get("updated_at"),
             "checks": [f["text"] for f in review_check.findings_of(checks, key)],
+            # #259 B: "approves itself Sat 14:30 unless you act", "waits for you: held"...
+            "auto": review_auto.note(autos.get(key), cfg["schedule"]["timezone"]),
         }
     return out
 

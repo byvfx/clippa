@@ -48,6 +48,7 @@ import bisect
 import os
 import subprocess
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 
 from . import jsonstate, tighten
@@ -331,7 +332,6 @@ def project_name(cfg: dict) -> str:
 def episode_name(stream_dir: Path, rc: dict, tz: str = "America/Los_Angeles") -> str:
     """{date} is the local air date (schedule.timezone), not UTC: an evening show in
     Pacific time starts on the next UTC day."""
-    from datetime import datetime
     from zoneinfo import ZoneInfo
 
     meta = jsonstate.load(stream_dir / "meta.json")
@@ -579,7 +579,14 @@ def push_previews(gazu, stream_dir: Path, rc: dict, proj: dict, ep: dict, types:
                                                normalize_movie=rc["normalize"],
                                                set_thumbnail=True)
         old = state.get(it["key"], {})  # keep what we last proposed, for the columns
+        if old:   # a new revision goes back to wfa: an automatic approval no longer stands
+            from . import review_auto
+
+            review_auto.republished(stream_dir, it["key"])
+        # published_at: when it first went up for review (review_auto's grace window counts from it)
         state[it["key"]] = {**{k: old[k] for k in ("fields", "thumbnail_text") if k in old},
+                            "published_at": old.get("published_at")
+                            or datetime.now(UTC).isoformat(timespec="seconds"),
                             "kind": it["kind"], "id": it["meta"]["id"],
                             "file": it["file"].relative_to(stream_dir).as_posix(),
                             "sequence": it["seq"], "entity_id": entity["id"],

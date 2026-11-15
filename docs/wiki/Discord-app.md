@@ -35,4 +35,5 @@ things on Discord's side, once:
 Settings worth knowing, all under `[discord]` and `[notify]` in `clipper/defaults.toml`:
 `max_upload_mb` (10 on a plain server, 50 or 100 with boosts) decides how previews are shrunk
 to fit; `thread_name` names the threads; `replan` reruns the schedule after each decision;
-`refresh_minutes` keeps the cards in step with decisions made in Kitsu or the war room.
+`refresh_minutes` keeps the cards in step with decisions made in Kitsu or the war room, and with
+items that [approved themselves](Review#approval-by-silence).

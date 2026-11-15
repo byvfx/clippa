@@ -1128,6 +1128,28 @@ def check_review_cams(cfg: dict) -> None:
                  f"cam = true on the webcam panels of [shows.{key}.shorts.layouts.*] (it renders nothing again)")
 
 
+def check_auto_approve(cfg: dict) -> None:
+    """[review] auto_approve (#259 B): which shows approve by silence, and that serve, which
+    does it every 10 minutes, is up."""
+    from . import daemon, review_auto
+    from .config import for_show
+
+    if not review_auto.enabled_anywhere(cfg):
+        return
+    on = []
+    for key in cfg["shows"] or {"": None}:
+        rc = for_show(cfg, key)["review"]
+        if rc["auto_approve"]:
+            floors = ", ".join(f"{k}s from {review_auto.floor_of(rc, k):g}" for k in review_auto.KINDS
+                               if review_auto.floor_of(rc, k))
+            on.append(f"{key or 'all'} ({floors or 'pre-shows only'}; {rc['auto_grace_minutes']} min)")
+    ok("review", "auto-approve on: " + "; ".join(on))
+    hb = daemon.heartbeat(cfg, "serve")
+    if not hb["up"]:
+        warn("review", f"auto-approve is on but serve isn't running ({daemon.state(hb)[1]}): nothing approves itself",
+             "clipper services status serve")
+
+
 def repo_state(porcelain: str) -> tuple[str, int, int]:
     """`git status --porcelain --branch` → (branch, commits ahead of upstream, changed files);
     branch "" when HEAD is detached."""
@@ -1332,6 +1354,7 @@ def main(cfg: dict, offline: bool = False, role: str = "all") -> int:
         check_cast_serve(cfg)
     if role in ("all", "serve"):
         check_people(cfg)
+        check_auto_approve(cfg)
         check_backup(cfg)
     if role in ("all", "serve", "bot"):
         check_news(cfg, offline)

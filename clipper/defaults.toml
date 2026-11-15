@@ -599,6 +599,18 @@ check_effort = "low"
 check_prompt_version = "v1"    # clipper/prompts/review_check_<v>.md
 check_frames = 8               # frames of each Short through the face detector
 open_minutes = 15              # a segment or compilation whose first minutes name someone else, not its subject
+# Approval by silence (`clipper review auto`, #259): serve approves an item nobody acted on once
+# it has been in review auto_grace_minutes, when its checks are clean, it isn't held or edited,
+# and its score is at least its kind's floor. Anything a person does to it (hold, a note, an
+# edit, a reopen, any decision) leaves it to a person for good. Usually turned on per show:
+# [shows.<key>.review] auto_approve = true. Stories and one-offs always wait for a person.
+auto_approve = false
+auto_grace_minutes = 120
+auto_min_short = 6             # the lowest score that approves itself; 0 = that kind waits for a person
+auto_min_pick = 0
+auto_min_segment = 0
+auto_min_compilation = 0
+auto_preshow = "now"           # a pre-show (clean checks): "now" at publish, "grace" like the rest, "off"
 
 [discord]
 # Review from Discord: `clipper review publish` posts one card per item (preview, title,

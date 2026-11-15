@@ -40,8 +40,41 @@ made in Kitsu (as of the bot's last sync) over the draft's. What it finds goes i
 on the Discord card, the war room's ⚠ badge and item window, and `clipper status` ("2 with check
 findings"). An item is checked again only when something it reads changed (`--force` to check
 anyway; `--dry-run` prices the vision calls; `--no-vision` skips them). A check that fails is a
-finding too. Findings don't stop anything yet: they say where to look. Approval by silence for
-clean items is the next step (#259).
+finding too. Findings don't stop anything: they say where to look, and an item with any waits for
+you rather than [approving itself](#approval-by-silence).
+
+## Approval by silence
+
+A show can let its clean items approve themselves: `[shows.<key>.review] auto_approve = true`
+(off by default). Every 10 minutes serve runs `clipper review auto`, which approves an item when:
+
+- nobody has acted on it: no decision, hold, note, edit or reopen, from Discord, the war room,
+  the command line or Kitsu itself. Anything you do leaves it to you for good (a hold clipper
+  set itself, for [other voices](#shorts-held-for-other-voices), only while it's on);
+- its [pre-flight checks](#pre-flight-checks) found nothing (run again just before, so an item
+  re-rendered since is checked anew);
+- its score is at least its kind's floor (`auto_min_short = 6`; picks, segments and compilations
+  are 0, which leaves them to you);
+- it has been in review `auto_grace_minutes` (120).
+
+The approval is an ordinary Kitsu decision with the rule in its comment ("Approved automatically:
+no action in 120 min, checks clean, score 7"), and the item is scheduled at once. Until then its
+Discord card and war room window say "approves itself Sat 14:30 unless you act", or why it waits
+for you ("waits for you: score 5 under 6"). `clipper review auto --dry-run` lists the same for
+every open item without changing anything. To take one back, reopen it or reject it: an upload
+stays private until its publish time.
+
+A **pre-show** approves itself at publish when its checks are clean (`auto_preshow = "now"`;
+`"grace"` gives it the window, `"off"` leaves it to you). Pre-shows go public the moment they
+upload, so nobody will have seen one before it is public. Stories and one-offs always wait for you.
+
+`clipper doctor` (role serve) says which shows have it on and warns when serve, which does the
+approving, isn't running. A new revision of an item (a re-render) takes an automatic approval
+back: the item is judged again. What happened is kept in the stream's `auto.json`. The weekly [audit](Audit) counts the items that
+approved themselves, and the [checkup](Checkup) names any that a person then rejected, reopened,
+held or sent back: the rule let through something it shouldn't have. On the past Shorts (11-14), the
+rule at 6 would have approved 105 of 181 approved Shorts by itself and one of four rejected ones
+("too much Jer", a taste call the window is for).
 
 ## Shorts held for other voices
 

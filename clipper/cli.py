@@ -665,6 +665,18 @@ def cmd_review(cfg: dict, args: argparse.Namespace) -> None:
             found = review_check.run(d, cfg, keys=args.items, force=args.force, vision=not args.no_vision)
             print("\n".join(review_check.lines(found)))
         return
+    if args.action == "auto":
+        from . import review_auto
+
+        tz = cfg["schedule"]["timezone"]
+        if args.json:
+            with to_stderr():
+                found = review_auto.run(cfg, args.stream, apply=not args.dry_run)
+            print_json(found)
+        else:
+            found = review_auto.run(cfg, args.stream, apply=not args.dry_run)
+            print("\n".join(review_auto.lines(found, tz)))
+        return
     if args.action in ("publish", "sync", "notify"):
         d = stream_dir(cfg, args.stream)
         if args.action == "publish":
@@ -1403,6 +1415,11 @@ def add_review(sub) -> None:
     r.add_argument("--no-vision", action="store_true", help="no vision call on the covers ([review] check_model)")
     r.add_argument("--dry-run", action="store_true", help="say how many vision calls it would make and their cost")
     r.add_argument("--json", action="store_true", help="the findings as JSON, {key: [finding]}")
+    r = rsub.add_parser("auto", help="approve items nobody acted on in the grace window, checks clean "
+                                     "([review] auto_approve, #259); serve runs it every 10 min")
+    r.add_argument("stream", nargs="?", help="only this stream")
+    r.add_argument("--dry-run", action="store_true", help="say what would approve itself and when; change nothing")
+    r.add_argument("--json", action="store_true", help="{stream: [{key, state, why, at}]} for the open items")
     r = rsub.add_parser("status", help="decision counts per stream, and what's scheduled")
     # Reads review.json unless asked: a sync writes it and can post to Kitsu, not for a status.
     r.add_argument("--sync", action="store_true", help="read Kitsu first")

@@ -246,12 +246,15 @@ live clips #81, blind items #111, investigate anyone #138, agent exploration #15
 a small `clipper mcp`; #13 may fold into it), Modal ideas #53, #55, #56,
 Udder Truth #58/#59/#60, P&L #50 (revenue once monetized). Write "#77 L6" rather than "fix #77" in commit
 messages: GitHub closes the issue on "fix".
-- **Review pre-flight checks (#259, 11-14):** step A, `clipper review check` (wiki Review#pre-flight-checks,
-  `clipper/review_check.py`, run by `review publish`), is PR #263, merged and deployed 11-14; the webcam panels are marked `cam = true` in clipper.toml
-  (backup `backups/clipper.toml.before_cam_marks_2026-11-14`). The vision backtest: both cover rejects caught,
-  ~6-9% of approved covers flagged (log). Step B, approval by
-  silence for clean items after a 2-hour grace window, is the next PR: build it on `checks.json` (an item with an
-  entry, no findings and a current signature; a missing entry or `sig: ""`, a failed run, is not clean) and keep the taste rejects (too much Jer, side gaming) as what the window is for.
+- **Review pre-flight checks and approval by silence (#259, 11-14):** step A, `clipper review check` (wiki
+  Review#pre-flight-checks), is PR #263, merged and deployed 11-14; the webcam panels are marked `cam = true`
+  in clipper.toml (backup `backups/clipper.toml.before_cam_marks_2026-11-14`). Step B, `clipper review auto`
+  (`clipper/review_auto.py`, serve's `auto` job every 10 min, wiki Review#approval-by-silence), is branch
+  `review-auto`: **off until the user turns a show on** after its merge and deploy, Kino Shorts first
+  (`[shows.kino.review] auto_approve = true` in the NAS clipper.toml, backup first), then Channel 404's;
+  segments once #258 C wires their score. Before that, `CLIPPER_REVIEW_AUTO_APPROVE=true clipper review auto
+  --dry-run` shows what it would do. Backtest: 105 of 181 approved Shorts would have approved themselves, and
+  1 of 4 rejected ones ("too much Jer", a taste call the window is for).
 - **Documentaries (11-13, PR #233, merged and deployed):** `clipper doc
   new|voice|build|master|leak|kit` (wiki Documentaries; `clipper/doc.py`, `doc_resolve.py`), the reusable form
   of the first mini-documentary's one-off Resolve scripts. A piece is `[paths] documentaries/<slug>/` on the

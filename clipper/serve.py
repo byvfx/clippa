@@ -12,6 +12,8 @@ Jobs (`jobs()`; each runs `clipper ...` as a child process; an interval of 0 tur
                notes not acted on, and every 30 min regardless, since `clipper retake` syncs
                Kitsu itself and finds notes nothing else synced; at once when the war room or
                the bot asks (POST /api/retake, which runs even with auto off)
+    auto       every 10 min while a show has [review] auto_approve: `clipper review auto` (#259), which
+               approves what nobody acted on in the grace window and replans
     tiktok     every [tiktok] auto_send_minutes: `clipper tiktok --auto` (when signed in)
     x          every [x] auto_post_minutes: `clipper x --auto` (when signed in)
     analytics  every [analytics] auto_hours, once something is uploaded
@@ -47,7 +49,7 @@ from typing import NamedTuple
 
 import requests
 
-from . import actions, alerts, daemon, news, preshow, retake, warroom
+from . import actions, alerts, daemon, news, preshow, retake, review_auto, warroom
 from .config import base
 from .errors import ClipperError
 
@@ -123,6 +125,10 @@ class Serve:
              lambda: bool(retake.pending(cfg)) or (self.since("retake") >= RETAKE_SYNC_S
                                                    and bool(actions.review_dirs(cfg))),
              self.start_retake),
+            # #259 B: approval by silence; the command syncs Kitsu for what is due before it acts
+            Job("auto", review_auto.EVERY_S if review_auto.enabled_anywhere(cfg) else 0,
+             lambda: not self.running("auto") and bool(actions.review_dirs(cfg)),
+             lambda: task(self.run_clipper("auto", ["review", "auto"]))),
             Job("tiktok", cfg["tiktok"]["auto_send_minutes"] * 60,
              lambda: paths["tiktok_token"].exists() and not self.running("tiktok"),
              lambda: task(self.run_clipper("tiktok", ["tiktok", "--auto"]))),

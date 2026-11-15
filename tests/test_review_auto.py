@@ -1,0 +1,332 @@
+"""Approval by silence (#259 B): review_auto's rules, its run, and where it shows."""
+from datetime import UTC, datetime, timedelta
+
+import pytest
+
+from clipper import actions, jsonstate, review_auto
+from clipper.errors import ClipperError
+
+T0 = datetime(2026, 11, 15, 12, 0, tzinfo=UTC)
+
+
+@pytest.fixture
+def cfg(defaults):
+    defaults["review"]["auto_approve"] = True
+    return defaults
+
+
+def short(score="7", **more):
+    return {"kind": "short", "fields": {"Score": score}, "published_at": T0.isoformat(), **more}
+
+
+CLEAN = {"sig": "abc", "findings": []}
+
+
+def v(cfg, st=None, r=None, check=CLEAN, auto=None, retaken=False, now=T0 + timedelta(hours=3), kind="stream"):
+    return review_auto.verdict(cfg, kind, "v01_t1", st or short(), r or {"decision": "pending", "fields": {}},
+                               check, auto or {}, retaken, now)
+
+
+def test_a_clean_short_over_the_floor_waits_out_the_grace_then_is_due(cfg):
+    w = v(cfg, now=T0 + timedelta(minutes=30))
+    assert w.state == "waiting" and w.at == T0 + timedelta(minutes=120)
+    assert v(cfg, now=T0 + timedelta(minutes=120)).state == "due"
+
+
+@pytest.mark.parametrize("kw, why", [
+    ({"st": short("5")}, "score 5 under 6"),
+    ({"st": short("")}, "no score"),
+    ({"st": {**short(), "kind": "segment"}}, "segments wait for a person"),
+    ({"r": {"decision": "pending", "fields": {"Hold": "true"}}}, "held"),
+    ({"r": {"decision": "pending", "fields": {}, "edited": ["YouTube title"]}}, "edited in Kitsu: YouTube title"),
+    ({"retaken": True}, "re-cut after a note"),
+    ({"check": None}, "not checked yet"),
+    ({"check": {"sig": "", "findings": [{"text": "the checks didn't run"}]}}, "its checks didn't run"),
+    ({"check": {"sig": "abc", "findings": [{"text": "a face on the cover is cut off"}]}}, "1 check finding(s)"),
+    ({"auto": {"out": "reopen by Brandon"}}, "reopen by Brandon"),
+    ({"kind": "story"}, "storys wait for a person"),
+    ({"kind": "oneoff"}, "one-offs wait for a person"),
+])
+def test_what_leaves_an_item_to_a_person(cfg, kw, why):
+    got = v(cfg, **kw)
+    assert got.state == "person" and why in got.why
+
+
+def test_decided_approved_and_off(cfg):
+    assert v(cfg, r={"decision": "rejected"}).state == "decided"
+    got = v(cfg, auto={"approved_at": T0.isoformat()})
+    assert got.state == "approved" and got.at == T0
+    cfg["review"]["auto_approve"] = False
+    assert v(cfg).state == "off"
+
+
+def test_a_preshow_goes_at_publish_whatever_its_score(cfg):
+    seg = {"kind": "segment", "fields": {}, "published_at": T0.isoformat()}
+    assert v(cfg, st=seg, kind="preshow", now=T0).state == "due"
+    cfg["review"]["auto_preshow"] = "grace"
+    assert v(cfg, st=seg, kind="preshow", now=T0).state == "waiting"
+    cfg["review"]["auto_preshow"] = "off"
+    assert v(cfg, st=seg, kind="preshow").state == "person"
+
+
+def test_an_older_publish_counts_from_when_it_was_first_seen(cfg):
+    st = short()
+    del st["published_at"]
+    got = v(cfg, st=st, auto={"seen": (T0 + timedelta(hours=2)).isoformat()})
+    assert got.state == "waiting" and got.at == T0 + timedelta(hours=4)
+
+
+def test_an_older_publish_not_seen_yet_has_no_deadline(cfg):
+    st = short()
+    del st["published_at"]
+    got = v(cfg, st=st)
+    assert got.state == "waiting" and got.at is None
+    assert review_auto.note(got, "UTC") == "approves itself unless you act (its grace starts at the next pass)"
+
+
+def test_a_floor_written_as_text_still_counts(cfg):
+    cfg["review"]["auto_min_short"] = "6"
+    assert review_auto.floor_of(cfg["review"], "short") == 6.0
+    assert v(cfg, st=short("5")).why == "score 5 under 6"
+    cfg["review"]["auto_min_short"] = "six"
+    assert review_auto.floor_of(cfg["review"], "short") == 0.0
+
+
+def test_a_new_revision_takes_an_automatic_approval_back(tmp_path):
+    jsonstate.write(review_auto.path(tmp_path), {"v01": {"approved_at": T0.isoformat()}, "v02": {"out": "hold"}})
+    jsonstate.write(tmp_path / "review.json", {"v01": {"decision": "approved", "status": "done"},
+                                               "v02": {"decision": "approved", "status": "done"}})
+    review_auto.republished(tmp_path, "v01")
+    review_auto.republished(tmp_path, "v02")
+    assert review_auto.load(tmp_path) == {"v01": {"was_approved_at": T0.isoformat()}, "v02": {"out": "hold"}}
+    rv = jsonstate.read(tmp_path / "review.json")
+    assert rv["v01"] == {"decision": "pending", "status": "wfa"}       # not read as a person's approval
+    assert rv["v02"]["decision"] == "approved"                         # a person's stands
+
+
+def test_an_action_refused_for_bad_input_doesnt_count(tmp_path):
+    item = actions.Item(tmp_path, "v01_t1", {})
+    with pytest.raises(ClipperError):
+        actions.reject({}, item, "  ", who="Brandon")
+    assert review_auto.load(tmp_path) == {}
+
+
+def test_touch_takes_it_out_for_good_and_marks_an_undone_approval(tmp_path):
+    review_auto.touch(tmp_path, "v01", "approve", review_auto.WHO)   # its own approval
+    assert review_auto.load(tmp_path) == {}
+    review_auto.touch(tmp_path, "v01", "hold", "Brandon")
+    review_auto.touch(tmp_path, "v01", "reopen", "Brandon")
+    assert review_auto.load(tmp_path)["v01"]["out"] == "hold by Brandon"     # the first reason stays
+    jsonstate.write(review_auto.path(tmp_path), {"v02": {"approved_at": T0.isoformat()}})
+    review_auto.touch(tmp_path, "v02", "reject", "Brandon")
+    assert review_auto.load(tmp_path)["v02"]["undone"] == "reject by Brandon"
+
+
+def test_a_person_action_goes_through_touch(tmp_path, monkeypatch):
+    monkeypatch.setattr(actions, "_status", lambda *a: None)
+    monkeypatch.setattr(actions, "refresh", lambda cfg, item: {})
+    item = actions.Item(tmp_path, "v01_t1", {})
+    actions.reopen({}, item, who="Brandon")
+    assert review_auto.load(tmp_path)["v01_t1"]["out"] == "reopen by Brandon"
+    actions.approve({}, actions.Item(tmp_path, "v02_t2", {}), "Approved automatically", who=review_auto.WHO)
+    assert "v02_t2" not in review_auto.load(tmp_path)
+
+
+def test_note_reads_like_a_card_line():
+    tz = "America/Los_Angeles"
+    assert review_auto.note({"state": "waiting", "at": T0.isoformat()}, tz) == "approves itself Sun 04:00 unless you act"
+    assert review_auto.note({"state": "person", "why": "held"}, tz) == "waits for you: held"
+    assert review_auto.note({"state": "decided"}, tz) == "" and review_auto.note(None, tz) == ""
+
+
+def test_stream_kind(tmp_path):
+    assert review_auto.stream_kind(tmp_path) == "stream"
+    jsonstate.write(tmp_path / "meta.json", {"kind": "preshow"})
+    assert review_auto.stream_kind(tmp_path) == "preshow"
+    jsonstate.write(tmp_path / "meta.json", {"kind": "preshow", "window": {"from": 60}})
+    assert review_auto.stream_kind(tmp_path) == "oneoff"
+
+
+# ---------- a run over a fake stream ----------
+
+def fake(cfg, tmp_path):
+    cfg["paths"]["streams"] = tmp_path / "streams"
+    sd = tmp_path / "streams" / "kick-9"
+    sd.mkdir(parents=True)
+    old = (datetime.now(UTC) - timedelta(hours=3)).isoformat(timespec="seconds")
+    state = {"v01_t1": {**short(), "published_at": old, "task_id": "T1"},
+             "v02_t2": {**short("4"), "published_at": old, "task_id": "T2"},
+             "v03_t3": {"kind": "short", "fields": {"Score": "7"}, "task_id": "T3"},   # an older publish
+             "v04_t4": {**short(), "published_at": old, "task_id": "T4"}}
+    jsonstate.write(sd / "review_state.json", state)
+    jsonstate.write(sd / "review.json", {k: {"decision": "pending", "fields": {}} for k in state}
+                    | {"v04_t4": {"decision": "rejected", "fields": {}}})
+    jsonstate.write(sd / "checks.json", {k: CLEAN for k in state})
+    return sd
+
+
+def test_run_approves_whats_due_and_replans_once(cfg, tmp_path, monkeypatch):
+    from clipper import review, review_check, schedule
+
+    sd = fake(cfg, tmp_path)
+    monkeypatch.setattr(review_auto, "for_stream", lambda c, d: cfg)
+    monkeypatch.setattr(review, "sync", lambda *a, **k: {})
+    monkeypatch.setattr(review_check, "run", lambda *a, **k: {})
+    approved, replans = [], []
+    monkeypatch.setattr(actions, "approve", lambda c, item, comment, who: approved.append((item.key, comment, who)))
+    monkeypatch.setattr(schedule, "run", lambda c, sync_first: replans.append(sync_first))
+
+    said = []
+    found = review_auto.run(cfg, apply=False, say=said.append)               # --dry-run
+    assert approved == [] and not review_auto.path(sd).exists()
+    assert [r["state"] for r in found["kick-9"]] == ["due", "person", "waiting"]
+
+    review_auto.run(cfg, say=said.append)
+    assert [a[0] for a in approved] == ["v01_t1"] and approved[0][2] == review_auto.WHO
+    assert "Approved automatically: no action in 120 min, checks clean, score 7" in approved[0][1]
+    assert replans == [False]
+    auto = review_auto.load(sd)
+    assert auto["v01_t1"]["approved_at"] and auto["v03_t3"]["seen"]           # its grace starts now
+    assert auto["v04_t4"]["out"] == "rejected by a person"                    # a reopen won't auto-approve it
+    review_auto.run(cfg, say=said.append)
+    assert len(approved) == 1 and replans == [False]                          # nothing new
+
+
+def test_a_person_acting_mid_run_wins(cfg, tmp_path, monkeypatch):
+    from clipper import review, review_check
+
+    sd = fake(cfg, tmp_path)
+    monkeypatch.setattr(review_auto, "for_stream", lambda c, d: cfg)
+
+    def sync_then_a_reject(*a, **k):   # the user rejects v01 just after the sync read Kitsu
+        review_auto.touch(sd, "v01_t1", "reject", "Brandon")
+    monkeypatch.setattr(review, "sync", sync_then_a_reject)
+    monkeypatch.setattr(review_check, "run", lambda *a, **k: {})
+    approved = []
+    monkeypatch.setattr(actions, "approve", lambda c, item, comment, who: approved.append(item.key))
+    assert review_auto.approve_due(cfg, sd, ["v01_t1"], say=lambda *_: None) == [] and approved == []
+
+
+def test_history_and_the_checkup_finding(cfg, tmp_path):
+    from clipper import checkup
+
+    sd = fake(cfg, tmp_path)
+    at = datetime.now(UTC) - timedelta(days=1)
+    jsonstate.write(review_auto.path(sd), {k: {"approved_at": at.isoformat()} for k in ("v01_t1", "v02_t2", "v04_t4")})
+    with jsonstate.update(sd / "review.json", {}) as rv:
+        rv["v01_t1"]["decision"] = "approved"
+    hist = {h["key"]: h["undone"] for h in review_auto.history(cfg)}
+    assert hist == {"v01_t1": "", "v02_t2": "reopened", "v04_t4": "rejected"}
+    with jsonstate.update(sd / "review.json", {}) as rv:
+        rv["v01_t1"]["fields"] = {"Hold": "true"}                           # held in Kitsu
+    with jsonstate.update(review_auto.path(sd), {}) as auto:
+        auto["v03_t3"] = {"was_approved_at": at.isoformat()}                # re-rendered since
+    hist = {h["key"]: h["undone"] for h in review_auto.history(cfg)}
+    assert hist["v01_t1"] == "held" and hist["v03_t3"] == ""
+    found = checkup.check_auto(cfg, datetime.now(UTC))
+    assert [f["key"] for f in found] == ["auto:kick-9/v01_t1", "auto:kick-9/v02_t2", "auto:kick-9/v04_t4"]
+    assert "was then rejected" in found[2]["text"]
+
+
+def test_the_card_says_when_it_approves_itself():
+    from clipper import notify
+
+    row = {"kind": "short", "duration_s": 30, "score": "7", "category": "", "found_by": "", "hook": "",
+           "decision": "pending", "hold": False, "publish_at": "", "scheduled": "", "uploaded": False,
+           "comment": "", "title": "t", "kitsu_url": "http://k", "short": "kick-9/v01", "date": "",
+           "revision": 1, "youtube_url": "", "auto": "approves itself Sun 04:00 unless you act"}
+    embed, _ = notify.card(row)
+    assert {"name": "Auto-approve", "value": "approves itself Sun 04:00 unless you act", "inline": False} \
+        in embed["fields"]
+
+
+def test_enabled_anywhere_follows_the_shows(defaults):
+    assert not review_auto.enabled_anywhere(defaults)
+    defaults["review"]["auto_approve"] = True
+    assert review_auto.enabled_anywhere(defaults)
+
+
+def stub(cfg, tmp_path, monkeypatch, approve=None):
+    from clipper import review, review_check, schedule
+
+    sd = fake(cfg, tmp_path)
+    monkeypatch.setattr(review_auto, "for_stream", lambda c, d: cfg)
+    monkeypatch.setattr(review, "sync", lambda *a, **k: {})
+    monkeypatch.setattr(review_check, "run", lambda *a, **k: {})
+    approved, replans = [], []
+    monkeypatch.setattr(actions, "approve", approve or (lambda c, item, comment, who: approved.append(item.key)))
+    monkeypatch.setattr(schedule, "run", lambda c, sync_first: replans.append(sync_first))
+    return sd, approved, replans
+
+
+def test_a_broken_auto_json_skips_the_stream(cfg, tmp_path, monkeypatch):
+    sd, approved, replans = stub(cfg, tmp_path, monkeypatch)
+    review_auto.path(sd).write_text("{not json", encoding="utf-8")
+    said = []
+    review_auto.run(cfg, say=said.append)
+    assert approved == [] and replans == [] and any("kick-9: skipped" in s for s in said)
+    assert review_auto.run(cfg, apply=False, say=said.append)["kick-9"]         # a dry run still lists
+
+
+def test_a_hold_seen_in_kitsu_keeps_it_out_after_its_release(cfg, tmp_path, monkeypatch):
+    sd, approved, _ = stub(cfg, tmp_path, monkeypatch)
+    with jsonstate.update(sd / "review.json", {}) as rv:
+        rv["v01_t1"]["fields"] = {"Hold": "true"}
+    review_auto.run(cfg, say=lambda *_: None)
+    assert review_auto.load(sd)["v01_t1"]["out"] == "held"
+    with jsonstate.update(sd / "review.json", {}) as rv:
+        rv["v01_t1"]["fields"] = {}                                             # released
+    review_auto.run(cfg, say=lambda *_: None)
+    assert approved == []
+
+
+def test_one_failed_approval_doesnt_lose_the_others(cfg, tmp_path, monkeypatch):
+    approved = []
+
+    def approve(c, item, comment, who):
+        if item.key == "v01_t1":
+            raise RuntimeError("Kitsu said no")
+        approved.append(item.key)
+    sd, _, replans = stub(cfg, tmp_path, monkeypatch, approve)
+    with jsonstate.update(sd / "review_state.json", {}) as st:
+        st["v02_t2"]["fields"]["Score"] = "8"
+    said = []
+    review_auto.run(cfg, say=said.append)
+    assert approved == ["v02_t2"] and replans == [False]
+    assert "approved_at" not in review_auto.load(sd).get("v01_t1", {})
+    assert any("v01_t1: not approved: RuntimeError" in s for s in said)
+
+
+def test_a_preshow_is_approved_at_publish(cfg, tmp_path, monkeypatch):
+    from clipper import notify, review
+
+    sd = tmp_path / "pre-1"
+    sd.mkdir()
+    jsonstate.write(sd / "meta.json", {"kind": "preshow"})
+    monkeypatch.setattr(notify, "for_stream", lambda c, d: cfg)
+    monkeypatch.setattr(review, "publish", lambda *a, **k: ["v01_t1"])
+    runs = []
+    monkeypatch.setattr(review_auto, "run", lambda c, stream: runs.append(stream))
+    cfg["discord"]["enabled"] = False
+    notify.publish_and_post(sd, cfg)
+    assert runs == ["pre-1"]
+    cfg["review"]["auto_preshow"] = "grace"
+    notify.publish_and_post(sd, cfg)
+    assert runs == ["pre-1"]
+
+
+def test_the_approval_runs_under_auto_jsons_lock(cfg, tmp_path, monkeypatch):
+    held = []
+
+    def approve(c, item, comment, who):   # the file lock other processes (the bot's touch) wait on
+        held.append(review_auto.path(item.stream_dir).with_name("auto.json.lock").exists())
+    stub(cfg, tmp_path, monkeypatch, approve)
+    review_auto.run(cfg, say=lambda *_: None)
+    assert held == [True]
+
+
+def test_clippers_own_hold_doesnt_last(cfg):
+    st = {**short(), "fields": {"Score": "7", "Hold": "true"}}                  # proposed held: other voices
+    got = v(cfg, st=st, r={"decision": "pending", "fields": {"Hold": "true"}})
+    assert got.state == "person" and got.why == "held for other voices" and not got.lasting
+    assert v(cfg, r={"decision": "pending", "fields": {"Hold": "true"}}).lasting   # a person's hold

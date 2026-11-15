@@ -209,8 +209,29 @@ def check_lint(cfg: dict, now: datetime) -> list[dict]:
     return out
 
 
+AUTO_LOOKBACK_DAYS = 14
+
+
+def check_auto(cfg: dict, now: datetime) -> list[dict]:
+    """An item that approved itself (#259 B) and that a person then rejected, asked to change,
+    held or reopened: the rule let through something it shouldn't have."""
+    from . import review_auto
+
+    out = []
+    for h in review_auto.history(cfg):
+        t = _when(h["at"])
+        if not h["undone"] or t is None or t < now - timedelta(days=AUTO_LOOKBACK_DAYS):
+            continue
+        out.append(finding(f"auto:{h['stream']}/{h['key']}", "auto", WARN,
+                           f"{h['stream']}/{h['key']} approved itself {t:%m-%d} and was then {h['undone']}",
+                           look="is the rule right? [review] auto_min_* and auto_grace_minutes "
+                                "(wiki Review#approval-by-silence)", stream=h["stream"]))
+    return out
+
+
 CHECKS: dict[str, Callable[[dict, datetime], list[dict]]] = {
-    "services": check_services, "streams": check_streams, "schedule": check_schedule, "lint": check_lint}
+    "services": check_services, "streams": check_streams, "schedule": check_schedule, "lint": check_lint,
+    "auto": check_auto}
 
 
 # ---------- running them ----------

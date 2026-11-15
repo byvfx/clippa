@@ -134,6 +134,8 @@ def card(r: dict) -> tuple[dict, list[dict]]:
         fields.append({"name": "Held: other voices" if r["hold"] else "Other voices",
                        "value": r["other_voices"] + (". Release the hold if the show carries it."
                                                      if r["hold"] else ""), "inline": False})
+    if r.get("auto"):     # #259 B: approval by silence, when the show has it on
+        fields.append({"name": "Auto-approve", "value": r["auto"][:200], "inline": False})
     if r.get("checks"):   # `clipper review check` (#259): what a person should look at
         fields.append({"name": "Checks", "value": "\n".join(f"⚠ {c}" for c in r["checks"])[:1000],
                        "inline": False})
@@ -370,6 +372,15 @@ def publish_and_post(stream_dir: Path, cfg: dict, force: bool = False, only: lis
 
     cfg = for_stream(cfg, stream_dir)  # the stream's own [discord] enabled, as publish and post see it
     published = review.publish(stream_dir, cfg, force=force, only=only)
+    rc = cfg.get("review") or {}
+    if published and rc.get("auto_approve") and rc.get("auto_preshow") == "now":
+        from . import review_auto
+
+        if review_auto.stream_kind(stream_dir) == "preshow":   # it goes public at upload: no waiting
+            try:
+                review_auto.run(cfg, stream=stream_dir.name)
+            except Exception as e:  # noqa: BLE001  # serve's next pass tries again
+                print(f"auto-approve: {type(e).__name__}: {e}")
     if post_cards and published and cfg["discord"]["enabled"]:
         post(stream_dir, cfg, keys=published)
     return published
