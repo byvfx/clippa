@@ -20,6 +20,7 @@ VERSIONS: dict[str, tuple[str, str]] = {
     "scan": ("scoring", "prompt_version"), "summary": ("scoring", "prompt_version"),
     # the pipeline stages
     "segments": ("segments", "prompt_version"), "compilation": ("segments", "prompt_version"),
+    "segment_score": ("segments", "score_prompt_version"),
     "meta": ("meta", "prompt_version"), "chapters": ("meta", "prompt_version"),
     "thumbnail": ("thumbnail", "prompt_version"),
     "thumbnail_enquirer": ("thumbnail", "enquirer_prompt_version"),

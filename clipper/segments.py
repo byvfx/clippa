@@ -146,10 +146,34 @@ def estimate(stream_dir: Path, cfg: dict, prompts: Prompts, split: bool) -> list
     return estimate_lines(cfg, rows) + [tail]
 
 
-def run(stream_dir: Path, cfg: dict, force: bool = False, dry_run: bool = False) -> list[dict]:
+def score_estimate(stream_dir: Path, cfg: dict, path: Path | None) -> list[str]:
+    """`--dry-run` with scoring: the score call priced over segments.json, or a note when the
+    split comes first (its segments aren't known yet)."""
+    if path is None:
+        return ["  plus one segment score call after the split (a few cents on summaries; "
+                "~100k tokens more with [segments] score_transcript)"]
+    from . import lift, segscore
+
+    segs = segscore.to_score(jsonstate.load(path)["segments"])
+    if not segs:
+        return ["  no cut segments to score"]
+    from datetime import UTC, datetime
+
+    sc = cfg["segments"]
+    row = segscore.estimate_row(stream_dir, cfg, segs, lift.rows(cfg, heat=False), datetime.now(UTC),
+                                sc["score_transcript"])
+    return estimate_lines(cfg, [row])
+
+
+def run(stream_dir: Path, cfg: dict, force: bool = False, dry_run: bool = False,
+        score_now: bool = False) -> list[dict]:
+    """Split (or reuse segments.json), filter, compilations; with [segments] score or score_now
+    (`--score`: again, over what has a score), the segments' model score (segscore.py)."""
     from . import preshow
 
     if is_preshow(stream_dir):  # one whole-video segment, no split
+        if score_now:
+            print("a pre-show is one whole video: nothing to rank, no score")
         if dry_run:
             print("estimate: a pre-show is one whole-video segment, no model call")
             return []
@@ -159,8 +183,16 @@ def run(stream_dir: Path, cfg: dict, force: bool = False, dry_run: bool = False)
     prompts = Prompts(cfg)
     prompts.vars["min_aside_s"] = seg_cfg["min_aside_s"]
     path = stream_dir / "segments.json"
+    scoring = seg_cfg["score"] or score_now
+    if scoring and (jsonstate.read(stream_dir / "meta.json", {}) or {}).get("kind") == "story":
+        if score_now:  # one whole narrated video, like a pre-show (Copilot, #261)
+            print("a story is one whole video: nothing to rank, no score")
+        scoring = False
     if dry_run:
-        print("\n".join(["estimate:"] + estimate(stream_dir, cfg, prompts, split=force or not path.exists())))
+        lines = estimate(stream_dir, cfg, prompts, split=force or not path.exists())
+        if scoring:
+            lines += score_estimate(stream_dir, cfg, path if path.exists() and not force else None)
+        print("\n".join(["estimate:"] + lines))
         return []
     claude = Claude(cfg)
 
@@ -172,6 +204,10 @@ def run(stream_dir: Path, cfg: dict, force: bool = False, dry_run: bool = False)
     segs = data["segments"]
     apply_filters(segs, seg_cfg)
     data["compilations"] = compilations(data, cfg, claude, prompts)
+    if scoring:
+        from .segscore import score_stream
+
+        score_stream(stream_dir, cfg, data, claude, force=score_now)
     data["cost_usd"] = round(data.get("cost_usd", 0) + claude.cost, 4)
     jsonstate.write(path, data)
 
@@ -182,8 +218,9 @@ def run(stream_dir: Path, cfg: dict, force: bool = False, dry_run: bool = False)
     for s in segs:
         mark = "CUT " if s["cut"] else "    "
         why = "" if s["cut"] else f"  ({', '.join(s['skip_reasons'])})"
+        rated = f" [score {s['score']}: {s['score_why']}]" if "score" in s else ""
         print(f"{mark}{s['id']} {hms(s['start_s'])}-{hms(s['end_s'])} {s['duration_s'] / 60:5.1f}m "
-              f"[{s['kind']}, src {s['source_share']}] {s['topic']}: {s['title']}{why}")
+              f"[{s['kind']}, src {s['source_share']}] {s['topic']}: {s['title']}{why}{rated}")
     for c in data["compilations"]:
         mins = sum(s["duration_s"] for s in segs if s["id"] in c["segments"]) / 60
         print(f"COMPILATION {c['topic']} ({', '.join(c['segments'])}, {mins:.0f} min): {c['title']}")

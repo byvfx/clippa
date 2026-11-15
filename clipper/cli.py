@@ -539,7 +539,19 @@ def cmd_score(cfg: dict, args: argparse.Namespace) -> None:
 def cmd_segments(cfg: dict, args: argparse.Namespace) -> None:
     from . import segments
 
-    segments.run(stream_dir(cfg, args.stream), cfg, force=args.force, dry_run=args.dry_run)
+    if args.backtest:
+        from . import segscore
+
+        if args.score:
+            raise ClipperError("--score scores a stream now; --backtest scores past ones as of their start")
+        segscore.backtest(cfg, stream=Path(args.stream).name if args.stream else "", transcript=args.transcript,
+                          force=args.force, dry_run=args.dry_run)
+        return
+    if args.transcript:
+        raise ClipperError("--transcript goes with --backtest ([segments] score_transcript sets it for a stream)")
+    if not args.stream:
+        raise ClipperError("segments: name a stream (or --backtest for every past one)")
+    segments.run(stream_dir(cfg, args.stream), cfg, force=args.force, dry_run=args.dry_run, score_now=args.score)
 
 
 def cmd_cut(cfg: dict, args: argparse.Namespace) -> None:
@@ -1241,8 +1253,14 @@ def add_pipeline(sub) -> None:
     p.set_defaults(fn=cmd_score)
 
     p = sub.add_parser("segments", help="split the stream into topic segments -> segments.json")
-    add_stream(p)
-    p.add_argument("--force", action="store_true", help="re-split instead of reusing segments.json")
+    add_stream(p, optional=True, help="the stream (optional with --backtest: every past one)")
+    p.add_argument("--force", action="store_true",
+                   help="re-split instead of reusing segments.json (with --backtest: score again)")
+    p.add_argument("--score", action="store_true",
+                   help="score the cut segments now, again if they have a score (#258; [segments] score)")
+    p.add_argument("--backtest", action="store_true",
+                   help="score past streams' segments as of each stream's start -> segment_scores_backtest.json")
+    p.add_argument("--transcript", action="store_true", help="with --backtest: send each segment's transcript too")
     p.add_argument("--dry-run", action="store_true", help="print the estimate (what a run would send, times "
                                                           "[llm] prices); call nothing")
     p.set_defaults(fn=cmd_segments)

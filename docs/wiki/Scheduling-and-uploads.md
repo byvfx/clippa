@@ -44,8 +44,10 @@ clipper analytics --lift --json
 ```
 
 The rankers are the Score column (Shorts and clips), the chat heat segments and compilations
-are ranked by, and the topic's track record: the median 7-day views of the show's earlier
-uploads on the same topic, counting only those whose 7 days were over when the stream began.
+are ranked by, the topic's track record (the median 7-day views of the show's earlier uploads
+on the same topic, counting only those whose 7 days were over when the stream began), and the
+[segment score](Pipeline#segment-scores): `model` from segments.json, `bt` and `bt_tx` from the
+backtest (summaries, and with the transcript).
 For each, per show and kind: how many uploads have a value, Spearman's rank correlation with
 7-day views (+1 orders them exactly as views do, 0 is no relation, nothing under 5 values),
 and, inside each stream with 4 or more, the views per upload of the uploads ranked above the

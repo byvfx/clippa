@@ -364,6 +364,15 @@ max_s = 3600
 skip_kinds = ["intro", "break", "ad_read", "outro", "gambling"]
 source_share = ["none", "some", "most"]   # drop "most" to skip watch-along segments
 compile_min_segments = 2       # topics with this many segments also get one long video
+# A model score for each cut segment (#258 B, clipper/segscore.py): 1-10 against the show's
+# typical upload, from the segment and the show's per-topic track record (analytics.json), in
+# one call after the split -> segments.json score, score_why. Off until `clipper segments
+# --backtest` and `clipper analytics --lift` show it ranks better than the topic record.
+score = false
+score_model = "claude-opus-5-5"
+score_effort = "medium"
+score_prompt_version = "v1"    # clipper/prompts/segment_score_<version>.md
+score_transcript = false       # also send each segment's transcript (~100k tokens for an 8 h stream)
 
 [cut]
 # Segments and compilations are always stream-copied (lossless; start on a keyframe).
