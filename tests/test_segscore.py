@@ -164,12 +164,63 @@ def test_segments_score_writes_segments_json(share, monkeypatch, capsys):
     # [segments] score off and nothing forced: a rerun scores nothing more
     segments.run(sdir, share)
     assert len(fake.calls) == 1
-    # with it on, only what has no score yet
+    # with it on, a stream already covered isn't scored again
     share["segments"]["score"] = True
     segments.run(sdir, share)
     assert len(fake.calls) == 1
     rows = {r["key"]: r for r in lift.rows(share)}
     assert rows["kick-2/s02_blade"]["model"] == 9
+
+
+def test_a_segment_passed_over_isnt_paid_for_on_every_rerun(share, monkeypatch):
+    fake = FakeClaude(leave_out={"s02"})
+    monkeypatch.setattr(segments, "Claude", lambda cfg: fake)
+    sdir = share["paths"]["streams"] / "kick-2"
+    share["segments"]["score"] = True
+    segments.run(sdir, share)
+    data = jsonstate.load(sdir / "segments.json")
+    assert data["score"]["ids"] == ["s01", "s02"] and data["score"]["left_out"] == ["s02"]
+    assert len(fake.calls) == 2                      # the one retry
+    segments.run(sdir, share)
+    assert len(fake.calls) == 2                      # covered: no new call
+    segments.run(sdir, share, score_now=True)
+    assert len(fake.calls) == 4                      # --score asks again
+
+
+def test_a_worse_second_answer_doesnt_replace_the_first(share, monkeypatch):
+    fake = FakeClaude(leave_out={"s02"})
+    real = fake.json_call
+
+    def worse(*a, **kw):
+        out = real(*a, **kw)
+        fake.leave_out = {"s01", "s02"}
+        return out
+    fake.json_call = worse
+    monkeypatch.setattr(segscore, "Claude", lambda cfg: fake)
+    segscore.backtest(share, stream="kick-2")
+    bt = jsonstate.load(share["paths"]["streams"] / "kick-2" / segscore.BACKTEST)
+    assert list(bt["summary"]["scores"]) == ["s01"]
+
+
+def test_a_broken_backtest_file_is_scored_again(share, monkeypatch, capsys):
+    (share["paths"]["streams"] / "kick-2" / segscore.BACKTEST).write_text("{nope", encoding="utf-8")
+    monkeypatch.setattr(segscore, "Claude", lambda cfg: FakeClaude())
+    assert segscore.backtest(share, stream="kick-2") == {"kick-2": 2}
+    assert "unreadable" in capsys.readouterr().out
+
+
+def test_segments_dry_run_prices_the_score(share, monkeypatch, capsys):
+    monkeypatch.setattr(segments, "Claude", lambda cfg: pytest.fail("no call on a dry run"))
+    sdir = share["paths"]["streams"] / "kick-2"
+    segments.run(sdir, share, dry_run=True, score_now=True)
+    out = capsys.readouterr().out
+    assert "segments.json is kept" in out and "score kick-2" in out and "total" in out
+    (sdir / "words.jsonl").write_text(json.dumps({"word": "hi", "start": 0.0, "end": 1.0, "seg": 0}) + "\n",
+                                      encoding="utf-8")                    # a re-split prices the transcript
+    segments.run(sdir, share, dry_run=True, force=True, score_now=True)
+    assert "plus one segment score call after the split" in capsys.readouterr().out
+    segments.run(sdir, share, dry_run=True)
+    assert "score kick-2" not in capsys.readouterr().out    # [segments] score off, no --score
 
 
 def test_cli_flags(share, monkeypatch):

@@ -172,6 +172,8 @@ def run(stream_dir: Path, cfg: dict, force: bool = False, dry_run: bool = False,
     from . import preshow
 
     if is_preshow(stream_dir):  # one whole-video segment, no split
+        if score_now:
+            print("a pre-show is one whole video: nothing to rank, no score")
         if dry_run:
             print("estimate: a pre-show is one whole-video segment, no model call")
             return []

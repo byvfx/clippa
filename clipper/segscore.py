@@ -24,13 +24,16 @@ from . import costs, jsonstate, lift
 from .config import base, for_stream
 from .errors import ClipperError
 from .llm import Claude, estimate_lines, preflight, tokens
-from .prompts import Prompts
+from .prompts import Prompts, version_of
 from .timefmt import hms
 
 BACKTEST = "segment_scores_backtest.json"
 VARIANTS = {False: "summary", True: "transcript"}
 MAX_TOPICS = 60          # the track record's topics, best median first
 OUT_PER_SEGMENT = 70     # output tokens a segment's score and why take, for estimates
+# The 2026-11-14 backtest's logged input was 1.6-1.8x llm.tokens' four-characters-a-token count,
+# summaries and transcripts alike (4,108 vs 2,302; 175,527 vs 102,918), so estimates scale by it.
+IN_FACTOR = 1.75
 
 SCHEMA = {
     "type": "object",
@@ -133,13 +136,16 @@ def score(sdir: Path, cfg: dict, segs: list[dict], rows: list[dict], before: dat
     rows = [r for r in rows if r["stream"] != sdir.name]
     text = message(rows, cfg["show"]["key"], before, segs, _words(sdir, transcript))
     ids = [s["id"] for s in segs]
+    system = Prompts(cfg).get("segment_score")
     got: dict[str, dict] = {}
     for _ in range(2):
-        out, meta = claude.json_call(sc["score_model"], Prompts(cfg).get("segment_score"), text, SCHEMA,
-                                     sc["score_effort"], fallback=True, stream=True)
+        out, meta = claude.json_call(sc["score_model"], system, text, SCHEMA, sc["score_effort"],
+                                     fallback=True, stream=True)
         if out is None:
             raise ClipperError(f"segment score: model refused ({meta.get('refusal')})")
-        got = checked(out, ids)
+        new = checked(out, ids)
+        if len(new) > len(got):  # the fuller answer, never a worse second one
+            got = new
         if len(got) == len(ids):
             break
     missing = [i for i in ids if i not in got]
@@ -154,16 +160,20 @@ def estimate_row(sdir: Path, cfg: dict, segs: list[dict], rows: list[dict], befo
     rows = [r for r in rows if r["stream"] != sdir.name]
     text = message(rows, cfg["show"]["key"], before, segs, _words(sdir, transcript))
     return (f"score {sdir.name}", cfg["segments"]["score_model"], 1,
-            tokens(Prompts(cfg).get("segment_score") + text), OUT_PER_SEGMENT * len(segs))
+            round(tokens(Prompts(cfg).get("segment_score") + text) * IN_FACTOR), OUT_PER_SEGMENT * len(segs))
 
 
 def score_stream(sdir: Path, cfg: dict, data: dict, claude: Claude, force: bool = False) -> int:
-    """[segments] score: fill segments.json's cut segments with score and score_why, as of now.
-    Only what has no score yet unless force; returns how many were scored. Writes nothing:
-    the caller saves data."""
+    """[segments] score: fill segments.json's cut segments with score and score_why, as of now,
+    all in one call so they're ranked together. Once a call has covered the stream's cut
+    segments it isn't made again (a segment the model passed over stays unscored rather than
+    paying for the whole call on every rerun) unless force or the cut set changed. Returns how
+    many were scored; writes nothing: the caller saves data."""
     sc = for_stream(cfg, sdir)["segments"]
     segs = to_score(data["segments"])
-    if not segs or (not force and all("score" in s for s in segs)):
+    asked = sorted(s["id"] for s in segs)
+    covered = (data.get("score") or {}).get("ids") == asked or all("score" in s for s in segs)
+    if not segs or (not force and covered):
         return 0
     spent = claude.cost
     got = score(sdir, cfg, segs, lift.rows(cfg, heat=False), datetime.now(UTC), sc["score_transcript"], claude)
@@ -173,10 +183,11 @@ def score_stream(sdir: Path, cfg: dict, data: dict, claude: Claude, force: bool 
         else:  # left out: no stale score from an earlier run either
             s.pop("score", None)
             s.pop("score_why", None)
-    data["score"] = {"model": sc["score_model"], "prompt_version": Prompts(for_stream(cfg, sdir)).version_of("segment_score"),
+    data["score"] = {"model": sc["score_model"], "prompt_version": version_of(for_stream(cfg, sdir), "segment_score"),
                      "transcript": sc["score_transcript"], "at": datetime.now(UTC).isoformat(timespec="seconds"),
-                     "usd": round(claude.cost - spent, 4)}
-    return len(segs)
+                     "usd": round(claude.cost - spent, 4), "ids": asked,
+                     "left_out": [i for i in asked if i not in got]}
+    return len(got)
 
 
 def backtest(cfg: dict, stream: str = "", transcript: bool = False, force: bool = False,
@@ -205,7 +216,13 @@ def backtest(cfg: dict, stream: str = "", transcript: bool = False, force: bool 
         if transcript and not (sdir / "words.jsonl").exists():
             print(f"  {sid}: no words.jsonl, skipped")
             continue
-        if not force and variant in (jsonstate.read(sdir / BACKTEST, {}) or {}):
+        try:
+            scored = variant in (jsonstate.read(sdir / BACKTEST, {}) or {})
+        except ValueError as e:  # a broken file: score it again (update rewrites it whole)
+            print(f"  {sid}: {BACKTEST} unreadable ({e}), scoring again")
+            jsonstate.write(sdir / BACKTEST, {})
+            scored = False
+        if not force and scored:
             print(f"  {sid}: {variant} already scored (--force to score again)")
             continue
         plan.append((sid, sdir, segs))
@@ -226,7 +243,7 @@ def backtest(cfg: dict, stream: str = "", transcript: bool = False, force: bool 
         sc = for_stream(cfg, sdir)["segments"]
         with jsonstate.update(sdir / BACKTEST, {}) as bt:
             bt[variant] = {"model": sc["score_model"],
-                           "prompt_version": Prompts(for_stream(cfg, sdir)).version_of("segment_score"),
+                           "prompt_version": version_of(for_stream(cfg, sdir), "segment_score"),
                            "as_of": starts[sid].isoformat(), "at": datetime.now(UTC).isoformat(timespec="seconds"),
                            "usd": round(claude.cost - spent, 4), "scores": got}
         done[sid] = len(got)
