@@ -217,3 +217,72 @@ def test_same_person_is_loose_about_spellings(defaults):
     assert same("Jerry", "Jerry Banfield") and same("Russel Brand", "Russell Brand")
     assert same("Jer", "The Quartering (Jer)")              # one people.json record
     assert not same("Jer", "Don Flurgundy") and not same("Jerry", "Jer")
+
+
+# ---------- where the findings show ----------
+
+def test_findings_reach_describe_counts_status_and_the_card(defaults, tmp_path, monkeypatch):
+    from clipper import actions, notify, review, status
+
+    sdir = tmp_path / "kick-3"
+    sdir.mkdir()
+    state = {k: {"kind": "short", "id": k, "file": f"shorts/{k}.mp4", "task_id": "T", "entity_id": "E",
+                 "kitsu_url": "http://k/t", "episode_url": "http://k/e", "fields": {}} for k in ("v01_t1", "v02_t2")}
+    jsonstate.write(sdir / "review_state.json", state)
+    jsonstate.write(sdir / "review.json", {"v02_t2": {"decision": "approved", "fields": {}}})
+    jsonstate.write(review_check.path(sdir), {
+        "v01_t1": {"sig": "x", "findings": [{"text": "no face in the cams layout's panel 1 of 2 (a webcam)"}]},
+        "v02_t2": {"sig": "y", "findings": [{"text": "a face on the cover is cut off"}]}})
+    monkeypatch.setattr(actions, "for_stream", lambda cfg, d: cfg)
+    monkeypatch.setattr(review, "ensure_links", lambda d, cfg, gazu=None: state)
+    monkeypatch.setattr(review, "items", lambda d, include, cfg: [])
+    monkeypatch.setattr(actions, "schedule_entries", lambda cfg: {})
+    monkeypatch.setattr(actions, "schedule_dropped", lambda cfg: {})
+    row = actions.describe(defaults, sdir)["v01_t1"]
+    assert row["checks"] == ["no face in the cams layout's panel 1 of 2 (a webcam)"]
+    counts = actions.stream_counts(defaults, sdir)
+    assert counts["flagged"] == 1   # the approved one isn't waiting on anyone
+    out = status.needs_lines({"needs_you": {"review": [counts], "findings": []}})
+    assert "1 with check findings" in out[0]
+    embed, _ = notify.card(row)
+    f = next(f for f in embed["fields"] if f["name"] == "Checks")
+    assert f["value"] == "⚠ no face in the cams layout's panel 1 of 2 (a webcam)"
+
+
+def test_publish_fills_the_checks_column_and_goes_on_when_they_break(defaults, tmp_path, monkeypatch):
+    from clipper import review
+
+    todo = [{"key": "v01_t1", "fields": {}}, {"key": "v02_t2", "fields": {}}]
+    monkeypatch.setattr(review_check, "run", lambda d, cfg, t: {
+        "v01_t1": [{"text": "a face on the cover is cut off"}], "v02_t2": []})
+    review.add_checks(tmp_path, defaults, todo)
+    assert [it["fields"]["Checks"] for it in todo] == ["a face on the cover is cut off", ""]
+
+    def boom(*a):
+        raise OSError("share gone")
+    monkeypatch.setattr(review_check, "run", boom)
+    review.add_checks(tmp_path, defaults, todo)
+    assert all(it["fields"]["Checks"] == "the checks didn't run: OSError: share gone" for it in todo)
+
+
+def test_text_dedupes_host_per_field(defaults):
+    defaults["checkup"]["words"] = ["hosts"]
+    it = {"title": "The hosts lose it", "description": "Our host says no.", "fields": {}}
+    texts = [t for _, t in review_check.text_findings(defaults, it)]
+    assert "title says 'hosts'" in texts
+    assert sum("title says" in t for t in texts) == 1               # not again from style_issues
+    assert any(t.startswith("description says \"host\"") for t in texts)   # the singular, another field
+
+
+def test_signature_follows_what_the_checks_read(defaults, tmp_path):
+    sd = fake_stream(defaults, tmp_path)
+    from clipper import config, review
+
+    cfg = config.for_stream(defaults, sd)
+    it = review.items(sd, ["segments"], cfg)[0]
+    one = review_check.signature(cfg, it, review_check.context(sd, cfg), False)
+    jsonstate.write(cfg["paths"]["people"], {"people": {"dsp": {"name": "DSP", "aliases": ["Phil"]}}})
+    import os
+    import time
+    os.utime(cfg["paths"]["people"], (time.time() + 5, time.time() + 5))
+    assert review_check.signature(cfg, it, review_check.context(sd, cfg), False) != one

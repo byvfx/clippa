@@ -75,6 +75,10 @@ def summary(found: list[dict]) -> str:
 
 # ---------- text ----------
 
+LABELS = {"title": "title", "description": "description", "hashtags": "hashtags", "tags": "tags",
+          "thumb_text": "thumbnail text"}
+HOST_WORD = re.compile(r"\bhosts?\b", re.IGNORECASE)   # style_issues' own "host" rule
+
 def text_findings(cfg: dict, it: dict) -> list[tuple[str, str]]:
     from .actions import style_issues
 
@@ -82,13 +86,14 @@ def text_findings(cfg: dict, it: dict) -> list[tuple[str, str]]:
     values = {"title": it["title"], "description": it["description"],
               "hashtags": f.get("Hashtags") or "", "tags": f.get("Tags") or "",
               "thumb_text": f.get("Thumbnail text") or ""}
-    out = [(WARN, p) for p in lint_text(cfg["checkup"]["words"], {
-        "title": values["title"], "description": values["description"],
-        "hashtags": values["hashtags"], "tags": values["tags"], "thumbnail text": values["thumb_text"]})]
-    linted = bool(out)
+    out, linted = [], set()
+    for field, text in values.items():
+        said = lint_text(cfg["checkup"]["words"], {LABELS[field]: text})
+        out += [(WARN, x) for x in said]
+        linted |= {field} if said else set()
     for x in style_issues(cfg, values):
-        if linted and " says \"host" in x["msg"]:
-            continue   # the [checkup] words already said it
+        if x["field"] in linted and HOST_WORD.search(x["msg"]):
+            continue   # the [checkup] words already said it for this field
         out.append((WARN, x["msg"]))
     if not (it["description"] or "").strip():
         out.append((WARN, "no description"))
@@ -193,7 +198,7 @@ def picture_findings(sdir: Path, cfg: dict, it: dict, ctx: dict) -> list[tuple[s
     from . import faces, shorts
 
     side = it["meta"]
-    layouts = {**shorts.with_examples(shorts.layouts_of(cfg["shorts"]), cfg)}
+    layouts = shorts.layouts_of(cfg["shorts"])
     scenes = short_scenes(side, layouts)
     if not scenes:
         return [(WARN, f"the Short's layout {side.get('layout')!r} isn't one this show has")]
@@ -301,10 +306,23 @@ VISION_SCHEMA = {
 }
 
 
+IMAGE_PX = 1568   # the longest side sent to the model; bigger photos (a Commons original) are shrunk
+
+
 def image_block(p: Path) -> dict:
-    kind = "image/png" if p.suffix.lower() == ".png" else "image/jpeg"
-    return {"type": "image", "source": {"type": "base64", "media_type": kind,
-                                        "data": base64.b64encode(p.read_bytes()).decode()}}
+    """The picture as a JPEG content block, no longer than IMAGE_PX on its long side: a cast
+    photo straight from Commons can be over the API's size limit for one image."""
+    import io
+
+    from PIL import Image
+
+    with Image.open(p) as im:
+        im = im.convert("RGB")
+        im.thumbnail((IMAGE_PX, IMAGE_PX))
+        buf = io.BytesIO()
+        im.save(buf, "JPEG", quality=85)
+    return {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
+                                        "data": base64.b64encode(buf.getvalue()).decode()}}
 
 
 def reference_photo(cfg: dict, name: str) -> Path | None:
@@ -367,15 +385,22 @@ def plain(text: str) -> str:
     return canon(re.sub(r"['\u2019]", "", text))
 
 
-def title_people(title: str, people: dict, exclude: set[str]) -> dict[str, str]:
-    """{person id: the name the title calls them} for everyone the title names, but the ids in
-    exclude (the show's own people). The longest name wins where two overlap."""
+def name_index(people: dict) -> dict[str, set[str]]:
+    """{person id: every name they answer to}, worked out once per run (people.names is a
+    handful of regexes a record)."""
     from .people import names
 
+    return {pid: names(rec, pid) for pid, rec in people.items()}
+
+
+def title_people(title: str, people: dict, exclude: set[str], index: dict | None = None) -> dict[str, str]:
+    """{person id: the name the title calls them} for everyone the title names, but the ids in
+    exclude (the show's own people). The longest name wins where two overlap."""
+    index = index if index is not None else name_index(people)
     words = f" {plain(title)} "
     found: dict[str, str] = {}
     taken: list[tuple[int, int]] = []
-    cands = sorted(((n, pid) for pid, rec in people.items() if pid not in exclude for n in names(rec, pid)),
+    cands = sorted(((n, pid) for pid in people if pid not in exclude for n in index[pid]),
                    key=lambda x: -len(x[0]))
     for n, pid in cands:
         i = words.find(f" {n} ")
@@ -455,9 +480,7 @@ def segment_names(seg: dict | None, people: dict, cfg: dict) -> set[str]:
 
 
 def subject_findings(sdir: Path, cfg: dict, it: dict, ctx: dict) -> list[tuple[str, str]]:
-    from .people import names
-
-    people, words, segs = ctx["people"], ctx["words"](), ctx["segments"]
+    people, index, words, segs = ctx["people"], ctx["names"], ctx["words"](), ctx["segments"]
     if not words:
         return []
     spans = item_spans(it, segs)
@@ -475,12 +498,12 @@ def subject_findings(sdir: Path, cfg: dict, it: dict, ctx: dict) -> list[tuple[s
     out = []
     from .review import bare_title
 
-    named = title_people(bare_title(cfg, it["title"]), people, own)
+    named = title_people(bare_title(cfg, it["title"]), people, own, index)
     for pid in named:
-        ns = names(people[pid], pid)
+        ns = index[pid]
         if mentions(text, ns) or ns & about:
             continue
-        others = sorted(((mentions(text, names(r, q)), r["name"]) for q, r in people.items()
+        others = sorted(((mentions(text, index[q]), r["name"]) for q, r in people.items()
                          if q not in own and q != pid), reverse=True)
         also = f"; it names {others[0][1]} {others[0][0]} times" if others and others[0][0] >= 2 else ""
         out.append((BAD, f"the title names {people[pid]['name']}, but the transcript never does"
@@ -488,8 +511,8 @@ def subject_findings(sdir: Path, cfg: dict, it: dict, ctx: dict) -> list[tuple[s
     if it["kind"] in ("segment", "compilation"):
         subj = set(about)
         for pid in named:
-            subj |= names(people[pid], pid)
-        f = opening_finding(cfg, words, spans[0][0], spans[-1][1], subj, people, own)
+            subj |= index[pid]
+        f = opening_finding(cfg, words, spans[0][0], spans[-1][1], subj, people, own, index)
         if f:
             out.append(f)
     return out
@@ -499,20 +522,19 @@ OPENING_OTHER = 3   # an opening that names someone else this often, and the sub
 
 
 def opening_finding(cfg: dict, words: list[dict], a: float, b: float, subj: set[str],
-                    people: dict, own: set[str]) -> tuple[str, str] | None:
+                    people: dict, own: set[str], index: dict | None = None) -> tuple[str, str] | None:
     """A long item whose first [review] open_minutes never name its subject but name someone
     else OPENING_OTHER times or more: the cut may start on another story (the comp-angry-joe
     reject, 11-14: "the first 20 mins is just phil")."""
-    from .people import names
-
     m = cfg["review"]["open_minutes"]
     if not subj or not m or b - a < 1.5 * m * 60:
         return None
     text = stretch_text(words, a, a + m * 60)
     if mentions(text, subj):
         return None
-    counts = sorted(((mentions(text, ns), rec["name"]) for pid, rec in people.items()
-                     if pid not in own and not ((ns := names(rec, pid)) & subj)), reverse=True)
+    index = index if index is not None else name_index(people)
+    counts = sorted(((mentions(text, index[pid]), rec["name"]) for pid, rec in people.items()
+                     if pid not in own and not (index[pid] & subj)), reverse=True)
     if not counts or counts[0][0] < OPENING_OTHER:
         return None
     n, who = counts[0]
@@ -528,13 +550,33 @@ def signature(cfg: dict, it: dict, ctx: dict, vision: bool) -> str:
     jpg = f.with_suffix(".jpg")
     cover = cover_entry(it, ctx) or {}
     rc = cfg["review"]
-    parts = [VERSION, f.name, f.stat().st_mtime if f.exists() else 0,
+    segs = ctx["segments"]
+    about = [segs.get(sid, {}) for sid in [it["meta"].get("id"), *it.get("segments", [])]]
+    if it["kind"] in ("pick", "short"):
+        about = [ctx["segment_at"](it["meta"]["in_s"]) or {}]
+    parts = [VERSION, ctx.get("inputs"), [(s.get("topic"), s.get("figures")) for s in about],
+             cfg["shorts"].get("layouts") if it["kind"] == "short" else None,
+             f.name, f.stat().st_mtime if f.exists() else 0,
              jpg.stat().st_mtime if jpg.exists() else 0, it["text"], it["fields"].get("Thumbnail text"),
              it["fields"].get("Tags"), {k: cover.get(k) for k in ("frame", "face", "photo", "main_person", "text")},
              it["meta"].get("layout"), it["meta"].get("scenes"), cfg["checkup"]["words"],
              rc["check_frames"], rc["open_minutes"], rc["check_model"] if vision else "",
              rc["check_prompt_version"] if vision else ""]
     return hashlib.sha1(json.dumps(parts, default=str, sort_keys=True).encode()).hexdigest()[:16]
+
+
+def inputs(sdir: Path, cfg: dict) -> list:
+    """What every item's checks also read, for the signature: when people.json, the known
+    faces or the transcript change, or [faces] match does, everything is checked again."""
+    from . import faces, people
+
+    def mtime(p: Path):
+        try:
+            return p.stat().st_mtime
+        except OSError:
+            return 0
+    return [mtime(people.path(cfg)), mtime(faces.known_path(cfg)), mtime(sdir / "words.jsonl"),
+            cfg["faces"]["match"]]
 
 
 def context(sdir: Path, cfg: dict) -> dict:
@@ -564,7 +606,8 @@ def context(sdir: Path, cfg: dict) -> dict:
         i = bisect.bisect_right(starts, t) - 1
         return cut[i] if i >= 0 and t < cut[i]["end_s"] else None
 
-    return {"people": people, "own": own_people(cfg, people), "segments": segs, "words": words,
+    return {"people": people, "names": name_index(people), "own": own_people(cfg, people),
+            "segments": segs, "words": words, "inputs": inputs(sdir, cfg),
             "segment_at": segment_at, "thumbs": jsonstate.read_or(sdir / "thumbnails.json", {})}
 
 
@@ -605,6 +648,7 @@ def run(sdir: Path, cfg: dict, todo: list[dict] | None = None, keys: list[str] |
     ctx = context(sdir, cfg)
     have = load(sdir)
     done: dict[str, dict] = {}
+    fresh: dict[str, dict] = {}
     claude = None
     for it in todo:
         sig = signature(cfg, it, ctx, vision)
@@ -617,12 +661,14 @@ def run(sdir: Path, cfg: dict, todo: list[dict] | None = None, keys: list[str] |
 
             claude = Claude(cfg)
         found, v = check_item(sdir, cfg, it, ctx, claude if vision else None)
-        done[it["key"]] = {"sig": sig, "at": datetime.now(UTC).isoformat(timespec="seconds"),
-                           "kind": it["kind"], "findings": found, **({"vision": v} if v else {})}
+        done[it["key"]] = fresh[it["key"]] = {
+            "sig": sig, "at": datetime.now(UTC).isoformat(timespec="seconds"), "kind": it["kind"],
+            "findings": found, **({"vision": v} if v else {})}
         say(f"  {it['key']}: " + ("; ".join(f["text"] for f in found) if found else "clean"))
-    if done and save:
-        with jsonstate.update(path(sdir), {}) as state:   # publish and the war room both write it
-            state.update(done)
+    if fresh and save:
+        # only what this run checked: a publish and a hand `review check` may run at once
+        with jsonstate.update(path(sdir), {}) as state:
+            state.update(fresh)
     return {k: v["findings"] for k, v in done.items()}
 
 

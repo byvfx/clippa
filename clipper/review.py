@@ -710,7 +710,12 @@ def add_checks(stream_dir: Path, cfg: dict, todo: list[dict]) -> None:
     from . import review_check
 
     print("checks:", flush=True)
-    found = review_check.run(stream_dir, cfg, todo)
+    try:
+        found = review_check.run(stream_dir, cfg, todo)
+    except Exception as e:  # noqa: BLE001  # advisory: the review goes out without them, flagged
+        why = f"the checks didn't run: {type(e).__name__}: {str(e)[:200]}"
+        print(f"  {why}", flush=True)
+        found = {it["key"]: [{"text": why}] for it in todo}
     for it in todo:
         if it["key"] in found:
             it["fields"]["Checks"] = review_check.summary(found[it["key"]])
