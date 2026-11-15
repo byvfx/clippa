@@ -254,11 +254,14 @@ messages: GitHub closes the issue on "fix".
   didn't see the two fix commits). Left open: the approval holds auto.json's lock over its Kitsu calls,
   so if Kitsu stalls over 60 s a person's action can go unrecorded in auto.json (their Kitsu decision
   still lands last, and the checkup still flags it), and over 120 s the lock goes stale and another
-  process can take it. **Off until the user turns a show on**, Kino Shorts first
-  (`[shows.kino.review] auto_approve = true` in the NAS clipper.toml, backup first), then Channel 404's;
-  segments once #258 C wires their score. Before that, `CLIPPER_REVIEW_AUTO_APPROVE=true clipper review auto
-  --dry-run` shows what it would do. Backtest: 105 of 181 approved Shorts would have approved themselves, and
-  1 of 4 rejected ones ("too much Jer", a taste call the window is for).
+  process can take it. **On for Kino since 11-15** (user): `[shows.kino.review] auto_approve = true` in the
+  NAS clipper.toml (backup `backups/clipper.toml.before_kino_auto_approve_2026-11-15`), serve restarted, its
+  `auto` job in the heartbeat; at turn-on Kino had no open Shorts (11 segments, 5 compilations, which wait).
+  Next, after a few days of Kino with nothing undone (checkup's `auto` check, `clipper review auto --dry-run`):
+  Channel 404's Shorts, then close #259. Segments: #258 is merged and deployed (PRs #260-#262, the worker
+  scores each stream's segments), but that score ranks within a stream, so backtest a segment floor
+  (`auto_min_segment`) before setting one. Backtest: 105 of 181 approved Shorts would have approved
+  themselves, and 1 of 4 rejected ones ("too much Jer", a taste call the window is for).
 - **Documentaries (11-13, PR #233, merged and deployed):** `clipper doc
   new|voice|build|master|leak|kit` (wiki Documentaries; `clipper/doc.py`, `doc_resolve.py`), the reusable form
   of the first mini-documentary's one-off Resolve scripts. A piece is `[paths] documentaries/<slug>/` on the
