@@ -67,7 +67,9 @@ A **pre-show** approves itself at publish when its checks are clean (`auto_presh
 `"grace"` gives it the window, `"off"` leaves it to you). Pre-shows go public the moment they
 upload, so nobody will have seen one before it is public. Stories and one-offs always wait for you.
 
-What happened is kept in the stream's `auto.json`. The weekly [audit](Audit) counts the items that
+`clipper doctor` (role serve) says which shows have it on and warns when serve, which does the
+approving, isn't running. A new revision of an item (a re-render) takes an automatic approval
+back: the item is judged again. What happened is kept in the stream's `auto.json`. The weekly [audit](Audit) counts the items that
 approved themselves, and the [checkup](Checkup) names any that a person then rejected, reopened,
 held or sent back: the rule let through something it shouldn't have. On the past Shorts (11-14), the
 rule at 6 would have approved 105 of 181 approved Shorts by itself and one of four rejected ones

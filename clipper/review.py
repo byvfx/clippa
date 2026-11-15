@@ -579,6 +579,10 @@ def push_previews(gazu, stream_dir: Path, rc: dict, proj: dict, ep: dict, types:
                                                normalize_movie=rc["normalize"],
                                                set_thumbnail=True)
         old = state.get(it["key"], {})  # keep what we last proposed, for the columns
+        if old:   # a new revision goes back to wfa: an automatic approval no longer stands
+            from . import review_auto
+
+            review_auto.republished(stream_dir, it["key"])
         # published_at: when it first went up for review (review_auto's grace window counts from it)
         state[it["key"]] = {**{k: old[k] for k in ("fields", "thumbnail_text") if k in old},
                             "published_at": old.get("published_at")

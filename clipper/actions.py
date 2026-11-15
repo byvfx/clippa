@@ -133,17 +133,17 @@ def approve(cfg: dict, item: Item, comment: str = "", who: str = "") -> dict:
 
 
 def reject(cfg: dict, item: Item, reason: str, who: str = "") -> dict:
-    _touched(item, "reject", who)
     if not reason.strip():
         raise ClipperError("reject needs a reason (it becomes a scoring example)")
+    _touched(item, "reject", who)
     _status(cfg, item, "rejected", reason.strip())
     return refresh(cfg, item)
 
 
 def changes(cfg: dict, item: Item, what: str, who: str = "") -> dict:
-    _touched(item, "changes", who)
     if not what.strip():
         raise ClipperError("say what to change")
+    _touched(item, "changes", who)
     _status(cfg, item, "retake", what.strip())
     return refresh(cfg, item)
 
@@ -171,7 +171,6 @@ def hold(cfg: dict, item: Item, on: bool = True, who: str = "") -> dict:
 
 
 def pin(cfg: dict, item: Item, when: str, who: str = "") -> dict:
-    _touched(item, "pin", who)
     cfg = for_stream(cfg, item.stream_dir)
     from .schedule import parse_when
 
@@ -179,6 +178,7 @@ def pin(cfg: dict, item: Item, when: str, who: str = "") -> dict:
     sc = cfg["schedule"]
     if when and not parse_when(when, ZoneInfo(sc["timezone"]), "00:00"):
         raise ClipperError(f"Publish at must be YYYY-MM-DD HH:MM or YYYY-MM-DD, not {when!r}")
+    _touched(item, "pin", who)
     _columns(cfg, item, {"Publish at": when},
              (f"Publish at {when}" if when else "Unpinned") + _by(who))
     return refresh(cfg, item)
@@ -287,7 +287,6 @@ META = {"YouTube title": (check_title, "Retitled"),
 
 def edit_meta(cfg: dict, item: Item, values: dict[str, str], who: str = "") -> dict:
     """Write some of the META columns (checked and normalized) in one Kitsu update."""
-    _touched(item, "edit", who)
     cfg = for_stream(cfg, item.stream_dir)
     values = {name: META[name][0](v) for name, v in values.items()}
     if not values:
@@ -304,13 +303,13 @@ def edit_meta(cfg: dict, item: Item, values: dict[str, str], who: str = "") -> d
     for name, v in values.items():
         label = META[name][1]
         notes.append(f"{label} edited" if "\n" in v or len(v) > 120 else f"{label}: {v}")
+    _touched(item, "edit", who)
     _columns(cfg, item, values, "; ".join(notes) + _by(who))
     return refresh(cfg, item)
 
 
 def thumbtext(cfg: dict, item: Item, text: str, who: str = "") -> dict:
     """The refresh's sync sees the new column value and re-renders the thumbnail."""
-    _touched(item, "thumbnail text", who)
     cfg = for_stream(cfg, item.stream_dir)
     from .thumbs import check_text, video_key
 
@@ -318,6 +317,7 @@ def thumbtext(cfg: dict, item: Item, text: str, who: str = "") -> dict:
     thumbs = jsonstate.read(item.stream_dir / "thumbnails.json", {})
     if video_key(item.stream_dir / item.state["file"].replace("\\", "/")) not in thumbs:
         raise ClipperError(f"{item.ref} has no thumbnail yet; run clipper thumbs first")
+    _touched(item, "thumbnail text", who)
     _columns(cfg, item, {review.THUMB_COL: text}, f"Thumbnail text: {text}{_by(who)}")
     return refresh(cfg, item)
 
@@ -445,7 +445,8 @@ def describe(cfg: dict, sdir: Path, gazu=None, links: bool = True) -> dict[str, 
     checks = review_check.load(sdir)
     from . import review_auto
 
-    autos = review_auto.verdicts(cfg, sdir) if cfg["review"]["auto_approve"] else {}
+    autos = (review_auto.verdicts(cfg, sdir, state=state, decisions=decisions, checks=checks)
+             if cfg["review"]["auto_approve"] else {})
     ls = review.Listing()
     out = {}
     for key, st in state.items():

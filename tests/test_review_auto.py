@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from clipper import actions, jsonstate, review_auto
+from clipper.errors import ClipperError
 
 T0 = datetime(2026, 11, 15, 12, 0, tzinfo=UTC)
 
@@ -73,6 +74,36 @@ def test_an_older_publish_counts_from_when_it_was_first_seen(cfg):
     del st["published_at"]
     got = v(cfg, st=st, auto={"seen": (T0 + timedelta(hours=2)).isoformat()})
     assert got.state == "waiting" and got.at == T0 + timedelta(hours=4)
+
+
+def test_an_older_publish_not_seen_yet_has_no_deadline(cfg):
+    st = short()
+    del st["published_at"]
+    got = v(cfg, st=st)
+    assert got.state == "waiting" and got.at is None
+    assert review_auto.note(got, "UTC") == "approves itself unless you act (its grace starts at the next pass)"
+
+
+def test_a_floor_written_as_text_still_counts(cfg):
+    cfg["review"]["auto_min_short"] = "6"
+    assert review_auto.floor_of(cfg["review"], "short") == 6.0
+    assert v(cfg, st=short("5")).why == "score 5 under 6"
+    cfg["review"]["auto_min_short"] = "six"
+    assert review_auto.floor_of(cfg["review"], "short") == 0.0
+
+
+def test_a_new_revision_takes_an_automatic_approval_back(tmp_path):
+    jsonstate.write(review_auto.path(tmp_path), {"v01": {"approved_at": T0.isoformat()}, "v02": {"out": "hold"}})
+    review_auto.republished(tmp_path, "v01")
+    review_auto.republished(tmp_path, "v02")
+    assert review_auto.load(tmp_path) == {"v01": {"was_approved_at": T0.isoformat()}, "v02": {"out": "hold"}}
+
+
+def test_an_action_refused_for_bad_input_doesnt_count(tmp_path):
+    item = actions.Item(tmp_path, "v01_t1", {})
+    with pytest.raises(ClipperError):
+        actions.reject({}, item, "  ", who="Brandon")
+    assert review_auto.load(tmp_path) == {}
 
 
 def test_touch_takes_it_out_for_good_and_marks_an_undone_approval(tmp_path):
@@ -154,6 +185,21 @@ def test_run_approves_whats_due_and_replans_once(cfg, tmp_path, monkeypatch):
     assert auto["v04_t4"]["out"] == "rejected by a person"                    # a reopen won't auto-approve it
     review_auto.run(cfg, say=said.append)
     assert len(approved) == 1 and replans == [False]                          # nothing new
+
+
+def test_a_person_acting_mid_run_wins(cfg, tmp_path, monkeypatch):
+    from clipper import review, review_check
+
+    sd = fake(cfg, tmp_path)
+    monkeypatch.setattr(review_auto, "for_stream", lambda c, d: cfg)
+
+    def sync_then_a_reject(*a, **k):   # the user rejects v01 just after the sync read Kitsu
+        review_auto.touch(sd, "v01_t1", "reject", "Brandon")
+    monkeypatch.setattr(review, "sync", sync_then_a_reject)
+    monkeypatch.setattr(review_check, "run", lambda *a, **k: {})
+    approved = []
+    monkeypatch.setattr(actions, "approve", lambda c, item, comment, who: approved.append(item.key))
+    assert review_auto.approve_due(cfg, sd, ["v01_t1"], say=lambda *_: None) == [] and approved == []
 
 
 def test_history_and_the_checkup_finding(cfg, tmp_path):

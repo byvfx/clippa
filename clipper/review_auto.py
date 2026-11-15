@@ -62,6 +62,26 @@ def touch(sdir: Path, key: str, what: str, who: str = "") -> None:
             e["out"], e["out_at"] = why, now_iso()
 
 
+def republished(sdir: Path, key: str) -> None:
+    """A new revision went up (publish sets the task back to wfa): an automatic approval of the
+    old one no longer stands, so the item is judged again (kept as `was_approved_at`)."""
+    try:
+        with jsonstate.update(path(sdir), {}) as state:
+            e = state.get(key)
+            if e and e.get("approved_at"):
+                e["was_approved_at"] = e.pop("approved_at")
+    except OSError as e:
+        print(f"{sdir.name}/{key}: auto.json not updated for the new revision: {e}")
+
+
+def floor_of(rc: dict, kind: str) -> float:
+    """[review] auto_min_<kind> as a number; 0 (a person decides) when unset or not a number."""
+    try:
+        return float(rc.get(f"auto_min_{kind}") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def enabled_anywhere(cfg: dict) -> bool:
     """Is any show (or the base config) on? serve's job runs only then."""
     root = base(cfg)
@@ -105,6 +125,24 @@ class Verdict:
                 "at": self.at.isoformat(timespec="seconds") if self.at else ""}
 
 
+def grace_for(rc: dict, kind_of_stream: str, st: dict, r: dict) -> tuple[float | None, str]:
+    """(minutes of grace, "") when this kind of item may approve itself; (None, why) when it
+    waits for a person: a pre-show by auto_preshow, a stream's item by its kind's score floor."""
+    if kind_of_stream == "preshow":
+        if rc["auto_preshow"] == "off":
+            return None, "pre-shows wait for a person ([review] auto_preshow)"
+        return (0 if rc["auto_preshow"] == "now" else rc["auto_grace_minutes"]), ""
+    if kind_of_stream != "stream":
+        return None, f"{'one-offs' if kind_of_stream == 'oneoff' else kind_of_stream + 's'} wait for a person"
+    floor = floor_of(rc, st["kind"])
+    if not floor:
+        return None, f"{st['kind']}s wait for a person ([review] auto_min_{st['kind']})"
+    score = score_of(st, r)
+    if score is None or score < floor:
+        return None, f"score {score:g} under {floor:g}" if score is not None else "no score"
+    return rc["auto_grace_minutes"], ""
+
+
 def verdict(cfg: dict, kind_of_stream: str, key: str, st: dict, r: dict, check: dict | None,
             auto: dict, retaken: bool, now: datetime) -> Verdict:
     """One item's state. cfg: the stream's; st: its review_state.json entry, r: review.json's
@@ -128,39 +166,31 @@ def verdict(cfg: dict, kind_of_stream: str, key: str, st: dict, r: dict, check: 
         return Verdict(key, "person", "edited in Kitsu: " + ", ".join(r["edited"]))
     if retaken:
         return Verdict(key, "person", "re-cut after a note")
-    grace = rc["auto_grace_minutes"]
-    if kind_of_stream == "preshow":
-        if rc["auto_preshow"] == "off":
-            return Verdict(key, "person", "pre-shows wait for a person ([review] auto_preshow)")
-        grace = 0 if rc["auto_preshow"] == "now" else grace
-    elif kind_of_stream == "stream":
-        floor = rc.get(f"auto_min_{st['kind']}") or 0
-        if not floor:
-            return Verdict(key, "person", f"{st['kind']}s wait for a person ([review] auto_min_{st['kind']})")
-        score = score_of(st, r)
-        if score is None or score < floor:
-            return Verdict(key, "person", f"score {score:g} under {floor:g}" if score is not None else "no score")
-    else:
-        return Verdict(key, "person", f"{'one-offs' if kind_of_stream == 'oneoff' else kind_of_stream + 's'}"
-                                      " wait for a person")
+    grace, why = grace_for(rc, kind_of_stream, st, r)
+    if grace is None:
+        return Verdict(key, "person", why)
     if not check or not check.get("sig"):
         return Verdict(key, "person", "not checked yet" if not check else "its checks didn't run")
     if check.get("findings"):
         return Verdict(key, "person", f"{len(check['findings'])} check finding(s)")
-    since = _when(st.get("published_at")) or _when(auto.get("seen")) or now
+    since = _when(st.get("published_at")) or _when(auto.get("seen"))
+    if since is None:   # published before published_at existed: the next pass starts its grace
+        return Verdict(key, "waiting", "its grace starts at the next pass")
     due = since + timedelta(minutes=grace)
     return Verdict(key, "due" if now >= due else "waiting", "", due)
 
 
-def verdicts(cfg: dict, sdir: Path, now: datetime | None = None) -> dict[str, Verdict]:
-    """Every published item of a stream. cfg: any (the stream's own is resolved here)."""
+def verdicts(cfg: dict, sdir: Path, now: datetime | None = None, state: dict | None = None,
+             decisions: dict | None = None, checks: dict | None = None) -> dict[str, Verdict]:
+    """Every published item of a stream. cfg: any (the stream's own is resolved here); state,
+    decisions, checks: review_state.json, review.json and checks.json when already loaded."""
     from . import review_check
 
     cfg = for_stream(cfg, sdir)
     now = now or datetime.now(UTC)
-    state = jsonstate.read_or(sdir / "review_state.json", {})
-    decisions = jsonstate.read_or(sdir / "review.json", {})
-    checks = review_check.load(sdir)
+    state = jsonstate.read_or(sdir / "review_state.json", {}) if state is None else state
+    decisions = jsonstate.read_or(sdir / "review.json", {}) if decisions is None else decisions
+    checks = review_check.load(sdir) if checks is None else checks
     auto = load(sdir)
     retaken = set(jsonstate.read_or(sdir / "retakes.json", {}))
     kind = stream_kind(sdir)
@@ -177,7 +207,8 @@ def note(v: Verdict | dict | None, tz: str) -> str:
     local = at.astimezone(ZoneInfo(tz)).strftime("%a %H:%M") if at else ""
     return {"approved": f"approved itself {local}".strip(),
             "due": "approves itself at the next pass unless you act",
-            "waiting": f"approves itself {local} unless you act",
+            "waiting": (f"approves itself {local} unless you act" if local
+                        else f"approves itself unless you act ({v.get('why')})"),
             "person": f"waits for you: {v.get('why')}"}.get(v.get("state"), "")
 
 
@@ -212,13 +243,16 @@ def approve_due(cfg: dict, sdir: Path, keys: list[str], say=print) -> list[str]:
     now = datetime.now(UTC)
     vs = verdicts(cfg, sdir, now)
     state = jsonstate.read_or(sdir / "review_state.json", {})
+    decisions = jsonstate.read_or(sdir / "review.json", {})
     rc = cfg["review"]
     done = []
     for key in keys:
         v = vs.get(key)
         if not v or v.state != "due":
             continue
-        score = score_of(state[key], jsonstate.read_or(sdir / "review.json", {}).get(key, {}))
+        if load(sdir).get(key, {}).get("out"):   # a person acted since the sync (touch writes first)
+            continue
+        score = score_of(state[key], decisions.get(key, {}))
         rule = (f"no action in {rc['auto_grace_minutes']} min, checks clean"
                 + (f", score {score:g}" if score is not None else ""))
         try:
@@ -255,7 +289,7 @@ def run(cfg: dict, stream: str | None = None, apply: bool = True, say=print,
         if due and apply:
             try:
                 approved += len(approve_due(scfg, sdir, due, say))
-            except (ClipperError, OSError) as e:   # Kitsu or the share: the next pass tries again
+            except Exception as e:  # noqa: BLE001  # one stream's trouble mustn't stop the rest; next pass retries
                 say(f"  {sdir.name}: {type(e).__name__}: {e}")
             vs = verdicts(scfg, sdir)
         rows = [v.as_dict() for v in vs.values() if v.state in ("due", "waiting", "person")]
