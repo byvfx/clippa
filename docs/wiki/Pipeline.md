@@ -138,4 +138,12 @@ scores past streams with the track record cut off at each stream's start, so not
 later leaks in, and writes beside segments.json, never into it. A stream's own uploads are never
 in its own record. Pre-shows and stories are one whole video and aren't scored. The model now
 and then passes over a segment on a touchy subject: it is asked once more, and what it still
-leaves out stays unscored. Nothing reads the score for scheduling yet (#258 step C).
+leaves out stays unscored.
+
+The budget ranks a stream's segments by the score (#258 C): each segment's score plus half its
+chat-heat percentile in the stream, so heat only breaks ties between equal scores, and a
+segment the model passed over gets the stream's median. A stream without scores, or with a
+segment cut after the score ran, is ranked by heat alone: one ranking never mixes the two. A
+compilation takes its best segment's score. Kitsu's Score column on a segment shows it; editing
+it there changes nothing (the score lives in segments.json). On this install `[segments] score`
+is on since 2026-11-14 (the backtest: level with heat on Kino, clearly better on Channel 404).

@@ -97,6 +97,27 @@ def segment_heat(sdir: Path, segments: list[dict]) -> dict[str, float]:
             for s in segments if int(s["end_s"]) > int(s["start_s"])}
 
 
+def segment_rank(seg_data: dict, heat: dict[str, float]) -> tuple[dict[str, float], bool]:
+    """What a stream's segments are ranked by, by id, and whether it's the model score (#258 C).
+    When a segment score covered the stream's cut segments (every one has a score, or the
+    score run's ids are exactly the cut ones and the model passed over a few), each is its score
+    plus half its heat percentile in the stream, so heat only breaks ties between equal scores;
+    a segment the model passed over gets the stream's median score. Otherwise chat heat alone,
+    as before: one ranking never mixes the two."""
+    cut = [s for s in seg_data.get("segments", []) if s.get("cut")]
+    scored = [s["score"] for s in cut if "score" in s]
+    covered = len(scored) == len(cut) or (seg_data.get("score") or {}).get("ids") == sorted(s["id"] for s in cut)
+    if not cut or not scored or not covered:
+        return heat, False
+    from .lift import median, ranks
+
+    mid = median(scored)
+    order = ranks([heat.get(s["id"], 0.0) for s in cut])
+    n = len(cut)
+    return {s["id"]: s.get("score", mid) + 0.5 * ((r - 1) / (n - 1) if n > 1 else 0.5)
+            for s, r in zip(cut, order, strict=True)}, True
+
+
 def release_window(cfg: dict, sdir: Path, meta: dict) -> tuple[datetime, datetime | None]:
     """When a stream's items may go out (kick_first_hours after it ended) and when they go
     stale (stale_days after that; None: never). A pre-show is already public on the show's
@@ -135,14 +156,16 @@ def candidates(cfg: dict, streams_dir: Path, sc: dict, tz: ZoneInfo) -> tuple[li
         budget = budget_for(ssc, meta["duration_s"] / 3600)
         seg_data = jsonstate.load(sdir / "segments.json")
         # Only read for streams that are still current and have a budget to rank against.
-        heat = (segment_heat(sdir, seg_data.get("segments", []))
-                if {"segment", "compilation"} & budget.keys()
-                and (not expires or expires > datetime.now(tz)) else {})
+        ranked = bool({"segment", "compilation"} & budget.keys()) and (not expires or expires > datetime.now(tz))
+        heat = segment_heat(sdir, seg_data.get("segments", [])) if ranked else {}
+        # The model score where the stream has one (#258 C), else the heat; never the Kitsu
+        # Score column for a segment, which only shows the score.
+        rank, by_score = segment_rank(seg_data, heat) if ranked else ({}, False)
         approved_segments = set()
         for key, r in review.items():
             kind = RELEASE_KIND[r["kind"]]
             fields = r.get("fields", {})
-            score = fields.get("Score") or (heat.get(r["id"], 0) if kind == "segment" else 0)
+            score = rank.get(r["id"], 0) if kind == "segment" else (fields.get("Score") or 0)
             item = {"key": f"{sdir.name}/{key}", "stream": sdir.name, "show": show, "kind": kind,
                     "id": r["id"], "file": f"{sdir.name}/" + r["file"].replace("\\", "/"),
                     "title": fields.get("YouTube title") or key,
@@ -163,8 +186,9 @@ def candidates(cfg: dict, streams_dir: Path, sc: dict, tz: ZoneInfo) -> tuple[li
                     if r["kind"] == "segment" and r["id"] in comp["segments"]]
         for comp in seg_data.get("compilations", []):
             key = f"{sdir.name}/comp-{comp['file'].removesuffix('.mp4')}"
-            comp_heat = [heat[s] for s in comp["segments"] if s in heat]
-            comp_score = sum(comp_heat) / len(comp_heat) if comp_heat else 0
+            comp_rank = [rank[s] for s in comp["segments"] if s in rank]
+            # its best segment's score; with heat alone, as before, their mean
+            comp_score = (max(comp_rank) if by_score else sum(comp_rank) / len(comp_rank)) if comp_rank else 0
             if split_key(key)[1] in review:
                 # Published as its own Kitsu item: its decision was used above; it still
                 # waits for its segments' slots.

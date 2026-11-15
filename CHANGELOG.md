@@ -8,6 +8,10 @@ current state; the version is `clipper --version` (set in `clipper/__init__.py` 
 
 ### 2026-11
 
+- 11-14: the schedule's budget ranks a stream's segments by their model score, chat heat breaking
+  ties, where a score covered the stream (else heat alone, as before); a compilation takes its best
+  segment's score; Kitsu's Score column shows a segment's score (#258 C). Turned on for Kino and
+  Channel 404 (`[segments] score = true` in this install's config).
 - 11-14: a model score for topic segments (#258 B, `clipper/segscore.py`, prompt
   `segment_score_v1`): one call per stream scores each cut segment 1-10 against the show's typical
   upload, from the segment and the show's per-topic track record. `clipper segments <stream> --score`,
