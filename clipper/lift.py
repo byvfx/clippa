@@ -252,14 +252,18 @@ def stream_facts(sdir: Path, heat: bool = True) -> dict:
     if heat:
         from .segscore import BACKTEST
 
-        try:
+        seg = {}
+        try:  # the scores first: a signals file that can't be read mustn't lose them (Copilot, #261)
             seg = jsonstate.read(sdir / "segments.json", {}) or {}
-            values = segment_heat(sdir, seg.get("segments", []))
-            comps = {c["file"].removesuffix(".mp4"): c["segments"] for c in seg.get("compilations", [])}
             models["model"] = {s["id"]: s["score"] for s in seg.get("segments", []) if "score" in s}
+            comps = {c["file"].removesuffix(".mp4"): c["segments"] for c in seg.get("compilations", [])}
+        except (OSError, ValueError, KeyError, TypeError) as e:
+            note("segments", e)
+        try:
+            values = segment_heat(sdir, seg.get("segments", []))
         except (OSError, ValueError, KeyError, TypeError) as e:
             note("chat heat", e)
-            values, comps = {}, {}
+            values = {}
         try:
             bt = jsonstate.read(sdir / BACKTEST, {}) or {}
             for name, variant in (("bt", "summary"), ("bt_tx", "transcript")):

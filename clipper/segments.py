@@ -184,6 +184,10 @@ def run(stream_dir: Path, cfg: dict, force: bool = False, dry_run: bool = False,
     prompts.vars["min_aside_s"] = seg_cfg["min_aside_s"]
     path = stream_dir / "segments.json"
     scoring = seg_cfg["score"] or score_now
+    if scoring and (jsonstate.read(stream_dir / "meta.json", {}) or {}).get("kind") == "story":
+        if score_now:  # one whole narrated video, like a pre-show (Copilot, #261)
+            print("a story is one whole video: nothing to rank, no score")
+        scoring = False
     if dry_run:
         lines = estimate(stream_dir, cfg, prompts, split=force or not path.exists())
         if scoring:
