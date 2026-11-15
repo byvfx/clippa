@@ -1,0 +1,299 @@
+"""Approval by silence (#259 step B): `clipper review auto`, and serve's job that runs it.
+
+An item approves itself when its show has [review] auto_approve on, nobody has acted on it,
+its pre-flight checks (review_check) are clean, its score is at least its kind's floor
+([review] auto_min_<kind>; 0 leaves that kind to a person) and it has been in review
+auto_grace_minutes. A pre-show goes at once (auto_preshow = "now"): it is public the moment it
+uploads, so nobody has seen one first. Stories and one-offs always wait for a person.
+
+Anything a person does to an item (any action through clipper/actions.py, a decision made in
+Kitsu, an edited column, a hold, a retake note) leaves it to a person for good. The approval
+is a Kitsu decision like any other (actions.approve, who "auto"), its rule in the comment.
+
+auto.json per stream, {key: {...}}:
+    seen         when the job first saw it pending without a published_at (older publishes)
+    out, out_at  why it waits for a person now, for good
+    approved_at  when it approved itself; undone: what a person did to it after that
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+from . import jsonstate
+from .config import base, for_show, for_stream
+from .errors import ClipperError
+
+STATE = "auto.json"
+EVERY_S = 600          # serve's job
+WHO = "auto"           # the actions' `who` for an automatic approval
+KINDS = ("short", "pick", "segment", "compilation")
+
+
+def path(sdir: Path) -> Path:
+    return sdir / STATE
+
+
+def load(sdir: Path) -> dict[str, dict]:
+    return jsonstate.read_or(path(sdir), {})
+
+
+def now_iso(now: datetime | None = None) -> str:
+    return (now or datetime.now(UTC)).isoformat(timespec="seconds")
+
+
+def touch(sdir: Path, key: str, what: str, who: str = "") -> None:
+    """A person acted on the item (actions.py calls this for every action but an automatic
+    approval): it waits for a person from now on, or, approved automatically already, the
+    approval was undone by hand (the audit counts those)."""
+    if who == WHO:
+        return
+    why = f"{what} by {who}" if who else what
+    with jsonstate.update(path(sdir), {}) as state:
+        e = state.setdefault(key, {})
+        if e.get("approved_at"):
+            if what != "approve":
+                e.setdefault("undone", why)
+                e.setdefault("undone_at", now_iso())
+        elif not e.get("out"):
+            e["out"], e["out_at"] = why, now_iso()
+
+
+def enabled_anywhere(cfg: dict) -> bool:
+    """Is any show (or the base config) on? serve's job runs only then."""
+    root = base(cfg)
+    return bool(root["review"]["auto_approve"]) or any(
+        for_show(root, key)["review"]["auto_approve"] for key in root["shows"])
+
+
+def stream_kind(sdir: Path) -> str:
+    """"stream" (a recorded show), "preshow", "oneoff" (a pre-show grabbed with a window) or
+    meta.json's own kind (a story)."""
+    meta = jsonstate.read_or(sdir / "meta.json", {})
+    kind = meta.get("kind") or "stream"
+    return "oneoff" if kind == "preshow" and meta.get("window") else kind
+
+
+def _when(iso: str | None) -> datetime | None:
+    try:
+        t = datetime.fromisoformat(iso or "")
+    except ValueError:
+        return None
+    return t if t.tzinfo else t.replace(tzinfo=UTC)
+
+
+def score_of(st: dict, r: dict) -> float | None:
+    raw = (r.get("fields") or {}).get("Score") or (st.get("fields") or {}).get("Score")
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+@dataclass
+class Verdict:
+    key: str
+    state: str          # approved | due | waiting | person | decided | off
+    why: str = ""
+    at: datetime | None = None   # waiting: when it approves itself; approved: when it did
+
+    def as_dict(self) -> dict:
+        return {"key": self.key, "state": self.state, "why": self.why,
+                "at": self.at.isoformat(timespec="seconds") if self.at else ""}
+
+
+def verdict(cfg: dict, kind_of_stream: str, key: str, st: dict, r: dict, check: dict | None,
+            auto: dict, retaken: bool, now: datetime) -> Verdict:
+    """One item's state. cfg: the stream's; st: its review_state.json entry, r: review.json's
+    (as last synced), check: checks.json's, auto: auto.json's."""
+    from .actions import is_held
+
+    rc = cfg["review"]
+    if auto.get("approved_at"):
+        return Verdict(key, "approved", "approved automatically", _when(auto["approved_at"]))
+    if not rc["auto_approve"]:
+        return Verdict(key, "off")
+    decision = r.get("decision") or "pending"
+    if decision != "pending":
+        return Verdict(key, "decided", decision.replace("_", " "))
+    if auto.get("out"):
+        return Verdict(key, "person", auto["out"])
+    fields = r.get("fields") or {}
+    if is_held(fields):
+        return Verdict(key, "person", "held")
+    if r.get("edited"):
+        return Verdict(key, "person", "edited in Kitsu: " + ", ".join(r["edited"]))
+    if retaken:
+        return Verdict(key, "person", "re-cut after a note")
+    grace = rc["auto_grace_minutes"]
+    if kind_of_stream == "preshow":
+        if rc["auto_preshow"] == "off":
+            return Verdict(key, "person", "pre-shows wait for a person ([review] auto_preshow)")
+        grace = 0 if rc["auto_preshow"] == "now" else grace
+    elif kind_of_stream == "stream":
+        floor = rc.get(f"auto_min_{st['kind']}") or 0
+        if not floor:
+            return Verdict(key, "person", f"{st['kind']}s wait for a person ([review] auto_min_{st['kind']})")
+        score = score_of(st, r)
+        if score is None or score < floor:
+            return Verdict(key, "person", f"score {score:g} under {floor:g}" if score is not None else "no score")
+    else:
+        return Verdict(key, "person", f"{'one-offs' if kind_of_stream == 'oneoff' else kind_of_stream + 's'}"
+                                      " wait for a person")
+    if not check or not check.get("sig"):
+        return Verdict(key, "person", "not checked yet" if not check else "its checks didn't run")
+    if check.get("findings"):
+        return Verdict(key, "person", f"{len(check['findings'])} check finding(s)")
+    since = _when(st.get("published_at")) or _when(auto.get("seen")) or now
+    due = since + timedelta(minutes=grace)
+    return Verdict(key, "due" if now >= due else "waiting", "", due)
+
+
+def verdicts(cfg: dict, sdir: Path, now: datetime | None = None) -> dict[str, Verdict]:
+    """Every published item of a stream. cfg: any (the stream's own is resolved here)."""
+    from . import review_check
+
+    cfg = for_stream(cfg, sdir)
+    now = now or datetime.now(UTC)
+    state = jsonstate.read_or(sdir / "review_state.json", {})
+    decisions = jsonstate.read_or(sdir / "review.json", {})
+    checks = review_check.load(sdir)
+    auto = load(sdir)
+    retaken = set(jsonstate.read_or(sdir / "retakes.json", {}))
+    kind = stream_kind(sdir)
+    return {key: verdict(cfg, kind, key, st, decisions.get(key, {}), checks.get(key), auto.get(key, {}),
+                         key in retaken, now) for key, st in state.items()}
+
+
+def note(v: Verdict | dict | None, tz: str) -> str:
+    """The line a card or the war room shows, "" when there's nothing to say."""
+    if not v:
+        return ""
+    v = v.as_dict() if isinstance(v, Verdict) else v
+    at = _when(v.get("at"))
+    local = at.astimezone(ZoneInfo(tz)).strftime("%a %H:%M") if at else ""
+    return {"approved": f"approved itself {local}".strip(),
+            "due": "approves itself at the next pass unless you act",
+            "waiting": f"approves itself {local} unless you act",
+            "person": f"waits for you: {v.get('why')}"}.get(v.get("state"), "")
+
+
+def _remember(sdir: Path, vs: dict[str, Verdict], state: dict, now: datetime) -> None:
+    """Stamp what the next pass must remember: when an older publish was first seen, and that
+    a person decided an item (in Kitsu, say), so a later reopen leaves it to them."""
+    auto = load(sdir)
+    seen = [k for k, v in vs.items() if v.state in ("due", "waiting") and not state[k].get("published_at")
+            and not auto.get(k, {}).get("seen")]
+    decided = [k for k, v in vs.items() if v.state == "decided" and not auto.get(k, {}).get("out")
+               and not auto.get(k, {}).get("approved_at")]
+    if not seen and not decided:
+        return
+    with jsonstate.update(path(sdir), {}) as data:
+        for k in seen:
+            data.setdefault(k, {}).setdefault("seen", now_iso(now))
+        for k in decided:
+            e = data.setdefault(k, {})
+            if not e.get("out"):
+                e["out"], e["out_at"] = f"{vs[k].why} by a person", now_iso(now)
+
+
+def approve_due(cfg: dict, sdir: Path, keys: list[str], say=print) -> list[str]:
+    """Approve the due items of one stream: Kitsu first (what a person did since the last sync
+    counts), the checks again (an item re-rendered since is checked anew, a cover's vision call
+    included), then each one still due. Returns the keys approved."""
+    from . import actions, review, review_check
+
+    cfg = for_stream(cfg, sdir)
+    review.sync(sdir, cfg, keys=keys, quiet=True)
+    review_check.run(sdir, cfg, keys=keys, say=lambda *_: None)
+    now = datetime.now(UTC)
+    vs = verdicts(cfg, sdir, now)
+    state = jsonstate.read_or(sdir / "review_state.json", {})
+    rc = cfg["review"]
+    done = []
+    for key in keys:
+        v = vs.get(key)
+        if not v or v.state != "due":
+            continue
+        score = score_of(state[key], jsonstate.read_or(sdir / "review.json", {}).get(key, {}))
+        rule = (f"no action in {rc['auto_grace_minutes']} min, checks clean"
+                + (f", score {score:g}" if score is not None else ""))
+        try:
+            actions.approve(cfg, actions.Item(sdir, key, state[key]),
+                            f"Approved automatically: {rule} ([review] auto_approve)", who=WHO)
+        except ClipperError as e:
+            say(f"  {sdir.name}/{key}: not approved: {e}")
+            continue
+        with jsonstate.update(path(sdir), {}) as data:
+            data.setdefault(key, {})["approved_at"] = now_iso()
+        say(f"  {sdir.name}/{key}: approved ({rule})")
+        done.append(key)
+    return done
+
+
+def run(cfg: dict, stream: str | None = None, apply: bool = True, say=print,
+        now: datetime | None = None) -> dict[str, list[dict]]:
+    """Every stream in review whose show has auto_approve on: approve what is due (apply), and
+    {stream: [verdict dicts]} for those still open. Replans once when anything approved."""
+    from . import actions
+
+    now = now or datetime.now(UTC)
+    dirs = [d for d in actions.review_dirs(cfg) if stream in (None, d.name)]
+    out: dict[str, list[dict]] = {}
+    approved = 0
+    for sdir in dirs:
+        scfg = for_stream(cfg, sdir)
+        if not scfg["review"]["auto_approve"]:
+            continue
+        vs = verdicts(scfg, sdir, now)
+        if apply:
+            _remember(sdir, vs, jsonstate.read_or(sdir / "review_state.json", {}), now)
+        due = [k for k, v in vs.items() if v.state == "due"]
+        if due and apply:
+            try:
+                approved += len(approve_due(scfg, sdir, due, say))
+            except (ClipperError, OSError) as e:   # Kitsu or the share: the next pass tries again
+                say(f"  {sdir.name}: {type(e).__name__}: {e}")
+            vs = verdicts(scfg, sdir)
+        rows = [v.as_dict() for v in vs.values() if v.state in ("due", "waiting", "person")]
+        if rows:
+            out[sdir.name] = rows
+    if approved and apply:
+        from . import schedule
+
+        schedule.run(cfg, sync_first=False)
+    return out
+
+
+def lines(found: dict[str, list[dict]], tz: str) -> list[str]:
+    out = []
+    for stream, rows in found.items():
+        out.append(stream)
+        out += [f"  {r['key']}: {note(r, tz)}" for r in rows]
+    return out or ["nothing waiting on auto-approval"]
+
+
+# ---------- the audit and the checkup ----------
+
+def history(cfg: dict) -> list[dict]:
+    """Every automatic approval: {stream, key, at, undone (what a person did after, or the
+    decision it has now when that isn't approved, or a retake), since}."""
+    out = []
+    for f in sorted(Path(cfg["paths"]["streams"]).glob(f"*/{STATE}")):
+        sdir = f.parent
+        decisions = jsonstate.read_or(sdir / "review.json", {})
+        retakes = jsonstate.read_or(sdir / "retakes.json", {})
+        for key, e in jsonstate.read_or(f, {}).items():
+            if not e.get("approved_at"):
+                continue
+            dec = (decisions.get(key) or {}).get("decision") or "approved"
+            undone = e.get("undone") or {"approved": "", "pending": "reopened",
+                                         "changes_requested": "sent back for changes"}.get(dec, dec)
+            if not undone and any(_when(h.get("at")) and _when(h["at"]) > _when(e["approved_at"])
+                                  for h in retakes.get(key) or []):
+                undone = "re-cut after a note"
+            out.append({"stream": sdir.name, "key": key, "at": e["approved_at"], "undone": undone})
+    return out

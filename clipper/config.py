@@ -140,6 +140,7 @@ CHOICES = {
     ("shorts", "window"): ("short", "clip"),
     ("schedule", "clip_order"): ("score", "stream"),
     ("preshow", "publish"): ("asap", "slots"),
+    ("review", "auto_preshow"): ("now", "grace", "off"),
     ("record", "container"): ("mkv", "ts"),
     ("rumble", "visibility"): ("public", "unlisted"),
     ("rumble", "schedule"): ("youtube", "now"),

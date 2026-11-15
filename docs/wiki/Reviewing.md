@@ -23,7 +23,9 @@ lands in Kitsu whichever surface you make it on. Three surfaces; pick what fits 
 Each item is one card: the preview (480p, the first 60 s of a long item), title, hook, the Kitsu
 link, and buttons. A **Checks** field lists what the [pre-flight checks](Review#pre-flight-checks)
 found (a face cut off, the wrong person on the cover, a title naming someone the item never
-mentions): look there first. **Approve**. **Reject…** with a reason. **Changes…** says what to change:
+mentions): look there first. When the show [approves by silence](Review#approval-by-silence), an
+**Auto-approve** field says when the item approves itself unless you act, or why it waits for you;
+any button you press leaves it to you. **Approve**. **Reject…** with a reason. **Changes…** says what to change:
 the item is re-cut or re-covered and comes back as a new card. **Hold** keeps it out of the
 schedule until you unhold it. **Reopen** undoes a decision. **Pin time…** sets its publish time.
 **Retitle…** edits the YouTube title, description, hashtags, tags and playlist in one form.

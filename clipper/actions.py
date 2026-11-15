@@ -115,12 +115,25 @@ def _by(who: str) -> str:
     return f" ({who})" if who else ""
 
 
+def _touched(item: Item, what: str, who: str) -> None:
+    """A person acted on it: review_auto leaves it to a person from now on (an automatic
+    approval, who "auto", doesn't count). Never fails the action itself."""
+    from . import review_auto
+
+    try:
+        review_auto.touch(item.stream_dir, item.key, what, who)
+    except OSError as e:
+        print(f"{item.ref}: couldn't note the action for auto-approval: {e}", file=sys.stderr)
+
+
 def approve(cfg: dict, item: Item, comment: str = "", who: str = "") -> dict:
+    _touched(item, "approve", who)
     _status(cfg, item, "approved", comment or f"Approved{_by(who)}")
     return refresh(cfg, item)
 
 
 def reject(cfg: dict, item: Item, reason: str, who: str = "") -> dict:
+    _touched(item, "reject", who)
     if not reason.strip():
         raise ClipperError("reject needs a reason (it becomes a scoring example)")
     _status(cfg, item, "rejected", reason.strip())
@@ -128,6 +141,7 @@ def reject(cfg: dict, item: Item, reason: str, who: str = "") -> dict:
 
 
 def changes(cfg: dict, item: Item, what: str, who: str = "") -> dict:
+    _touched(item, "changes", who)
     if not what.strip():
         raise ClipperError("say what to change")
     _status(cfg, item, "retake", what.strip())
@@ -135,6 +149,7 @@ def changes(cfg: dict, item: Item, what: str, who: str = "") -> dict:
 
 
 def reopen(cfg: dict, item: Item, who: str = "") -> dict:
+    _touched(item, "reopen", who)
     _status(cfg, item, "wfa", f"Reopened for review{_by(who)}")
     return refresh(cfg, item)
 
@@ -143,17 +158,20 @@ def restore(cfg: dict, item: Item, status_short: str, who: str = "") -> dict:
     """Put the task back to an earlier status (the war room's undo). The comment is a
     clipper note, so the decision's reason stays the earlier comment (a retake isn't
     planned again, a reject keeps its scoring example)."""
+    _touched(item, "undo", who)
     _status(cfg, item, status_short, f"{review.NOTE_PREFIX} Undo: back to {status_short}{_by(who)}")
     return refresh(cfg, item)
 
 
 def hold(cfg: dict, item: Item, on: bool = True, who: str = "") -> dict:
+    _touched(item, "hold", who)
     _columns(cfg, item, {"Hold": "true" if on else "false"},
              f"Hold {'on' if on else 'off'}{_by(who)}")
     return refresh(cfg, item)
 
 
 def pin(cfg: dict, item: Item, when: str, who: str = "") -> dict:
+    _touched(item, "pin", who)
     cfg = for_stream(cfg, item.stream_dir)
     from .schedule import parse_when
 
@@ -269,6 +287,7 @@ META = {"YouTube title": (check_title, "Retitled"),
 
 def edit_meta(cfg: dict, item: Item, values: dict[str, str], who: str = "") -> dict:
     """Write some of the META columns (checked and normalized) in one Kitsu update."""
+    _touched(item, "edit", who)
     cfg = for_stream(cfg, item.stream_dir)
     values = {name: META[name][0](v) for name, v in values.items()}
     if not values:
@@ -291,6 +310,7 @@ def edit_meta(cfg: dict, item: Item, values: dict[str, str], who: str = "") -> d
 
 def thumbtext(cfg: dict, item: Item, text: str, who: str = "") -> dict:
     """The refresh's sync sees the new column value and re-renders the thumbnail."""
+    _touched(item, "thumbnail text", who)
     cfg = for_stream(cfg, item.stream_dir)
     from .thumbs import check_text, video_key
 
@@ -423,6 +443,9 @@ def describe(cfg: dict, sdir: Path, gazu=None, links: bool = True) -> dict[str, 
         outputs = {}
     meta = jsonstate.read(sdir / "meta.json", {})
     checks = review_check.load(sdir)
+    from . import review_auto
+
+    autos = review_auto.verdicts(cfg, sdir) if cfg["review"]["auto_approve"] else {}
     ls = review.Listing()
     out = {}
     for key, st in state.items():
@@ -463,6 +486,8 @@ def describe(cfg: dict, sdir: Path, gazu=None, links: bool = True) -> dict[str, 
             "file": sdir / st["file"].replace("\\", "/"), "preview": sdir / "review" / f"{key}.mp4",
             "revision": st.get("revision"), "synced_at": r.get("updated_at"),
             "checks": [f["text"] for f in review_check.findings_of(checks, key)],
+            # #259 B: "approves itself Sat 14:30 unless you act", "waits for you: held"...
+            "auto": review_auto.note(autos.get(key), cfg["schedule"]["timezone"]),
         }
     return out
 

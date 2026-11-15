@@ -12,6 +12,7 @@ streams/<id>/.run.lock       the worker holding this stream (its name inside)
 streams/.serve.lock          one serve, one bot: OS locks held while the process lives
 streams/.bot.lock
 streams/.retake.lock         one retake run at a time
+streams/<id>/auto.json       approval by silence: who acted on an item, what approved itself (Review)
 streams/.serve/status.json   heartbeats: serve, bot, recorder
 streams/.bot/status.json
 streams/.record/status.json
@@ -111,7 +112,7 @@ process instead and logs it to `logs/retake.log`.
 ## Child processes
 
 - **serve** runs each background job as a `clipper <args>` child (upload, preshow check, retake,
-  tiktok, x, analytics, cast auto, news check) and copies its output into `logs/serve.log`
+  review auto, tiktok, x, analytics, cast auto, news check) and copies its output into `logs/serve.log`
   (`[paths] serve_log`). A non-zero exit queues a DM (kind `upload` or `failure`) keyed on the
   command and its last line, so a different item failing the next hour isn't swallowed by the
   cooldown.

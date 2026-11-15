@@ -111,7 +111,11 @@ def check_reviews(cfg: dict, now: datetime, days: int) -> dict:
             counts[item.get("decision") or "?"] = counts.get(item.get("decision") or "?", 0) + 1
             if item.get("decision") == "rejected" and item.get("comment"):
                 reasons.append({"item": f"{f.parent.name}/{key}", "comment": item["comment"][:160]})
-    return {"counts": counts, "rejected_because": reasons}
+    from . import review_auto
+
+    autos = [h for h in review_auto.history(cfg) if _within(h["at"], now, days)]
+    return {"counts": counts, "rejected_because": reasons, "auto": len(autos),
+            "auto_undone": [f"{h['stream']}/{h['key']}: {h['undone']}" for h in autos if h["undone"]]}
 
 
 def check_disk(cfg: dict, now: datetime, days: int) -> dict:
@@ -251,7 +255,9 @@ def text(snap: dict, tz: ZoneInfo, limit: int = TOP) -> str:
     if (s := snap.get("spend")) is not None:
         lines.append(f"Spend: {_money(s)}")
     if (v := snap.get("reviews")) is not None and v["counts"]:
-        lines.append("Review: " + ", ".join(f"{n} {k.replace('_', ' ')}" for k, n in sorted(v["counts"].items())))
+        lines.append("Review: " + ", ".join(f"{n} {k.replace('_', ' ')}" for k, n in sorted(v["counts"].items()))
+                     + (f" ({v['auto']} approved themselves, {len(v.get('auto_undone') or [])} undone)"
+                        if v.get("auto") else ""))
     if (d := snap.get("disk")) is not None:
         lines.append(f"Disk: {d['free_gb']} GB free")
     if (g := snap.get("repo")) is not None:
