@@ -124,7 +124,7 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   `serve` (war room on 127.0.0.1:8765, on the tailnet as https://clipper.taile415cd.ts.net/; heartbeat
   `streams/.serve/status.json`), `bot` (`streams/.bot/status.json`) and `worker` (cuts with QSV on the iGPU).
   Code changes go out with `bash deploy/hub/deploy.sh` from a main checkout; `clipper services status|restart ...`
-  runs docker compose there (`[serve] hub`). Last deploy 2026-11-13 13:51: main as of #239 (with #233). **The config and
+  runs docker compose there (`[serve] hub`). Last deploy 2026-11-15 15:49: main as of #270. **The config and
   all state are on the NAS:** `//192.168.0.155/docker/clipper` (`/data`) holds `clipper.toml` (the one copy;
   `CLIPPER_CONFIG` on the laptop points at it), `schedule.json`, secrets/, backups/, logs/, faces/, voices/,
   news/, weekly/, archive/, layouts/, people.json, fonts/. The laptop's old copies: `backups/laptop-state-2026-11-05/`.
@@ -252,7 +252,9 @@ messages: GitHub closes the issue on "fix".
   didn't see the two fix commits). Left open: the approval holds auto.json's lock over its Kitsu calls,
   so if Kitsu stalls over 60 s a person's action can go unrecorded in auto.json (their Kitsu decision
   still lands last, and the checkup still flags it), and over 120 s the lock goes stale and another
-  process can take it. **On for Kino since 11-15** (user): `[shows.kino.review] auto_approve = true` in the
+  process can take it. Stale findings (PR #270, deployed 11-15): the auto job re-checks, at most hourly
+  per stream (`recheck.json`), items held only by their findings; the Kitsu Checks column and shows without
+  auto keep old findings until the next publish. **On for Kino since 11-15** (user): `[shows.kino.review] auto_approve = true` in the
   NAS clipper.toml (backup `backups/clipper.toml.before_kino_auto_approve_2026-11-15`), serve restarted, its
   `auto` job in the heartbeat; at turn-on Kino had no open Shorts (11 segments, 5 compilations, which wait).
   Next, after a few days of Kino with nothing undone (checkup's `auto` check, `clipper review auto --dry-run`):
