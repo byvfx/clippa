@@ -313,3 +313,20 @@ def test_a_preshow_is_approved_at_publish(cfg, tmp_path, monkeypatch):
     cfg["review"]["auto_preshow"] = "grace"
     notify.publish_and_post(sd, cfg)
     assert runs == ["pre-1"]
+
+
+def test_the_approval_runs_under_auto_jsons_lock(cfg, tmp_path, monkeypatch):
+    held = []
+
+    def approve(c, item, comment, who):   # the file lock other processes (the bot's touch) wait on
+        held.append(review_auto.path(item.stream_dir).with_name("auto.json.lock").exists())
+    stub(cfg, tmp_path, monkeypatch, approve)
+    review_auto.run(cfg, say=lambda *_: None)
+    assert held == [True]
+
+
+def test_clippers_own_hold_doesnt_last(cfg):
+    st = {**short(), "fields": {"Score": "7", "Hold": "true"}}                  # proposed held: other voices
+    got = v(cfg, st=st, r={"decision": "pending", "fields": {"Hold": "true"}})
+    assert got.state == "person" and got.why == "held for other voices" and not got.lasting
+    assert v(cfg, r={"decision": "pending", "fields": {"Hold": "true"}}).lasting   # a person's hold

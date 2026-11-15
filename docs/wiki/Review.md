@@ -49,7 +49,8 @@ A show can let its clean items approve themselves: `[shows.<key>.review] auto_ap
 (off by default). Every 10 minutes serve runs `clipper review auto`, which approves an item when:
 
 - nobody has acted on it: no decision, hold, note, edit or reopen, from Discord, the war room,
-  the command line or Kitsu itself. Anything you do leaves it to you for good;
+  the command line or Kitsu itself. Anything you do leaves it to you for good (a hold clipper
+  set itself, for [other voices](#shorts-held-for-other-voices), only while it's on);
 - its [pre-flight checks](#pre-flight-checks) found nothing (run again just before, so an item
   re-rendered since is checked anew);
 - its score is at least its kind's floor (`auto_min_short = 6`; picks, segments and compilations

@@ -168,7 +168,10 @@ def verdict(cfg: dict, kind_of_stream: str, key: str, st: dict, r: dict, check: 
         return Verdict(key, "person", auto["out"])
     fields = r.get("fields") or {}
     if is_held(fields):
-        return Verdict(key, "person", "held", lasting=True)
+        # clipper's own hold (other voices) can lift by itself; a person's, or their release of
+        # clipper's, differs from the proposal and also shows as edited: that one lasts
+        mine = is_held(st.get("fields") or {})
+        return Verdict(key, "person", "held for other voices" if mine else "held", lasting=not mine)
     if r.get("edited"):
         return Verdict(key, "person", "edited in Kitsu: " + ", ".join(r["edited"]), lasting=True)
     if retaken:
@@ -314,7 +317,7 @@ def run(cfg: dict, stream: str | None = None, apply: bool = True, say=print,
     if approved and apply:
         from . import schedule
 
-        schedule.run(cfg, sync_first=False)
+        schedule.run(base(cfg), sync_first=False)   # every show's schedule, not one stream's view
     return out
 
 
@@ -350,8 +353,8 @@ def history(cfg: dict) -> list[dict]:
                           "changes_requested": "sent back for changes"}.get(dec, dec)
                 if not undone and is_held(r.get("fields") or {}):
                     undone = "held"   # a hold set in Kitsu, which leaves the decision approved
-            if not undone and any(_when(h.get("at")) and _when(h["at"]) > _when(at)
-                                  for h in retakes.get(key) or []):
+            since = _when(at) or datetime.min.replace(tzinfo=UTC)
+            if not undone and any((_when(h.get("at")) or since) > since for h in retakes.get(key) or []):
                 undone = "re-cut after a note"
             out.append({"stream": sdir.name, "key": key, "at": at, "undone": undone})
     return out

@@ -122,7 +122,7 @@ def _touched(item: Item, what: str, who: str) -> None:
 
     try:
         review_auto.touch(item.stream_dir, item.key, what, who)
-    except OSError as e:
+    except (OSError, ValueError) as e:   # a lock timeout, a broken auto.json
         print(f"{item.ref}: couldn't note the action for auto-approval: {e}", file=sys.stderr)
 
 
