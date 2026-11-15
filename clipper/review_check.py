@@ -248,8 +248,17 @@ def same_person(cfg: dict, a: str, b: str, people: dict) -> bool:
 def cover_face_finding(cfg: dict, who: str, match: float, meant: str, people: dict) -> tuple[str, str] | None:
     """The cover's face looks like someone known (who, at similarity match) other than the
     person the cover is meant to show: a finding. A face nobody matches says nothing (a
-    costume, a guest)."""
+    costume, a guest), and so does a meant name people.json doesn't know ("Jeremy Hambly",
+    "Kino's chef"): main_person is free text, and the vision call judges those covers."""
+    from .people import find
+
     if not who or not meant or match < cfg["faces"]["match"] or same_person(cfg, who, meant, people):
+        return None
+    try:
+        fw, fm = find(cfg, who, people), find(cfg, meant, people)
+    except ClipperError:   # a name two records answer to
+        return None
+    if not fw or not fm or fw[0] == fm[0]:
         return None
     return (BAD, f"the cover's face looks like {who} ({match:.2f}), not {meant}")
 

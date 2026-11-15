@@ -120,11 +120,16 @@ def test_segment_names_take_the_topics_last_word():
 
 def test_cover_face_finding_only_for_a_confident_someone_else(defaults):
     defaults["faces"]["match"] = 0.7
-    assert review_check.cover_face_finding(defaults, "Jerry", 0.82, "Jer", {}) == \
+    people = {"jerry-banfield": {"name": "Jerry Banfield", "aliases": ["Jerry"]},
+              "the-quartering": {"name": "The Quartering (Jer)"}, "ppp": {"name": "PPP"}}
+    assert review_check.cover_face_finding(defaults, "Jerry", 0.82, "Jer", people) == \
         (BAD, "the cover's face looks like Jerry (0.82), not Jer")
-    assert review_check.cover_face_finding(defaults, "Jerry", 0.5, "Jer", {}) is None     # not sure who
-    assert review_check.cover_face_finding(defaults, "PPP", 0.9, "ppp", {}) is None       # the same
-    assert review_check.cover_face_finding(defaults, "", 0.0, "Jer", {}) is None
+    assert review_check.cover_face_finding(defaults, "Jerry", 0.5, "Jer", people) is None     # not sure who
+    assert review_check.cover_face_finding(defaults, "PPP", 0.9, "ppp", people) is None       # the same
+    assert review_check.cover_face_finding(defaults, "", 0.0, "Jer", people) is None
+    # a meant name no record has (main_person is free text) is left to the vision call
+    assert review_check.cover_face_finding(defaults, "Jer", 0.85, "Jeremy Hambly", people) is None
+    assert review_check.cover_face_finding(defaults, "PPP", 0.81, "Heel vs Babyface", people) is None
 
 
 def test_vision_findings():
