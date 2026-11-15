@@ -15,7 +15,7 @@ anything goes out. The app was called clipper; the `clipper` command, package, c
 and containers keep that name.
 
 **[How it works, what it costs and why it's built this way](https://byvfx.github.io/clippa/)**:
-the full breakdown (the figures above are as of 11 November 2026).
+the full breakdown (the figures above are as of 14 November 2026).
 
 ```
 fetch / record -> signals -> transcribe -> score -> segments -> faces -> cut -> meta -> thumbs -> shorts
