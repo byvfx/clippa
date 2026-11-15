@@ -250,8 +250,11 @@ messages: GitHub closes the issue on "fix".
   Review#pre-flight-checks), is PR #263, merged and deployed 11-14; the webcam panels are marked `cam = true`
   in clipper.toml (backup `backups/clipper.toml.before_cam_marks_2026-11-14`). Step B, `clipper review auto`
   (`clipper/review_auto.py`, serve's `auto` job every 10 min, wiki Review#approval-by-silence), is PR #265,
-  merged and deployed 11-14 (Copilot's 9 findings and a second local review's fixed; Copilot didn't
-  see the two fix commits): **off until the user turns a show on**, Kino Shorts first
+  merged and deployed 11-14 (Copilot's 9 findings fixed, and 5 of a second local review's 7; Copilot
+  didn't see the two fix commits). Left open: the approval holds auto.json's lock over its Kitsu calls,
+  so if Kitsu stalls over 60 s a person's action can go unrecorded in auto.json (their Kitsu decision
+  still lands last, and the checkup still flags it), and over 120 s the lock goes stale and another
+  process can take it. **Off until the user turns a show on**, Kino Shorts first
   (`[shows.kino.review] auto_approve = true` in the NAS clipper.toml, backup first), then Channel 404's;
   segments once #258 C wires their score. Before that, `CLIPPER_REVIEW_AUTO_APPROVE=true clipper review auto
   --dry-run` shows what it would do. Backtest: 105 of 181 approved Shorts would have approved themselves, and
