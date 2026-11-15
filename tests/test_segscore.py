@@ -202,6 +202,43 @@ def test_a_worse_second_answer_doesnt_replace_the_first(share, monkeypatch):
     assert list(bt["summary"]["scores"]) == ["s01"]
 
 
+def test_a_dry_run_leaves_a_broken_backtest_file_alone(share, capsys):
+    path = share["paths"]["streams"] / "kick-2" / segscore.BACKTEST
+    path.write_text("{nope", encoding="utf-8")
+    segscore.backtest(share, stream="kick-2", dry_run=True)
+    assert path.read_text(encoding="utf-8") == "{nope"
+
+
+def test_a_refused_retry_keeps_the_first_answer(share, monkeypatch):
+    fake = FakeClaude(leave_out={"s02"})
+    real = fake.json_call
+    calls = []
+
+    def refuse_second(*a, **kw):
+        calls.append(1)
+        return real(*a, **kw) if len(calls) == 1 else (None, {"refusal": "no"})
+    fake.json_call = refuse_second
+    monkeypatch.setattr(segscore, "Claude", lambda cfg: fake)
+    assert segscore.backtest(share, stream="kick-2") == {"kick-2": 1}
+
+
+def test_the_backtest_uses_each_shows_own_config(share, monkeypatch):
+    seen = []
+    monkeypatch.setattr(segscore, "Claude", lambda cfg: seen.append(cfg["show"]["key"]) or FakeClaude())
+    segscore.backtest(share)
+    assert seen == ["kino"]          # one client per show, from the show's config, not the base
+
+
+def test_a_story_is_never_scored(share, monkeypatch, capsys):
+    sdir = share["paths"]["streams"] / "kick-2"
+    meta = jsonstate.load(sdir / "meta.json")
+    jsonstate.write(sdir / "meta.json", {**meta, "kind": "story"})
+    monkeypatch.setattr(segments, "Claude", lambda cfg: FakeClaude())
+    segments.run(sdir, share, score_now=True)
+    assert "a story is one whole video" in capsys.readouterr().out
+    assert "score" not in jsonstate.load(sdir / "segments.json")["segments"][0]
+
+
 def test_a_broken_backtest_file_is_scored_again(share, monkeypatch, capsys):
     (share["paths"]["streams"] / "kick-2" / segscore.BACKTEST).write_text("{nope", encoding="utf-8")
     monkeypatch.setattr(segscore, "Claude", lambda cfg: FakeClaude())

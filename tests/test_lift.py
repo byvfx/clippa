@@ -183,7 +183,7 @@ def test_cli_lift(share, capsys):
 def test_a_broken_stream_file_leaves_that_stream_out(share, capsys):
     (share["paths"]["streams"] / "kick-1" / "segments.json").write_text("{not json", encoding="utf-8")
     rows = {r["key"]: r for r in lift.rows(share)}
-    assert rows["kick-1/s01_dsp"]["heat"] is None and "kick-1: no chat heat" in capsys.readouterr().err
+    assert rows["kick-1/s01_dsp"]["heat"] is None and "kick-1: no segments" in capsys.readouterr().err
     assert rows["kick-1/s01_dsp"]["decided_at"] == datetime(2026, 10, 20, 3, tzinfo=UTC)  # the start survives
 
 
@@ -192,6 +192,17 @@ def test_an_upload_with_no_start_still_counts_for_the_others():
     rows[0]["decided_at"] = None
     lift.topic_history(rows)
     assert rows[0]["topic"] is None and rows[1]["topic"] == 100
+
+
+def test_a_broken_signals_file_keeps_the_model_scores(share, capsys):
+    sdir = share["paths"]["streams"] / "kick-1"
+    seg = jsonstate.load(sdir / "segments.json")
+    seg["segments"][0]["score"] = 8
+    jsonstate.write(sdir / "segments.json", seg)
+    (sdir / "signals.parquet").write_bytes(b"not parquet")
+    rows = {r["key"]: r for r in lift.rows(share)}
+    assert rows["kick-1/s01_dsp"]["model"] == 8 and rows["kick-1/s01_dsp"]["heat"] is None
+    assert "no chat heat" in capsys.readouterr().err
 
 
 def test_heat_is_read_only_where_something_ranks_by_it(share, monkeypatch):

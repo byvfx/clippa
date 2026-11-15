@@ -142,6 +142,8 @@ def score(sdir: Path, cfg: dict, segs: list[dict], rows: list[dict], before: dat
         out, meta = claude.json_call(sc["score_model"], system, text, SCHEMA, sc["score_effort"],
                                      fallback=True, stream=True)
         if out is None:
+            if got:  # a refused retry keeps the first answer (Copilot, #261)
+                break
             raise ClipperError(f"segment score: model refused ({meta.get('refusal')})")
         new = checked(out, ids)
         if len(new) > len(got):  # the fuller answer, never a worse second one
@@ -220,7 +222,8 @@ def backtest(cfg: dict, stream: str = "", transcript: bool = False, force: bool 
             scored = variant in (jsonstate.read(sdir / BACKTEST, {}) or {})
         except ValueError as e:  # a broken file: score it again (update rewrites it whole)
             print(f"  {sid}: {BACKTEST} unreadable ({e}), scoring again")
-            jsonstate.write(sdir / BACKTEST, {})
+            if not dry_run:  # a dry run leaves every file as it found it (Copilot, #261)
+                jsonstate.write(sdir / BACKTEST, {})
             scored = False
         if not force and scored:
             print(f"  {sid}: {variant} already scored (--force to score again)")
@@ -233,14 +236,20 @@ def backtest(cfg: dict, stream: str = "", transcript: bool = False, force: bool 
     if not plan:
         print("nothing to score")
         return {}
-    claude = Claude(cfg)
-    preflight(claude, cfg["segments"]["score_model"])
+    # One client per show's resolved config, so a show's own provider and model are the ones
+    # checked and used (Copilot, #261); costs add up over them.
+    clients: dict[str, Claude] = {}
     done = {}
     for sid, sdir, segs in plan:
         costs.set_context("segments backtest", sid)
+        scfg = for_stream(cfg, sdir)
+        sc = scfg["segments"]
+        claude = clients.get(scfg["show"]["key"])
+        if claude is None:
+            claude = clients[scfg["show"]["key"]] = Claude(scfg)
+            preflight(claude, sc["score_model"])
         spent = claude.cost
         got = score(sdir, cfg, segs, rows, starts[sid], transcript, claude)
-        sc = for_stream(cfg, sdir)["segments"]
         with jsonstate.update(sdir / BACKTEST, {}) as bt:
             bt[variant] = {"model": sc["score_model"],
                            "prompt_version": version_of(for_stream(cfg, sdir), "segment_score"),
@@ -248,5 +257,5 @@ def backtest(cfg: dict, stream: str = "", transcript: bool = False, force: bool 
                            "usd": round(claude.cost - spent, 4), "scores": got}
         done[sid] = len(got)
         print(f"  {sid}: {len(got)} segments as of {starts[sid]:%Y-%m-%d}, ${claude.cost - spent:.3f}")
-    print(f"{variant}: {len(done)} streams, ${claude.cost:.2f}")
+    print(f"{variant}: {len(done)} streams, ${sum(c.cost for c in clients.values()):.2f}")
     return done
