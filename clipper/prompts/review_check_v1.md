@@ -13,8 +13,9 @@ Answer only what you can see:
 - person_shown: "yes" when the main photo's face is clearly that person, "no" when it is
   clearly someone else (another face from the reference, a different age, build or hair, a
   cartoon or a stock photo where a real person was meant), "unsure" when you can't tell (no
-  reference photo and no other clue, a costume, a face too small or turned away). With no
-  person named, "unsure".
+  reference photo and no other clue, a face too small or turned away, or a costume, wig, hood or
+  face paint on the main photo's person: the show's people dress up). With no person named,
+  "unsure".
 - face_cut_off: true when the main photo's face is cut so its eyes, nose or mouth are outside
   the picture or hidden under the headline or a box. Hair or the top of the head cut off is
   fine, and so is a face in profile or turned partly away.

@@ -195,8 +195,8 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
 - **Review checks (#259 A):** once that PR is merged and deployed, mark the webcam panels in clipper.toml
   (`cam = true`: Kino watch panels 2-3, watch_hosts and cams both; Channel 404 watch panel 2 (Don), desk;
   Chud's are `focus = "face"` already). Not before the deploy: the deployed code would count the key in a
-  Short's render signature. `clipper doctor` warns while a show marks none. A vision backtest over every
-  past cover is ~$9 on Sonnet, not run yet (your call).
+  Short's render signature. `clipper doctor` warns while a show marks none. The vision backtest ran 11-14
+  (log): both cover rejects caught, ~6-9% of approved covers flagged.
 - Branches and worktrees were cleaned up again 11-13: everything merged is gone, plus the old `ccr-*` and
   `claude/clipper-investigate-command-*` branches and the swarm worktree, all at the user's word. Kept on
   purpose: `story-dig` and `jev-lab` (`C:\clipper-jevlab`; it holds `jev-gate`'s commit), both pushed and
