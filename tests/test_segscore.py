@@ -222,6 +222,20 @@ def test_a_refused_retry_keeps_the_first_answer(share, monkeypatch):
     assert segscore.backtest(share, stream="kick-2") == {"kick-2": 1}
 
 
+def test_a_refused_stream_doesnt_stop_the_backtest(share, monkeypatch, capsys):
+    fake = FakeClaude()
+    real = fake.json_call
+
+    def refuse_kick1(model, system, user, *a, **kw):
+        if "No segment upload of this show" in user:   # kick-1 is the first, with nothing known yet
+            return None, {"refusal": "no"}
+        return real(model, system, user, *a, **kw)
+    fake.json_call = refuse_kick1
+    monkeypatch.setattr(segscore, "Claude", lambda cfg: fake)
+    assert segscore.backtest(share) == {"kick-2": 2}
+    assert "kick-1: not scored" in capsys.readouterr().out
+
+
 def test_the_backtest_uses_each_shows_own_config(share, monkeypatch):
     seen = []
     monkeypatch.setattr(segscore, "Claude", lambda cfg: seen.append(cfg["show"]["key"]) or FakeClaude())

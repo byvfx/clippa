@@ -238,18 +238,23 @@ def backtest(cfg: dict, stream: str = "", transcript: bool = False, force: bool 
         return {}
     # One client per show's resolved config, so a show's own provider and model are the ones
     # checked and used (Copilot, #261); costs add up over them.
-    clients: dict[str, Claude] = {}
+    clients: dict[tuple[str, str], Claude] = {}
     done = {}
     for sid, sdir, segs in plan:
         costs.set_context("segments backtest", sid)
         scfg = for_stream(cfg, sdir)
         sc = scfg["segments"]
-        claude = clients.get(scfg["show"]["key"])
+        which = (scfg["show"]["key"], sc["score_model"])  # a stream's config.toml may pick another model
+        claude = clients.get(which)
         if claude is None:
-            claude = clients[scfg["show"]["key"]] = Claude(scfg)
+            claude = clients[which] = Claude(scfg)
             preflight(claude, sc["score_model"])
         spent = claude.cost
-        got = score(sdir, cfg, segs, rows, starts[sid], transcript, claude)
+        try:
+            got = score(sdir, cfg, segs, rows, starts[sid], transcript, claude)
+        except ClipperError as e:  # one refused stream doesn't stop the rest
+            print(f"  {sid}: not scored ({e})")
+            continue
         with jsonstate.update(sdir / BACKTEST, {}) as bt:
             bt[variant] = {"model": sc["score_model"],
                            "prompt_version": version_of(for_stream(cfg, sdir), "segment_score"),
