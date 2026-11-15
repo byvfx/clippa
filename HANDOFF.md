@@ -163,13 +163,11 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   dossier (one stated a self-claimed role as fact). The DSP story (11-04) went to Kitsu for review instead.
 - **Receipts for Don:** first video private at https://youtu.be/q6gemx2kKMs (2026-10-26); sending it is the
   user's call. On-screen source links would need a re-cut.
-- **Weekly:** issue 03 posted (X thread 11-01). Issue 04 (Nov 1-7, Jer's midterm meltdown cover, the user's
-  pick) built 2026-11-08 in `weekly/2026-11-07/`, $1.11; Jer and PPP faces pinned by hand in issue.json (the
-  auto picks were a Jer-movie actor and a costume torso: the faces stage names movie and costume look-alikes
-  as the cast, worth a look before issue 05); in Discord `#weekly`. Not posted yet; the X thread text is in
-  issue.json `post.x` (OK'd 11-08), held by the X cap: a one-time scheduled task (`clipper-weekly-04-x-thread`)
-  posts it 11-09 11:42 when 3 slots free, unless the hourly auto job takes them. Issue 05 is Saturday
-  2026-11-14 (on a Sunday add `--week <Saturday>`).
+- **Weekly:** issue 04 (Nov 1-7, Jer cover) in `weekly/2026-11-07/`. Issue 05 (Nov 8-14, "Lindsay's Cruise
+  Hell!", the user's pick) built 2026-11-15 in `weekly/2026-11-14/`, $0.78; the cover is a real teary
+  close-up of her from Wed's stream (the user wanted "very unflattering", crying), pinned by hand (log
+  11-15). Not yet in Discord `#weekly`, not posted, no X thread text yet. The faces stage still mislabels
+  (her auto pick was a Disney performer from her video). Issue 06 is Saturday 2026-11-21.
 - **The Udder Truth:** storyboard complete, voice and pipeline chosen; next the newsroom set (Brass Eye refs in
   studio/mockups/udder_truth/refs/), new desk plates, then Moo's WAN renders (~1,550 Runway credits).
 - **Costs and analytics:** October ~$200 in model/GPU spend, ~$184 of it the Jer archive; Haiku scoring
