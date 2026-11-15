@@ -9,11 +9,6 @@ from clipper.errors import ClipperError
 T0 = datetime(2026, 11, 15, 12, 0, tzinfo=UTC)
 
 
-@pytest.fixture(autouse=True)
-def no_recheck_memory():
-    review_auto._rechecked.clear()
-
-
 @pytest.fixture
 def cfg(defaults):
     defaults["review"]["auto_approve"] = True
@@ -310,7 +305,9 @@ def test_a_recheck_is_hourly_per_stream_and_off_with_the_checks(cfg, tmp_path, m
     for minutes in (0, 10, 50, 61):
         review_auto.run(cfg, say=lambda *_: None, now=t + timedelta(minutes=minutes))
     assert asked == [["v01_t1"], ["v01_t1"]] and approved == []
-    review_auto._rechecked.clear()
+    # on disk, not in memory: serve runs every pass as a new `clipper review auto` process
+    assert jsonstate.read(sd / review_auto.RECHECK, {})["at"] == review_auto.now_iso(t + timedelta(minutes=61))
+    (sd / review_auto.RECHECK).unlink()
     cfg["review"]["checks"] = False
     review_auto.run(cfg, say=lambda *_: None)
     assert len(asked) == 2

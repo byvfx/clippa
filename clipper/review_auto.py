@@ -29,8 +29,8 @@ from .config import base, for_show, for_stream
 STATE = "auto.json"
 EVERY_S = 600          # serve's job
 RECHECK_S = 3600       # findings are checked again at most this often per stream
+RECHECK = "recheck.json"   # per stream, {"at": the last recheck}: serve runs each pass as a new process
 WHO = "auto"           # the actions' `who` for an automatic approval
-_rechecked: dict[str, datetime] = {}   # stream folder -> its last recheck, this process
 KINDS = ("short", "pick", "segment", "compilation")
 
 
@@ -250,6 +250,17 @@ def _remember(sdir: Path, vs: dict[str, Verdict], state: dict, now: datetime) ->
                 e["out"], e["out_at"] = why, now_iso(now)
 
 
+def recheck_due(sdir: Path, now: datetime) -> bool:
+    """Is a recheck due (RECHECK_S since the last)? Stamps now when it is, under the file's lock,
+    so two passes that overlap don't both run one."""
+    with jsonstate.update(sdir / RECHECK, {}) as st:
+        last = _when(st.get("at"))
+        if last and (now - last).total_seconds() < RECHECK_S:
+            return False
+        st["at"] = now_iso(now)
+    return True
+
+
 def recheck(cfg: dict, sdir: Path, vs: dict[str, Verdict], now: datetime, say=print) -> dict[str, Verdict]:
     """Check again, at most every RECHECK_S per stream, the items that wait only on their
     checks (findings, or a run that failed). Findings stay in checks.json until something checks
@@ -261,10 +272,8 @@ def recheck(cfg: dict, sdir: Path, vs: dict[str, Verdict], now: datetime, say=pr
     from . import review_check
 
     keys = [k for k, v in vs.items() if v.on_checks]
-    last = _rechecked.get(str(sdir))
-    if not keys or not cfg["review"]["checks"] or (last and (now - last).total_seconds() < RECHECK_S):
+    if not keys or not cfg["review"]["checks"] or not recheck_due(sdir, now):
         return vs
-    _rechecked[str(sdir)] = now
     try:
         review_check.run(sdir, cfg, keys=keys, say=lambda *_: None)
     except Exception as e:  # noqa: BLE001  # the due items still go; the next recheck tries again
