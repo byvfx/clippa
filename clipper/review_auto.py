@@ -28,6 +28,8 @@ from .config import base, for_show, for_stream
 
 STATE = "auto.json"
 EVERY_S = 600          # serve's job
+RECHECK_S = 3600       # findings are checked again at most this often per stream
+RECHECK = "recheck.json"   # per stream, {"at": the last recheck}: serve runs each pass as a new process
 WHO = "auto"           # the actions' `who` for an automatic approval
 KINDS = ("short", "pick", "segment", "compilation")
 
@@ -126,6 +128,7 @@ class Verdict:
     why: str = ""
     at: datetime | None = None   # waiting: when it approves itself; approved: when it did
     lasting: bool = False        # a person's doing (a hold, an edit, a note): out for good once seen
+    on_checks: bool = False      # it waits only on its checks: findings, or a run that failed
 
     def as_dict(self) -> dict:
         return {"key": self.key, "state": self.state, "why": self.why,
@@ -179,10 +182,12 @@ def verdict(cfg: dict, kind_of_stream: str, key: str, st: dict, r: dict, check: 
     grace, why = grace_for(rc, kind_of_stream, st, r)
     if grace is None:
         return Verdict(key, "person", why)
-    if not check or not check.get("sig"):
-        return Verdict(key, "person", "not checked yet" if not check else "its checks didn't run")
+    if not check:
+        return Verdict(key, "person", "not checked yet")
+    if not check.get("sig"):
+        return Verdict(key, "person", "its checks didn't run", on_checks=True)
     if check.get("findings"):
-        return Verdict(key, "person", f"{len(check['findings'])} check finding(s)")
+        return Verdict(key, "person", f"{len(check['findings'])} check finding(s)", on_checks=True)
     since = _when(st.get("published_at")) or _when(auto.get("seen"))
     if since is None:   # published before published_at existed: the next pass starts its grace
         return Verdict(key, "waiting", "its grace starts at the next pass")
@@ -245,6 +250,38 @@ def _remember(sdir: Path, vs: dict[str, Verdict], state: dict, now: datetime) ->
                 e["out"], e["out_at"] = why, now_iso(now)
 
 
+def recheck_due(sdir: Path, now: datetime) -> bool:
+    """Is a recheck due (RECHECK_S since the last)? Stamps now when it is, under the file's lock,
+    so two passes that overlap don't both run one."""
+    with jsonstate.update(sdir / RECHECK, {}) as st:
+        last = _when(st.get("at"))
+        if last and (now - last).total_seconds() < RECHECK_S:
+            return False
+        st["at"] = now_iso(now)
+    return True
+
+
+def recheck(cfg: dict, sdir: Path, vs: dict[str, Verdict], now: datetime, say=print) -> dict[str, Verdict]:
+    """Check again, at most every RECHECK_S per stream, the items that wait only on their
+    checks (findings, or a run that failed). Findings stay in checks.json until something checks
+    the item again, and only a publish or a due item did: findings from older check code
+    (kick-137715636's, 11-14) kept items out of the window for good. review_check.run skips an
+    item whose signature is unchanged, so a finding that still holds costs no vision call. An
+    item never checked waits for a person as before, and nothing runs with [review] checks off.
+    checks.json only: the Kitsu Checks column keeps what the last publish wrote."""
+    from . import review_check
+
+    keys = [k for k, v in vs.items() if v.on_checks]
+    if not keys or not cfg["review"]["checks"] or not recheck_due(sdir, now):
+        return vs
+    try:
+        review_check.run(sdir, cfg, keys=keys, say=lambda *_: None)
+    except Exception as e:  # noqa: BLE001  # the due items still go; the next recheck tries again
+        say(f"  {sdir.name}: checks not run again: {type(e).__name__}: {e}")
+        return vs
+    return verdicts(cfg, sdir, now, strict=True)
+
+
 def approve_due(cfg: dict, sdir: Path, keys: list[str], say=print) -> list[str]:
     """Approve the due items of one stream: Kitsu first (what a person did since the last sync
     counts), the checks again (an item re-rendered since is checked anew, a cover's vision call
@@ -303,6 +340,7 @@ def run(cfg: dict, stream: str | None = None, apply: bool = True, say=print,
         try:   # one stream's trouble (a broken auto.json, Kitsu down) mustn't stop the rest
             vs = verdicts(scfg, sdir, now, strict=apply)
             if apply:
+                vs = recheck(scfg, sdir, vs, now, say)
                 _remember(sdir, vs, jsonstate.read_or(sdir / "review_state.json", {}), now)
             due = [k for k, v in vs.items() if v.state == "due"]
             if due and apply:

@@ -52,7 +52,11 @@ A show can let its clean items approve themselves: `[shows.<key>.review] auto_ap
   the command line or Kitsu itself. Anything you do leaves it to you for good (a hold clipper
   set itself, for [other voices](#shorts-held-for-other-voices), only while it's on);
 - its [pre-flight checks](#pre-flight-checks) found nothing (run again just before, so an item
-  re-rendered since is checked anew);
+  re-rendered since is checked anew). Once an hour the job also checks again the items held only
+  by their findings (or by a check run that failed), so a stale finding clears itself once what
+  it read or the checks' version changes; one that still holds costs no vision call. That updates
+  `checks.json` (the war room, the card, `clipper status`), not the Kitsu Checks column, which
+  the next publish rewrites. An item never checked still waits for you;
 - its score is at least its kind's floor (`auto_min_short = 6`; picks, segments and compilations
   are 0, which leaves them to you);
 - it has been in review `auto_grace_minutes` (120).
