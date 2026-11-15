@@ -190,11 +190,13 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   (111 GB would go at 30 days). The test stream is in `[streams] never_prune` (set 11-13).
 - `secrets/youtube_cookies.netscape.txt` on the share is unused since PR #195 and can be deleted.
 - Close Fusion and merge the `mockups/udder_truth/` leftovers into `studio/mockups/` (ignored by `/mockups/`).
-- **`C:\clipper` is on `ccr-8319354b-axsr9v`** (Sloth Beat fanmag, a cloud branch) since 11-14 00:57, with
-  uncommitted fanmag work in the tree (thumbs/fanmag.py, config, doctor, Covers wiki, studio mockups). Until
-  that work is committed and the checkout is back on main and pulled, `clipper` on PATH runs that branch's
-  code, which has no `clipart` (and none of main's later changes). Check `git branch --show-current` there
-  before branching.
+- `C:\clipper` is back on main and clean (11-14). The fanmag work is on `ccr-8319354b-axsr9v` (pushed,
+  "fan-mag paused for the user's next tweaks"). Still check `git branch --show-current` there before branching.
+- **Review checks (#259 A):** once that PR is merged and deployed, mark the webcam panels in clipper.toml
+  (`cam = true`: Kino watch panels 2-3, watch_hosts and cams both; Channel 404 watch panel 2 (Don), desk;
+  Chud's are `focus = "face"` already). Not before the deploy: the deployed code would count the key in a
+  Short's render signature. `clipper doctor` warns while a show marks none. A vision backtest over every
+  past cover is ~$9 on Sonnet, not run yet (your call).
 - Branches and worktrees were cleaned up again 11-13: everything merged is gone, plus the old `ccr-*` and
   `claude/clipper-investigate-command-*` branches and the swarm worktree, all at the user's word. Kept on
   purpose: `story-dig` and `jev-lab` (`C:\clipper-jevlab`; it holds `jev-gate`'s commit), both pushed and
