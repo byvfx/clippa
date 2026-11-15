@@ -1,0 +1,219 @@
+"""`clipper review check` (#259 step A): the pure parts, and a run over a small fake stream."""
+from __future__ import annotations
+
+import json
+
+from clipper import jsonstate, review_check, shorts
+from clipper.checkup import BAD, WARN
+
+WATCH = {"panels": [{"src": [0, 0.137, 0.74, 0.74], "h": 608},
+                    {"src": [0.74, 0.21, 0.26, 0.31], "h": 656, "cam": True},
+                    {"src": [0.74, 0.52, 0.26, 0.31], "h": 656, "cam": True}]}
+
+
+def face(x, y, w, h, marks=None):
+    """A detect() face; marks default to a face's eyes, nose and mouth well inside its box."""
+    marks = marks or [[x + w * fx, y + h * fy] for fx, fy in
+                      ((0.3, 0.35), (0.7, 0.35), (0.5, 0.55), (0.35, 0.75), (0.65, 0.75))]
+    return {"box": [x, y, w, h], "marks": marks}
+
+
+# ---------- a Short's picture ----------
+
+def test_panel_slots_stack_the_layout_top_to_bottom():
+    assert review_check.panel_slots(WATCH, 1920) == [(0, 608), (608, 1264), (1264, 1920)]
+    assert shorts.panel_heights({"panels": [{"src": [0, 0, 1, 1]}, {"src": [0, 0, 1, 1]}]}, 1920) == [960, 960]
+
+
+def test_cam_panels_are_marked_or_follow_the_face():
+    assert review_check.cam_panels(WATCH) == [1, 2]
+    chud = {"panels": [{"src": [0, 0, 1, 1]}, {"src": [0, 0, 1, 1], "focus": "face"}]}
+    assert review_check.cam_panels(chud) == [1]
+    assert review_check.cam_panels({"panels": [{"src": [0, 0, 1, 1], "focus": "face", "cam": False}]}) == []
+    assert review_check.cam_panels({"panels": [{"src": [0, 0, 1, 1]}]}) == []   # unmarked: not checked
+
+
+def test_frame_verdicts_by_the_eyes_nose_and_mouth():
+    slots = review_check.panel_slots(WATCH, 1920)
+    middle = face(0.4, 0.4, 0.2, 0.12)                     # inside panel 2
+    # panel 3: leaning in, the chin past the frame's bottom, the mouth still in: fine
+    leaning = face(0.4, 0.85, 0.25, 0.16, marks=[[0.47, 0.9], [0.58, 0.9], [0.52, 0.94], [0.48, 0.97], [0.57, 0.97]])
+    assert review_check.frame_verdicts([middle, leaning], slots, 1920, [1, 2]) == {1: "ok", 2: "ok"}
+    # an eye off the left side of the Short: cut off
+    cut = face(-0.05, 0.4, 0.2, 0.12, marks=[[0.0, 0.44], [0.08, 0.44], [0.05, 0.47], [0.02, 0.5], [0.08, 0.5]])
+    assert review_check.frame_verdicts([cut], slots, 1920, [1, 2]) == {1: "edge", 2: "none"}
+    # the mouth below panel 2's bottom (in panel 3's rows): cut by the seam
+    seam = face(0.4, 0.57, 0.2, 0.1, marks=[[0.45, 0.6], [0.55, 0.6], [0.5, 0.63], [0.46, 0.67], [0.54, 0.67]])
+    assert review_check.frame_verdicts([seam], slots, 1920, [1])[1] == "edge"
+
+
+def test_picture_summary_needs_enough_frames_and_a_share():
+    n = {"watch": 3}
+    assert review_check.picture_summary({("watch", 1): ["none", "none"]}, n) == []   # too few frames
+    out = review_check.picture_summary({("watch", 1): ["none", "none", "ok", "ok"],
+                                        ("watch", 2): ["edge", "ok", "ok", "ok", "ok", "ok"]}, n)
+    assert out == [(BAD, "no face in the watch layout's panel 2 of 3 (a webcam) in 2 of 4 frames")]
+    out = review_check.picture_summary({("watch", 2): ["edge", "edge", "ok", "ok", "ok", "ok"]}, n)
+    assert out and "cut off at the edge of the watch layout's panel 3" in out[0][1]
+
+
+def test_short_scenes_follow_the_tightened_cut():
+    side = {"in_s": 100.0, "out_s": 140.0, "layout": "cams 0:00 > watch 0:20",
+            "scenes": [[0.0, 20.0, "cams"], [20.0, 40.0, "watch"]],
+            "tightened": {"pauses": [{"from": 5.0, "to": 8.0}]}}
+    assert review_check.short_scenes(side, {"cams": {}, "watch": {}}) == [[0.0, 17.0, "cams"], [17.0, 37.0, "watch"]]
+    one = {"in_s": 0.0, "out_s": 30.0, "layout": "watch"}
+    assert review_check.short_scenes(one, {"watch": {}}) == [[0.0, 30.0, "watch"]]
+    assert review_check.short_scenes(one, {"cams": {}}) == []   # a layout the show no longer has
+
+
+def test_a_cam_mark_renders_nothing_again():
+    sc = {"captions": True, "lufs": -14, "width": 1080, "height": 1920}
+    bare = {"watch": {"panels": [{"src": [0, 0, 1, 1], "h": 1920}]}}
+    marked = {"watch": {"panels": [{"src": [0, 0, 1, 1], "h": 1920, "cam": True}]}}
+    scenes = [[0.0, 30.0, "watch"]]
+    assert shorts.short_signature(sc, "libx264", 1, 31, scenes, bare) == \
+        shorts.short_signature(sc, "libx264", 1, 31, scenes, marked)
+
+
+# ---------- the subject ----------
+
+PEOPLE = {
+    "jer": {"name": "The Quartering (Jer)", "aliases": []},
+    "jerry-banfield": {"name": "Jerry Banfield", "aliases": []},
+    "don": {"name": "Channel 404 News (Don Flurgundy)", "aliases": ["Don"]},
+    "dsp": {"name": "DSP (DarkSydePhil)", "aliases": []},
+    "ppp": {"name": "PPP", "aliases": []},
+}
+
+
+def test_plain_drops_apostrophes_so_dont_is_never_don():
+    assert review_check.plain("Don't you dare") == "dont you dare"
+    assert review_check.plain("PPP's take on Jer’s show") == "ppp take on jer show"
+    assert review_check.mentions(review_check.plain("I don't know, Don said"), {"don"}) == 1
+
+
+def test_title_people_skips_the_shows_own_and_takes_the_longest_name():
+    assert review_check.title_people("Jer roasts PPP", PEOPLE, {"ppp"}) == {"jer": "jer"}
+    assert review_check.title_people("Jerry Banfield's comeback", PEOPLE, set()) == {"jerry-banfield": "jerry banfield"}
+    assert review_check.title_people("Don't stop", PEOPLE, set()) == {}
+
+
+def test_opening_finding_wants_someone_else_and_no_subject(defaults):
+    words = [{"word": w, "start": i * 10.0, "end": i * 10.0 + 1} for i, w in
+             enumerate(["DSP", "said", "DSP", "again", "and", "DSP", "Joe", "finally"] + ["x"] * 300)]
+    defaults["review"]["open_minutes"] = 1
+    f = review_check.opening_finding(defaults, words, 0, 3000, {"angry joe", "joe"}, PEOPLE, set())
+    assert f and f[0] == WARN and "name DSP (DarkSydePhil) 3 times and its subject never" in f[1]
+    # the subject named in the opening: fine
+    assert review_check.opening_finding(defaults, words, 0, 3000, {"dsp"}, PEOPLE, set()) is None
+    # too short to say
+    assert review_check.opening_finding(defaults, words, 0, 80, {"joe"}, PEOPLE, set()) is None
+
+
+def test_segment_names_take_the_topics_last_word():
+    names = review_check.segment_names({"topic": "Angry Joe", "figures": ["DSP"]}, PEOPLE, {"paths": {}})
+    assert {"angry joe", "joe", "dsp", "darksydephil"} <= names
+
+
+# ---------- the cover ----------
+
+def test_cover_face_finding_only_for_a_confident_someone_else(defaults):
+    defaults["faces"]["match"] = 0.7
+    assert review_check.cover_face_finding(defaults, "Jerry", 0.82, "Jer", {}) == \
+        (BAD, "the cover's face looks like Jerry (0.82), not Jer")
+    assert review_check.cover_face_finding(defaults, "Jerry", 0.5, "Jer", {}) is None     # not sure who
+    assert review_check.cover_face_finding(defaults, "PPP", 0.9, "ppp", {}) is None       # the same
+    assert review_check.cover_face_finding(defaults, "", 0.0, "Jer", {}) is None
+
+
+def test_vision_findings():
+    assert review_check.vision_findings({}) == []
+    v = {"person_shown": "no", "face_cut_off": True, "text_reads": False, "problems": ["  a frozen   frame "]}
+    assert review_check.vision_findings(v) == [
+        (BAD, "the cover doesn't show the person it names"), (BAD, "a face on the cover is cut off"),
+        (WARN, "the cover's words are hard to read"), (WARN, "cover: a frozen frame")]
+    assert review_check.vision_findings({"person_shown": "unsure", "face_cut_off": False,
+                                         "text_reads": True, "problems": []}) == []
+    assert "wouldn't look" in review_check.vision_findings({"refused": True})[0][1]
+
+
+def test_summary_fits_the_column():
+    assert review_check.summary([]) == ""
+    long = [{"text": "x" * 300}, {"text": "y" * 300}]
+    out = review_check.summary(long)
+    assert len(out) == review_check.COLUMN_CHARS and out.endswith("…")
+
+
+# ---------- a run over a fake stream ----------
+
+def fake_stream(cfg, tmp_path):
+    cfg["paths"]["streams"] = tmp_path / "streams"
+    cfg["paths"]["streamers"] = tmp_path / "streamers.json"
+    cfg["paths"]["archive"] = tmp_path / "archive"
+    jsonstate.write(cfg["paths"]["people"], {"people": {k: dict(v) for k, v in PEOPLE.items()}})
+    sd = cfg["paths"]["streams"] / "kick-1"
+    (sd / "segments").mkdir(parents=True)
+    seg = {"id": "s01", "start_s": 0.0, "end_s": 3000.0, "topic": "Angry Joe", "figures": ["Angry Joe"],
+           "title": "Angry Joe hosts a stream", "description": "", "source_share": "none", "cut": True}
+    jsonstate.write(sd / "segments.json", {"segments": [seg]})
+    jsonstate.write(sd / "segments" / "s01_angry-joe.json", seg)
+    (sd / "segments" / "s01_angry-joe.mp4").write_bytes(b"")
+    jsonstate.write(sd / "meta.json", {"started_at": "2026-11-14T03:00:00+00:00"})
+    lines = [{"word": w, "start": i * 10.0, "end": i * 10.0 + 1} for i, w in
+             enumerate(["DSP", "DSP", "DSP", "Jer"] + ["x"] * 296)]
+    (sd / "words.jsonl").write_text("\n".join(json.dumps(x) for x in lines), encoding="utf-8")
+    return sd
+
+
+def test_run_checks_keeps_and_skips_the_unchanged(defaults, tmp_path):
+    sd = fake_stream(defaults, tmp_path)
+    defaults["review"]["check_model"] = ""      # offline: no vision call
+    defaults["review"]["open_minutes"] = 5
+    said = []
+    found = review_check.run(sd, defaults, say=said.append)
+    texts = [f["text"] for f in found["s01_angry-joe"]]
+    assert any("says 'hosts'" in t for t in texts)             # [checkup] words
+    assert "no description" in texts
+    assert any("name DSP (DarkSydePhil) 3 times" in t for t in texts)
+    assert all(f["stream"] == "kick-1" and f["check"] in review_check.CHECKS for f in found["s01_angry-joe"])
+    assert review_check.flagged_keys(sd) == {"s01_angry-joe"}
+    assert len(said) == 1
+    review_check.run(sd, defaults, say=said.append)            # nothing changed: not checked again
+    assert len(said) == 1
+    review_check.run(sd, defaults, say=said.append, force=True)
+    assert len(said) == 2
+    side = sd / "segments" / "s01_angry-joe.json"
+    jsonstate.write(side, {**jsonstate.load(side), "title": "Angry Joe returns", "description": "About Joe."})
+    found = review_check.run(sd, defaults, say=said.append)
+    assert len(said) == 3 and not any("hosts" in f["text"] for f in found["s01_angry-joe"])
+
+
+def test_run_save_false_writes_nothing_and_a_broken_check_is_a_finding(defaults, tmp_path, monkeypatch):
+    sd = fake_stream(defaults, tmp_path)
+    defaults["review"]["check_model"] = ""
+
+    def boom(*a, **k):
+        raise ValueError("no words")
+    monkeypatch.setattr(review_check, "subject_findings", boom)
+    found = review_check.run(sd, defaults, save=False, say=lambda *_: None)
+    assert not review_check.path(sd).exists()
+    assert any(f["level"] == BAD and "the subject check failed: ValueError: no words" in f["text"]
+               for f in found["s01_angry-joe"])
+
+
+def test_estimate_counts_covers_to_look_at(defaults, tmp_path):
+    sd = fake_stream(defaults, tmp_path)
+    assert review_check.estimate(sd, defaults)[0] == 0          # no cover .jpg
+    (sd / "segments" / "s01_angry-joe.jpg").write_bytes(b"")
+    n, usd = review_check.estimate(sd, defaults)
+    assert n == 1 and usd > 0
+    defaults["review"]["check_model"] = ""
+    assert review_check.estimate(sd, defaults) == (0, 0.0)
+
+
+def test_same_person_is_loose_about_spellings(defaults):
+    same = lambda a, b: review_check.same_person(defaults, a, b, PEOPLE)
+    assert same("Jerry", "Jerry Banfield") and same("Russel Brand", "Russell Brand")
+    assert same("Jer", "The Quartering (Jer)")              # one people.json record
+    assert not same("Jer", "Don Flurgundy") and not same("Jerry", "Jer")

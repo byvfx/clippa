@@ -65,6 +65,8 @@ def needs_lines(s: dict) -> list[str]:
     for r in s["needs_you"]["review"]:
         c = r["counts"]
         parts = [f"{c[k]} {k.replace('_', ' ')}" for k in actions.OPEN if c.get(k)]
+        if r.get("flagged"):
+            parts.append(f"{r['flagged']} with check findings")
         if r["held"]:
             parts.append(f"{r['held']} held")
         out.append(f"{r['stream']} ({r['date'] or '?'}): {', '.join(parts)}"

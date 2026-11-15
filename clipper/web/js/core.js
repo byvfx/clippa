@@ -219,7 +219,7 @@ const STATUS = { unslotted: i => i.decision === "approved" && !i.scheduled && !i
   scheduled: i => !!i.scheduled && !i.uploaded, uploaded: i => i.uploaded, held: i => i.hold,
   pinned: i => !!i.publish_at, dropped: i => !!i.dropped, issues: i => (i.issues || []).length > 0 };
 const STATUS_LABEL = { unslotted: "Approved, no slot", scheduled: "Scheduled", uploaded: "Uploaded", held: "Held",
-  pinned: "Pinned", dropped: "Not going out (stale / over budget)", issues: "Has style issues" };
+  pinned: "Pinned", dropped: "Not going out (stale / over budget)", issues: "Has style issues or check findings" };
 function textOf(i) {
   return [i.title, i.hook, i.ref, i.description, i.topic, i.hashtags, i.playlist, i.category, i.thumb_text]
     .join(" ").toLowerCase();

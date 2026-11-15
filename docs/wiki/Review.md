@@ -15,6 +15,33 @@ of a compilation can't be changed by a note. Approved items are scheduled and
 uploaded ([Scheduling and uploads](Scheduling-and-uploads)). `clipper review status` shows the
 decisions and what's scheduled.
 
+## Pre-flight checks
+
+Before an item reaches you, `clipper review publish` looks at it the way you would
+(`clipper review check <stream>` by hand; `[review] checks = false` turns it off):
+
+- **Text**: the `[checkup] words` ("hosts" and the like), YouTube's limits, a word `[bleep]`
+  would mask, no description.
+- **A Short's webcams**: frames of the rendered Short through the face detector. A webcam panel
+  with no face in most frames, or a face cut off at the panel's edge (an eye, the nose or the
+  mouth past it; a chin past the edge is only someone leaning in), is a finding. The webcam
+  panels are the ones marked `cam = true` in the show's layouts (or `focus = "face"`); a layout
+  with neither isn't checked. The mark doesn't change the picture, so adding it renders nothing again.
+- **The cover**: the face on it against the person the cover is meant to show, by the known
+  faces ([Faces](Faces)), and one vision call (`[review] check_model`, about a cent a cover) on
+  the finished cover: the right person, a face cut off, words that don't read.
+- **The subject**: a person the title names whom the transcript around the item never names
+  (and its segment isn't about), and a segment or compilation whose first `[review]
+  open_minutes` (15) name someone else three times or more and its subject never: the cut may
+  start on another story.
+
+What it finds goes in the stream's `checks.json`, the Kitsu **Checks** column, a Checks field
+on the Discord card, the war room's ⚠ badge and item window, and `clipper status` ("2 with check
+findings"). An item is checked again only when something it reads changed (`--force` to check
+anyway; `--dry-run` prices the vision calls; `--no-vision` skips them). A check that fails is a
+finding too. Findings don't stop anything yet: they say where to look. Approval by silence for
+clean items is the next step (#259).
+
 ## Shorts held for other voices
 
 A Short whose voices other than the show's own people (`[meta] cast`) run over `[scoring]
