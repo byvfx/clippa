@@ -24,6 +24,7 @@ them in particular but is all there is.
 from __future__ import annotations
 
 import sys
+from bisect import bisect_left, bisect_right
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -73,12 +74,21 @@ def median(xs: list[float]) -> float:
     return 0.0 if not n else xs[n // 2] if n % 2 else (xs[n // 2 - 1] + xs[n // 2]) / 2
 
 
+def half_of(v: float, vals: list[float]) -> str:
+    """"top", "bottom" or "" for value v among vals (sorted): the positions its tie run takes
+    (1 = the lowest) must all sit in the top half, or all in the bottom one."""
+    n, h = len(vals), len(vals) // 2
+    lo, hi = bisect_left(vals, v) + 1, bisect_right(vals, v)
+    return "top" if lo > n - h else "bottom" if hi <= h else ""
+
+
 def halves(rows: list[dict], ranker: str) -> dict:
-    """Inside each stream with MIN_HALVES+ ranked uploads: the uploads ranked above the middle
-    against those below it, by rank, so uploads tied across the middle (six Shorts all scored 6)
-    count in neither half; a stream with nothing on one side is left out. Totals of views and
-    uploads per half over the streams, and in how many streams the top half drew more views per
-    upload."""
+    """Inside each stream with MIN_HALVES+ ranked uploads: the top half by the ranker against
+    the bottom half (the middle one of an odd count in neither). A run of tied values that
+    reaches across the line between the halves counts in neither ([9, 8, 8, 8, 1, 0]: the 8s
+    are out, 9 is the top, 1 and 0 the bottom); a stream left with nothing on one side is left
+    out. Totals of views and uploads per half over the streams, and in how many streams the top
+    half drew more views per upload."""
     by_stream: dict[str, list[dict]] = {}
     for r in rows:
         if r.get(ranker) is not None:
@@ -87,10 +97,10 @@ def halves(rows: list[dict], ranker: str) -> dict:
     for group in by_stream.values():
         if len(group) < MIN_HALVES:
             continue
-        rk = ranks([r[ranker] for r in group])
-        mid = (len(group) + 1) / 2
-        top = [r["views"] for r, x in zip(group, rk, strict=True) if x > mid]
-        bottom = [r["views"] for r, x in zip(group, rk, strict=True) if x < mid]
+        vals = sorted(r[ranker] for r in group)
+        where = [half_of(r[ranker], vals) for r in group]
+        top = [r["views"] for r, w in zip(group, where, strict=True) if w == "top"]
+        bottom = [r["views"] for r, w in zip(group, where, strict=True) if w == "bottom"]
         if not top or not bottom:
             continue
         out["streams"] += 1
@@ -122,12 +132,17 @@ def known_by(r: dict, when: datetime) -> bool:
 
 def topic_history(rows: list[dict]) -> None:
     """Sets each row's "topic": the median views of the same show's earlier uploads on its
-    topic that were known_by its stream's start, or None (no topic, or no such upload)."""
+    topic that were known_by its stream's start, or None (no topic, no such upload, or no known
+    start: a publish time would let in what was learned after the stream). A row with no start
+    still counts in the others' history: its views are real, only its own decision time isn't."""
     by_topic: dict[tuple, list[dict]] = {}
     for r in rows:
         if topic_key(r.get("topic_name", "")):
             by_topic.setdefault((r["show"], topic_key(r["topic_name"])), []).append(r)
     for r in rows:
+        if r["decided_at"] is None:
+            r["topic"] = None
+            continue
         prior = [p["views"] for p in by_topic.get((r["show"], topic_key(r.get("topic_name", ""))), [])
                  if p is not r and known_by(p, r["decided_at"])]
         r["topic"] = median(prior) if prior else None
@@ -221,17 +236,25 @@ def stream_facts(sdir: Path, heat: bool = True) -> dict:
     compilations' segments. Empty for a stream that's gone (pruned or never here)."""
     from .schedule import segment_heat
 
-    try:
+    def note(what: str, e: Exception) -> None:
+        print(f"lift: {sdir.name}: no {what} ({type(e).__name__}: {str(e)[:120]})", file=sys.stderr)
+
+    started = None
+    try:  # apart from the heat: a broken segments.json mustn't lose a good start time
         meta = jsonstate.read(sdir / "meta.json", {}) or {}
-        seg = (jsonstate.read(sdir / "segments.json", {}) or {}) if heat else {}
-        values = segment_heat(sdir, seg.get("segments", [])) if heat else {}
         started = when(meta["started_at"]) if meta.get("started_at") else None
-    except (OSError, ValueError, KeyError, TypeError) as e:  # one broken stream file: that stream is unknown
-        print(f"lift: {sdir.name} left out of heat and stream times ({type(e).__name__}: {str(e)[:120]})",
-              file=sys.stderr)
-        return {"started": None, "heat": {}, "comps": {}}
-    return {"started": started, "heat": values,
-            "comps": {c["file"].removesuffix(".mp4"): c["segments"] for c in seg.get("compilations", [])}}
+    except (OSError, ValueError, TypeError) as e:
+        note("stream start", e)
+    values, comps = {}, {}
+    if heat:
+        try:
+            seg = jsonstate.read(sdir / "segments.json", {}) or {}
+            values = segment_heat(sdir, seg.get("segments", []))
+            comps = {c["file"].removesuffix(".mp4"): c["segments"] for c in seg.get("compilations", [])}
+        except (OSError, ValueError, KeyError, TypeError) as e:
+            note("chat heat", e)
+            values, comps = {}, {}
+    return {"started": started, "heat": values, "comps": comps}
 
 
 def item_heat(kind: str, key: str, facts: dict) -> float | None:
@@ -269,7 +292,7 @@ def rows(cfg: dict, heat: bool = True) -> list[dict]:
             score = None
         out.append({"key": r["key"], "stream": sid, "show": r.get("show") or "?", "kind": r["kind"],
                     "title": r.get("title", ""), "views": int(d7.get("views") or 0), "published": published,
-                    "decided_at": f["started"] or published, "topic_name": r.get("topic") or "",
+                    "decided_at": f["started"], "topic_name": r.get("topic") or "",
                     "score": score, "heat": item_heat(r["kind"], key, f)})
     topic_history(out)
     return out

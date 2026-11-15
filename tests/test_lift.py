@@ -47,6 +47,10 @@ def test_halves_leave_ties_across_the_middle_out():
     rows = [row(f"c/v0{i}", v, kind="short", score=s) for i, (s, v) in enumerate([(9, 50), (8, 50), (7, 60), (2, 1), (2, 1), (2, 1)])]
     h = lift.halves(rows, "score")
     assert (h["top_n"], h["bottom_n"], h["top_won"]) == (3, 3, 1)
+    # a tie run off-centre still reaches across the line: [9, 8, 8, 8, 1, 0] keeps only 9 vs 1, 0 (Copilot, #260)
+    rows = [row(f"d/v0{i}", v, kind="short", score=s) for i, (s, v) in enumerate([(9, 9), (8, 1), (8, 1), (8, 1), (1, 3), (0, 5)])]
+    assert lift.halves(rows, "score") == {"streams": 1, "top": 9, "top_n": 1, "bottom": 8, "bottom_n": 2,
+                                          "top_won": 1}
 
 
 def test_by_value_medians_per_whole_score():
@@ -152,9 +156,9 @@ def test_rows_from_the_share(share):
     assert rows["kick-1/comp-dsp"]["heat"] == 2.0                         # its segments' mean
     assert rows["kick-1/v01_t03"]["score"] == 7.0 and rows["kick-1/v01_t03"]["heat"] is None
     assert rows["kick-1/s01_dsp"]["decided_at"] == datetime(2026, 10, 20, 3, tzinfo=UTC)
-    old = rows["gone-2/s01_dsp"]                    # a pruned stream: no heat, its publish time as the decision
-    assert old["heat"] is None and old["decided_at"].tzinfo is not None
-    assert old["topic"] == 50                        # kick-1's two DSP segments were known by 11-05
+    old = rows["gone-2/s01_dsp"]                    # a stream that's gone: no heat, no start
+    assert old["heat"] is None and old["decided_at"] is None
+    assert old["topic"] is None                      # never its publish time: that lets later results in
     assert lift.topic_record(share, "kino")[0] == {"topic": "DSP", "n": 3, "median": 40, "best": 60,
                                                    "best_title": "S2"}
 
@@ -179,7 +183,15 @@ def test_cli_lift(share, capsys):
 def test_a_broken_stream_file_leaves_that_stream_out(share, capsys):
     (share["paths"]["streams"] / "kick-1" / "segments.json").write_text("{not json", encoding="utf-8")
     rows = {r["key"]: r for r in lift.rows(share)}
-    assert rows["kick-1/s01_dsp"]["heat"] is None and "kick-1 left out" in capsys.readouterr().err
+    assert rows["kick-1/s01_dsp"]["heat"] is None and "kick-1: no chat heat" in capsys.readouterr().err
+    assert rows["kick-1/s01_dsp"]["decided_at"] == datetime(2026, 10, 20, 3, tzinfo=UTC)  # the start survives
+
+
+def test_an_upload_with_no_start_still_counts_for_the_others():
+    rows = [row("a/s01", 100, topic="DSP"), row("b/s01", 5, topic="DSP", days=20, decided=T0 + timedelta(days=20))]
+    rows[0]["decided_at"] = None
+    lift.topic_history(rows)
+    assert rows[0]["topic"] is None and rows[1]["topic"] == 100
 
 
 def test_heat_is_read_only_where_something_ranks_by_it(share, monkeypatch):
