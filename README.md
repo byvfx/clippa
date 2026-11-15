@@ -2,7 +2,7 @@
   <a href="https://byvfx.github.io/clippa/">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="docs/readme/hero-dark.png">
-      <img src="docs/readme/hero-light.png" width="100%" alt="Clippa. One 8-hour stream with the moments Clippa picks out of it. 306 videos published to YouTube since mid-October, about $3.50 for a full run on an 8-hour stream, 2,732 hours of archive transcribed and indexed, 694 offline tests.">
+      <img src="docs/readme/hero-light.png" width="100%" alt="Clippa. One 8-hour stream with the moments Clippa picks out of it. 390 videos uploaded to YouTube since mid-October, about $3.50 for a full run on an 8-hour stream, 2,732 hours of archive transcribed and indexed, 975 offline tests.">
     </picture>
   </a>
 </p>
