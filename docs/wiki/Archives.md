@@ -10,6 +10,7 @@ clipper archive status
 clipper modal                                                     # GPUs up, runs, spend, archive ETA
 clipper costs [--month 2026-10]                                   # month's spend: models + Modal + fixed, by stage/show/stream
 clipper analytics --report [--month 2026-10] [--refresh]          # YouTube month: views, sources, 7-day numbers by show/kind/day/hour
+clipper analytics --lift [--show kino] [--kind segment]           # what predicts views (Scheduling-and-uploads)
 clipper archive check jer                                         # which source links still play
 clipper archive links jer                                         # the dead and restricted ones
 clipper archive index jer                                         # keyword index, index.sqlite (free)

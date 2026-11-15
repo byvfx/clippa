@@ -8,7 +8,10 @@ Usage:
     clipper analytics --report [--month 2026-10] [--refresh]
                                   the month: channel totals, where views came from, 7-day
                                   numbers of its uploads by show/kind/category/day/hour, best
-                                  and weakest -> reports/analytics/<month>.md + .csv (#42)
+                                  and weakest, and what predicts views (lift.py) ->
+                                  reports/analytics/<month>.md + .csv (#42)
+    clipper analytics --lift [--show KEY] [--kind segment] [--json]
+                                  what predicts views, every upload so far (lift.py, #258)
 
 Views, likes and comments come from the YouTube Data API with the upload sign-in. Once a
 video is 7 days old, its first-7-days numbers come from the YouTube Analytics API (needs
@@ -27,6 +30,7 @@ from pathlib import Path
 
 from . import jsonstate
 from .config import base, for_stream
+from .lift import D7_DAYS, median
 from .states import split_key
 
 ANALYTICS_SCOPE = "https://www.googleapis.com/auth/yt-analytics.readonly"
@@ -111,7 +115,7 @@ def run(cfg: dict, sign_in: bool = False) -> dict:
             if rec.get("d7") or vid not in by_id:
                 continue
             pub = datetime.fromisoformat(rec["publish_at"]).astimezone(UTC).date()
-            if (now.date() - pub).days < 8:  # Analytics lags ~2 days; wait for a full week
+            if (now.date() - pub).days < D7_DAYS:  # Analytics lags ~2 days; wait for a full week
                 continue
             r = ya.reports().query(
                 ids="channel==MINE", startDate=pub.isoformat(),
@@ -212,29 +216,24 @@ def fetch_channel(cfg: dict, ya, now: datetime) -> dict:
     return out
 
 
-def _median(xs: list[float]) -> float:
-    xs = sorted(xs)
-    n = len(xs)
-    return 0.0 if not n else xs[n // 2] if n % 2 else (xs[n // 2 - 1] + xs[n // 2]) / 2
-
-
 def _group(rows: list[dict], key) -> list[dict]:
     """Per group of videos with 7-day numbers: count, median and total 7-day views, mean %
     watched; biggest median first."""
     groups: dict[str, list[dict]] = {}
     for r in rows:
         groups.setdefault(key(r) or "(none)", []).append(r)
-    out = [{"key": k, "n": len(g), "median_views": round(_median([r["d7"]["views"] for r in g]), 1),
+    out = [{"key": k, "n": len(g), "median_views": round(median([r["d7"]["views"] for r in g]), 1),
             "views": sum(r["d7"]["views"] for r in g),
             "pct": round(sum(r["d7"].get("averageViewPercentage", 0) for r in g) / len(g), 1)}
            for k, g in groups.items()]
     return sorted(out, key=lambda x: (-x["median_views"], -x["n"]))
 
 
-def report(cfg: dict, month: str = "") -> dict:
+def report(cfg: dict, month: str = "", lift: bool = False) -> dict:
     """One month: channel totals (and the month before), uploads by kind, 7-day performance
     of that month's uploads by show, kind, category, weekday and hour, best and weakest,
-    traffic sources and the daily numbers."""
+    traffic sources and the daily numbers. lift: also what predicts views over every upload
+    so far (lift.py; it reads each stream's signals, so the war room's panel leaves it out)."""
     from zoneinfo import ZoneInfo
 
     cfg = base(cfg)
@@ -291,7 +290,16 @@ def report(cfg: dict, month: str = "") -> dict:
                    "subs": d["subscribersGained"] - d["subscribersLost"]}
                   for d in daily if d["day"].startswith(month)],
         "videos": [row(r) for r in sorted(mine, key=lambda r: r["local"])],
+        "lift": lift_table(cfg) if lift else [],
     }
+
+
+def lift_table(cfg: dict) -> list[dict]:
+    """The report's last section: lift.table over every upload so far, not only the month's
+    (a month is too few to rank anything by)."""
+    from . import lift
+
+    return lift.table(lift.rows(cfg))
 
 
 def report_markdown(rep: dict) -> str:
@@ -334,6 +342,13 @@ def report_markdown(rep: dict) -> str:
                   "### Best", "", *vids(rep["best"]), ""]
         if rep["worst"]:
             lines += ["### Weakest", "", *vids(rep["worst"]), ""]
+    if rep.get("lift"):
+        from . import lift
+
+        lines += ["## What predicts views (every upload so far)", "",
+                  "Each ranker against 7-day views: the Score column, the chat heat `clipper schedule` "
+                  "ranks segments by, and the topic's earlier uploads (`clipper analytics --lift`).", "",
+                  lift.markdown(rep["lift"]), ""]
     lines += ["Medians of fewer than 3 videos are anecdotes, not trends. Every upload is in the .csv beside this file.", ""]
     return "\n".join(lines)
 

@@ -31,6 +31,32 @@ can jump the queue with `[schedule] priority = true` in its stream config
 In the [war room](War-room) the schedule shows the open slots of the next two weeks; drag an
 item onto a slot to pin it.
 
+## What predicts views
+
+The budget is only as good as what it ranks by. `clipper analytics --lift` checks each ranker
+against how the uploads did in their first 7 days (no model call; it reads `analytics.json`, so
+run `clipper analytics` first if it's stale):
+
+```bash
+clipper analytics --lift                      # every show and kind
+clipper analytics --lift --show kino --kind segment
+clipper analytics --lift --json
+```
+
+The rankers are the Score column (Shorts and clips), the chat heat segments and compilations
+are ranked by, and the topic's track record: the median 7-day views of the show's earlier
+uploads on the same topic, counting only those whose 7 days were over when the stream began.
+For each, per show and kind: how many uploads have a value, Spearman's rank correlation with
+7-day views (+1 orders them exactly as views do, 0 is no relation, nothing under 5 values),
+and, inside each stream with 4 or more, the views per upload of the uploads ranked above the
+middle against those below it (uploads tied across the middle count in neither), with the
+number of streams where the top half won. Median views per score follow the table. Each show
+stands alone: Kino's uploads draw far more than Channel 404's, so a row pooling them would
+mostly measure the show.
+
+Only what went out has views, so a ranker is checked on what it let through, not on what the
+budget dropped. `clipper analytics --report` ends with the same table, over every upload so far.
+
 ## Past the daily limit
 
 Upload the file in Studio and `clipper upload --attach <item> <link>` fills in the rest (title,

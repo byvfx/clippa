@@ -941,10 +941,25 @@ def cmd_completion(cfg: dict, args: argparse.Namespace) -> None:
 def cmd_analytics(cfg: dict, args: argparse.Namespace) -> None:
     from . import analytics
 
+    if args.lift:
+        from . import lift
+
+        other = [f for f, on in (("--report", args.report), ("--list", args.list_only), ("--sign-in", args.sign_in),
+                                 ("--refresh", args.refresh), ("--month", args.month)) if on]
+        if other:
+            raise ClipperError(f"--lift is a report of its own; leave out {', '.join(other)}")
+        show = args.lift_show or args.show
+        if show and show not in config.base(cfg)["shows"]:
+            raise ClipperError(f"no [shows.{show}] in the config; shows: {', '.join(config.base(cfg)['shows'])}")
+        groups = lift.table(lift.rows(cfg), show=show, kind=args.kind)
+        print_json(groups) if args.json else print(lift.markdown(groups))
+        return
+    if args.json or args.kind or args.lift_show:
+        raise ClipperError("--show, --kind and --json go with --lift")
     if args.report:
         if args.refresh:
             analytics.run(cfg)
-        rep = analytics.report(cfg, args.month or "")
+        rep = analytics.report(cfg, args.month or "", lift=True)
         print(analytics.report_markdown(rep))
         print(f"-> {analytics.write_report(cfg, rep)}")
     else:
@@ -1480,6 +1495,11 @@ def add_review(sub) -> None:
                    help="the month's report -> reports/analytics/<month>.md + .csv")
     p.add_argument("--month", help="with --report: YYYY-MM (default: this month)")
     p.add_argument("--refresh", action="store_true", help="with --report: refresh analytics.json first")
+    p.add_argument("--lift", action="store_true",
+                   help="what predicts views: score, chat heat and topic history against 7-day views (no model)")
+    p.add_argument("--show", dest="lift_show", metavar="KEY", help="with --lift: one show")
+    p.add_argument("--kind", choices=["short", "clip", "segment", "compilation"], help="with --lift: one kind")
+    p.add_argument("--json", action="store_true", help="with --lift: print JSON")
     p.set_defaults(fn=cmd_analytics)
 
 

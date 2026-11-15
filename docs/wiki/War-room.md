@@ -181,7 +181,8 @@ to `""` (console only) says to use `docker compose logs` instead.
   subscribers against the month before, views per day, where views came from (Shorts feed,
   search, ...), and the first-7-day numbers of that month's uploads by show, kind, weekday and
   hour, with the best and weakest. `clipper analytics --report` writes the same as
-  `reports/analytics/<month>.md` plus a .csv of every upload.
+  `reports/analytics/<month>.md` plus a .csv of every upload, and ends with
+  [what predicts views](Scheduling-and-uploads#what-predicts-views), which the panel leaves out.
 
 ## Layouts
 
