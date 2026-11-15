@@ -521,7 +521,7 @@ def subject_findings(sdir: Path, cfg: dict, it: dict, ctx: dict) -> list[tuple[s
         subj = set(about)
         for pid in named:
             subj |= index[pid]
-        f = opening_finding(cfg, words, spans[0][0], spans[-1][1], subj, people, own, index)
+        f = opening_finding(cfg, words, spans, subj, people, own, index)
         if f:
             out.append(f)
     return out
@@ -530,15 +530,27 @@ def subject_findings(sdir: Path, cfg: dict, it: dict, ctx: dict) -> list[tuple[s
 OPENING_OTHER = 3   # an opening that names someone else this often, and the subject never
 
 
-def opening_finding(cfg: dict, words: list[dict], a: float, b: float, subj: set[str],
+def opening(spans: list[tuple[float, float]], seconds: float) -> list[tuple[float, float]]:
+    """The stream stretches of an item's first seconds of playback: a compilation plays its
+    segments one after another, the stream time between them isn't in it."""
+    out, left = [], seconds
+    for a, b in spans:
+        if left <= 0:
+            break
+        out.append((a, min(b, a + left)))
+        left -= b - a
+    return out
+
+
+def opening_finding(cfg: dict, words: list[dict], spans: list[tuple[float, float]], subj: set[str],
                     people: dict, own: set[str], index: dict | None = None) -> tuple[str, str] | None:
     """A long item whose first [review] open_minutes never name its subject but name someone
     else OPENING_OTHER times or more: the cut may start on another story (the comp-angry-joe
-    reject, 11-14: "the first 20 mins is just phil")."""
+    reject, 11-14: "the first 20 mins is just phil"). spans: the stream stretches it plays, in order."""
     m = cfg["review"]["open_minutes"]
-    if not subj or not m or b - a < 1.5 * m * 60:
+    if not subj or not m or sum(b - a for a, b in spans) < 1.5 * m * 60:
         return None
-    text = stretch_text(words, a, a + m * 60)
+    text = " ".join(stretch_text(words, a, b) for a, b in opening(spans, m * 60))
     if mentions(text, subj):
         return None
     index = index if index is not None else name_index(people)
@@ -569,6 +581,7 @@ def signature(cfg: dict, it: dict, ctx: dict, vision: bool) -> str:
              jpg.stat().st_mtime if jpg.exists() else 0, it["text"], it["fields"].get("Thumbnail text"),
              it["fields"].get("Tags"), {k: cover.get(k) for k in ("frame", "face", "photo", "main_person", "text")},
              it["meta"].get("layout"), it["meta"].get("scenes"), cfg["checkup"]["words"],
+             cfg["meta"].get("cast"), cfg["meta"].get("show_name"), cfg.get("bleep"),
              rc["check_frames"], rc["open_minutes"], rc["check_model"] if vision else "",
              rc["check_prompt_version"] if vision else ""]
     return hashlib.sha1(json.dumps(parts, default=str, sort_keys=True).encode()).hexdigest()[:16]
@@ -654,6 +667,7 @@ def run(sdir: Path, cfg: dict, todo: list[dict] | None = None, keys: list[str] |
     rc = cfg["review"]
     todo = select(sdir, cfg, todo, keys)
     vision = bool(rc["check_model"]) if vision is None else (vision and bool(rc["check_model"]))
+    started = datetime.now(UTC).isoformat(timespec="seconds")
     ctx = context(sdir, cfg)
     have = load(sdir)
     done: dict[str, dict] = {}
@@ -675,10 +689,21 @@ def run(sdir: Path, cfg: dict, todo: list[dict] | None = None, keys: list[str] |
             "findings": found, **({"vision": v} if v else {})}
         say(f"  {it['key']}: " + ("; ".join(f["text"] for f in found) if found else "clean"))
     if fresh and save:
-        # only what this run checked: a publish and a hand `review check` may run at once
+        # only what this run checked, and not over a result another run (a publish and a hand
+        # `review check` may overlap) wrote after this one started: that one read newer files
         with jsonstate.update(path(sdir), {}) as state:
-            state.update(fresh)
+            state.update({k: v for k, v in fresh.items() if (state.get(k) or {}).get("at", "") <= started})
     return {k: v["findings"] for k, v in done.items()}
+
+
+def record_failure(sdir: Path, keys: list[str], why: str) -> None:
+    """A run that failed outright: each item gets a finding with no signature, so it is
+    checked again next time and nothing reads it as clean meanwhile."""
+    at = datetime.now(UTC).isoformat(timespec="seconds")
+    with jsonstate.update(path(sdir), {}) as state:
+        for k in keys:
+            state[k] = {"sig": "", "at": at,
+                        "findings": [finding(f"run:{k}:0", "run", BAD, why, stream=sdir.name)]}
 
 
 def select(sdir: Path, cfg: dict, todo: list[dict] | None, keys: list[str] | None) -> list[dict]:
@@ -690,7 +715,29 @@ def select(sdir: Path, cfg: dict, todo: list[dict] | None, keys: list[str] | Non
         todo = review.items(sdir, cfg["review"]["include"], cfg)
     if keys:
         todo = [it for it in todo if any(it["key"] == k or it["key"].split("_")[0] == k for k in keys)]
-    return todo
+    return as_edited(sdir, todo)
+
+
+EDITABLE = ("YouTube title", "YouTube description", "Hashtags", "Tags", "Thumbnail text")
+
+
+def as_edited(sdir: Path, todo: list[dict]) -> list[dict]:
+    """The items as they'll upload: a title, description, hashtags or tags a reviewer changed in
+    Kitsu (review.json, as of the last sync) over the draft's. Copies; todo is left alone."""
+    fields = {k: (r.get("fields") or {}) for k, r in jsonstate.read_or(sdir / "review.json", {}).items()}
+    out = []
+    for it in todo:
+        got = {n: v for n in EDITABLE if isinstance(v := fields.get(it["key"], {}).get(n), str) and v.strip()}
+        if not got:
+            out.append(it)
+            continue
+        it = {**it, "fields": {**it["fields"], **got}}
+        it["title"] = got.get("YouTube title", it["title"])
+        it["description"] = got.get("YouTube description", it["description"])
+        tags = it["fields"].get("Hashtags")
+        it["text"] = f"{it['title']}\n\n{it['description']}" + (f"\n\n{tags}" if tags else "")
+        out.append(it)
+    return out
 
 
 def estimate(sdir: Path, cfg: dict, todo: list[dict] | None = None,

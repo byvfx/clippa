@@ -716,6 +716,10 @@ def add_checks(stream_dir: Path, cfg: dict, todo: list[dict]) -> None:
         why = f"the checks didn't run: {type(e).__name__}: {str(e)[:200]}"
         print(f"  {why}", flush=True)
         found = {it["key"]: [{"text": why}] for it in todo}
+        try:   # so the card, the war room and status don't read these items as clean
+            review_check.record_failure(stream_dir, [it["key"] for it in todo], why)
+        except Exception as e2:  # noqa: BLE001  # the Kitsu column still says it
+            print(f"  and checks.json couldn't say so: {type(e2).__name__}: {e2}", flush=True)
     for it in todo:
         if it["key"] in found:
             it["fields"]["Checks"] = review_check.summary(found[it["key"]])

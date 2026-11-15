@@ -253,8 +253,8 @@ Udder Truth #58/#59/#60, P&L #50 (revenue once monetized). Write "#77 L6" rather
 messages: GitHub closes the issue on "fix".
 - **Review pre-flight checks (#259, 11-14):** step A, `clipper review check` (wiki Review#pre-flight-checks,
   `clipper/review_check.py`, run by `review publish`), is its own PR (branch `review-check`). Step B, approval by
-  silence for clean items after a 2-hour grace window, is the next PR: build it on `checks.json` (an item with no
-  findings, signature current) and keep the taste rejects (too much Jer, side gaming) as what the window is for.
+  silence for clean items after a 2-hour grace window, is the next PR: build it on `checks.json` (an item with an
+  entry, no findings and a current signature; a missing entry or `sig: ""`, a failed run, is not clean) and keep the taste rejects (too much Jer, side gaming) as what the window is for.
 - **Documentaries (11-13, PR #233, merged and deployed):** `clipper doc
   new|voice|build|master|leak|kit` (wiki Documentaries; `clipper/doc.py`, `doc_resolve.py`), the reusable form
   of the first mini-documentary's one-off Resolve scripts. A piece is `[paths] documentaries/<slug>/` on the

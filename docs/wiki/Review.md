@@ -35,7 +35,8 @@ Before an item reaches you, `clipper review publish` looks at it the way you wou
   open_minutes` (15) name someone else three times or more and its subject never: the cut may
   start on another story.
 
-What it finds goes in the stream's `checks.json`, the Kitsu **Checks** column, a Checks field
+The text checks read the title, description, hashtags and tags as they'll upload: a change you
+made in Kitsu (as of the bot's last sync) over the draft's. What it finds goes in the stream's `checks.json`, the Kitsu **Checks** column, a Checks field
 on the Discord card, the war room's ⚠ badge and item window, and `clipper status` ("2 with check
 findings"). An item is checked again only when something it reads changed (`--force` to check
 anyway; `--dry-run` prices the vision calls; `--no-vision` skips them). A check that fails is a

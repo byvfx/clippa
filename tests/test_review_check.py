@@ -103,12 +103,25 @@ def test_opening_finding_wants_someone_else_and_no_subject(defaults):
     words = [{"word": w, "start": i * 10.0, "end": i * 10.0 + 1} for i, w in
              enumerate(["DSP", "said", "DSP", "again", "and", "DSP", "Joe", "finally"] + ["x"] * 300)]
     defaults["review"]["open_minutes"] = 1
-    f = review_check.opening_finding(defaults, words, 0, 3000, {"angry joe", "joe"}, PEOPLE, set())
+    f = review_check.opening_finding(defaults, words, [(0, 3000)], {"angry joe", "joe"}, PEOPLE, set())
     assert f and f[0] == WARN and "name DSP (DarkSydePhil) 3 times and its subject never" in f[1]
     # the subject named in the opening: fine
-    assert review_check.opening_finding(defaults, words, 0, 3000, {"dsp"}, PEOPLE, set()) is None
+    assert review_check.opening_finding(defaults, words, [(0, 3000)], {"dsp"}, PEOPLE, set()) is None
     # too short to say
-    assert review_check.opening_finding(defaults, words, 0, 80, {"joe"}, PEOPLE, set()) is None
+    assert review_check.opening_finding(defaults, words, [(0, 80)], {"joe"}, PEOPLE, set()) is None
+
+
+def test_a_compilations_opening_is_playback_time(defaults):
+    assert review_check.opening([(0, 30), (2000, 3000)], 60) == [(0, 30), (2000, 2030)]
+    assert review_check.opening([(0, 100)], 60) == [(0, 60)]
+    # DSP three times in the first cut; Joe only in stream time the compilation leaves out
+    words = [{"word": w, "start": t, "end": t + 1} for w, t in
+             [("DSP", 0), ("DSP", 10), ("DSP", 20), ("Joe", 40), ("x", 2010), ("x", 2900)]]
+    defaults["review"]["open_minutes"] = 1
+    f = review_check.opening_finding(defaults, words, [(0, 30), (2000, 3000)], {"joe"}, PEOPLE, set())
+    assert f and "name DSP (DarkSydePhil) 3 times" in f[1]
+    # two short cuts hours apart are a short compilation, not a long one
+    assert review_check.opening_finding(defaults, words, [(0, 30), (9000, 9030)], {"joe"}, PEOPLE, set()) is None
 
 
 def test_segment_names_take_the_topics_last_word():
@@ -192,6 +205,29 @@ def test_run_checks_keeps_and_skips_the_unchanged(defaults, tmp_path):
     jsonstate.write(side, {**jsonstate.load(side), "title": "Angry Joe returns", "description": "About Joe."})
     found = review_check.run(sd, defaults, say=said.append)
     assert len(said) == 3 and not any("hosts" in f["text"] for f in found["s01_angry-joe"])
+    # a title a reviewer changed in Kitsu (review.json) is what's checked, and a change rechecks
+    jsonstate.write(sd / "review.json", {"s01_angry-joe": {"fields": {"YouTube title": "The hosts give up"}}})
+    found = review_check.run(sd, defaults, say=said.append)
+    assert len(said) == 4 and any(f["text"] == "title says 'hosts'" for f in found["s01_angry-joe"])
+
+
+def test_run_leaves_a_newer_result_alone(defaults, tmp_path, monkeypatch):
+    sd = fake_stream(defaults, tmp_path)
+    defaults["review"]["check_model"] = ""
+    newer = {"sig": "other", "at": "2999-01-01T00:00:00+00:00", "findings": []}
+
+    def meanwhile(sdir, cfg, it, ctx, claude):   # another run finishes while this one checks
+        jsonstate.write(review_check.path(sdir), {it["key"]: newer})
+        return [], {}
+    monkeypatch.setattr(review_check, "check_item", meanwhile)
+    review_check.run(sd, defaults, say=lambda *_: None)
+    assert review_check.load(sd)["s01_angry-joe"] == newer
+
+
+def test_record_failure_flags_the_items_until_checked_again(tmp_path):
+    review_check.record_failure(tmp_path, ["v01_t1"], "the checks didn't run: OSError: x")
+    assert review_check.flagged_keys(tmp_path) == {"v01_t1"}
+    assert review_check.load(tmp_path)["v01_t1"]["sig"] == ""
 
 
 def test_run_save_false_writes_nothing_and_a_broken_check_is_a_finding(defaults, tmp_path, monkeypatch):
@@ -268,6 +304,7 @@ def test_publish_fills_the_checks_column_and_goes_on_when_they_break(defaults, t
     monkeypatch.setattr(review_check, "run", boom)
     review.add_checks(tmp_path, defaults, todo)
     assert all(it["fields"]["Checks"] == "the checks didn't run: OSError: share gone" for it in todo)
+    assert review_check.flagged_keys(tmp_path) == {"v01_t1", "v02_t2"}   # the card and status see it too
 
 
 def test_text_dedupes_host_per_field(defaults):
@@ -290,4 +327,7 @@ def test_signature_follows_what_the_checks_read(defaults, tmp_path):
     import os
     import time
     os.utime(cfg["paths"]["people"], (time.time() + 5, time.time() + 5))
-    assert review_check.signature(cfg, it, review_check.context(sd, cfg), False) != one
+    two = review_check.signature(cfg, it, review_check.context(sd, cfg), False)
+    assert two != one
+    cfg["meta"]["cast"] = [*cfg["meta"]["cast"], "Jerry"]     # the show's own people
+    assert review_check.signature(cfg, it, review_check.context(sd, cfg), False) != two
