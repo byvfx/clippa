@@ -94,6 +94,8 @@ COLUMNS = [
     ("Shot", "Hook", "string", None),
     ("Shot", "Category", "list", ["fail", "win", "joke", "insight", "reaction", "hot_take"]),
     ("Shot", "Score", "number", None),
+    # Segments: the model score (#258, segments.json score; 1-10), what the budget ranks by.
+    ("Sequence", "Score", "number", None),
     ("Shot", "Found by", "list", ["chat", "transcript"]),
     # Shorts: the crop layout (a name from [shorts] layouts); edit it and rerun clipper shorts.
     ("Shot", "Layout", "string", None),
@@ -224,6 +226,8 @@ def items(stream_dir: Path, include: list[str], cfg: dict | None = None) -> list
     seg_data = jsonstate.load(stream_dir / "segments.json")
     cut_segs = sorted((s for s in seg_data["segments"] if s["cut"]), key=lambda s: s["start_s"])
     starts = [s["start_s"] for s in cut_segs]
+    # the model score (#258): segments.json's, newer than a cut sidecar's when --score ran later
+    scores = {s["id"]: s["score"] for s in seg_data["segments"] if "score" in s}
 
     def segment_of(t: float) -> dict | None:
         i = bisect.bisect_right(starts, t) - 1
@@ -238,7 +242,8 @@ def items(stream_dir: Path, include: list[str], cfg: dict | None = None) -> list
                         "file": side.with_suffix(".mp4"), "title": d["title"],
                         "description": d["description"],
                         "duration_s": d["end_s"] - d.get("cut_start_s", d["start_s"]),
-                        "fields": {"Topic": d["topic"], "Source audio": d["source_share"]},
+                        "fields": {"Topic": d["topic"], "Source audio": d["source_share"],
+                                   "Score": scores.get(d["id"], d.get("score"))},
                         "meta": d})
     if "picks" in include:
         for side in sorted((stream_dir / "clips").glob("*.json")):

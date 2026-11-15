@@ -21,8 +21,9 @@ further ahead; `--sync` reads Kitsu first).
 ## Staying current
 
 To stay current rather than build a backlog, `[schedule] stream_budget` caps each stream's
-releases per kind (scaled by its length; the best Shorts by score, segments and compilations
-by chat heat) and `stale_days` lets go of whatever isn't out that many days after it could
+releases per kind (scaled by its length; the best Shorts by score, segments by their
+[segment score](Pipeline#segment-scores) with chat heat breaking ties, or by heat where a
+stream has no score, and compilations by their best segment) and `stale_days` lets go of whatever isn't out that many days after it could
 first go. Items let go stay approved in Kitsu (war room filter "Not going out"); pin one with
 "Publish at" to send it anyway. A `stream_budget` kind at 0 goes only when pinned. A big night
 can jump the queue with `[schedule] priority = true` in its stream config
