@@ -298,8 +298,9 @@ def rows(cfg: dict, heat: bool = True) -> list[dict]:
             facts[sid] = stream_facts(streams / sid, sid in hot)
         f = facts[sid]
         published = when(r["publish_at"])
-        try:
-            score = float(r["score"]) if r.get("score") not in (None, "") else None
+        try:  # a segment's Kitsu Score is its model score, already the model ranker
+            score = (float(r["score"]) if r.get("score") not in (None, "") and r["kind"] != "segment"
+                     else None)
         except (TypeError, ValueError):
             score = None
         out.append({"key": r["key"], "stream": sid, "show": r.get("show") or "?", "kind": r["kind"],

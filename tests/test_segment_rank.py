@@ -74,6 +74,20 @@ def test_candidates_rank_by_the_score(stream):
     assert score["comp-t"] == score["s02_t"]                 # a compilation: its best segment's
 
 
+def test_a_compilation_with_its_own_kitsu_item_takes_its_best_segment(stream):
+    cfg, sdir = stream
+    rv = jsonstate.load(sdir / "review.json")
+    rv["comp-t"] = {"kind": "compilation", "id": "T", "file": "compilations/t.mp4", "decision": "approved",
+                    "fields": {}}
+    jsonstate.write(sdir / "review.json", rv)
+    st = jsonstate.load(sdir / "review_state.json")
+    st["comp-t"] = {"entity_id": "ec"}
+    jsonstate.write(sdir / "review_state.json", st)
+    items, _ = schedule.candidates(cfg, sdir.parent, cfg["schedule"], ZoneInfo("UTC"))
+    score = {it["key"].split("/")[1]: it["score"] for it in items}
+    assert score["comp-t"] == score["s02_t"] and [k for k in score if k == "comp-t"] == ["comp-t"]
+
+
 def test_candidates_keep_heat_without_scores(stream):
     cfg, sdir = stream
     data = jsonstate.load(sdir / "segments.json")
