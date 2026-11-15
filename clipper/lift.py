@@ -11,6 +11,9 @@ The rankers, one row each per show and kind where there are values:
     topic   the median 7-day views of the show's earlier uploads with the same topic, counting
             only those whose 7 days were over when the stream began (the record the scheduler
             or a prompt could have had then)
+    model   a segment's model score in segments.json ([segments] score, segscore.py)
+    bt      the backtest's model score from summaries, as of the stream's start
+    bt_tx   the same with the transcript (segment_scores_backtest.json, `segments --backtest`)
 
 For each: how many uploads have a value, Spearman's rank correlation against 7-day views, and,
 inside each stream with 4+ ranked uploads, the 7-day views of its top half against its bottom
@@ -33,7 +36,7 @@ from .config import base
 from .states import split_key
 
 KINDS = ("short", "clip", "segment", "compilation")
-RANKERS = ("score", "heat", "topic")
+RANKERS = ("score", "heat", "topic", "model", "bt", "bt_tx")
 D7_DAYS = 8            # analytics.run fetches a video's 7-day numbers once it is this many days old
 MIN_SPEARMAN = 5       # fewer values than this: no correlation shown
 MIN_HALVES = 4         # ranked uploads a stream needs before its halves count
@@ -245,16 +248,25 @@ def stream_facts(sdir: Path, heat: bool = True) -> dict:
         started = when(meta["started_at"]) if meta.get("started_at") else None
     except (OSError, ValueError, TypeError) as e:
         note("stream start", e)
-    values, comps = {}, {}
+    values, comps, models = {}, {}, {}
     if heat:
+        from .segscore import BACKTEST
+
         try:
             seg = jsonstate.read(sdir / "segments.json", {}) or {}
             values = segment_heat(sdir, seg.get("segments", []))
             comps = {c["file"].removesuffix(".mp4"): c["segments"] for c in seg.get("compilations", [])}
+            models["model"] = {s["id"]: s["score"] for s in seg.get("segments", []) if "score" in s}
         except (OSError, ValueError, KeyError, TypeError) as e:
             note("chat heat", e)
             values, comps = {}, {}
-    return {"started": started, "heat": values, "comps": comps}
+        try:
+            bt = jsonstate.read(sdir / BACKTEST, {}) or {}
+            for name, variant in (("bt", "summary"), ("bt_tx", "transcript")):
+                models[name] = {i: v["score"] for i, v in (bt.get(variant) or {}).get("scores", {}).items()}
+        except (OSError, ValueError, KeyError, TypeError) as e:
+            note("backtest scores", e)
+    return {"started": started, "heat": values, "comps": comps, "models": models}
 
 
 def item_heat(kind: str, key: str, facts: dict) -> float | None:
@@ -293,7 +305,9 @@ def rows(cfg: dict, heat: bool = True) -> list[dict]:
         out.append({"key": r["key"], "stream": sid, "show": r.get("show") or "?", "kind": r["kind"],
                     "title": r.get("title", ""), "views": int(d7.get("views") or 0), "published": published,
                     "decided_at": f["started"], "topic_name": r.get("topic") or "",
-                    "score": score, "heat": item_heat(r["kind"], key, f)})
+                    "score": score, "heat": item_heat(r["kind"], key, f),
+                    **{name: (by.get(key.split("_")[0]) if r["kind"] == "segment" else None)
+                       for name, by in f.get("models", {}).items()}})
     topic_history(out)
     return out
 

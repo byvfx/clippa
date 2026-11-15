@@ -39,7 +39,10 @@ publish` run on the picks alone, before the slow stages do the segments and comp
   named, `[music]`), and the weekly credits a quote to whoever said it.
 - **score**: Claude reads the transcript and heat curve and proposes moments and picks. A
   rerun pays every window again, so it refuses without `--force`.
-- **segments**: Claude splits the stream into topic segments and compilations.
+- **segments**: Claude splits the stream into topic segments and compilations. With
+  `[segments] score = true` (off by default) one more call scores each cut segment 1-10 as its
+  own upload, from the segment and the show's record per topic; see
+  [Segment scores](Pipeline#segment-scores).
 - **faces**: who is on screen, by face, over every keyframe (CPU, `clipper faces`): groups named
   against known faces kept for every show ([Faces](Faces)). The worker runs it after the fast
   lane, before the slow cut.
@@ -110,3 +113,29 @@ whose in/out points are unchanged, `thumbs` keeps a cover whose cut is unchanged
 
 [Pre-shows](Pre-shows) and one-off YouTube videos take a shorter path: one whole video, no
 clips or Shorts.
+
+## Segment scores
+
+Which of a stream's segments go out is decided by its budget, and the budget ranks segments by
+chat heat, which barely tracks views ([what predicts views](Scheduling-and-uploads#what-predicts-views)).
+A segment score is a model's guess instead (`clipper/segscore.py`, prompt `segment_score_v1`):
+one call per stream sees every cut segment (title, summary, topic, kind, how much is someone
+else's video) and the show's track record, the median and best 7-day views of its earlier
+uploads on each topic, and scores each 1-10 against the show's typical upload, with one
+sentence of why.
+
+```bash
+clipper segments <stream> --score --dry-run     # what it costs (a few cents on summaries)
+clipper segments <stream> --score               # into segments.json: score, score_why
+clipper segments --backtest --dry-run           # every past stream, as of its start
+clipper segments --backtest [--transcript]      # -> segment_scores_backtest.json per stream
+clipper analytics --lift --kind segment         # the bt / bt_tx rows: did it rank them right?
+```
+
+`[segments] score = true` scores each new stream after its split; `score_transcript` sends each
+segment's transcript too (~100k tokens for an 8 h stream, about $0.40 on Opus). The backtest
+scores past streams with the track record cut off at each stream's start, so nothing learned
+later leaks in, and writes beside segments.json, never into it. A stream's own uploads are never
+in its own record. Pre-shows and stories are one whole video and aren't scored. The model now
+and then passes over a segment on a touchy subject: it is asked once more, and what it still
+leaves out stays unscored. Nothing reads the score for scheduling yet (#258 step C).

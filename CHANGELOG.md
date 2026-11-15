@@ -8,6 +8,12 @@ current state; the version is `clipper --version` (set in `clipper/__init__.py` 
 
 ### 2026-11
 
+- 11-14: a model score for topic segments (#258 B, `clipper/segscore.py`, prompt
+  `segment_score_v1`): one call per stream scores each cut segment 1-10 against the show's typical
+  upload, from the segment and the show's per-topic track record. `clipper segments <stream> --score`,
+  `[segments] score` (off) after each split, and `clipper segments --backtest [--transcript]` over
+  past streams as of their start (segment_scores_backtest.json), which `clipper analytics --lift`
+  reads as the bt and bt_tx rankers.
 - 11-14: `clipper analytics --lift [--show] [--kind] [--json]` checks what clipper ranks uploads by
   against their 7-day views (#258 A, no model): the Score column, the segments' chat heat and the
   topic's earlier uploads, as Spearman's correlation and each stream's top half against its bottom
