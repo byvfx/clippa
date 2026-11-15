@@ -94,9 +94,14 @@ def test_a_floor_written_as_text_still_counts(cfg):
 
 def test_a_new_revision_takes_an_automatic_approval_back(tmp_path):
     jsonstate.write(review_auto.path(tmp_path), {"v01": {"approved_at": T0.isoformat()}, "v02": {"out": "hold"}})
+    jsonstate.write(tmp_path / "review.json", {"v01": {"decision": "approved", "status": "done"},
+                                               "v02": {"decision": "approved", "status": "done"}})
     review_auto.republished(tmp_path, "v01")
     review_auto.republished(tmp_path, "v02")
     assert review_auto.load(tmp_path) == {"v01": {"was_approved_at": T0.isoformat()}, "v02": {"out": "hold"}}
+    rv = jsonstate.read(tmp_path / "review.json")
+    assert rv["v01"] == {"decision": "pending", "status": "wfa"}       # not read as a person's approval
+    assert rv["v02"]["decision"] == "approved"                         # a person's stands
 
 
 def test_an_action_refused_for_bad_input_doesnt_count(tmp_path):
@@ -212,9 +217,15 @@ def test_history_and_the_checkup_finding(cfg, tmp_path):
         rv["v01_t1"]["decision"] = "approved"
     hist = {h["key"]: h["undone"] for h in review_auto.history(cfg)}
     assert hist == {"v01_t1": "", "v02_t2": "reopened", "v04_t4": "rejected"}
+    with jsonstate.update(sd / "review.json", {}) as rv:
+        rv["v01_t1"]["fields"] = {"Hold": "true"}                           # held in Kitsu
+    with jsonstate.update(review_auto.path(sd), {}) as auto:
+        auto["v03_t3"] = {"was_approved_at": at.isoformat()}                # re-rendered since
+    hist = {h["key"]: h["undone"] for h in review_auto.history(cfg)}
+    assert hist["v01_t1"] == "held" and hist["v03_t3"] == ""
     found = checkup.check_auto(cfg, datetime.now(UTC))
-    assert [f["key"] for f in found] == ["auto:kick-9/v02_t2", "auto:kick-9/v04_t4"]
-    assert "was then rejected" in found[1]["text"]
+    assert [f["key"] for f in found] == ["auto:kick-9/v01_t1", "auto:kick-9/v02_t2", "auto:kick-9/v04_t4"]
+    assert "was then rejected" in found[2]["text"]
 
 
 def test_the_card_says_when_it_approves_itself():
@@ -233,3 +244,72 @@ def test_enabled_anywhere_follows_the_shows(defaults):
     assert not review_auto.enabled_anywhere(defaults)
     defaults["review"]["auto_approve"] = True
     assert review_auto.enabled_anywhere(defaults)
+
+
+def stub(cfg, tmp_path, monkeypatch, approve=None):
+    from clipper import review, review_check, schedule
+
+    sd = fake(cfg, tmp_path)
+    monkeypatch.setattr(review_auto, "for_stream", lambda c, d: cfg)
+    monkeypatch.setattr(review, "sync", lambda *a, **k: {})
+    monkeypatch.setattr(review_check, "run", lambda *a, **k: {})
+    approved, replans = [], []
+    monkeypatch.setattr(actions, "approve", approve or (lambda c, item, comment, who: approved.append(item.key)))
+    monkeypatch.setattr(schedule, "run", lambda c, sync_first: replans.append(sync_first))
+    return sd, approved, replans
+
+
+def test_a_broken_auto_json_skips_the_stream(cfg, tmp_path, monkeypatch):
+    sd, approved, replans = stub(cfg, tmp_path, monkeypatch)
+    review_auto.path(sd).write_text("{not json", encoding="utf-8")
+    said = []
+    review_auto.run(cfg, say=said.append)
+    assert approved == [] and replans == [] and any("kick-9: skipped" in s for s in said)
+    assert review_auto.run(cfg, apply=False, say=said.append)["kick-9"]         # a dry run still lists
+
+
+def test_a_hold_seen_in_kitsu_keeps_it_out_after_its_release(cfg, tmp_path, monkeypatch):
+    sd, approved, _ = stub(cfg, tmp_path, monkeypatch)
+    with jsonstate.update(sd / "review.json", {}) as rv:
+        rv["v01_t1"]["fields"] = {"Hold": "true"}
+    review_auto.run(cfg, say=lambda *_: None)
+    assert review_auto.load(sd)["v01_t1"]["out"] == "held"
+    with jsonstate.update(sd / "review.json", {}) as rv:
+        rv["v01_t1"]["fields"] = {}                                             # released
+    review_auto.run(cfg, say=lambda *_: None)
+    assert approved == []
+
+
+def test_one_failed_approval_doesnt_lose_the_others(cfg, tmp_path, monkeypatch):
+    approved = []
+
+    def approve(c, item, comment, who):
+        if item.key == "v01_t1":
+            raise RuntimeError("Kitsu said no")
+        approved.append(item.key)
+    sd, _, replans = stub(cfg, tmp_path, monkeypatch, approve)
+    with jsonstate.update(sd / "review_state.json", {}) as st:
+        st["v02_t2"]["fields"]["Score"] = "8"
+    said = []
+    review_auto.run(cfg, say=said.append)
+    assert approved == ["v02_t2"] and replans == [False]
+    assert "approved_at" not in review_auto.load(sd).get("v01_t1", {})
+    assert any("v01_t1: not approved: RuntimeError" in s for s in said)
+
+
+def test_a_preshow_is_approved_at_publish(cfg, tmp_path, monkeypatch):
+    from clipper import notify, review
+
+    sd = tmp_path / "pre-1"
+    sd.mkdir()
+    jsonstate.write(sd / "meta.json", {"kind": "preshow"})
+    monkeypatch.setattr(notify, "for_stream", lambda c, d: cfg)
+    monkeypatch.setattr(review, "publish", lambda *a, **k: ["v01_t1"])
+    runs = []
+    monkeypatch.setattr(review_auto, "run", lambda c, stream: runs.append(stream))
+    cfg["discord"]["enabled"] = False
+    notify.publish_and_post(sd, cfg)
+    assert runs == ["pre-1"]
+    cfg["review"]["auto_preshow"] = "grace"
+    notify.publish_and_post(sd, cfg)
+    assert runs == ["pre-1"]

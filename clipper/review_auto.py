@@ -25,7 +25,6 @@ from zoneinfo import ZoneInfo
 
 from . import jsonstate
 from .config import base, for_show, for_stream
-from .errors import ClipperError
 
 STATE = "auto.json"
 EVERY_S = 600          # serve's job
@@ -37,8 +36,10 @@ def path(sdir: Path) -> Path:
     return sdir / STATE
 
 
-def load(sdir: Path) -> dict[str, dict]:
-    return jsonstate.read_or(path(sdir), {})
+def load(sdir: Path, strict: bool = False) -> dict[str, dict]:
+    """auto.json. strict (deciding to approve): a broken file raises rather than reading as
+    "nobody acted", which would hide a person's opt-out; display callers read it leniently."""
+    return jsonstate.read(path(sdir), {}) if strict else jsonstate.read_or(path(sdir), {})
 
 
 def now_iso(now: datetime | None = None) -> str:
@@ -54,23 +55,28 @@ def touch(sdir: Path, key: str, what: str, who: str = "") -> None:
     why = f"{what} by {who}" if who else what
     with jsonstate.update(path(sdir), {}) as state:
         e = state.setdefault(key, {})
-        if e.get("approved_at"):
-            if what != "approve":
-                e.setdefault("undone", why)
-                e.setdefault("undone_at", now_iso())
-        elif not e.get("out"):
-            e["out"], e["out_at"] = why, now_iso()
+        if e.get("approved_at") and what != "approve":
+            e.setdefault("undone", why)
+            e.setdefault("undone_at", now_iso())
+        if not e.get("out") and not (e.get("approved_at") and what == "approve"):
+            e["out"], e["out_at"] = why, now_iso()   # for good, a later re-render included
 
 
 def republished(sdir: Path, key: str) -> None:
     """A new revision went up (publish sets the task back to wfa): an automatic approval of the
-    old one no longer stands, so the item is judged again (kept as `was_approved_at`)."""
+    old one no longer stands, so the item is judged again (kept as `was_approved_at`). review.json
+    says so too, since no sync may follow (a publish without cards): left "approved", the next
+    pass would take it for a person's decision."""
     try:
         with jsonstate.update(path(sdir), {}) as state:
             e = state.get(key)
-            if e and e.get("approved_at"):
-                e["was_approved_at"] = e.pop("approved_at")
-    except OSError as e:
+            if not (e and e.get("approved_at")):
+                return
+            e["was_approved_at"] = e.pop("approved_at")
+        with jsonstate.update(sdir / "review.json", {}) as rv:
+            if key in rv:
+                rv[key].update(decision="pending", status="wfa")
+    except (OSError, ValueError) as e:
         print(f"{sdir.name}/{key}: auto.json not updated for the new revision: {e}")
 
 
@@ -119,6 +125,7 @@ class Verdict:
     state: str          # approved | due | waiting | person | decided | off
     why: str = ""
     at: datetime | None = None   # waiting: when it approves itself; approved: when it did
+    lasting: bool = False        # a person's doing (a hold, an edit, a note): out for good once seen
 
     def as_dict(self) -> dict:
         return {"key": self.key, "state": self.state, "why": self.why,
@@ -161,11 +168,11 @@ def verdict(cfg: dict, kind_of_stream: str, key: str, st: dict, r: dict, check: 
         return Verdict(key, "person", auto["out"])
     fields = r.get("fields") or {}
     if is_held(fields):
-        return Verdict(key, "person", "held")
+        return Verdict(key, "person", "held", lasting=True)
     if r.get("edited"):
-        return Verdict(key, "person", "edited in Kitsu: " + ", ".join(r["edited"]))
+        return Verdict(key, "person", "edited in Kitsu: " + ", ".join(r["edited"]), lasting=True)
     if retaken:
-        return Verdict(key, "person", "re-cut after a note")
+        return Verdict(key, "person", "re-cut after a note", lasting=True)
     grace, why = grace_for(rc, kind_of_stream, st, r)
     if grace is None:
         return Verdict(key, "person", why)
@@ -181,9 +188,11 @@ def verdict(cfg: dict, kind_of_stream: str, key: str, st: dict, r: dict, check: 
 
 
 def verdicts(cfg: dict, sdir: Path, now: datetime | None = None, state: dict | None = None,
-             decisions: dict | None = None, checks: dict | None = None) -> dict[str, Verdict]:
+             decisions: dict | None = None, checks: dict | None = None,
+             strict: bool = False) -> dict[str, Verdict]:
     """Every published item of a stream. cfg: any (the stream's own is resolved here); state,
-    decisions, checks: review_state.json, review.json and checks.json when already loaded."""
+    decisions, checks: review_state.json, review.json and checks.json when already loaded;
+    strict: a broken auto.json raises rather than reading as empty (to approve by it)."""
     from . import review_check
 
     cfg = for_stream(cfg, sdir)
@@ -191,7 +200,7 @@ def verdicts(cfg: dict, sdir: Path, now: datetime | None = None, state: dict | N
     state = jsonstate.read_or(sdir / "review_state.json", {}) if state is None else state
     decisions = jsonstate.read_or(sdir / "review.json", {}) if decisions is None else decisions
     checks = review_check.load(sdir) if checks is None else checks
-    auto = load(sdir)
+    auto = load(sdir, strict)
     retaken = set(jsonstate.read_or(sdir / "retakes.json", {}))
     kind = stream_kind(sdir)
     return {key: verdict(cfg, kind, key, st, decisions.get(key, {}), checks.get(key), auto.get(key, {}),
@@ -213,22 +222,24 @@ def note(v: Verdict | dict | None, tz: str) -> str:
 
 
 def _remember(sdir: Path, vs: dict[str, Verdict], state: dict, now: datetime) -> None:
-    """Stamp what the next pass must remember: when an older publish was first seen, and that
-    a person decided an item (in Kitsu, say), so a later reopen leaves it to them."""
-    auto = load(sdir)
+    """Stamp what the next pass must remember: when an older publish was first seen, and what a
+    person did outside clipper (a decision, a hold, an edit or a note, in Kitsu say), so undoing
+    it later (a reopen, a release) still leaves the item to them."""
+    auto = load(sdir, strict=True)
     seen = [k for k, v in vs.items() if v.state in ("due", "waiting") and not state[k].get("published_at")
             and not auto.get(k, {}).get("seen")]
-    decided = [k for k, v in vs.items() if v.state == "decided" and not auto.get(k, {}).get("out")
-               and not auto.get(k, {}).get("approved_at")]
-    if not seen and not decided:
+    acted = {k: f"{v.why} by a person" if v.state == "decided" else v.why for k, v in vs.items()
+             if (v.state == "decided" or v.lasting) and not auto.get(k, {}).get("out")
+             and not auto.get(k, {}).get("approved_at")}
+    if not seen and not acted:
         return
     with jsonstate.update(path(sdir), {}) as data:
         for k in seen:
             data.setdefault(k, {}).setdefault("seen", now_iso(now))
-        for k in decided:
+        for k, why in acted.items():
             e = data.setdefault(k, {})
             if not e.get("out"):
-                e["out"], e["out_at"] = f"{vs[k].why} by a person", now_iso(now)
+                e["out"], e["out_at"] = why, now_iso(now)
 
 
 def approve_due(cfg: dict, sdir: Path, keys: list[str], say=print) -> list[str]:
@@ -241,28 +252,32 @@ def approve_due(cfg: dict, sdir: Path, keys: list[str], say=print) -> list[str]:
     review.sync(sdir, cfg, keys=keys, quiet=True)
     review_check.run(sdir, cfg, keys=keys, say=lambda *_: None)
     now = datetime.now(UTC)
-    vs = verdicts(cfg, sdir, now)
     state = jsonstate.read_or(sdir / "review_state.json", {})
     decisions = jsonstate.read_or(sdir / "review.json", {})
+    vs = verdicts(cfg, sdir, now, state=state, decisions=decisions, strict=True)
+    _remember(sdir, vs, state, now)   # a hold or an edit the sync just found is a person's for good
     rc = cfg["review"]
     done = []
     for key in keys:
         v = vs.get(key)
         if not v or v.state != "due":
             continue
-        if load(sdir).get(key, {}).get("out"):   # a person acted since the sync (touch writes first)
-            continue
         score = score_of(state[key], decisions.get(key, {}))
         rule = (f"no action in {rc['auto_grace_minutes']} min, checks clean"
                 + (f", score {score:g}" if score is not None else ""))
         try:
-            actions.approve(cfg, actions.Item(sdir, key, state[key]),
-                            f"Approved automatically: {rule} ([review] auto_approve)", who=WHO)
-        except ClipperError as e:
-            say(f"  {sdir.name}/{key}: not approved: {e}")
+            # Under auto.json's lock: a person's action notes itself there (touch) before its Kitsu
+            # write, so it either landed first and is seen here, or waits and lands after this.
+            with jsonstate.locked(path(sdir)):
+                if load(sdir, strict=True).get(key, {}).get("out"):
+                    continue
+                actions.approve(cfg, actions.Item(sdir, key, state[key]),
+                                f"Approved automatically: {rule} ([review] auto_approve)", who=WHO)
+                with jsonstate.update(path(sdir), {}) as data:
+                    data.setdefault(key, {})["approved_at"] = now_iso()
+        except Exception as e:  # noqa: BLE001  # the rest still go, and what went still replans
+            say(f"  {sdir.name}/{key}: not approved: {type(e).__name__}: {e}")
             continue
-        with jsonstate.update(path(sdir), {}) as data:
-            data.setdefault(key, {})["approved_at"] = now_iso()
         say(f"  {sdir.name}/{key}: approved ({rule})")
         done.append(key)
     return done
@@ -282,16 +297,17 @@ def run(cfg: dict, stream: str | None = None, apply: bool = True, say=print,
         scfg = for_stream(cfg, sdir)
         if not scfg["review"]["auto_approve"]:
             continue
-        vs = verdicts(scfg, sdir, now)
-        if apply:
-            _remember(sdir, vs, jsonstate.read_or(sdir / "review_state.json", {}), now)
-        due = [k for k, v in vs.items() if v.state == "due"]
-        if due and apply:
-            try:
+        try:   # one stream's trouble (a broken auto.json, Kitsu down) mustn't stop the rest
+            vs = verdicts(scfg, sdir, now, strict=apply)
+            if apply:
+                _remember(sdir, vs, jsonstate.read_or(sdir / "review_state.json", {}), now)
+            due = [k for k, v in vs.items() if v.state == "due"]
+            if due and apply:
                 approved += len(approve_due(scfg, sdir, due, say))
-            except Exception as e:  # noqa: BLE001  # one stream's trouble mustn't stop the rest; next pass retries
-                say(f"  {sdir.name}: {type(e).__name__}: {e}")
-            vs = verdicts(scfg, sdir)
+                vs = verdicts(scfg, sdir)
+        except Exception as e:  # noqa: BLE001  # the next pass tries again
+            say(f"  {sdir.name}: skipped: {type(e).__name__}: {e}")
+            continue
         rows = [v.as_dict() for v in vs.values() if v.state in ("due", "waiting", "person")]
         if rows:
             out[sdir.name] = rows
@@ -315,19 +331,27 @@ def lines(found: dict[str, list[dict]], tz: str) -> list[str]:
 def history(cfg: dict) -> list[dict]:
     """Every automatic approval: {stream, key, at, undone (what a person did after, or the
     decision it has now when that isn't approved, or a retake), since}."""
+    from .actions import is_held
+
     out = []
     for f in sorted(Path(cfg["paths"]["streams"]).glob(f"*/{STATE}")):
         sdir = f.parent
         decisions = jsonstate.read_or(sdir / "review.json", {})
         retakes = jsonstate.read_or(sdir / "retakes.json", {})
         for key, e in jsonstate.read_or(f, {}).items():
-            if not e.get("approved_at"):
+            at = e.get("approved_at") or e.get("was_approved_at")   # was: a new revision since
+            if not at:
                 continue
-            dec = (decisions.get(key) or {}).get("decision") or "approved"
-            undone = e.get("undone") or {"approved": "", "pending": "reopened",
-                                         "changes_requested": "sent back for changes"}.get(dec, dec)
-            if not undone and any(_when(h.get("at")) and _when(h["at"]) > _when(e["approved_at"])
+            r = decisions.get(key) or {}
+            dec = r.get("decision") or "approved"
+            undone = e.get("undone") or ""
+            if not undone and e.get("approved_at"):   # its decision now (a re-render resets it)
+                undone = {"approved": "", "pending": "reopened",
+                          "changes_requested": "sent back for changes"}.get(dec, dec)
+                if not undone and is_held(r.get("fields") or {}):
+                    undone = "held"   # a hold set in Kitsu, which leaves the decision approved
+            if not undone and any(_when(h.get("at")) and _when(h["at"]) > _when(at)
                                   for h in retakes.get(key) or []):
                 undone = "re-cut after a note"
-            out.append({"stream": sdir.name, "key": key, "at": e["approved_at"], "undone": undone})
+            out.append({"stream": sdir.name, "key": key, "at": at, "undone": undone})
     return out
