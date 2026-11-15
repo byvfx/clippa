@@ -124,6 +124,9 @@ COLUMNS = [
     # re-renders the .jpg and re-attaches it here.
     ("Sequence", "Thumbnail text", "string", None),
     ("Shot", "Thumbnail text", "string", None),
+    # What `clipper review check` found (#259), one line; empty when the item is clean.
+    ("Sequence", "Checks", "textarea", None),
+    ("Shot", "Checks", "textarea", None),
 ]
 THUMB_COL = "Thumbnail text"
 SEQUENCE_KINDS = ("segment", "compilation")
@@ -681,6 +684,8 @@ def publish(stream_dir: Path, cfg: dict, force: bool = False,
     cfg = for_stream(cfg, stream_dir)
     rc = cfg["review"]
     todo = items(stream_dir, [k for k in rc["include"] if not only or k in only], cfg)
+    if rc["checks"]:
+        add_checks(stream_dir, cfg, todo)
     render_previews(stream_dir, cfg, todo)
 
     gazu = connect(rc)
@@ -697,6 +702,27 @@ def publish(stream_dir: Path, cfg: dict, force: bool = False,
     if cfg["thumbnail"]["kitsu"]:
         attach_thumbnails(stream_dir, cfg, gazu, keys=[it["key"] for it in todo] if only else None)
     return list(published)
+
+
+def add_checks(stream_dir: Path, cfg: dict, todo: list[dict]) -> None:
+    """Run the pre-flight checks (review_check) and put each item's summary in its Checks
+    column ("" when clean, which clears an old finding)."""
+    from . import review_check
+
+    print("checks:", flush=True)
+    try:
+        found = review_check.run(stream_dir, cfg, todo)
+    except Exception as e:  # noqa: BLE001  # advisory: the review goes out without them, flagged
+        why = f"the checks didn't run: {type(e).__name__}: {str(e)[:200]}"
+        print(f"  {why}", flush=True)
+        found = {it["key"]: [{"text": why}] for it in todo}
+        try:   # so the card, the war room and status don't read these items as clean
+            review_check.record_failure(stream_dir, [it["key"] for it in todo], why)
+        except Exception as e2:  # noqa: BLE001  # the Kitsu column still says it
+            print(f"  and checks.json couldn't say so: {type(e2).__name__}: {e2}", flush=True)
+    for it in todo:
+        if it["key"] in found:
+            it["fields"]["Checks"] = review_check.summary(found[it["key"]])
 
 
 def attach_thumbnails(stream_dir: Path, cfg: dict, gazu=None, keys: list[str] | None = None) -> int:

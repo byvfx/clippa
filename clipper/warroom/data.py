@@ -144,8 +144,9 @@ def stream_rows(cfg: dict, sdir: Path) -> list[dict]:
     rows = [{**row_json(sdir, r, ls), "show": sc["show"]["key"],
              "show_name": sc["meta"]["show_name"] or ""}
             for r in actions.describe(cfg, sdir).values()]
-    for r in rows:  # #19: the card's warning badge
+    for r in rows:  # #19: the card's warning badge; #259: the check findings count too
         r["issues"] = actions.style_issues(sc, {f: r.get(f) or "" for f in actions.STYLE_FIELDS})
+        r["issues"] += [{"field": "checks", "msg": c} for c in r.get("checks") or []]
     return rows
 
 def all_rows(cfg: dict, streams: list | None = None) -> list[dict]:

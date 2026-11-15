@@ -63,7 +63,8 @@ before throwing away a title, description, note or release time you typed but di
 
 Titles, descriptions, hashtags and cover words are checked as you type ("hosts", unmasked
 swearing, YouTube's length limits with the show prefix), and cards with a problem carry a ⚠
-badge.
+badge. The badge counts the [pre-flight checks](Review#pre-flight-checks)' findings too (a face cut
+off, the wrong person on the cover), and the item's window lists them under **Checks**.
 
 ## Cover editor
 

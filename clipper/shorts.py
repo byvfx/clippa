@@ -160,12 +160,9 @@ def pickable(layouts: dict) -> dict[str, dict]:
     return {n: lay for n, lay in layouts.items() if lay.get("pick", True)}
 
 
-def panel_crops(layout: dict, W: int, H: int, out_w: int, out_h: int,
-                faces: dict[int, tuple[float, float]] | None = None) -> list[tuple]:
-    """(x, y, w, h, panel_h) per panel: the panel's src box (fractions of the frame),
-    cut down to the aspect of its slot (out_w x panel_h) around its focus point. Panels
-    without an "h" share what's left of out_h. faces: panel index -> where the face sits
-    in that panel's box (0-1 of the box, from face_centers); the window is centred on it."""
+def panel_heights(layout: dict, out_h: int) -> list[int]:
+    """Each panel's height in the rendered Short, top to bottom. Panels without an "h" share
+    what's left of out_h."""
     panels = layout["panels"]
     fixed = sum(p.get("h", 0) for p in panels)
     free = [p for p in panels if not p.get("h")]
@@ -177,6 +174,17 @@ def panel_crops(layout: dict, W: int, H: int, out_w: int, out_h: int,
     # panels writes a chroma row past its frame (ffmpeg 7.1 aborts, malloc corrupted).
     heights = [h // 2 * 2 for h in heights[:-1]]
     heights.append(out_h - sum(heights))
+    return heights
+
+
+def panel_crops(layout: dict, W: int, H: int, out_w: int, out_h: int,
+                faces: dict[int, tuple[float, float]] | None = None) -> list[tuple]:
+    """(x, y, w, h, panel_h) per panel: the panel's src box (fractions of the frame),
+    cut down to the aspect of its slot (out_w x panel_h) around its focus point. Panels
+    without an "h" share what's left of out_h. faces: panel index -> where the face sits
+    in that panel's box (0-1 of the box, from face_centers); the window is centred on it."""
+    panels = layout["panels"]
+    heights = panel_heights(layout, out_h)
     crops = []
     for i, (p, ph) in enumerate(zip(panels, heights)):
         x, y, w, h = (p["src"][0] * W, p["src"][1] * H, p["src"][2] * W, p["src"][3] * H)
@@ -446,11 +454,18 @@ def short_signature(sc: dict, codec: str, a: float, b: float, scenes: list[list]
         sig_base["faces"] = [{str(i): list(c) for i, c in f.items()} for f in faces]
     if tight:
         sig_base["tighten"] = tight
+    # A panel's `cam` mark is for the review checks (#259), not the picture: left out, so
+    # marking a layout's webcams doesn't render every Short again.
+    def drawn(lay: dict) -> dict:
+        if not any(isinstance(p, dict) and "cam" in p for p in lay.get("panels", [])):
+            return lay
+        return {**lay, "panels": [{k: v for k, v in p.items() if k != "cam"} if isinstance(p, dict) else p
+                                  for p in lay["panels"]]}
     # One scene keeps the signature it always had, so Shorts made before scene
     # detection aren't re-rendered when it finds the same single layout.
-    return signature({**sig_base, "layout": layouts[scenes[0][2]], "name": scenes[0][2]}
+    return signature({**sig_base, "layout": drawn(layouts[scenes[0][2]]), "name": scenes[0][2]}
                      if len(scenes) == 1 else
-                     {**sig_base, "scenes": [[s, e, n, layouts[n]] for s, e, n in scenes]})
+                     {**sig_base, "scenes": [[s, e, n, drawn(layouts[n])] for s, e, n in scenes]})
 
 
 # ---------- captions ----------

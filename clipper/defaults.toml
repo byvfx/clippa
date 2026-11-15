@@ -505,6 +505,9 @@ photos = ""
 # a busy screen box with another layout, and with them "center" is never picked.
 # pick = false keeps a layout out of the picker (and needs no screenshot): another way
 # to frame a scene that has its own layout, e.g. only the webcams of a watch scene.
+# cam = true marks a panel as a webcam for `clipper review check` (#259): it looks for a face
+# there in the rendered Short, not cut off at the edge (focus = "face" counts as one too).
+# It doesn't change the picture, so marking one renders nothing again.
 # Force one layout for a whole Short with --layout, the Kitsu "Layout" column or
 # shorts.json, then rerun `clipper shorts` and `clipper review publish`. Older Shorts:
 # `clipper shorts <stream> --check` lists their scenes; --rescene re-renders those that change.
@@ -584,6 +587,18 @@ preview_codec = ""             # empty = cut.clip_codec
 preview_quality = 28
 max_upload_mb = 480            # Kitsu's proxy rejects bigger uploads; longer previews re-encode to fit
 normalize = false              # true = Kitsu re-encodes uploads on the NAS
+# Pre-flight checks (`clipper review check`, #259): what the reviewer would look at, before they
+# do. Text (house words, YouTube's limits, an unmasked bleep), a Short's webcam panels (a face
+# in each, not cut off at the edge: mark a layout's webcam panels with cam = true), the cover
+# (its face is the person it names; one vision call on the .jpg) and the subject (the title's
+# people are in the transcript; a segment names its subject early). Findings: checks.json, the
+# Kitsu Checks column, the Discord card, the war room's badge, `clipper status`.
+checks = true                  # `clipper review publish` runs the checks first
+check_model = "claude-sonnet-5-5"   # the cover's vision call (~$0.01 a cover); "" = none
+check_effort = "low"
+check_prompt_version = "v1"    # clipper/prompts/review_check_<v>.md
+check_frames = 8               # frames of each Short through the face detector
+open_minutes = 15              # a segment or compilation whose first minutes name someone else, not its subject
 
 [discord]
 # Review from Discord: `clipper review publish` posts one card per item (preview, title,

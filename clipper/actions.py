@@ -34,7 +34,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import jsonstate, review
+from . import jsonstate, review, review_check
 from .config import base, for_stream, stream_dir
 from .errors import ClipperError
 from .schedule import truthy
@@ -422,6 +422,7 @@ def describe(cfg: dict, sdir: Path, gazu=None, links: bool = True) -> dict[str, 
     except FileNotFoundError:
         outputs = {}
     meta = jsonstate.read(sdir / "meta.json", {})
+    checks = review_check.load(sdir)
     ls = review.Listing()
     out = {}
     for key, st in state.items():
@@ -461,6 +462,7 @@ def describe(cfg: dict, sdir: Path, gazu=None, links: bool = True) -> dict[str, 
             "thumb_mtime": ls.mtime(jpg),
             "file": sdir / st["file"].replace("\\", "/"), "preview": sdir / "review" / f"{key}.mp4",
             "revision": st.get("revision"), "synced_at": r.get("updated_at"),
+            "checks": [f["text"] for f in review_check.findings_of(checks, key)],
         }
     return out
 
@@ -501,13 +503,15 @@ def stream_counts(cfg: dict, sdir: Path, links: bool = False, now: datetime | No
     state = review.ensure_links(sdir, cfg) if links else jsonstate.load(sdir / "review_state.json")
     decisions = jsonstate.read(sdir / "review.json", {})
     meta = jsonstate.read(sdir / "meta.json", {})
+    flagged_keys = review_check.flagged_keys(sdir)
     stale = stale_at(cfg, sdir, meta)
     now = now or datetime.now(ZoneInfo("UTC"))
     counts: dict[str, int] = {}
-    held = waiting = 0
+    held = waiting = flagged = 0
     for key in state:
         r = decisions.get(key, {})
         counts[r.get("decision", "pending")] = counts.get(r.get("decision", "pending"), 0) + 1
+        flagged += key in flagged_keys and r.get("decision", "pending") in OPEN
         # only an approved item waits on its hold: a rejected one that arrived held is done with
         if r.get("decision") == "approved":
             fields = r.get("fields") or {}
@@ -515,7 +519,7 @@ def stream_counts(cfg: dict, sdir: Path, links: bool = False, now: datetime | No
             waiting += hold_waiting(fields, stale, now)
     first = next(iter(state.values()), {})
     return {"stream": sdir.name, "date": meta.get("started_at", "")[:10], "title": meta.get("title", ""),
-            "counts": counts, "held": held, "held_waiting": waiting,
+            "counts": counts, "held": held, "held_waiting": waiting, "flagged": flagged,
             "open": sum(counts.get(k, 0) for k in OPEN), "episode_url": first.get("episode_url", "")}
 
 

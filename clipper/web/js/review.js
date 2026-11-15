@@ -259,6 +259,7 @@ function openModal(ref) {
           ${i.score ? `<b>Score</b><span>${esc(i.score)} · ${esc(i.category)} · ${esc(i.found_by)}</span>` : ""}
           <b>Revision</b><span>${esc(i.revision)} ${i.synced_at ? "· synced " + ago(i.synced_at) : ""}</span>
           <b>Links</b><span><a href="${esc(i.kitsu_url)}" target="_blank">Kitsu</a>${i.youtube_url ? ` · <a href="${esc(i.youtube_url)}" target="_blank">YouTube</a>` : ""}</span>
+          ${i.checks?.length ? `<b>Checks</b><span class="warn-line">${i.checks.map(c => "⚠ " + esc(c)).join("<br>")}</span>` : ""}
         </div>
         ${hist.length ? `<div class="form"><label>Retakes</label>${hist.map(h => `<div class="ev" style="padding:6px 0"><div class="w">${esc(ago(h.at))}</div><q>${esc(h.comment)}</q><div class="r-${esc(h.result)}">${esc(h.summary || h.unsupported || h.error)}</div></div>`).join("")}</div>` : ""}
       </div>

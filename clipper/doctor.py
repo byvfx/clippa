@@ -1113,6 +1113,21 @@ def check_faces(cfg: dict) -> None:
              "clipper faces <stream>, then --name F01=Name --enroll (or --enroll-photos)")
 
 
+def check_review_cams(cfg: dict) -> None:
+    """`clipper review check` looks for a face in a Short's webcam panels: those marked cam =
+    true (or focus = "face") in the show's layouts. A show with none isn't checked (#259)."""
+    from . import review_check, shorts
+    from .config import for_show
+
+    if not cfg["review"]["checks"]:
+        return
+    for key in cfg["shows"]:
+        lays = {n: lay for n, lay in shorts.layouts_of(for_show(cfg, key)["shorts"]).items() if n != "center"}
+        if lays and not any(review_check.cam_panels(lay) for lay in lays.values()):
+            warn("review", f"[shows.{key}] marks no webcam panel: the review checks don't look at its Shorts' cams",
+                 f"cam = true on the webcam panels of [shows.{key}.shorts.layouts.*] (it renders nothing again)")
+
+
 def repo_state(porcelain: str) -> tuple[str, int, int]:
     """`git status --porcelain --branch` → (branch, commits ahead of upstream, changed files);
     branch "" when HEAD is detached."""
@@ -1300,6 +1315,7 @@ def main(cfg: dict, offline: bool = False, role: str = "all") -> int:
         check_fonts(cfg)
         check_photos(cfg)
         check_faces(cfg)
+        check_review_cams(cfg)
         check_gpu(cfg)
     check_keys(cfg, role)
     if role not in ("nas", "control"):

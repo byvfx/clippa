@@ -29,6 +29,7 @@ VERSIONS: dict[str, tuple[str, str]] = {
     "thumbnail_feedback": ("thumbnail", "retry_prompt_version"),
     "shorts_layout": ("shorts", "layout_prompt_version"),
     "retake": ("retake", "prompt_version"),
+    "review_check": ("review", "check_prompt_version"),
     "pick": ("pick", "prompt_version"), "pick_locate": ("pick", "prompt_version"),
     "preshow": ("preshow", "prompt_version"), "oneoff": ("preshow", "oneoff_prompt_version"),
     # the extras

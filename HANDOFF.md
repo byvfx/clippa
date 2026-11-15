@@ -190,11 +190,13 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   (111 GB would go at 30 days). The test stream is in `[streams] never_prune` (set 11-13).
 - `secrets/youtube_cookies.netscape.txt` on the share is unused since PR #195 and can be deleted.
 - Close Fusion and merge the `mockups/udder_truth/` leftovers into `studio/mockups/` (ignored by `/mockups/`).
-- **`C:\clipper` is on `ccr-8319354b-axsr9v`** (Sloth Beat fanmag, a cloud branch) since 11-14 00:57, with
-  uncommitted fanmag work in the tree (thumbs/fanmag.py, config, doctor, Covers wiki, studio mockups). Until
-  that work is committed and the checkout is back on main and pulled, `clipper` on PATH runs that branch's
-  code, which has no `clipart` (and none of main's later changes). Check `git branch --show-current` there
-  before branching.
+- `C:\clipper` is back on main and clean (11-14). The fanmag work is on `ccr-8319354b-axsr9v` (pushed,
+  "fan-mag paused for the user's next tweaks"). Still check `git branch --show-current` there before branching.
+- **Review checks (#259 A):** once that PR is merged and deployed, mark the webcam panels in clipper.toml
+  (`cam = true`: Kino watch panels 2-3, watch_hosts and cams both; Channel 404 watch panel 2 (Don), desk;
+  Chud's are `focus = "face"` already). Not before the deploy: the deployed code would count the key in a
+  Short's render signature. `clipper doctor` warns while a show marks none. The vision backtest ran 11-14
+  (log): both cover rejects caught, ~6-9% of approved covers flagged.
 - Branches and worktrees were cleaned up again 11-13: everything merged is gone, plus the old `ccr-*` and
   `claude/clipper-investigate-command-*` branches and the swarm worktree, all at the user's word. Kept on
   purpose: `story-dig` and `jev-lab` (`C:\clipper-jevlab`; it holds `jev-gate`'s commit), both pushed and
@@ -249,6 +251,10 @@ live clips #81, blind items #111, investigate anyone #138, agent exploration #15
 a small `clipper mcp`; #13 may fold into it), Modal ideas #53, #55, #56,
 Udder Truth #58/#59/#60, P&L #50 (revenue once monetized). Write "#77 L6" rather than "fix #77" in commit
 messages: GitHub closes the issue on "fix".
+- **Review pre-flight checks (#259, 11-14):** step A, `clipper review check` (wiki Review#pre-flight-checks,
+  `clipper/review_check.py`, run by `review publish`), is its own PR (branch `review-check`). Step B, approval by
+  silence for clean items after a 2-hour grace window, is the next PR: build it on `checks.json` (an item with an
+  entry, no findings and a current signature; a missing entry or `sig: ""`, a failed run, is not clean) and keep the taste rejects (too much Jer, side gaming) as what the window is for.
 - **Documentaries (11-13, PR #233, merged and deployed):** `clipper doc
   new|voice|build|master|leak|kit` (wiki Documentaries; `clipper/doc.py`, `doc_resolve.py`), the reusable form
   of the first mini-documentary's one-off Resolve scripts. A piece is `[paths] documentaries/<slug>/` on the

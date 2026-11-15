@@ -649,6 +649,22 @@ def cmd_retake(cfg: dict, args: argparse.Namespace) -> None:
 def cmd_review(cfg: dict, args: argparse.Namespace) -> None:
     from . import actions, notify, review
 
+    if args.action == "check":
+        from . import review_check
+
+        d = stream_dir(cfg, args.stream)
+        if args.dry_run:
+            n, usd = review_check.estimate(d, cfg, keys=args.items, force=args.force)
+            print(f"{n} vision calls, about ${usd:.2f}" + ("" if n else " (nothing to look at again)"))
+            return
+        if args.json:
+            with to_stderr():
+                found = review_check.run(d, cfg, keys=args.items, force=args.force, vision=not args.no_vision)
+            print_json(found)
+        else:
+            found = review_check.run(d, cfg, keys=args.items, force=args.force, vision=not args.no_vision)
+            print("\n".join(review_check.lines(found)))
+        return
     if args.action in ("publish", "sync", "notify"):
         d = stream_dir(cfg, args.stream)
         if args.action == "publish":
@@ -1379,6 +1395,14 @@ def add_review(sub) -> None:
     add_stream(r)
     add_items(r, "only these items, e.g. c01,s02", old=("--keys",))
     r.add_argument("--force", action="store_true", help="repost items already posted")
+    r = rsub.add_parser("check", help="pre-flight checks: text, a Short's webcam panels, the cover, "
+                                      "the subject (#259); findings in checks.json")
+    add_stream(r)
+    add_items(r, "only these items, e.g. v04,s02")
+    r.add_argument("--force", action="store_true", help="check again items whose inputs haven't changed")
+    r.add_argument("--no-vision", action="store_true", help="no vision call on the covers ([review] check_model)")
+    r.add_argument("--dry-run", action="store_true", help="say how many vision calls it would make and their cost")
+    r.add_argument("--json", action="store_true", help="the findings as JSON, {key: [finding]}")
     r = rsub.add_parser("status", help="decision counts per stream, and what's scheduled")
     # Reads review.json unless asked: a sync writes it and can post to Kitsu, not for a status.
     r.add_argument("--sync", action="store_true", help="read Kitsu first")
