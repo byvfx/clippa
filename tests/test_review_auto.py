@@ -9,6 +9,11 @@ from clipper.errors import ClipperError
 T0 = datetime(2026, 11, 15, 12, 0, tzinfo=UTC)
 
 
+@pytest.fixture(autouse=True)
+def no_recheck_memory():
+    review_auto._rechecked.clear()
+
+
 @pytest.fixture
 def cfg(defaults):
     defaults["review"]["auto_approve"] = True
@@ -282,10 +287,33 @@ def test_findings_are_checked_again_so_stale_ones_dont_hold_an_item_for_good(cfg
             st.update({key: CLEAN for key in keys})
         return {}
     monkeypatch.setattr(review_check, "run", rerun)
+    with jsonstate.update(sd / "review.json", {}) as rv:
+        rv["v02_t2"]["fields"] = {"Hold": "true"}                                # waits for a person anyway
+    with jsonstate.update(sd / "checks.json", {}) as st:
+        st["v02_t2"] = {"sig": "old", "findings": [{"text": "x"}]}
     found = review_auto.run(cfg, apply=False, say=lambda *_: None)                # a dry run doesn't check
     assert asked == [] and found["kick-9"][0]["why"] == "1 check finding(s)"
     review_auto.run(cfg, say=lambda *_: None)
-    assert asked[0] == ["v01_t1", "v03_t3"] and approved == ["v01_t1"]          # v03: never checked
+    assert asked[0] == ["v01_t1"] and approved == ["v01_t1"]  # not v03, never checked: a person's
+    assert asked[1:] == [["v01_t1"]]                                            # approve_due's own run
+    assert review_auto.verdicts(cfg, sd)["v03_t3"].why == "not checked yet"
+
+
+def test_a_recheck_is_hourly_per_stream_and_off_with_the_checks(cfg, tmp_path, monkeypatch):
+    from clipper import review_check
+
+    sd, approved, _ = stub(cfg, tmp_path, monkeypatch)
+    jsonstate.write(sd / "checks.json", {"v01_t1": {"sig": "s", "findings": [{"text": "a real one"}]}})
+    asked = []
+    monkeypatch.setattr(review_check, "run", lambda sdir, c, keys=None, **k: asked.append(keys) or {})
+    t = datetime.now(UTC)
+    for minutes in (0, 10, 50, 61):
+        review_auto.run(cfg, say=lambda *_: None, now=t + timedelta(minutes=minutes))
+    assert asked == [["v01_t1"], ["v01_t1"]] and approved == []
+    review_auto._rechecked.clear()
+    cfg["review"]["checks"] = False
+    review_auto.run(cfg, say=lambda *_: None)
+    assert len(asked) == 2
 
 
 def test_a_check_that_fails_again_doesnt_stop_the_due_items(cfg, tmp_path, monkeypatch):
