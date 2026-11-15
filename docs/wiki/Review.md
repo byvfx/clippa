@@ -52,7 +52,9 @@ A show can let its clean items approve themselves: `[shows.<key>.review] auto_ap
   the command line or Kitsu itself. Anything you do leaves it to you for good (a hold clipper
   set itself, for [other voices](#shorts-held-for-other-voices), only while it's on);
 - its [pre-flight checks](#pre-flight-checks) found nothing (run again just before, so an item
-  re-rendered since is checked anew);
+  re-rendered since is checked anew). Each pass also checks again the items held only by their
+  findings, so a stale finding clears itself once what it read or the checks' version changes;
+  one that still holds costs nothing to keep;
 - its score is at least its kind's floor (`auto_min_short = 6`; picks, segments and compilations
   are 0, which leaves them to you);
 - it has been in review `auto_grace_minutes` (120).

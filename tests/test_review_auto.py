@@ -268,6 +268,42 @@ def test_a_broken_auto_json_skips_the_stream(cfg, tmp_path, monkeypatch):
     assert review_auto.run(cfg, apply=False, say=said.append)["kick-9"]         # a dry run still lists
 
 
+def test_findings_are_checked_again_so_stale_ones_dont_hold_an_item_for_good(cfg, tmp_path, monkeypatch):
+    # kick-137715636: findings from the first version of the checks kept every item out of the window
+    from clipper import review_check
+
+    sd, approved, _ = stub(cfg, tmp_path, monkeypatch)
+    jsonstate.write(sd / "checks.json", {"v01_t1": {"sig": "old", "findings": [{"text": "the title names Kino"}]}})
+    asked = []
+
+    def rerun(sdir, c, keys=None, **k):
+        asked.append(keys)
+        with jsonstate.update(review_check.path(sdir), {}) as st:
+            st.update({key: CLEAN for key in keys})
+        return {}
+    monkeypatch.setattr(review_check, "run", rerun)
+    found = review_auto.run(cfg, apply=False, say=lambda *_: None)                # a dry run doesn't check
+    assert asked == [] and found["kick-9"][0]["why"] == "1 check finding(s)"
+    review_auto.run(cfg, say=lambda *_: None)
+    assert asked[0] == ["v01_t1", "v03_t3"] and approved == ["v01_t1"]          # v03: never checked
+
+
+def test_a_check_that_fails_again_doesnt_stop_the_due_items(cfg, tmp_path, monkeypatch):
+    from clipper import review_check
+
+    sd, approved, _ = stub(cfg, tmp_path, monkeypatch)
+    with jsonstate.update(sd / "checks.json", {}) as st:
+        st["v03_t3"] = {"sig": "old", "findings": [{"text": "x"}]}
+
+    def boom(sdir, c, keys=None, **k):
+        if keys == ["v03_t3"]:
+            raise RuntimeError("people.json unreadable")
+        return {}
+    monkeypatch.setattr(review_check, "run", boom)
+    review_auto.run(cfg, say=lambda *_: None)
+    assert approved == ["v01_t1"]
+
+
 def test_a_hold_seen_in_kitsu_keeps_it_out_after_its_release(cfg, tmp_path, monkeypatch):
     sd, approved, _ = stub(cfg, tmp_path, monkeypatch)
     with jsonstate.update(sd / "review.json", {}) as rv:
