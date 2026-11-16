@@ -48,6 +48,8 @@ import bisect
 import os
 import subprocess
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -130,6 +132,10 @@ COLUMNS = [
     ("Shot", "Checks", "textarea", None),
 ]
 THUMB_COL = "Thumbnail text"
+CHECKS_COL = "Checks"
+# Columns only clipper writes (what the checks found): a value there that differs from the
+# proposal is never a person's edit, so the window doesn't take it for one.
+ADVISORY = (CHECKS_COL,)
 SEQUENCE_KINDS = ("segment", "compilation")
 # Comments clipper adds to record a column change (Hold, Publish at, title); sync never
 # takes one of these as the reason for a decision.
@@ -729,7 +735,62 @@ def add_checks(stream_dir: Path, cfg: dict, todo: list[dict]) -> None:
             print(f"  and checks.json couldn't say so: {type(e2).__name__}: {e2}", flush=True)
     for it in todo:
         if it["key"] in found:
-            it["fields"]["Checks"] = review_check.summary(found[it["key"]])
+            it["fields"][CHECKS_COL] = review_check.summary(found[it["key"]])
+
+
+def set_checks(stream_dir: Path, cfg: dict, summaries: dict[str, str]) -> list[str]:
+    """Write each item's Checks column ({key: summary}, "" when clean) after the checks ran
+    again outside a publish (review_auto's recheck), and keep it as the proposal in
+    review_state.json so a later publish still owns the column. Items whose column already
+    says so are left alone. Returns the keys written."""
+    cfg = for_stream(cfg, stream_dir)
+    state_path = stream_dir / "review_state.json"
+    state = jsonstate.read(state_path, {})
+    todo = {k: s for k, s in summaries.items()
+            if k in state and (state[k].get("fields") or {}).get(CHECKS_COL, "") != s}
+    if not todo:
+        return []
+    gazu = connect(cfg["review"])
+    fmap = column_fields(gazu, gazu.project.get_project_by_name(project_name(cfg)))
+    done = []
+    for key, s in todo.items():
+        st = state[key]
+        if set_columns(gazu, fmap, ENTITY[st["kind"]], st["entity_id"], {CHECKS_COL: s}):
+            done.append(key)
+    with jsonstate.update(state_path, {}) as now:
+        for key in done:
+            if key in now:
+                now[key].setdefault("fields", {})[CHECKS_COL] = todo[key]
+    return done
+
+
+@contextmanager
+def kitsu_deadline(seconds: float) -> Iterator[None]:
+    """Every Kitsu request inside gives up once `seconds` have gone, so a caller holding a lock
+    over a few calls lets go in time (gazu itself never times out: a stalled Kitsu would hold
+    it for good). A request past the deadline raises TimeoutError before it is sent."""
+    import gazu
+
+    session = gazu.client.default_client.session
+    end = time.monotonic() + seconds
+    send = session.request
+    own = "request" in vars(session)   # already patched on the instance (nested)
+
+    def request(*args, **kw):
+        left = end - time.monotonic()
+        if left <= 0:
+            raise TimeoutError(f"Kitsu took over {seconds:.0f} s")
+        kw["timeout"] = min(left, kw.get("timeout") or left)
+        return send(*args, **kw)
+
+    session.request = request
+    try:
+        yield
+    finally:
+        if own:
+            session.request = send
+        else:
+            del session.request
 
 
 def attach_thumbnails(stream_dir: Path, cfg: dict, gazu=None, keys: list[str] | None = None) -> int:
@@ -902,7 +963,7 @@ def sync(stream_dir: Path, cfg: dict, keys: list[str] | None = None,
                     "comment": comment, "comment_id": cid,
                     "fields": fields,
                     "edited": sorted(n for n, v in fields.items()
-                                     if n in proposed and (v or "") != proposed[n]),
+                                     if n in proposed and n not in ADVISORY and (v or "") != proposed[n]),
                     "updated_at": task.get("updated_at")}
     if thumb_edits:
         apply_thumbnail_text(stream_dir, cfg, gazu, fmap, thumb_edits)

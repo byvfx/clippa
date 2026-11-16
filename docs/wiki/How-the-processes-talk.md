@@ -33,7 +33,9 @@ A change happens under `<file>.lock`, a file created exclusively beside the stat
 the holder's name inside (host, pid, time, a uuid). A writer waits up to **60 s** for it. Nothing
 removes a lock on a timer: the next writer that finds one whose modification time is over
 **120 s** old takes it for abandoned, deletes it and goes ahead. Keep the locked part short: no
-Kitsu or YouTube calls inside. The error "`<file>.lock is held by another process for over 60 s
+Kitsu or YouTube calls inside. The one exception is `auto.json`: the automatic approval makes its
+Kitsu decision under that lock, so a person's action can't land before it, and bounds those calls
+with `review.kitsu_deadline` (25 s, well inside the 60 s a waiter allows). The error "`<file>.lock is held by another process for over 60 s
 (delete it if nothing is running)`" means the lock stayed fresh for the whole minute: a slow
 writer still holding it, or one that died less than 120 s before. Read the name inside, and try
 again once the file is over 120 s old; delete it by hand only when nothing is running.
