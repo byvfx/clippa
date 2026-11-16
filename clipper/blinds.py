@@ -821,19 +821,28 @@ def _fresh(cfg: dict, db: sqlite3.Connection, where: str) -> list[dict]:
     return [b for b in rows if alertable(cfg, b)]
 
 
+ASKED = {  # the other half of a pair was really posted: an alert's message, a digest's day (no "twin:"/"left:")
+    "alerted_at": "alerted_at IS NOT NULL AND alert_msg != 'twin'",
+    "digest_day": "digest_day IS NOT NULL AND digest_day NOT LIKE '%:%'",
+}
+
+
 def _twin_taken(db: sqlite3.Connection, b: dict, column: str) -> bool:
-    """A pair is asked once: its other half was already alerted (or put in a digest)."""
-    return bool(b["pair"]) and db.execute(f"SELECT 1 FROM blinds WHERE pair = ? AND id != ? AND {column} IS NOT NULL",
-                                          (b["pair"], b["id"])).fetchone() is not None
+    """A pair is asked once: its other half was already posted (an alert, or in a digest), or
+    already answered (a guess, No idea, Not ours) wherever that was."""
+    return bool(b["pair"]) and db.execute(
+        f"SELECT 1 FROM blinds WHERE pair = ? AND id != ? AND (({ASKED[column]}) "
+        "OR status IN ('answered', 'no_idea', 'not_ours'))", (b["pair"], b["id"])).fetchone() is not None
 
 
 def _with_twin(cfg: dict, db: sqlite3.Connection, b: dict) -> dict:
-    """The twin shown with it, unless the twin is one that would never be posted itself
-    (a private person, hidden, or sensitive without sensitive_alerts)."""
+    """The twin shown with it, only when it could be posted itself: waiting, published in the
+    last ALERT_DAYS, not a private person, not hidden, not sensitive without sensitive_alerts."""
     if b["pair"]:
+        cut = news.now() - timedelta(days=ALERT_DAYS)
         t = next((as_dict(r) for r in db.execute("SELECT * FROM blinds WHERE pair = ? AND id != ?",
                                                   (b["pair"], b["id"]))), None)
-        if t and not t["private"] and not hidden(cfg, t) and (cfg["blinds"]["sensitive_alerts"] or not t["sensitive"]):
+        if t and alertable(cfg, t) and _published(t) > cut:
             b["twin"] = t
     return b
 
@@ -841,7 +850,8 @@ def _with_twin(cfg: dict, db: sqlite3.Connection, b: dict) -> dict:
 def own_alerts(cfg: dict) -> list[dict]:
     """The blinds that get an alert of their own, oldest first: with alert = "all" every one,
     with "digest" or "ours" those that could be about someone this install follows. A blind
-    whose twin was alerted is marked and skipped (a pair is asked once)."""
+    whose twin was posted or answered is marked and skipped (a pair is asked once); one whose
+    twin is in this same batch is only skipped, so it can still go if the twin's post fails."""
     mode = cfg["blinds"]["alert"]
     if mode not in ("all", "digest", "ours"):
         return []
@@ -849,7 +859,9 @@ def own_alerts(cfg: dict) -> list[dict]:
     try:
         out, pairs = [], set()
         for b in _fresh(cfg, db, "alerted_at IS NULL" + ("" if mode == "all" else " AND ours = 1")):
-            if b["pair"] in pairs or _twin_taken(db, b, "alerted_at"):
+            if b["pair"] in pairs:
+                continue
+            if _twin_taken(db, b, "alerted_at"):
                 db.execute("UPDATE blinds SET alerted_at = ?, alert_msg = 'twin' WHERE id = ?",
                            (news.iso(news.now()), b["id"]))
                 continue
@@ -909,14 +921,16 @@ def start_digest(cfg: dict, day: str) -> tuple[list[dict], int]:
             return [], 0
         out, pairs = [], set()
         for b in _fresh(cfg, db, "digest_day IS NULL"):
-            if b["pair"] in pairs or _twin_taken(db, b, "digest_day"):
-                db.execute("UPDATE blinds SET digest_day = ? WHERE id = ?", (day, b["id"]))
+            if b["pair"] in pairs:  # its twin is in this one: it waits, in case that post fails
+                continue
+            if _twin_taken(db, b, "digest_day"):
+                db.execute("UPDATE blinds SET digest_day = ? WHERE id = ?", (f"twin:{day}", b["id"]))
                 continue
             pairs.add(b["pair"] or b["id"])
             out.append(b)
         left = out[:-DIGEST_MAX] if len(out) > DIGEST_MAX else []
         for b in left:  # the oldest: the war room has them
-            db.execute("UPDATE blinds SET digest_day = ? WHERE id = ?", (day, b["id"]))
+            db.execute("UPDATE blinds SET digest_day = ? WHERE id = ?", (f"left:{day}", b["id"]))
         kept = [_with_twin(cfg, db, b) for b in out[len(left):]]
         db.execute("UPDATE digests SET blinds = ? WHERE day = ?", (len(kept), day))
         db.commit()
@@ -976,7 +990,7 @@ def answer_line(b: dict) -> str:
     if not b["guesses"]:
         return ""
     g = b["guesses"][0]
-    why = f", because {md(g['why'])}" if g["why"] else ""
+    why = f", because {md(' '.join(g['why'].split()))}" if g["why"] else ""  # one line: the next answer replaces it
     return f"→ Your guess: **{md(g['name'])}**{why}"
 
 
@@ -984,7 +998,9 @@ def answered_text(content: str, b: dict, limit: int = 2000) -> str:
     """An alert's text with its answer line (the last answer's, replaced) at the end; the blind's
     text gives way when the two don't fit in one message."""
     line = answer_line(b)[:limit // 2]
-    kept = "\n".join(x for x in content.split("\n") if not x.startswith("→ "))
+    lines = content.split("\n")
+    end = next((i for i, x in enumerate(lines) if x.startswith("→ ")), len(lines))
+    kept = "\n".join(lines[:end])  # the old answer is everything from its arrow on
     room = limit - len(line) - 1
     if len(kept) > room:
         kept = kept[:room - 1].rstrip() + "…"

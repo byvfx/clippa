@@ -828,3 +828,41 @@ def test_a_long_why_keeps_the_whole_answer_line(cfg):
     got = blinds.answer(cfg, "long", "Jane Streamer", "because " * 60)
     out = blinds.answered_text(text, got)
     assert len(out) <= 2000 and out.endswith(blinds.answer_line(got)) and "…" in out
+
+
+def test_a_pair_answered_anywhere_is_not_asked_again(cfg):
+    put(cfg, "x", ours=1, pair="e-x", status="not_ours")                # answered in the war room
+    put(cfg, "y", ours=1, pair="e-x", source="bg")
+    assert blinds.own_alerts(cfg) == [] and blinds.start_digest(cfg, "2026-11-15") == ([], 0)
+
+
+def test_a_twin_in_the_same_batch_waits_until_the_other_is_really_posted(cfg):
+    cfg["blinds"]["alert"] = "all"
+    put(cfg, "x", pair="e-x", published=iso_days_ago(0.5))
+    put(cfg, "y", pair="e-x", source="bg")
+    assert [b["id"] for b in blinds.own_alerts(cfg)] == ["x"]          # the post failed: nothing was marked
+    assert [b["id"] for b in blinds.own_alerts(cfg)] == ["x"]
+    blinds.mark_alerted(cfg, "x", "1/2")
+    assert blinds.own_alerts(cfg) == []
+    cfg["blinds"]["alert"] = "digest"
+    assert [b["id"] for b in blinds.start_digest(cfg, "2026-11-15")[0]] == ["x"]   # the bot stopped before x
+    assert [b["id"] for b in blinds.start_digest(cfg, "2026-11-16")[0]] == ["x"]   # so x comes again, not lost
+    blinds.mark_digested(cfg, "x", "2026-11-16")
+    assert blinds.start_digest(cfg, "2026-11-17") == ([], 0)
+
+
+def test_an_old_or_answered_twin_is_not_shown(cfg):
+    cfg["blinds"]["alert"] = "all"
+    put(cfg, "x", pair="e-x")
+    put(cfg, "y", pair="e-x", source="bg", published=iso_days_ago(6), text="The old twin.")
+    got = blinds.own_alerts(cfg)
+    assert [b["id"] for b in got] == ["x"] and "twin" not in got[0]
+
+
+def test_a_multiline_why_is_replaced_whole(cfg):
+    put(cfg, "a")
+    text = blinds.alert_text(blinds.one(cfg, "a"))
+    once = blinds.answered_text(text, blinds.answer(cfg, "a", "Jane Streamer", "first line\nsecond line"))
+    assert once.endswith("because first line second line")
+    again = blinds.answered_text(once, blinds.answer(cfg, "a", none=True))
+    assert again == f"{text}\n→ No idea."

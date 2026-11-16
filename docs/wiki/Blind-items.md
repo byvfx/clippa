@@ -152,7 +152,8 @@ The answer goes at the end of the message. The buttons stay, so you can change i
 - a hidden one (`[blinds] hide`)
 - one you already answered, or one whose clues aren't read yet (it comes once they are)
 - one published more than two days ago, so a backfill doesn't flood the channel
-- a twin whose other half was already asked about: a pair is asked once, the twin shown with it
+- a twin whose other half was already posted or answered (anywhere): a pair is asked once, the twin shown with
+  it when it could be posted itself
 
 Sensitive blinds (crime, health, sexuality, abuse, minors) are posted only with `[blinds]
 sensitive_alerts = true`. This install has it on; the default is off. To mute one kind, add its
