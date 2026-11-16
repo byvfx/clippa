@@ -241,7 +241,7 @@ archive fun #63, transcript-framed edits #66 (one issue since 11-15, sections #6
 came first: built 11-09, PR #191, `[edit] tighten`. The user found it "better than I thought" on the
 test stream but wants it **off** until it clearly helps; turn it on per show (`[shows.<key>.edit]`)
 only at their word. #67's model edit plan waits until edited Shorts prove themselves), crisis mode #73, setup #78,
-live clips #81, blind items #111 (reworked 11-15: you guess first in Discord or the war room, then it investigates; `alert = "all"` to start; both guesses scored on reveals; 4 PRs planned, none built), investigate anyone #138, agent exploration #158 (on hold at the user's word 11-09; next would be a week of phone use, then
+live clips #81, blind items #111 (reworked 11-15: you guess first in Discord or the war room, then it investigates; a daily digest (`alert = "digest"`) to start, any drama not only ours; both guesses scored on reveals; 4 PRs planned, none built), investigate anyone #138, agent exploration #158 (on hold at the user's word 11-09; next would be a week of phone use, then
 a small `clipper mcp`; #13 may fold into it), Modal ideas #53, #56,
 Udder Truth #58/#59/#60, P&L #50 (revenue once monetized). Write "#77 L6" rather than "fix #77" in commit
 messages: GitHub closes the issue on "fix".
