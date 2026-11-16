@@ -30,6 +30,10 @@ channels = ["kick-channel-slug"]     # the Kick channels the recorder watches (w
 
 # Gossip blind items (wiki: Blind items): uncomment the sources you want, then
 # `clipper blinds check --backfill 30 --dry-run` prices the first read.
+# [blinds]
+# check_minutes = 30         # serve checks the sources; the bot asks you in Discord
+# alert = "digest"           # a thread a day at digest_at; "all", "ours" or "off"
+# sensitive_alerts = false   # true: ask about crime, health, sexuality and abuse blinds too
 # [[blinds.sources]]
 # name = "cdan"
 # feed = "https://www.crazydaysandnights.net/feeds/posts/default"

@@ -17,8 +17,10 @@ Every [discord] refresh_minutes the bot also re-reads Kitsu for streams with pos
 and edits cards whose status, hold, pin, title or schedule changed outside Discord
 (clipper/cardsync.py). Every minute it DMs the notifications other processes queued
 (clipper/alerts.py), and every few minutes it posts the stories `clipper news check`
-found. It logs to paths.bot_log as well as the console, only one bot runs per streams
-folder (a lock file), and it writes a heartbeat (clipper/daemon.py) that the war room's
+found and asks you about the gossip blinds `clipper blinds check` stored (#111: a digest a
+day and alerts of their own, each with I think it's…, No idea and Not ours). It logs to
+paths.bot_log as well as the console, only one bot runs per streams folder (a lock file),
+and it writes a heartbeat (clipper/daemon.py) that the war room's
 Health panel and `clipper services status` read. deploy/hub runs it as a container.
 
 Everything that isn't Discord is `clipper serve` (clipper/serve.py): the war room, the
@@ -45,7 +47,18 @@ from zoneinfo import ZoneInfo
 import discord
 from discord import app_commands
 
-from . import actions, alerts, cardsync, daemon, digest, news, notify, schedule, serve
+from . import (
+    actions,
+    alerts,
+    blinds,
+    cardsync,
+    daemon,
+    digest,
+    news,
+    notify,
+    schedule,
+    serve,
+)
 from .errors import ClipperError
 from .timefmt import length
 
@@ -58,6 +71,7 @@ FORMS = {  # action: (modal title, field label, required, max length, multiline)
     "thumbtext": ("Thumbnail text", "2-4 words on the thumbnail", True, 40, False),
 }
 NEWS_POST_S = 300  # how often the bot posts what `clipper news check` (a serve job) found
+BLINDS_POST_S = 300  # ...and asks about the blinds `clipper blinds check` (a serve job) stored
 DONE = {"approve": "Approved", "reject": "Rejected", "changes": "Changes requested for",
         "reopen": "Reopened", "hold": "Hold toggled on", "pin": "Pinned",
         "thumbtext": "New thumbnail text for"}
@@ -144,6 +158,31 @@ class Form(discord.ui.Modal):
         await self.bot.apply(interaction, self.action, self.ref, self.field.value)
 
 
+class BlindGuess(discord.ui.Modal):
+    """I think it's…: a name, and why if you like."""
+
+    def __init__(self, bot: Bot, bid: str):
+        super().__init__(title="Who do you think it is?", timeout=900)
+        self.bot, self.bid = bot, bid
+        self.name = discord.ui.TextInput(label="Name", max_length=120)
+        self.why = discord.ui.TextInput(label="Why (optional)", required=False, max_length=500,
+                                        style=discord.TextStyle.paragraph,
+                                        placeholder="he said he was in Vegas that week")
+        self.add_item(self.name)
+        self.add_item(self.why)
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        await self.bot.blind_answer(interaction, self.bid, name=self.name.value, why=self.why.value)
+
+
+def blind_view(bid: str) -> discord.ui.View:
+    view = discord.ui.View(timeout=None)
+    view.add_item(CardButton("blindguess", bid, "I think it's…", discord.ButtonStyle.primary))
+    view.add_item(CardButton("blindnone", bid, "No idea"))
+    view.add_item(CardButton("blindnot", bid, "Not ours"))
+    return view
+
+
 def view_for(components: list[dict]) -> discord.ui.View:
     view = discord.ui.View(timeout=None)
     for i, row in enumerate(components):
@@ -167,6 +206,7 @@ class Bot(discord.Client):
         self.tree = app_commands.CommandTree(self)
         self.lock = asyncio.Lock()  # one Kitsu job at a time
         self.started_at = datetime.now(UTC).isoformat(timespec="seconds")
+        self.public_warned: set[int] = set()  # #blinds channels found public, warned about this run
         register_commands(self)
 
     async def setup_hook(self) -> None:
@@ -178,6 +218,8 @@ class Bot(discord.Client):
             self.loop.create_task(self.refresh_cards())
         if self.cfg["news"]["check_minutes"] > 0:
             self.loop.create_task(self.news_loop())
+        if self.cfg["blinds"]["check_minutes"] > 0 and self.cfg["blinds"]["alert"] != "off":
+            self.loop.create_task(self.blinds_loop())
         if self.cfg["notify"]["enabled"]:
             self.loop.create_task(self.notify_loop())
         self.loop.create_task(self.beat_loop())
@@ -224,6 +266,108 @@ class Bot(discord.Client):
                 except (Exception, SystemExit):
                     log.exception("news: posting failed")
             await asyncio.sleep(NEWS_POST_S)
+
+    async def blinds_loop(self) -> None:
+        """Ask about the blinds `clipper blinds check` (a serve job) stored, every few minutes."""
+        await self.wait_until_ready()
+        await asyncio.sleep(120)  # after serve's first check
+        while not self.is_closed():
+            try:
+                await self.post_blinds()
+            except (Exception, SystemExit):
+                log.exception("blinds: posting failed")
+            await asyncio.sleep(BLINDS_POST_S)
+
+    async def blinds_channel(self) -> discord.TextChannel:
+        """[blinds] channel_id; else the text channel named [blinds] channel, made if missing and
+        seen only by the bot and the allowed users. One that @everyone can see is used, with a
+        warning (a DM once per cooldown): these are guesses about real people."""
+        bc = self.cfg["blinds"]
+        if bc["channel_id"]:
+            channel = self.get_channel(int(bc["channel_id"])) or await self.fetch_channel(int(bc["channel_id"]))
+        else:
+            name = str(bc["channel"]).strip().lstrip("#").lower()
+            if not name:
+                raise ClipperError("set [blinds] channel (a name) or channel_id")
+            guild = self.get_guild(self.guild_id) or await self.fetch_guild(self.guild_id)
+            channel = discord.utils.get(guild.text_channels, name=name) or await self.private_channel(guild, name)
+        if not isinstance(channel, discord.TextChannel):
+            raise ClipperError("[blinds] channel_id: use a text channel (a digest is a thread in it)")
+        if channel.permissions_for(channel.guild.default_role).view_channel and channel.id not in self.public_warned:
+            self.public_warned.add(channel.id)  # once per run in the log; the DM has its cooldown
+            log.warning(f"blinds: everyone in the server can see #{channel.name}")
+            await asyncio.to_thread(alerts.send, self.cfg, "failure",
+                                    f"Everyone in the server can see #{channel.name}, where the bot asks about "
+                                    "gossip blinds. Make it private (only you and the bot).", key="blinds:public")
+        return channel
+
+    async def private_channel(self, guild: discord.Guild, name: str) -> discord.TextChannel:
+        """Hidden from @everyone; the bot and the allowed users see it. Only permissions the
+        bot's invite gave it can be granted here (wiki Discord-app)."""
+        see = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True,
+                                          send_messages_in_threads=True)
+        overwrites = {guild.default_role: discord.PermissionOverwrite(view_channel=False),
+                      guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True,
+                                                            create_public_threads=True, send_messages_in_threads=True,
+                                                            read_message_history=True),
+                      **{discord.Object(id=u, type=discord.Member): see for u in self.allowed}}
+        try:
+            channel = await guild.create_text_channel(
+                name, overwrites=overwrites, reason="clipper blinds",
+                topic="Gossip blind items (clipper blinds): who do you think each one is about? Research for "
+                      "you alone, never published.")
+        except discord.Forbidden:
+            raise ClipperError(f"couldn't make #{name}: give the bot Manage Channels, or make a private channel "
+                               "by hand and set [blinds] channel_id") from None
+        except discord.HTTPException as e:  # e.g. an allowed user id that isn't on the server
+            raise ClipperError(f"couldn't make #{name} ({e.text or e.status}): check [discord] allowed_user_ids, "
+                               "or make a private channel by hand and set [blinds] channel_id") from None
+        log.info(f"blinds: made #{name} (private)")
+        return channel
+
+    async def post_blinds(self) -> None:
+        """Alerts of their own first, then the day's digest once it is due: a message in the
+        channel, and in its thread one message per blind."""
+        cfg, quiet = self.cfg, discord.AllowedMentions.none()  # outside text: never a ping
+        own = await asyncio.to_thread(blinds.own_alerts, cfg)
+        if own:
+            channel = await self.blinds_channel()
+            for b in own:
+                msg = await channel.send(blinds.alert_text(b), view=blind_view(b["id"]), allowed_mentions=quiet)
+                await asyncio.to_thread(blinds.mark_alerted, cfg, b["id"], f"{channel.id}/{msg.id}")
+            log.info(f"blinds: {len(own)} alert(s)")
+        day = await asyncio.to_thread(blinds.digest_due, cfg)  # after: a bad digest_at stops only the digest
+        if not day:
+            return
+        channel = await self.blinds_channel()
+        todo, more = await asyncio.to_thread(blinds.start_digest, cfg, day)
+        if not todo:  # nothing new today: no digest
+            return
+        head = await channel.send(blinds.digest_head(day, len(todo), more), allowed_mentions=quiet)
+        try:
+            where = await head.create_thread(name=f"Blinds {day}", auto_archive_duration=10080)
+        except discord.HTTPException as e:  # no Create Public Threads: the channel itself
+            log.warning(f"blinds: no thread for the digest ({e.text or e.status}); posting in #{channel.name}")
+            where = channel
+        for n, b in enumerate(todo, 1):
+            await where.send(blinds.alert_text(b, n), view=blind_view(b["id"]), allowed_mentions=quiet)
+            await asyncio.to_thread(blinds.mark_digested, cfg, b["id"], day, str(where.id))
+        log.info(f"blinds: digest {day}, {len(todo)} blind(s)")
+
+    async def blind_answer(self, interaction: discord.Interaction, bid: str, name: str = "", why: str = "",
+                           none: bool = False, not_ours: bool = False) -> None:
+        """Answer through blinds.answer, as the war room and the CLI do, then end the message
+        with the answer (the buttons stay: a new answer replaces it)."""
+        who = self.who(interaction)
+        try:
+            b = await asyncio.to_thread(blinds.answer, self.cfg, bid, name, why, none, not_ours, who=who)
+        except ClipperError as e:
+            await interaction.response.send_message(f"Nothing changed: {e}", ephemeral=True)
+            return
+        log.info(f"{who}: blind {bid} {b['status']}")
+        await interaction.response.edit_message(
+            content=blinds.answered_text(interaction.message.content if interaction.message else "", b),
+            allowed_mentions=discord.AllowedMentions.none())
 
     async def notify_loop(self) -> None:
         """DM the queued notifications (#22, clipper/alerts.py) every minute."""
@@ -411,6 +555,12 @@ class Bot(discord.Client):
     async def on_button(self, interaction: discord.Interaction, action: str, ref: str) -> None:
         if action.startswith("news"):
             await self.news_button(interaction, action, ref)
+            return
+        if action == "blindguess":
+            await interaction.response.send_modal(BlindGuess(self, ref))
+            return
+        if action in ("blindnone", "blindnot"):
+            await self.blind_answer(interaction, ref, none=action == "blindnone", not_ours=action == "blindnot")
             return
         if action == "retitle":
             try:

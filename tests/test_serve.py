@@ -27,7 +27,7 @@ def test_the_jobs_table_follows_the_config(defaults, tmp_path):
     cfg = cfg_in(defaults, tmp_path, youtube={"auto_upload_minutes": 60}, retake={"auto": True},
                  tiktok={"auto_send_minutes": 0})
     every = {name: every for name, every, *_ in serve.Serve(cfg).jobs()}
-    assert set(every) == {"upload", "preshow", "retake", "auto", "tiktok", "x", "analytics", "cast", "news",
+    assert set(every) == {"upload", "preshow", "retake", "auto", "tiktok", "x", "analytics", "cast", "news", "blinds",
                           "backup", "prune"}
     assert every["backup"] == 3600 and every["prune"] == 0      # prune: only with keep_source_days
     assert every["auto"] == 0                                   # no show approves by silence

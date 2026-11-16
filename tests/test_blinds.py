@@ -372,10 +372,11 @@ def test_an_older_store_gets_the_paired_at_column(cfg):
     import sqlite3
 
     old = sqlite3.connect(blinds.home(cfg) / "blinds.sqlite")
-    old.executescript(blinds.SCHEMA.replace(",\n    paired_at TEXT", ""))
+    old.executescript(blinds.SCHEMA.replace(",\n    paired_at TEXT, alerted_at TEXT, alert_msg TEXT, digest_day TEXT", ""))
+    assert not set(blinds.ADDED) & {r[1] for r in old.execute("PRAGMA table_info(blinds)")}
     old.close()
     db = blinds.connect(cfg)
-    assert "paired_at" in {r["name"] for r in db.execute("PRAGMA table_info(blinds)")}
+    assert set(blinds.ADDED) <= {r["name"] for r in db.execute("PRAGMA table_info(blinds)")}
     db.close()
 
 
@@ -535,9 +536,10 @@ def test_the_command_routes_and_dry_run_spends_nothing(cfg, monkeypatch, capsys)
 
 def test_blinds_never_reach_anything_published():
     """Guesses about real people are research only: no module but the command, the module itself
-    and the war room's Blinds window reads them (step 2 adds the bot and serve, which only show them)."""
+    the war room's Blinds window and the bot's alerts read them."""
     allowed = {"blinds.py", "cli.py", "doctor.py",  # doctor reads the source settings only
-               "warroom/blinds.py", "warroom/__init__.py", "warroom/httpd.py"}  # the window and its routes
+               "warroom/blinds.py", "warroom/__init__.py", "warroom/httpd.py",  # the window and its routes
+               "bot.py"}  # asks you in Discord
     src = ROOT / "clipper"
     readers = sorted(p.relative_to(src).as_posix() for p in src.rglob("*.py")
                      if p.relative_to(src).as_posix() not in allowed
@@ -546,6 +548,10 @@ def test_blinds_never_reach_anything_published():
     for name in ("__init__.py", "httpd.py"):  # these two only route to the window's module
         assert not re.search(r"from \.\. import.*\bblinds\b|\bblinds\.(listing|one|answer|get|connect)\(",
                              (src / "warroom" / name).read_text(encoding="utf-8"))
+    used = set(re.findall(r"\bblinds\.(\w+)\(", (src / "bot.py").read_text(encoding="utf-8")))
+    assert used == {"alert_text", "digest_head", "answered_text"}  # the rest go through asyncio.to_thread
+    called = set(re.findall(r"to_thread\(blinds\.(\w+)", (src / "bot.py").read_text(encoding="utf-8")))
+    assert called == {"own_alerts", "digest_due", "start_digest", "mark_alerted", "mark_digested", "answer"}
 
 
 def test_doctor_checks_the_sources(cfg, monkeypatch):
@@ -646,3 +652,217 @@ def test_the_war_room_window(cfg, monkeypatch):
 
 
 ADD_BY_HAND = blinds.add_by_hand
+
+
+# ---------- step 2: alerts and the digest ----------
+
+def put(cfg, bid, **over):
+    """A blind straight into the store, waiting for a guess unless over says otherwise."""
+    row = {"id": bid, "source": "cdan", "kind": "blind", "title": "Blind Item #1", "url": f"https://cdan.example/{bid}",
+           "published": TODAY, "day": TODAY[:10], "text": "This streamer was seen crying.", "status": "waiting",
+           "clues": json.dumps([{"type": "event", "text": "after the lawsuit", "weight": 3}]),
+           "claim": "The blind claims a thing.", "fields": json.dumps(["streaming"]), "ours": 0,
+           "sensitive": "[]", "private": 0, "guesses": "[]", "history": "[]", "clued_at": TODAY, **over}
+    db = blinds.connect(cfg)
+    db.execute(f"INSERT INTO blinds ({', '.join(row)}) VALUES ({', '.join('?' * len(row))})", list(row.values()))
+    db.commit()
+    db.close()
+    return bid
+
+
+def test_who_gets_an_alert_of_their_own(cfg):
+    assert cfg["blinds"]["alert"] == "digest" and cfg["blinds"]["check_minutes"] == 0
+    put(cfg, "a", ours=1)
+    put(cfg, "b")                                                       # not ours: the digest only
+    put(cfg, "c", ours=1, private=1)                                    # a private person: never
+    put(cfg, "d", ours=1, sensitive='["health"]')                       # sensitive: off by default
+    put(cfg, "e", ours=1, published=iso_days_ago(5))                    # a backfill's old one
+    put(cfg, "f", ours=1, status="answered")                            # answered in the war room
+    put(cfg, "g", ours=1, status="unread", clued_at=None)               # clues not read yet: later
+    put(cfg, "h", ours=1, fields='["sports"]')
+    cfg["blinds"]["hide"] = ["field:sports"]                            # hidden: never alerted
+    assert [b["id"] for b in blinds.own_alerts(cfg)] == ["a"]
+    cfg["blinds"]["sensitive_alerts"] = True
+    assert [b["id"] for b in blinds.own_alerts(cfg)] == ["a", "d"]
+    blinds.mark_alerted(cfg, "a", "1/2")
+    assert [b["id"] for b in blinds.own_alerts(cfg)] == ["d"]           # once
+    cfg["blinds"]["alert"] = "all"
+    assert [b["id"] for b in blinds.own_alerts(cfg)] == ["b", "d"]
+    cfg["blinds"]["alert"] = "off"
+    assert blinds.own_alerts(cfg) == []
+
+
+def test_a_pair_is_alerted_once_with_its_twin(cfg):
+    cfg["blinds"]["alert"] = "all"
+    put(cfg, "x", pair="e-x", published=iso_days_ago(0.5))
+    put(cfg, "y", source="bg", pair="e-x", text="Which streamer cried at the trial?")
+    got = blinds.own_alerts(cfg)
+    assert [b["id"] for b in got] == ["x"] and got[0]["twin"]["id"] == "y"
+    assert "Twin (bg" in blinds.alert_text(got[0])
+    blinds.mark_alerted(cfg, "x", "1/2")
+    assert blinds.own_alerts(cfg) == []
+    put(cfg, "z", pair="e-z")
+    put(cfg, "w", pair="e-z", source="bg")
+    blinds.mark_alerted(cfg, "w", "1/3")                                # its twin was asked: z is skipped
+    assert blinds.own_alerts(cfg) == [] and blinds.connect(cfg).execute(
+        "SELECT alert_msg FROM blinds WHERE id = 'z'").fetchone()[0] == "twin"
+
+
+def test_the_digest_comes_once_a_day_after_digest_at(cfg, monkeypatch):
+    from zoneinfo import ZoneInfo
+
+    tz = ZoneInfo(cfg["schedule"]["timezone"])
+    noon = datetime.now(tz).replace(hour=12, minute=0, second=0, microsecond=0)
+    evening = noon.replace(hour=20, minute=5)
+    put(cfg, "a", ours=1)
+    put(cfg, "b")
+    put(cfg, "c", private=1)
+    assert blinds.digest_due(cfg, noon) == ""
+    day = blinds.digest_due(cfg, evening)
+    assert day == evening.date().isoformat()
+    todo, more = blinds.start_digest(cfg, day)
+    assert [b["id"] for b in todo] == ["a", "b"] and more == 0         # ours too: it is every blind
+    assert blinds.start_digest(cfg, day) == ([], 0) and blinds.digest_due(cfg, evening) == ""
+    blinds.mark_digested(cfg, "a", day, "99")                        # the bot posted a, then stopped
+    put(cfg, "d")
+    tomorrow = (evening + timedelta(days=1)).date().isoformat()
+    assert [b["id"] for b in blinds.start_digest(cfg, tomorrow)[0]] == ["b", "d"]  # b wasn't posted: tomorrow
+    cfg["blinds"]["alert"] = "ours"
+    assert blinds.digest_due(cfg, evening + timedelta(days=2)) == ""
+    cfg["blinds"]["alert"], cfg["blinds"]["digest_at"] = "digest", "8pm"
+    with pytest.raises(ClipperError, match="HH:MM"):
+        blinds.digest_due(cfg, evening)
+
+
+def test_a_big_digest_keeps_the_newest(cfg, monkeypatch):
+    monkeypatch.setattr(blinds, "DIGEST_MAX", 2)
+    for i in range(4):
+        put(cfg, f"b{i}", published=iso_days_ago(1 - i / 10))
+    todo, more = blinds.start_digest(cfg, "2026-11-15")
+    assert [b["id"] for b in todo] == ["b2", "b3"] and more == 2
+    for b in todo:
+        blinds.mark_digested(cfg, b["id"], "2026-11-15")
+    assert blinds.start_digest(cfg, "2026-11-16") == ([], 0)            # the left-out ones don't come back
+    assert "2 older ones" in blinds.digest_head("2026-11-15", 2, 2) and "Sun Nov 15" in blinds.digest_head(
+        "2026-11-15", 2, 0)
+
+
+def test_the_alert_shows_the_blind_never_a_guess_of_clippers(cfg):
+    put(cfg, "a", ours=1, title="Blind Item #3", text="This *streamer* [link](http://x) @everyone\n\nLine two.",
+        sensitive='["health"]', url="javascript:alert(1)")
+    b = blinds.one(cfg, "a")
+    text = blinds.alert_text(b)
+    assert text.startswith("👀 **Could be someone you follow.** CDAN: Blind Item #3 ·")  # no link: not http
+    assert "> This \\*streamer\\* \\[link\\]\\(http://x\\) @everyone" in text and "> Line two." in text
+    assert "- after the lawsuit *(event)*" in text and "Tags: field:streaming, sensitive:health" in text
+    assert blinds.alert_text(b, 3).startswith("**3.** CDAN: Blind Item #3 ·")
+    put(cfg, "long", text="word " * 2000)
+    long = blinds.alert_text(blinds.one(cfg, "long"), 7)
+    assert len(long) <= 2000 and long.startswith("**7.** CDAN: [Blind Item #1](<https://cdan.example/long>)")
+    assert "…" in long and "**Clues**" in long
+
+    got = blinds.answer(cfg, "a", "Jane Streamer", "the crying")
+    once = blinds.answered_text(text, got)
+    assert once.endswith("→ Your guess: **Jane Streamer**, because the crying")
+    again = blinds.answered_text(once, blinds.answer(cfg, "a", none=True))
+    assert again.endswith("→ No idea.") and "Your guess" not in again
+    assert blinds.answered_text(again, blinds.answer(cfg, "a", not_ours=True)).endswith("Not ours: nothing more is spent on it.")
+
+
+def test_serve_runs_the_check_and_the_bot_asks(cfg):
+    from clipper import serve
+
+    jobs = {j.name: j for j in serve.Serve(cfg).jobs()}
+    assert jobs["blinds"].every_s == 0                                  # off by default
+    cfg["blinds"]["check_minutes"] = 30
+    jobs = {j.name: j for j in serve.Serve(cfg).jobs()}
+    assert jobs["blinds"].every_s == 1800 and jobs["blinds"].ready()
+    cfg["blinds"]["sources"] = []
+    assert not {j.name: j for j in serve.Serve(cfg).jobs()}["blinds"].ready()
+
+
+def test_doctor_checks_the_alert_settings(cfg, monkeypatch):
+    from clipper import doctor
+
+    seen = []
+    for kind in ("ok", "fail", "warn"):
+        monkeypatch.setattr(doctor, kind, lambda area, what, hint="", kind=kind: seen.append((kind, what)))
+    cfg["blinds"].update(check_minutes=30, alert="sometimes", digest_at="8pm", channel="", channel_id="")
+    doctor.check_blinds(cfg, offline=True)
+    fails = [w for k, w in seen if k == "fail"]
+    assert any("alert" in w for w in fails) and any("digest_at" in w for w in fails)
+    assert any("channel" in w for w in fails)
+    seen.clear()
+    cfg["blinds"].update(alert="digest", digest_at="20:00", channel="blinds")
+    doctor.check_blinds(cfg, offline=True)
+    assert not [w for k, w in seen if k == "fail"]
+    assert any("digest at 20:00" in w for k, w in seen if k == "ok")
+
+
+def test_the_two_day_window_reads_each_feeds_offset(cfg):
+    from datetime import timezone
+
+    pst = timezone(timedelta(hours=-8))
+    put(cfg, "in", ours=1, published=(datetime.now(UTC) - timedelta(hours=47)).astimezone(pst).isoformat())
+    put(cfg, "out", ours=1, published=(datetime.now(UTC) - timedelta(hours=49)).astimezone(pst).isoformat())
+    assert [b["id"] for b in blinds.own_alerts(cfg)] == ["in"]
+
+
+def test_a_twin_that_would_never_be_posted_is_not_shown(cfg):
+    cfg["blinds"]["alert"] = "all"
+    put(cfg, "x", pair="e-x")
+    put(cfg, "y", source="bg", pair="e-x", sensitive='["health"]', text="The sensitive twin.")
+    got = blinds.own_alerts(cfg)
+    assert [b["id"] for b in got] == ["x"] and "twin" not in got[0] and "sensitive twin" not in blinds.alert_text(got[0])
+    blinds.mark_alerted(cfg, "x", "")
+    cfg["blinds"]["sensitive_alerts"] = True
+    put(cfg, "z", pair="e-z")
+    put(cfg, "w", source="bg", pair="e-z", sensitive='["health"]')
+    shown = blinds.own_alerts(cfg)
+    assert [b["id"] for b in shown] == ["w"] and shown[0]["twin"]["id"] == "z"  # sensitive ones on: both shown
+
+
+def test_a_long_why_keeps_the_whole_answer_line(cfg):
+    put(cfg, "long", text="word " * 2000)
+    text = blinds.alert_text(blinds.one(cfg, "long"))
+    got = blinds.answer(cfg, "long", "Jane Streamer", "because " * 60)
+    out = blinds.answered_text(text, got)
+    assert len(out) <= 2000 and out.endswith(blinds.answer_line(got)) and "…" in out
+
+
+def test_a_pair_answered_anywhere_is_not_asked_again(cfg):
+    put(cfg, "x", ours=1, pair="e-x", status="not_ours")                # answered in the war room
+    put(cfg, "y", ours=1, pair="e-x", source="bg")
+    assert blinds.own_alerts(cfg) == [] and blinds.start_digest(cfg, "2026-11-15") == ([], 0)
+
+
+def test_a_twin_in_the_same_batch_waits_until_the_other_is_really_posted(cfg):
+    cfg["blinds"]["alert"] = "all"
+    put(cfg, "x", pair="e-x", published=iso_days_ago(0.5))
+    put(cfg, "y", pair="e-x", source="bg")
+    assert [b["id"] for b in blinds.own_alerts(cfg)] == ["x"]          # the post failed: nothing was marked
+    assert [b["id"] for b in blinds.own_alerts(cfg)] == ["x"]
+    blinds.mark_alerted(cfg, "x", "1/2")
+    assert blinds.own_alerts(cfg) == []
+    cfg["blinds"]["alert"] = "digest"
+    assert [b["id"] for b in blinds.start_digest(cfg, "2026-11-15")[0]] == ["x"]   # the bot stopped before x
+    assert [b["id"] for b in blinds.start_digest(cfg, "2026-11-16")[0]] == ["x"]   # so x comes again, not lost
+    blinds.mark_digested(cfg, "x", "2026-11-16")
+    assert blinds.start_digest(cfg, "2026-11-17") == ([], 0)
+
+
+def test_an_old_or_answered_twin_is_not_shown(cfg):
+    cfg["blinds"]["alert"] = "all"
+    put(cfg, "x", pair="e-x")
+    put(cfg, "y", pair="e-x", source="bg", published=iso_days_ago(6), text="The old twin.")
+    got = blinds.own_alerts(cfg)
+    assert [b["id"] for b in got] == ["x"] and "twin" not in got[0]
+
+
+def test_a_multiline_why_is_replaced_whole(cfg):
+    put(cfg, "a")
+    text = blinds.alert_text(blinds.one(cfg, "a"))
+    once = blinds.answered_text(text, blinds.answer(cfg, "a", "Jane Streamer", "first line\nsecond line"))
+    assert once.endswith("because first line second line")
+    again = blinds.answered_text(once, blinds.answer(cfg, "a", none=True))
+    assert again == f"{text}\n→ No idea."
