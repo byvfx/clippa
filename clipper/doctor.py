@@ -1009,6 +1009,33 @@ def check_news(cfg: dict, offline: bool) -> None:
            + (", Google News" if nc["google_news"] else ""))
 
 
+def check_blinds(cfg: dict, offline: bool) -> None:
+    """#111: the [[blinds.sources]] settings, and (online) whether each feed answers."""
+    if not cfg["blinds"]["sources"]:
+        return
+    from . import blinds, news
+
+    try:
+        srcs = blinds.source_list(cfg)
+    except ClipperError as e:
+        fail("blinds", str(e), "fix the entry in clipper.toml (wiki Blind-items)")
+        return
+    if offline:
+        ok("blinds", f"{len(srcs)} source(s): {', '.join(s['name'] for s in srcs)}")
+        return
+    bad = []
+    for s in srcs:
+        try:
+            body, _, _ = news.fetch(blinds.page_url(s["feed"], s["kind"], 0))
+            blinds.entries(body or b"<rss/>")
+        except Exception as e:  # noqa: BLE001 - any failure is the finding
+            bad.append(f"{s['name']}: {type(e).__name__}")
+    if bad:
+        warn("blinds", "feeds not answering: " + "; ".join(bad), "check the feed in [[blinds.sources]]")
+    else:
+        ok("blinds", f"{len(srcs)} source(s) answer: {', '.join(s['name'] for s in srcs)}")
+
+
 def check_broll(cfg: dict) -> None:
     """#229: the b-roll library's settings; DVIDS and Pixabay need a key."""
     from . import broll
@@ -1358,6 +1385,7 @@ def main(cfg: dict, offline: bool = False, role: str = "all") -> int:
         check_backup(cfg)
     if role in ("all", "serve", "bot"):
         check_news(cfg, offline)
+        check_blinds(cfg, offline)
     if role == "claude":
         check_claude(cfg)
     if not offline:

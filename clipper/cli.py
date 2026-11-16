@@ -386,7 +386,10 @@ def cmd_blinds(cfg: dict, args: argparse.Namespace) -> None:
         print(f"{len(rows)} blind(s); * could be someone you follow, ! sensitive, p a private person")
     elif a == "show":
         b = blinds.one(cfg, args.blind)
-        print_json(b) if args.json else print(blinds.show_text(b))
+        if args.json:
+            print_json(b)
+        else:
+            print(blinds.show_text(b))
     elif a == "guess":
         bid = blinds.add_by_hand(cfg, args.text, clues=not args.no_clues)
         print(blinds.show_text(blinds.one(cfg, bid)))

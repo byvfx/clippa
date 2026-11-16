@@ -55,6 +55,7 @@ STATUSES = ("unread", "waiting", "answered", "no_idea", "not_ours", "reveal")
 TEXT_MAX = 6000
 PAGE = 150            # Blogger's largest page
 CLUE_BATCH = 10
+MAX_TRIES = 3         # a blind the clue pass refuses or skips this often is asked about without clues
 PAIR_POOL = 60
 A = "{http://www.w3.org/2005/Atom}"
 CONTENT = "{http://purl.org/rss/1.0/modules/content/}encoded"
@@ -63,7 +64,7 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS blinds (id TEXT PRIMARY KEY, source TEXT, kind TEXT, title TEXT, url TEXT,
     published TEXT, day TEXT, seen_at TEXT, text TEXT, edited_at TEXT, status TEXT,
     clues TEXT, claim TEXT, fields TEXT, ours INTEGER, sensitive TEXT, private INTEGER, clued_at TEXT,
-    clue_model TEXT, pair TEXT, pair_why TEXT, guesses TEXT, history TEXT, claim_token TEXT, claimed_at TEXT);
+    clue_model TEXT, clue_tries INTEGER DEFAULT 0, pair TEXT, pair_why TEXT, guesses TEXT, history TEXT, claim_token TEXT, claimed_at TEXT);
 CREATE INDEX IF NOT EXISTS blinds_status ON blinds(status);
 CREATE INDEX IF NOT EXISTS blinds_published ON blinds(published);
 CREATE TABLE IF NOT EXISTS sources (name TEXT PRIMARY KEY, etag TEXT, modified TEXT, fetched_at TEXT,
@@ -123,7 +124,7 @@ def as_dict(row: sqlite3.Row) -> dict:
     for k in ("clues", "fields", "sensitive", "guesses", "history"):
         d[k] = json.loads(d[k]) if d.get(k) else []
     d["ours"], d["private"] = bool(d["ours"]), bool(d["private"])
-    for k in ("claim_token", "claimed_at"):
+    for k in ("claim_token", "claimed_at", "clue_tries"):
         d.pop(k, None)
     return d
 
@@ -163,15 +164,16 @@ def source_list(cfg: dict) -> list[dict]:
 
 
 def page_url(feed: str, kind: str, page: int) -> str:
-    """The feed's page-th page, 0 first. Blogger at its largest page size with start-index,
-    both set here over any in the feed's own query (Blogger ignores max-results without a
+    """The feed's page-th page, 0 first. Blogger newest-published first at its largest page size
+    with start-index, all set here over any in the feed's own query (Blogger ignores max-results without a
     start-index: 25 posts, then the second page would skip the rest); WordPress by paged; an
     rss source has only its one page."""
     parts = urlsplit(feed)
     query = parse_qsl(parts.query, keep_blank_values=True)
     if kind == "blogger":
         query = [(k, v) for k, v in query if k not in ("max-results", "start-index")]
-        query += [("max-results", str(PAGE)), ("start-index", str(1 + PAGE * page))]
+        query = [(k, v) for k, v in query if k != "orderby"]
+        query += [("orderby", "published"), ("max-results", str(PAGE)), ("start-index", str(1 + PAGE * page))]
     elif page and kind == "wordpress":
         query = [(k, v) for k, v in query if k != "paged"] + [("paged", str(page + 1))]
     elif page:
@@ -183,8 +185,8 @@ def pages(src: dict, since: datetime | None, max_pages: int, etag: str | None = 
           modified: str | None = None):
     """(page, entries, etag, modified) per fetched page: the first only, or with since back to
     then (at most max_pages). The first page is fetched with etag/modified, so an unchanged
-    feed yields nothing, and paging stops at a page with nothing not seen on an earlier one
-    (a feed past its end may repeat its last page)."""
+    feed yields nothing, and paging stops at a page wholly older than since, or with nothing
+    not seen on an earlier one (a feed past its end may repeat its last page)."""
     seen: set[str] = set()
     for page in range(max_pages if since else 1):
         body, et, mod = news.fetch(page_url(src["feed"], src["kind"], page),
@@ -197,8 +199,9 @@ def pages(src: dict, since: datetime | None, max_pages: int, etag: str | None = 
             return
         seen |= uids
         yield page, items, et, mod
-        oldest = min((w for w in (news.when(e["published"]) for e in items) if w), default="")
-        if not since or not items or src["kind"] == "rss" or (oldest and oldest < news.iso(since)):
+        # Past the start once a whole page is older (robust to a post edited out of order).
+        newest = max((w for w in (news.when(e["published"]) for e in items) if w), default="")
+        if not since or not items or src["kind"] == "rss" or (newest and newest < news.iso(since)):
             return
 
 
@@ -274,15 +277,14 @@ def store(db: sqlite3.Connection, src: dict, items: list[dict], since: datetime 
         bid, text = blind_id(src, kind, e), text_of(e["html"])
         if not text:
             continue
-        old = db.execute("SELECT text FROM blinds WHERE id = ?", (bid,)).fetchone()
-        if old is None:
-            db.execute("INSERT INTO blinds (id, source, kind, title, url, published, day, seen_at, text, status, "
-                       "guesses, history) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', '[]')",
-                       (bid, src["name"], kind, e["title"], e["url"], published, day_of(e["published"]), t, text,
-                        "reveal" if kind == "reveal" else "unread"))
+        # OR IGNORE: a check by hand and serve's can store the same post at once.
+        if db.execute("INSERT OR IGNORE INTO blinds (id, source, kind, title, url, published, day, seen_at, text, "
+                      "status, guesses, history) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', '[]')",
+                      (bid, src["name"], kind, e["title"], e["url"], published, day_of(e["published"]), t, text,
+                       "reveal" if kind == "reveal" else "unread")).rowcount:
             new += 1
-        elif old["text"] != text:
-            db.execute("UPDATE blinds SET text = ?, edited_at = ? WHERE id = ?", (text, t, bid))
+        elif db.execute("UPDATE blinds SET text = ?, edited_at = ? WHERE id = ? AND text != ?",
+                        (text, t, bid, text)).rowcount:
             edited += 1
     return new, edited
 
@@ -394,20 +396,45 @@ def read_clues(cfg: dict, db: sqlite3.Connection, claude=None, say=print) -> lis
             claude = Claude(cfg)
             preflight(claude, bc["clues_model"])
         system, names, w, done = Prompts(cfg).get("blinds_clues"), followed(cfg), weights(cfg), []
+
+        def ask(rows: list) -> list[str] | None:
+            out, _meta = claude.json_call(bc["clues_model"], system, clues_request(rows, names), CLUES_SCHEMA,
+                                          bc["clues_effort"])
+            if out is None:
+                return None
+            got = apply_clues(db, rows, out, w, bc["clues_model"])
+            db.commit()
+            return got
+
         for b in range(0, len(todo), CLUE_BATCH):
             batch = todo[b:b + CLUE_BATCH]
-            out, _meta = claude.json_call(bc["clues_model"], system, clues_request(batch, names), CLUES_SCHEMA,
-                                          bc["clues_effort"])
-            if out is None:  # refused: these stay unread for the next check
-                say(f"  the clue pass refused a batch of {len(batch)}; trying again next check")
-                continue
-            done += apply_clues(db, batch, out, w, bc["clues_model"])
-            db.commit()
+            got = ask(batch)
+            if got is None and len(batch) > 1:  # one blind it won't read refuses the call: ask one by one
+                say(f"  the clue pass refused a batch of {len(batch)}; asking one at a time")
+                got = [i for r in batch for i in (ask([r]) or [])]
+            done += got or []
+            missed(db, [r for r in batch if r["id"] not in set(got or [])], say)
         say(f"read the clues of {len(done)} blind(s)" + (f", ${claude.cost:.3f}" if getattr(claude, "cost", 0) else ""))
         return done
     finally:
         db.execute("UPDATE blinds SET claim_token = NULL WHERE claim_token = ?", (token,))
         db.commit()
+
+
+def missed(db: sqlite3.Connection, rows: list, say=print) -> None:
+    """Blinds the clue pass refused or left out: tried again next check, and after MAX_TRIES
+    asked about with no clues (so one it won't read doesn't come back every check)."""
+    t = news.iso(news.now())
+    for r in rows:
+        tries = (r["clue_tries"] or 0) + 1
+        if tries < MAX_TRIES:
+            db.execute("UPDATE blinds SET clue_tries = ? WHERE id = ?", (tries, r["id"]))
+            continue
+        db.execute("UPDATE blinds SET clue_tries = ?, clues = '[]', claim = ?, clued_at = ?, clue_model = 'refused', "
+                   "status = CASE WHEN status = 'unread' THEN 'waiting' ELSE status END WHERE id = ?",
+                   (tries, "(the clue pass wouldn't read this one)", t, r["id"]))
+        say(f"  {r['id']}: not read after {tries} tries; it waits for you without clues")
+    db.commit()
 
 
 # ---------- pairing ----------
@@ -422,19 +449,23 @@ def pair_request(new: list, pool: list) -> str:
 
 
 def pair(cfg: dict, db: sqlite3.Connection, ids: list[str], claude=None, say=print) -> int:
-    """Pair the newly clued blinds with unpaired twins from other sources within pair_days."""
+    """Pair the newly clued blinds with unpaired twins from other sources within pair_days
+    (feed sources only: a blind pasted by hand isn't paired)."""
     bc = cfg["blinds"]
-    if not ids or db.execute("SELECT COUNT(DISTINCT source) FROM blinds WHERE kind = 'blind'").fetchone()[0] < 2:
+    if not ids or db.execute("SELECT COUNT(DISTINCT source) FROM blinds WHERE kind = 'blind' "
+                             "AND source != 'hand'").fetchone()[0] < 2:
         return 0
     from .prompts import Prompts
 
     system, made = None, 0
     for sid in sorted({r["source"] for r in db.execute(
             f"SELECT source FROM blinds WHERE id IN ({','.join('?' * len(ids))})", ids)}):
+        if sid == "hand":  # a pasted blind isn't paired (step 1)
+            continue
         new = db.execute(f"SELECT * FROM blinds WHERE source = ? AND pair IS NULL AND clued_at IS NOT NULL "
                          f"AND id IN ({','.join('?' * len(ids))}) ORDER BY published", (sid, *ids)).fetchall()
         cut = news.iso(news.now() - timedelta(days=bc["pair_days"]))
-        pool = db.execute("SELECT * FROM blinds WHERE source != ? AND kind = 'blind' AND pair IS NULL AND "
+        pool = db.execute("SELECT * FROM blinds WHERE source NOT IN (?, 'hand') AND kind = 'blind' AND pair IS NULL AND "
                           "clued_at IS NOT NULL AND published > ? ORDER BY published DESC LIMIT ?",
                           (sid, cut, PAIR_POOL)).fetchall()
         if not new or not pool:
@@ -480,7 +511,8 @@ def apply_pairs(db: sqlite3.Connection, batch: list, pool_ids: set[str], pairs: 
 # ---------- check ----------
 
 def check(cfg: dict, backfill_days: float = 0, clues: bool = True, claude=None, say=print) -> dict:
-    """Fetch every source, read the clues of what is unread, pair twins. Returns counts."""
+    """Fetch every source, read the clues of what is unread (at most max_clues, or with a
+    backfill all of them), pair twins. Returns counts."""
     srcs = source_list(cfg)
     if not srcs:
         say("no sources: add [[blinds.sources]] entries to clipper.toml (clipper.example.toml has two)")
@@ -494,7 +526,11 @@ def check(cfg: dict, backfill_days: float = 0, clues: bool = True, claude=None, 
         prune(cfg, db)
         read, paired = [], 0
         if clues and cfg["blinds"]["clues_model"]:
-            read = read_clues(cfg, db, claude, say)
+            while True:  # max_clues a pass; a backfill reads everything it brought in
+                got = read_clues(cfg, db, claude, say)
+                read += got
+                if not got or not backfill_days:
+                    break
             paired = pair(cfg, db, read, claude, say)
         return {"new": new, "edited": edited, "read": len(read), "paired": paired}
     finally:
@@ -505,6 +541,9 @@ def prune(cfg: dict, db: sqlite3.Connection) -> int:
     """Forget what is older than keep_days, except blinds the user answered (the scorecard's)."""
     cut = news.iso(news.now() - timedelta(days=cfg["blinds"]["keep_days"]))
     n = db.execute("DELETE FROM blinds WHERE published < ? AND status != 'answered'", (cut,)).rowcount
+    if n:  # a twin left on its own is unpaired
+        db.execute("UPDATE blinds SET pair = NULL, pair_why = NULL WHERE pair IS NOT NULL AND pair IN "
+                   "(SELECT pair FROM blinds WHERE pair IS NOT NULL GROUP BY pair HAVING COUNT(*) = 1)")
     db.commit()
     return n
 
@@ -530,7 +569,9 @@ def estimate(cfg: dict, backfill_days: float = 0, say=print) -> list[str]:
         system = tokens(Prompts(cfg).get("blinds_clues")) + tokens("\n".join(followed(cfg)))
         tin = calls * system + sum(tokens(t) + 30 for t in texts)
         tout = len(texts) * 220
-        return [f"{len(texts)} blinds to read:", *estimate_lines(cfg, [("clues", cfg["blinds"]["clues_model"],
+        note = "" if backfill_days or len(texts) <= cfg["blinds"]["max_clues"] else (
+            f" (one check reads {cfg['blinds']['max_clues']}, [blinds] max_clues; --backfill reads them all)")
+        return [f"{len(texts)} blinds to read{note}:", *estimate_lines(cfg, [("clues", cfg["blinds"]["clues_model"],
                                                                          calls, tin, tout)])]
     finally:
         db.close()
@@ -545,12 +586,18 @@ def add_by_hand(cfg: dict, text: str, clues: bool = True, claude=None, say=print
         raise ClipperError("an empty blind")
     db = connect(cfg)
     try:
-        day = news.now().date().isoformat()
-        n = db.execute("SELECT COUNT(*) FROM blinds WHERE source = 'hand' AND day = ?", (day,)).fetchone()[0] + 1
-        bid, t = f"hand-{day}-{n}", news.iso(news.now())
-        db.execute("INSERT INTO blinds (id, source, kind, title, url, published, day, seen_at, text, status, guesses, "
-                   "history) VALUES (?, 'hand', 'blind', 'By hand', '', ?, ?, ?, ?, 'unread', '[]', '[]')",
-                   (bid, t, day, t, text))
+        day, t = news.now().date().isoformat(), news.iso(news.now())
+        taken = {r["id"] for r in db.execute("SELECT id FROM blinds WHERE source = 'hand' AND day = ?", (day,))}
+        n = 1
+        while True:  # the next free number; again if another paste took it meanwhile
+            while f"hand-{day}-{n}" in taken:
+                n += 1
+            bid = f"hand-{day}-{n}"
+            if db.execute("INSERT OR IGNORE INTO blinds (id, source, kind, title, url, published, day, seen_at, text, "
+                          "status, guesses, history) VALUES (?, 'hand', 'blind', 'By hand', '', ?, ?, ?, ?, 'unread', "
+                          "'[]', '[]')", (bid, t, day, t, text)).rowcount:
+                break
+            taken.add(bid)
         db.commit()
         if clues and cfg["blinds"]["clues_model"]:
             read_clues(cfg, db, claude, say)

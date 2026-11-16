@@ -48,7 +48,7 @@ def iso_days_ago(d: float, offset: str = "-08:00") -> str:
 def atom(*entries) -> bytes:
     """(title, published, html) entries in Blogger's shape."""
     body = "".join(
-        f"<entry><id>tag:blogger.com,1999:blog-1.post-{i}</id><published>{p}</published>"
+        f"<entry><id>tag:blogger.com,1999:blog-1.post-{abs(hash((t, p))) % 10**9}</id><published>{p}</published>"
         f"<title type='text'>{t}</title><content type='html'>{escape(h)}</content>"
         f"<link rel='alternate' type='text/html' href='https://cdan.example/p/{i}.html'/></entry>"
         for i, (t, p, h) in enumerate(entries))
@@ -142,11 +142,12 @@ def test_wordpress_ids_hash_the_guid(cfg, monkeypatch):
 
 def test_page_urls():
     feed = "https://cdan.example/feeds/posts/default"
-    # Blogger ignores max-results without a start-index, so both are always there, ours.
-    assert blinds.page_url(feed, "blogger", 0) == feed + "?max-results=150&start-index=1"
-    assert blinds.page_url(feed, "blogger", 2) == feed + "?max-results=150&start-index=301"
-    assert blinds.page_url(feed + "?alt=rss&max-results=50", "blogger", 1) == (
-        feed + "?alt=rss&max-results=150&start-index=151")
+    # Blogger ignores max-results without a start-index, so both are always there, ours, and
+    # newest-published first (its default order can be by last update).
+    q = "orderby=published&max-results=150&start-index="
+    assert blinds.page_url(feed, "blogger", 0) == f"{feed}?{q}1"
+    assert blinds.page_url(feed, "blogger", 2) == f"{feed}?{q}301"
+    assert blinds.page_url(feed + "?alt=rss&max-results=50&orderby=updated", "blogger", 1) == f"{feed}?alt=rss&{q}151"
     assert blinds.page_url("https://bg.example/feed/", "wordpress", 0) == "https://bg.example/feed/"
     assert blinds.page_url("https://bg.example/feed/", "wordpress", 1) == "https://bg.example/feed/?paged=2"
     assert blinds.page_url("https://x.example/rss", "rss", 0) == "https://x.example/rss"
@@ -169,6 +170,24 @@ def test_backfill_pages_back_and_skips_the_etag(cfg, monkeypatch):
     seen.clear()
     blinds.check(cfg, clues=False)  # a normal check sends the stored ETag, first page only
     assert [e for u, e in seen if "cdan" in u] == ["etag-1"] and len([u for u, _ in seen if "cdan" in u]) == 1
+
+
+def test_paging_goes_on_past_an_old_post_until_a_page_is_wholly_older(cfg, monkeypatch):
+    pages = {"start-index=1&": atom(("Blind Item #1", iso_days_ago(1), "new"), ("Blind Item #9", iso_days_ago(300), "edited old")),
+             "start-index=151": atom(("Blind Item #2", iso_days_ago(20), "still inside")),
+             "start-index=301": atom(("Blind Item #3", iso_days_ago(50), "older")),
+             "start-index=451": AssertionError}
+
+    def cdan(url):
+        for k, body in pages.items():
+            if k in url + "&":
+                if body is AssertionError:
+                    raise AssertionError("paged past a wholly older page")
+                return body
+        raise AssertionError(url)
+
+    feeds(monkeypatch, {"cdan.example": cdan, "bg.example": rss()})
+    assert blinds.check(cfg, backfill_days=30, clues=False)["new"] == 2
 
 
 def test_a_source_that_fails_is_recorded_and_the_rest_go_on(cfg, monkeypatch):
@@ -242,6 +261,34 @@ def test_a_refusal_or_a_blind_left_out_stays_unread(cfg, monkeypatch):
     db.close()
 
 
+def test_a_refused_batch_is_asked_one_by_one_and_gives_up_after_three_tries(cfg, monkeypatch):
+    feeds(monkeypatch, {"cdan.example": cdan_feed(), "bg.example": rss()})
+
+    def picky(user):  # refuses any call that holds the crying blind
+        return None if "crying" in user else clue_answer(1)
+    fake = Fake(*[picky] * 20)
+    lines = []
+    assert blinds.check(cfg, claude=fake, say=lines.append)["read"] == 1
+    assert len(fake.calls) == 3  # the batch, then each blind alone
+    statuses = {b["id"][-3:]: b["status"] for b in blinds.listing(cfg)}
+    assert statuses == {"b16": "unread", "-b2": "waiting"}
+    for _ in range(2):
+        blinds.check(cfg, claude=fake, say=lines.append)
+    (b,) = [b for b in blinds.listing(cfg) if b["id"].endswith("b16")]
+    assert b["status"] == "waiting" and b["clues"] == [] and b["clue_model"] == "refused"
+    assert any("not read after 3 tries" in x for x in lines)
+    calls = len(fake.calls)
+    blinds.check(cfg, claude=fake)
+    assert len(fake.calls) == calls  # given up on: not asked again
+
+
+def test_a_backfill_reads_past_max_clues(cfg, monkeypatch):
+    feeds(monkeypatch, {"cdan.example": cdan_feed(), "bg.example": rss()})
+    cfg["blinds"]["max_clues"] = 1
+    fake = Fake(clue_answer(1), clue_answer(1))
+    assert blinds.check(cfg, backfill_days=30, claude=fake)["read"] == 2
+
+
 def test_the_clue_prompt_never_asks_for_a_name(cfg):
     from clipper.prompts import Prompts
 
@@ -277,6 +324,21 @@ def test_twins_from_two_sources_become_one_event(cfg, monkeypatch):
     assert {b["pair"] for b in rows} == {f"e-{older}"}
     newer = next(b for b in rows if b["id"] != older)
     assert blinds.one(cfg, newer["id"])["twin"]["id"] == older
+    # The older twin pruned: the newer one is unpaired, not left pointing at nothing.
+    db = blinds.connect(cfg)
+    db.execute("UPDATE blinds SET published = '2020-01-01T00:00:00+00:00' WHERE id = ?", (older,))
+    db.commit()
+    blinds.prune(cfg, db)
+    db.close()
+    assert blinds.one(cfg, newer["id"])["pair"] is None
+
+
+def test_a_blind_by_hand_is_never_paired_or_a_reason_to_pair(cfg, monkeypatch):
+    blinds.add_by_hand(cfg, "The singer and the yacht.", claude=Fake(clue_answer(1)))
+    feeds(monkeypatch, {"cdan.example": atom(("Blind Item #3", TODAY, "That singer on the yacht.")), "bg.example": rss()})
+    fake = Fake(clue_answer(1))
+    assert blinds.check(cfg, claude=fake)["paired"] == 0
+    assert len(fake.calls) == 1  # the clue pass only: no pairing call
 
 
 # ---------- by hand ----------
@@ -291,6 +353,13 @@ def test_a_blind_by_hand_gets_a_daily_number_and_its_clues(cfg):
     assert blinds.one(cfg, a)["status"] == "waiting"
     with pytest.raises(ClipperError, match="empty"):
         blinds.add_by_hand(cfg, "  <p></p> ", clues=False)
+    db = blinds.connect(cfg)  # a gap in the numbers (or a paste taken meanwhile) skips to a free one
+    db.execute("UPDATE blinds SET id = ? WHERE id = ?", (f"hand-{day}-5", a))
+    db.execute("INSERT INTO blinds (id, source, kind, day, text, status) VALUES (?, 'hand', 'blind', 'other', 'x', 'unread')",
+               (f"hand-{day}-1",))
+    db.commit()
+    db.close()
+    assert blinds.add_by_hand(cfg, "Third", clues=False) == f"hand-{day}-3"
 
 
 # ---------- the answer ----------
@@ -389,8 +458,31 @@ def test_the_command_routes_and_dry_run_spends_nothing(cfg, monkeypatch, capsys)
 def test_blinds_never_reach_anything_published():
     """Guesses about real people are research only: no module but the command and the module
     itself reads them (step 2 adds the bot, serve and the war room, which only show them)."""
-    allowed = {"blinds.py", "cli.py"}
+    allowed = {"blinds.py", "cli.py", "doctor.py"}  # doctor reads the source settings only
     readers = sorted(p.name for p in (ROOT / "clipper").rglob("*.py")
                      if p.name not in allowed and re.search(r"\bblinds\b\s*(import|\.)|import blinds|blinds\.sqlite",
                                                             p.read_text(encoding="utf-8")))
     assert readers == []
+
+
+def test_doctor_checks_the_sources(cfg, monkeypatch):
+    from clipper import doctor
+
+    seen = []
+    monkeypatch.setattr(doctor, "ok", lambda area, what, hint="": seen.append(("ok", area, what)))
+    monkeypatch.setattr(doctor, "fail", lambda area, what, hint="": seen.append(("fail", area, what)))
+    monkeypatch.setattr(doctor, "warn", lambda area, what, hint="": seen.append(("warn", area, what)))
+    doctor.check_blinds(cfg, offline=True)
+    assert seen == [("ok", "blinds", "2 source(s): cdan, bg")]
+    seen.clear()
+    feeds(monkeypatch, {"cdan.example": cdan_feed(), "bg.example": lambda url: b"not xml"})
+    doctor.check_blinds(cfg, offline=False)
+    assert seen[0][0] == "warn" and "bg: ParseError" in seen[0][2]
+    seen.clear()
+    cfg["blinds"]["sources"] = [{"name": "x", "feed": "https://x", "kind": "atom"}]
+    doctor.check_blinds(cfg, offline=True)
+    assert seen[0][0] == "fail" and "kind must be" in seen[0][2]
+    seen.clear()
+    cfg["blinds"]["sources"] = []
+    doctor.check_blinds(cfg, offline=True)
+    assert seen == []

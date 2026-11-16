@@ -23,10 +23,18 @@ blind = "^Blind Item #"              # titles that are blinds (a regex)
 reveal = "^Blind Items? Revealed"    # titles that are reveals (checked first)
 ```
 
-Anything else in the feed is skipped. `kind` also sets how `--backfill` pages back: Blogger by
-`start-index` (150 posts a page), WordPress by `paged`. An `rss` source has only its one page.
-Paging stops at the backfill's start, at `[blinds] backfill_pages`, or at a page that holds
-nothing new.
+Anything else in the feed is skipped. `kind` also sets how `--backfill` pages back:
+- **Blogger:** newest-published first, 150 posts a page, by `start-index`. Blogger ignores a page
+  size given without one, so clipper always sets both itself.
+- **WordPress:** by `paged`.
+- **rss:** only its one page.
+
+Paging stops at the first page wholly older than the backfill's start, at `[blinds]
+backfill_pages`, or at a page that holds nothing new. A backfill also reads the clues of
+everything it brought in. An ordinary check reads at most `max_clues`.
+
+`clipper doctor` (the all, serve and bot roles) fails on a bad source entry. Online, it warns
+when a feed doesn't answer.
 
 A Blogger blog numbers its blinds afresh each day, so such a blind's id is its source, date and
 number: `cdan-2026-11-15-b16` is that day's Blind Item #16, and `cdan-2026-11-15-r4` is its Blind
@@ -80,14 +88,19 @@ newest first, at most `max_clues` per check. It returns:
 - **sensitive:** crime, health, sexuality, abuse or minors
 - **private:** whether it points at a private person
 
-It **never names or hints at who it might be**, so your guess is your own. A blind the model
-refused, or left out of its answer, stays unread for the next check. Reading costs about $0.0002
+It **never names or hints at who it might be**, so your guess is your own.
+
+When a call is refused, its ten blinds are asked one at a time, so one blind the model won't read
+doesn't hold up the others. A blind still refused, or left out of the answer, is tried again on
+the next check. After three tries it waits for your guess without clues (its claim says the clue
+pass wouldn't read it) instead of coming back every check. Reading costs about $0.0002
 a blind: a month of one busy source is well under a dollar. `check --dry-run` prices it first.
 
 **Twins.** Different sources often blind the same event. A newly read blind is compared with
 other sources' unpaired blinds from the last `pair_days` (prompt `blinds_pair_v1`, the same
 model). A pair becomes one event: asked once, and answered by either source's reveal. With only
-one source, no pairing call is made.
+one feed source, no pairing call is made. Blinds pasted by hand aren't paired yet. A pair whose
+other half is forgotten (`keep_days`) is unpaired.
 
 ## Tags and hiding
 
