@@ -53,6 +53,7 @@
 - [Investigations](Investigations)
 - [Search swarm](Search-swarm)
 - [Story dossiers](Story-dossiers)
+- [Blind items](Blind-items)
 
 **Working on Clippa**
 - [Developing](Developing)

@@ -28,6 +28,19 @@ channels = ["kick-channel-slug"]     # the Kick channels the recorder watches (w
 # review_channel_id = ""
 # allowed_user_ids = ["..."]
 
+# Gossip blind items (wiki: Blind items): uncomment the sources you want, then
+# `clipper blinds check --backfill 30 --dry-run` prices the first read.
+# [[blinds.sources]]
+# name = "cdan"
+# feed = "https://www.crazydaysandnights.net/feeds/posts/default"
+# kind = "blogger"
+# blind = "^Blind Item #"
+# reveal = "^Blind Items? Revealed"
+# [[blinds.sources]]
+# name = "blindgossip"
+# feed = "https://www.blindgossip.com/feed/"   # verify: the whole site answered 500 on 2026-11-15
+# kind = "wordpress"
+
 # ---------- shows ----------
 # One table per show. A stream belongs to the show whose `channels` include the Kick
 # channel in its meta.json (recordings and `clipper fetch` both write it), and that
