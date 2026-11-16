@@ -822,7 +822,7 @@ def _fresh(cfg: dict, db: sqlite3.Connection, where: str) -> list[dict]:
 
 
 ASKED = {  # the other half of a pair was really posted: an alert's message, a digest's day (no "twin:"/"left:")
-    "alerted_at": "alerted_at IS NOT NULL AND alert_msg != 'twin'",
+    "alerted_at": "alerted_at IS NOT NULL AND alert_msg IS NOT 'twin'",
     "digest_day": "digest_day IS NOT NULL AND digest_day NOT LIKE '%:%'",
 }
 
@@ -1004,7 +1004,7 @@ def answered_text(content: str, b: dict, limit: int = 2000) -> str:
     room = limit - len(line) - 1
     if len(kept) > room:
         kept = kept[:room - 1].rstrip() + "…"
-    return f"{kept}\n{line}"
+    return f"{kept}\n{line}" if line else kept
 
 
 def digest_head(day: str, n: int, more: int) -> str:
