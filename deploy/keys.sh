@@ -43,8 +43,9 @@ check_keys() {
         sync)
             for name in $differ; do
                 mine=$(printf '%s\n' "$own" | grep -m1 "^$name"$'\t' | cut -f2-)
-                K="$name" V="$mine" awk 'BEGIN { k = ENVIRON["K"]; v = ENVIRON["V"] }
-                    index($0, k "=") == 1 { print k "=" v; next } { print }' "$env_local" > "$env_local.tmp"
+                # umask 077: the copy holds every key, so it's private from its first byte
+                (umask 077 && K="$name" V="$mine" awk 'BEGIN { k = ENVIRON["K"]; v = ENVIRON["V"] }
+                    index($0, k "=") == 1 { print k "=" v; next } { print }' "$env_local" > "$env_local.tmp")
                 mv "$env_local.tmp" "$env_local"
             done
             chmod 600 "$env_local"

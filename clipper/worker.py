@@ -301,6 +301,7 @@ def run_stream(cfg: dict, stream_dir: Path, config_path: str | None = None,  # n
             run.save()
             log.info("%s: %s (stage %d of %d)", name, stage, i + 1, len(order))  # #205
             t = time.time()
+            keys_then = stream_keys(cfg, stream_dir)  # the keys this stage starts with (Copilot, #281)
             env = {**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"}
             with open(log_path, "a", encoding="utf-8") as out:
                 out.write(f"\n=== {now_iso()} {' '.join(cmd[3:])}\n")
@@ -315,10 +316,9 @@ def run_stream(cfg: dict, stream_dir: Path, config_path: str | None = None,  # n
                 if code == KEY_REJECTED:
                     # The same key would only be refused again: hold the stream until a key
                     # changes (pending) and give back the attempt, which wasn't the stream's fault.
-                    try:
-                        run.data["key_rejected"] = keys_fingerprint(cfg["paths"])
-                    except OSError:
-                        run.data["key_rejected"] = "unread"  # differs from any real one: retried next pass
+                    # The fingerprint is the one the stage started with: a key replaced while it
+                    # ran is a change, so the stream is tried again at once.
+                    run.data["key_rejected"] = keys_then
                     run.data["attempts"] = max(0, run.data.get("attempts", 1) - 1)
                 run.save()
                 log.error("%s: %s failed (exit %s), see %s", name, stage, code, log_path)
@@ -349,6 +349,16 @@ def run_stream(cfg: dict, stream_dir: Path, config_path: str | None = None,  # n
             log.info("%s: run %s", name, run.data["status"])
 
 
+def stream_keys(cfg: dict, d: Path) -> str:
+    """The fingerprint of the model keys a stage of this stream reads: its show's or its own
+    [paths] (for_stream), as the stage resolves them. "unread" when a key file can't be read
+    just now (a NAS blip)."""
+    try:
+        return keys_fingerprint(for_stream(cfg, d)["paths"])
+    except (OSError, ValueError, ClipperError):  # a blip, or a stream config.toml mid-edit
+        return "unread"
+
+
 def takes(cfg: dict, channel: str) -> bool:
     """Whether the worker clips this channel's recordings ([worker] channels, a show for it)."""
     wc = cfg["worker"]
@@ -373,7 +383,6 @@ def pending(cfg: dict) -> list[Path]:
     # Grabbed pre-shows: meta.json is written once the download is complete.
     ready += [m.parent for m in sorted(root.glob(f"{PRESHOW_PREFIX}*/meta.json"))]
     out = []
-    keys = None
     for d in ready:
         run = jsonstate.read_or(d / "run.json", {})
         if run.get("status") in ("done", "skip"):
@@ -381,13 +390,10 @@ def pending(cfg: dict) -> list[Path]:
         if run.get("status") == "running" and age_s(run.get("heartbeat")) < wc["stale_minutes"] * 60:
             continue
         if run.get("status") == "failed" and run.get("key_rejected"):
-            try:
-                keys = keys or keys_fingerprint(cfg["paths"])
-            except OSError:
-                continue  # a key file unreadable just now: stay held, look again next pass
-            if keys != run["key_rejected"]:
+            keys = stream_keys(cfg, d)
+            if keys != "unread" and keys != run["key_rejected"]:
                 out.append(d)  # a key changed (a fixed env.local, a new key file): try now
-            continue
+            continue  # (unreadable just now: stay held, look again next pass)
         if run.get("status") == "failed":
             if run.get("attempts", 0) >= wc["max_attempts"]:
                 continue
@@ -465,7 +471,8 @@ def watch(cfg: dict, config_path: str | None = None, once: bool = False) -> None
             alert(f"clipper worker: {d.name} stopped, an API key was rejected: {run.get('error', '')[:500]}"
                   " (held, not retried, until a key changes: fix the key the error names, on the hub in"
                   " deploy/hub/env.local and then deploy.sh; the worker picks it up again by itself)",
-                  kind="failure", key=f"key_rejected:{run['key_rejected']}")  # one DM a key set, any streams
+                  # streams held by one key set share a DM: at most one per [notify] cooldown_hours
+                  kind="failure", key=f"key_rejected:{run['key_rejected']}")
         elif run.get("status") == "failed":
             left = wc["max_attempts"] - run.get("attempts", 0)
             alert(f"clipper worker: {d.name} failed: {run.get('error', '')[:600]}"

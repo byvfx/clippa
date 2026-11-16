@@ -266,3 +266,33 @@ def test_a_rejected_key_holds_the_stream_until_a_key_changes(tmp_path, defaults,
     monkeypatch.setattr(worker.subprocess, "call", lambda cmd, **kw: 0)
     assert worker.run_stream(cfg, d, stages=["score"], force=True)
     assert "key_rejected" not in jsonstate.read_or(d / "run.json", {})
+
+
+def test_the_held_fingerprint_is_the_one_the_stage_started_with(tmp_path, defaults, monkeypatch):
+    """Copilot on #281: a key replaced while the stage ran is a change, so the stream is taken
+    again at once instead of held on the new key's fingerprint."""
+    from clipper.errors import KEY_REJECTED
+
+    for env in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "OPENROUTER_API_KEY", "LOCAL_LLM_API_KEY"):
+        monkeypatch.delenv(env, raising=False)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "old")
+    cfg = {**defaults, "shows": {}, "paths": {**defaults["paths"], "streams": tmp_path}}
+    d = tmp_path / "kick-2"
+    (d / "live").mkdir(parents=True)
+    jsonstate.write(d / "live" / "state.json", {"status": "done", "channel": "x"})
+
+    def rotated_meanwhile(cmd, stdout=None, **kw):
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "new")   # fixed while the old one was refused
+        return KEY_REJECTED
+    monkeypatch.setattr(worker.subprocess, "call", rotated_meanwhile)
+    monkeypatch.setattr(worker, "keep_awake", lambda on: None)
+    worker.run_stream(cfg, d, stages=["score"], force=True)
+    assert worker.pending(cfg) == [d]
+
+
+def test_a_rejected_key_passes_through_the_handlers_that_swallow_errors():
+    from clipper.errors import KeyRejected, key_rejected
+
+    auth = type("AuthenticationError", (Exception,), {"__module__": "anthropic._exceptions"})
+    assert key_rejected(KeyRejected("x")) and key_rejected(auth("y"))
+    assert not key_rejected(RuntimeError("z")) and not key_rejected(type("AuthenticationError", (Exception,), {})("w"))

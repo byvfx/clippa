@@ -33,3 +33,11 @@ class KeyRejected(ClipperError):
 
     def __init__(self, message: str):
         super().__init__(message, status=KEY_REJECTED)
+
+
+def key_rejected(e: BaseException) -> bool:
+    """A refused key: KeyRejected, or the Anthropic SDK's AuthenticationError from a call past
+    the preflight. A handler that turns errors into findings or a retry passes these through,
+    so they reach cli.main as exit KEY_REJECTED (#281)."""
+    return isinstance(e, KeyRejected) or (
+        type(e).__name__ == "AuthenticationError" and type(e).__module__.startswith("anthropic"))

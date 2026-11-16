@@ -44,7 +44,7 @@ from pathlib import Path
 from . import jsonstate
 from .checkup import BAD, WARN, finding, lint_text
 from .config import for_stream
-from .errors import ClipperError
+from .errors import ClipperError, key_rejected
 
 CHECKS_FILE = "checks.json"
 VERSION = 1            # bump when a check changes: every item is checked again
@@ -651,7 +651,9 @@ def check_item(sdir: Path, cfg: dict, it: dict, ctx: dict, claude) -> tuple[list
                 got, vision = cover_findings(sdir, cfg, it, ctx, claude)
             else:
                 got = subject_findings(sdir, cfg, it, ctx)
-        except Exception as e:  # noqa: BLE001  # one broken check mustn't pass the item
+        except Exception as e:  # one broken check mustn't pass the item
+            if key_rejected(e):
+                raise  # not the item's fault: exit KEY_REJECTED, so the stream is held (#281)
             got = [(BAD, f"the {name} check failed: {type(e).__name__}: {str(e)[:200]}")]
         found += [(name, level, text) for level, text in got]
     return [finding(f"{name}:{it['key']}:{n}", name, level, text, stream=sdir.name)
