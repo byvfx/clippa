@@ -727,6 +727,22 @@ def one(cfg: dict, bid: str) -> dict:
     return b
 
 
+def twins(cfg: dict, pairs: set[str]) -> dict[str, list[str]]:
+    """The ids in each of these pairs, from the whole store (a list's source and date filters
+    leave out the other half)."""
+    if not pairs:
+        return {}
+    db = connect(cfg)
+    try:
+        out: dict[str, list[str]] = {}
+        for r in db.execute("SELECT id, pair FROM blinds WHERE pair IN (SELECT value FROM json_each(?)) ORDER BY id",
+                            (json.dumps(sorted(pairs)),)):
+            out.setdefault(r["pair"], []).append(r["id"])
+        return out
+    finally:
+        db.close()
+
+
 def mark_of(b: dict) -> str:
     return ("*" if b["ours"] else " ") + ("!" if b["sensitive"] else " ") + ("p" if b["private"] else " ")
 

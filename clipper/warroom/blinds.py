@@ -25,25 +25,29 @@ def _days(days) -> float:
         return 14
 
 
-def blinds_get(cfg: dict, days: str | float = "", view: str = "", source: str = "") -> dict:
+def blinds_get(cfg: dict, days: str | float = "", view: str = "", source: str = "", focus: str = "") -> dict:
     """The blinds of the last `days` for one view (waiting on you first, at most SHOWN), counts
     per status, the sources, the people a guess can match, and the background check. [blinds]
-    hide leaves blinds out of every view but All, and out of the counts but All's."""
+    hide leaves blinds out of every view but All, and out of the counts but All's. `focus` is a
+    blind to jump to (a twin, a paste): it is added first when the view, range or cap left it out."""
     from .. import blinds
 
     d, view = _days(days), view if view in VIEWS else "waiting"
     every = blinds.listing(cfg, d, "", source, everything=True)
     rows = [b for b in every if (view == "all" or (b["status"] == VIEWS[view] and not b["hidden"]))]
     counts = {s: 0 for s in blinds.STATUSES} | {"all": len(every)}
-    pairs: dict[str, list[str]] = {}
     for b in every:
         counts[b["status"]] += not b["hidden"]
-        if b["pair"]:
-            pairs.setdefault(b["pair"], []).append(b["id"])
     more, rows = max(len(rows) - SHOWN, 0), rows[:SHOWN]
-    for b in rows:  # the other half of a pair, to jump to (its id is in the pair's own: e-<older id>)
-        b["twin_id"] = next((i for i in pairs.get(b["pair"] or "", []) if i != b["id"]),
-                            b["pair"][2:] if b["pair"] and b["pair"][2:] != b["id"] else "")
+    if focus and focus not in {b["id"] for b in rows}:
+        try:
+            rows.insert(0, blinds.one(cfg, focus))
+        except ClipperError:
+            pass  # gone (pruned): the window just doesn't jump
+    twins = blinds.twins(cfg, {b["pair"] for b in rows if b["pair"]})  # whatever the filters left out
+    for b in rows:
+        b.pop("twin", None)
+        b["twin_id"] = next((i for i in twins.get(b["pair"] or "", []) if i != b["id"]), "")
     try:
         srcs, src_error = blinds.sources_report(cfg), ""
     except ClipperError as e:

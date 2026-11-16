@@ -3,7 +3,9 @@
 // else; "Check now" fetches the sources in the background. Nothing here is ever published.
 
 let BS = null;  // {data, days, view, source, paste, full: Set, jump, win}
-let BLINDSWIN = 0, BPOLL = 0;
+// BLINDSWIN names one opening of the window (a write still in flight checks it); BLINDSREQ is the
+// latest read, so an older read that answers late is dropped. A poll changes only the second.
+let BLINDSWIN = 0, BLINDSREQ = 0, BPOLL = 0;
 const blindsWin = win => win === BLINDSWIN && $("#tool").open && $("#tool").dataset.kind === "blinds";
 const BVIEWS = [["waiting", "Waiting on you"], ["answered", "Answered"], ["no_idea", "No idea"], ["not_ours", "Not ours"],
   ["reveal", "Reveals"], ["unread", "Unread"], ["all", "All"]];
@@ -12,15 +14,18 @@ const BSTAT = { unread: "clues not read yet", waiting: "waiting on you", answere
 
 async function showBlinds(opts = {}) {
   const d = $("#tool");
-  const win = ++BLINDSWIN;
+  if (!BS || !d.open || d.dataset.kind !== "blinds") { BS = null; BLINDSWIN++; }  // a fresh opening
+  const win = BLINDSWIN, req = ++BLINDSREQ;
   d.dataset.kind = "blinds"; d.classList.remove("cover"); d.classList.add("facesw");
-  if (!BS || !d.open) d.innerHTML = `<div class="m-head"><b>Blinds</b><button class="x" aria-label="Close" title="Close (Esc)" data-close>×</button></div><div class="tbody">Loading…</div>`;
+  if (!BS) d.innerHTML = `<div class="m-head"><b>Blinds</b><button class="x" aria-label="Close" title="Close (Esc)" data-close>×</button></div><div class="tbody">Loading…</div>`;
   if (!d.open) d.showModal();
-  const s = { days: 14, view: "waiting", source: "", paste: false, full: new Set(), ...(BS || {}), ...opts };
+  const DEF = { days: 14, view: "waiting", source: "", paste: false, full: new Set() };
+  const s = { ...DEF, ...(BS || {}), ...opts };
   try {
-    const data = await api(`/api/blinds?days=${s.days}&view=${encodeURIComponent(s.view)}&source=${encodeURIComponent(s.source)}`);
-    if (!blindsWin(win)) return;
-    BS = { ...s, data, win };
+    const data = await api(`/api/blinds?days=${s.days}&view=${encodeURIComponent(s.view)}&source=${encodeURIComponent(s.source)}`
+      + (s.jump ? `&focus=${encodeURIComponent(s.jump)}` : ""));
+    if (!blindsWin(win) || req !== BLINDSREQ) return;
+    BS = { ...DEF, ...(BS || {}), ...opts, data, win };  // what changed meanwhile (the paste box) stays as it is now
     renderBlinds();
   } catch (e) {
     const box = d.querySelector(".tbody");
@@ -125,7 +130,7 @@ document.addEventListener("click", async e => {
   const ds = t.dataset;
   if (ds.bview) return showBlinds({ view: ds.bview });
   if (ds.bmore) { BS.full.has(ds.bmore) ? BS.full.delete(ds.bmore) : BS.full.add(ds.bmore); return renderBlinds(); }
-  if (ds.bjump) return showBlinds({ view: "all", jump: ds.bjump, days: Math.max(BS.days, 30) });
+  if (ds.bjump) return showBlinds({ view: "all", source: "", jump: ds.bjump });  // the server adds it if out of range
   if (ds.bguess) {
     const card = t.closest(".bl"), name = $(".bname", card).value.trim();
     if (!name) { $(".bname", card).focus(); return toast("Type who you think it is, or say No idea.", true); }
@@ -166,4 +171,4 @@ document.addEventListener("keydown", e => {
   e.preventDefault();
   $("[data-bguess]", e.target.closest(".bl")).click();
 });
-$("#tool").addEventListener("close", () => { if ($("#tool").dataset.kind === "blinds") { BS = null; BLINDSWIN++; } });
+$("#tool").addEventListener("close", () => { if ($("#tool").dataset.kind === "blinds") { BS = null; BLINDSWIN++; clearTimeout(BPOLL); } });

@@ -113,7 +113,7 @@ GET_API = {
     "/api/cast": lambda cfg, qs: cast_get(cfg, _q(qs, "person")),
     "/api/news": lambda cfg, qs: news_get(cfg, _q(qs, "days")),
     "/api/news/search": lambda cfg, qs: news_search(cfg, _q(qs, "q")),
-    "/api/blinds": lambda cfg, qs: blinds_get(cfg, _q(qs, "days"), _q(qs, "view"), _q(qs, "source")),
+    "/api/blinds": lambda cfg, qs: blinds_get(cfg, _q(qs, "days"), _q(qs, "view"), _q(qs, "source"), _q(qs, "focus")),
     "/api/investigations": lambda cfg, qs: investigations_get(cfg, _q(qs, "subject"), _q(qs, "run")),
 }
 

@@ -604,6 +604,18 @@ def test_the_war_room_window(cfg, monkeypatch):
     db.close()
     twins = {x["id"]: x["twin_id"] for x in warroom.blinds_get(cfg)["blinds"]}
     assert twins == {a: b, b: a}
+    db = blinds.connect(cfg)  # the twin from another source, and older than the range: still linked
+    db.execute("UPDATE blinds SET source = 'bg', published = ? WHERE id = ?", (iso_days_ago(60), b))
+    db.commit()
+    db.close()
+    assert [(x["id"], x["twin_id"]) for x in warroom.blinds_get(cfg, source="cdan")["blinds"]] == [(a, b)]
+    jumped = warroom.blinds_get(cfg, view="all", focus=b)["blinds"]  # out of range: added first for the jump
+    assert jumped[0]["id"] == b and jumped[0]["twin_id"] == a and "twin" not in jumped[0]
+    assert warroom.blinds_get(cfg, focus="no-such-blind")["view"] == "waiting"
+    db = blinds.connect(cfg)
+    db.execute("UPDATE blinds SET source = 'cdan', published = ? WHERE id = ?", (TODAY, b))
+    db.commit()
+    db.close()
 
     got = warroom.blinds_answer(cfg, {"id": a, "name": "jane streamer", "why": "the crying"})["blind"]
     assert got["status"] == "answered" and got["guesses"][0]["who"] == "war room" and "tags" in got

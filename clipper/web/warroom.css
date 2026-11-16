@@ -287,8 +287,8 @@ input.search { margin-left: auto; width: 180px; }
 .nctx { border-left: 3px solid var(--line); padding: 4px 10px; color: var(--dim); font-size: 13px; }
 /* #111 blinds: the blind's text, its typed clues, your guess */
 .blinds { grid-template-columns: minmax(0, 1fr); }  /* the tabs scroll on a phone; the window doesn't */
-.blinds .seg { max-width: 100%; overflow-x: auto; }
-.blinds .seg button { white-space: nowrap; }
+#tool.facesw .blinds .seg { max-width: 100%; overflow-x: auto; }  /* beats .facesw .seg's overflow: hidden */
+#tool.facesw .blinds .seg button { white-space: nowrap; }
 .blinds .seg .n { color: var(--faint); font-size: 11px; }
 .bl .nh .by { overflow-wrap: anywhere; }
 .bl .btext { white-space: pre-wrap; max-height: 9.5em; overflow: hidden; line-height: 1.45; }
