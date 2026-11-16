@@ -193,9 +193,9 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
 - Branches and worktrees were cleaned up again 11-13: everything merged is gone, plus the old `ccr-*` and
   `claude/clipper-investigate-command-*` branches and the swarm worktree, all at the user's word. Kept on
   purpose: `story-dig` and `jev-lab` (`C:\clipper-jevlab`; it holds `jev-gate`'s commit), both pushed and
-  unmerged. `.claude/worktrees/instagram` (`archive/instagram-source`) holds **uncommitted** Instagram-source
-  work (`clipper/instagram.py`, its test, 12 files changed): the only copy, so commit it (then push the
-  branch) before anything else. `.claude/worktrees/elated-snyder-52f189` is clean (detached on main) and can go once no
+  unmerged. `.claude/worktrees/instagram` (`archive/instagram-source`) holds the Instagram-source work
+  (`clipper/instagram.py`, its test, 14 files), committed and pushed 11-13 (b270e5c), unmerged; its base is
+  main as of #215, so rebase before a PR. `.claude/worktrees/elated-snyder-52f189` is clean (detached on main) and can go once no
   session uses it.
 - The DSP story video is in Kitsu for review (Kino Casino / "2026-11-04 story-dsp-credit-score-590", 3:14).
 - TikTok drafts to post by hand: the 10/25 batch (kick-133940023 v04_t04, v05_t05, v07_t14, v08_t18) would
@@ -213,11 +213,10 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
 - Old approved Short titles/descriptions that still say "hosts" (Kitsu text): a war-room find-and-replace dry
   run found 14; not applied.
 - Decisions on #66 (transcript-framed edits): which item kinds, replace or sit beside the plain cut, sound
-  effects, order after #67. Sloth Beat handle check (@slothbeat).
-- Cast (#41): it fills itself; look over Kept and New in the war room's Cast window (drop wrong or costume
+  effects, order after the edit plan (#66's #67 section). Sloth Beat handle check (@slothbeat).
+- Cast (#41 closed 11-15): it fills itself; look over Kept and New in the war room's Cast window (drop wrong or costume
   photos; image search photos always wait for you). Check Jer f868aa21db (auto-kept at 0.73 from a costume
-  night). #41 closes once a cover and a weekly issue use kept cast photos (weekly 05,
-  11-14, is the test). Candice Owens has the alias "Candace Owens" (Commons' spelling, 11-13).
+  night). Candice Owens has the alias "Candace Owens" (Commons' spelling, 11-13).
 - Faces: enroll PPP in his maple-leaf cap from the first non-costume stream (October was costumes every night).
 - Permissions: Papa Meat (#45), MikeyNohMore (#80). Ben Avery archive pull (#47); Jerry Banfield pull waits on
   desktop/storage (#44).
@@ -230,20 +229,20 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
 ## Open work
 **Priority labels (user, 2026-11-13):** every open issue carries one: `p1-now` (built 11-13, one PR each, all merged
 and deployed 11-13: #199 PR #247, #204 PR #248, #228 PR #249,
-#205 PR #250; #201, #203 and #206 closed; 11-13 also closed #7 into #78 and #57 as built), `p2-dated` (#192 after 11-16,
-#41 after weekly 05), `p3-track` (one big track at a time, the user picks: desktop install #46 → #44/#47/#45/#78;
+#205 PR #250; #201, #203 and #206 closed; 11-13 also closed #7 into #78 and #57 as built), `p2-dated` (#192 after 11-16), `p3-track` (one big track at a time, the user picks: desktop install #46 → #44/#47/#45/#78;
 Udder Truth #58-#60; archive tooling #221-#227 before the next mini-doc; b-roll #229), `waiting` (#80, #48, #45),
 `parked` (the rest). `gh issue list --label p1-now` is the queue. 11-13: #13 folded into #158, #200 closed (its
-setup/doctor bug moved to #78), #70 narrowed to punch-ins/emphasis (tighten built).
+setup/doctor bug moved to #78), #70 narrowed to punch-ins/emphasis (tighten built). 11-15 (user): #41 and #55 closed as built, #67-#71
+folded into #66 (each a section there).
 Tracked as GitHub issues (byvfx/clipper); roadmaps are issues only: (NAS hub #14 and self-checks #185
 closed 11-09; checkup's turn-on steps are under Checkup below),
-Posts blind items #36 (the rest of the YouTube Posts roadmap #30 closed 11-09), Instagram Reels #39, cast library #41, lore-order playlists #43,
-archive fun #63, transcript-framed edits #66 (#67-#71; 11-09 the user wasn't sure #67 is needed, so #70's tighten
+Posts blind items #36 (the rest of the YouTube Posts roadmap #30 closed 11-09), Instagram Reels #39, lore-order playlists #43,
+archive fun #63, transcript-framed edits #66 (one issue since 11-15, sections #67-#71; 11-09 the user wasn't sure #67 is needed, so #70's tighten
 came first: built 11-09, PR #191, `[edit] tighten`. The user found it "better than I thought" on the
 test stream but wants it **off** until it clearly helps; turn it on per show (`[shows.<key>.edit]`)
 only at their word. #67's model edit plan waits until edited Shorts prove themselves), crisis mode #73, setup #78,
 live clips #81, blind items #111, investigate anyone #138, agent exploration #158 (on hold at the user's word 11-09; next would be a week of phone use, then
-a small `clipper mcp`; #13 may fold into it), Modal ideas #53, #55, #56,
+a small `clipper mcp`; #13 may fold into it), Modal ideas #53, #56,
 Udder Truth #58/#59/#60, P&L #50 (revenue once monetized). Write "#77 L6" rather than "fix #77" in commit
 messages: GitHub closes the issue on "fix".
 - **Review pre-flight checks and approval by silence (#259, 11-14):** step A, `clipper review check` (wiki
