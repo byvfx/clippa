@@ -11,7 +11,7 @@ from pathlib import Path
 
 from . import __version__, config, jsonstate
 from .config import stream_dir
-from .errors import ClipperError, did_you_mean
+from .errors import KEY_REJECTED, ClipperError, did_you_mean
 
 STREAM_HELP = "stream id under paths.streams (or latest, latest:<show>, a unique start of an id), or a stream dir"
 
@@ -2268,6 +2268,14 @@ def main() -> None:
         if str(e):
             print(e, file=sys.stderr)
         raise SystemExit(e.status) from None
+    except Exception as e:
+        # A Claude call past the preflight (or in a stage without one) whose key is refused: the
+        # same exit as KeyRejected, so the worker holds the stream instead of retrying it.
+        if type(e).__name__ == "AuthenticationError" and type(e).__module__.startswith("anthropic"):
+            print(f"Claude API rejected the key (ANTHROPIC_API_KEY or [paths] anthropic_key): {e}",
+                  file=sys.stderr)
+            raise SystemExit(KEY_REJECTED) from None
+        raise
 
 
 def run_command(args: argparse.Namespace) -> None:

@@ -258,7 +258,7 @@ def test_a_401_is_a_rejected_key_not_a_retry(posted, monkeypatch, defaults):
     sent, replies = posted
     monkeypatch.setenv("OPENROUTER_API_KEY", "k")
     replies.append(FakeResponse({"error": {"message": "No auth credentials found"}}, status=401))
-    with pytest.raises(KeyRejected, match="OPENROUTER_API_KEY was rejected") as e:
+    with pytest.raises(KeyRejected, match=r"OPENROUTER_API_KEY \(or \[paths\] openrouter_key\) was rejected") as e:
         llm.LLM(defaults).preflight("openrouter:openai/gpt-5-mini")
     assert e.value.status == KEY_REJECTED and len(sent) == 1
     replies.append(FakeResponse({"error": {"message": "flagged"}}, status=403))
@@ -277,3 +277,35 @@ def test_the_keys_fingerprint_changes_with_a_key_and_hides_it(monkeypatch, tmp_p
     (tmp_path / "openai.txt").write_text("from-a-file")
     b = llm.keys_fingerprint({})
     assert llm.keys_fingerprint({"openai_key": tmp_path / "openai.txt"}) != b
+
+
+def test_geminis_400_for_a_bad_key_is_a_rejected_key(posted, monkeypatch, defaults):
+    from clipper.errors import KeyRejected
+
+    sent, replies = posted
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    replies.append(FakeResponse({"error": {"message": "API key not valid. Please pass a valid API key."}}, status=400))
+    with pytest.raises(KeyRejected, match="GEMINI_API_KEY"):
+        llm.LLM(defaults).preflight("gemini:gemini-3-flash")
+
+
+def test_a_key_file_that_cant_be_read_raises_rather_than_seeming_to_change(monkeypatch, tmp_path):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    (tmp_path / "openai_dir").mkdir()  # there, but reading it fails
+    with pytest.raises(OSError):
+        llm.keys_fingerprint({"openai_key": tmp_path / "openai_dir"})
+
+
+def test_cli_exits_key_rejected_on_a_claude_auth_error_past_the_preflight(monkeypatch, capsys):
+    from clipper import cli
+    from clipper.errors import KEY_REJECTED
+
+    auth = type("AuthenticationError", (Exception,), {"__module__": "anthropic._exceptions"})
+    monkeypatch.setattr(cli, "run_command", lambda args: (_ for _ in ()).throw(auth("invalid x-api-key")))
+    monkeypatch.setattr("sys.argv", ["clipper", "status"])
+    with pytest.raises(SystemExit) as e:
+        cli.main()
+    assert e.value.code == KEY_REJECTED and "rejected the key" in capsys.readouterr().err
+    monkeypatch.setattr(cli, "run_command", lambda args: (_ for _ in ()).throw(KeyError("other")))
+    with pytest.raises(KeyError):
+        cli.main()

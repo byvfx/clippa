@@ -315,7 +315,10 @@ def run_stream(cfg: dict, stream_dir: Path, config_path: str | None = None,  # n
                 if code == KEY_REJECTED:
                     # The same key would only be refused again: hold the stream until a key
                     # changes (pending) and give back the attempt, which wasn't the stream's fault.
-                    run.data["key_rejected"] = keys_fingerprint(cfg["paths"])
+                    try:
+                        run.data["key_rejected"] = keys_fingerprint(cfg["paths"])
+                    except OSError:
+                        run.data["key_rejected"] = "unread"  # differs from any real one: retried next pass
                     run.data["attempts"] = max(0, run.data.get("attempts", 1) - 1)
                 run.save()
                 log.error("%s: %s failed (exit %s), see %s", name, stage, code, log_path)
@@ -378,7 +381,10 @@ def pending(cfg: dict) -> list[Path]:
         if run.get("status") == "running" and age_s(run.get("heartbeat")) < wc["stale_minutes"] * 60:
             continue
         if run.get("status") == "failed" and run.get("key_rejected"):
-            keys = keys or keys_fingerprint(cfg["paths"])
+            try:
+                keys = keys or keys_fingerprint(cfg["paths"])
+            except OSError:
+                continue  # a key file unreadable just now: stay held, look again next pass
             if keys != run["key_rejected"]:
                 out.append(d)  # a key changed (a fixed env.local, a new key file): try now
             continue
@@ -457,9 +463,9 @@ def watch(cfg: dict, config_path: str | None = None, once: bool = False) -> None
         run = jsonstate.read_or(d / "run.json", {})
         if run.get("status") == "failed" and run.get("key_rejected"):
             alert(f"clipper worker: {d.name} stopped, an API key was rejected: {run.get('error', '')[:500]}"
-                  " (held, not retried, until a key changes: on the hub, fix deploy/hub/env.local and"
-                  " run deploy.sh; the worker then picks it up again by itself)",
-                  kind="failure", key="key_rejected")  # one DM for every stream it holds
+                  " (held, not retried, until a key changes: fix the key the error names, on the hub in"
+                  " deploy/hub/env.local and then deploy.sh; the worker picks it up again by itself)",
+                  kind="failure", key=f"key_rejected:{run['key_rejected']}")  # one DM a key set, any streams
         elif run.get("status") == "failed":
             left = wc["max_attempts"] - run.get("attempts", 0)
             alert(f"clipper worker: {d.name} failed: {run.get('error', '')[:600]}"
