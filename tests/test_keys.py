@@ -100,3 +100,20 @@ def test_an_unreachable_provider_is_no_answer_not_a_rejection(cfg, monkeypatch):
     anth = next(k for k in keys.specs(cfg) if k.name == "Anthropic")
     got = keys.check(cfg, anth)
     assert got["ok"] is None and "couldn't reach" in got["note"]
+
+
+def test_an_answer_about_a_replaced_key_isnt_shown_for_the_new_one(cfg, monkeypatch):
+    import requests
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "old")
+    monkeypatch.setattr(requests, "get", lambda url, headers, timeout: Answer(401, "invalid x-api-key"))
+    warroom.keys_check(cfg, {"name": "Anthropic"})
+    row = lambda: {r["name"]: r for r in warroom.keys_get(cfg)["keys"]}["Anthropic"]
+    assert row()["last"]["ok"] is False and "of" not in row()["last"]   # the tag stays on the server
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "new")                       # redeployed with a fixed key
+    assert row()["last"] is None
+
+
+def test_a_scoped_key_without_the_permission_isnt_called_rejected():
+    ok, note = keys.classify(401, '{"detail": {"status": "missing_permissions", "message": "lacks permission models_read"}}')
+    assert ok is None and "may still work" in note

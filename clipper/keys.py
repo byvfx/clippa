@@ -114,6 +114,8 @@ def classify(code: int, text: str) -> tuple[bool | None, str]:
     t = text.lower()
     if 200 <= code < 300:
         return True, "works"
+    if code in (401, 403) and "permission" in t:  # a scoped key (ElevenLabs) can't answer this one
+        return None, f"the key isn't allowed to answer this check (HTTP {code}); it may still work"
     if code in (401, 403) or (code == 400 and "key" in t and ("invalid" in t or "not valid" in t)):
         return False, f"rejected (HTTP {code})"
     return None, f"no answer about the key (HTTP {code})"
@@ -127,7 +129,7 @@ def check(cfg: dict, key: Key) -> dict:
     if not v:
         return {"ok": None, "note": "not set", "at": now_iso()}
     if not key.check:
-        return {"ok": None, "note": f"not checked: {key.why_not}", "at": now_iso()}
+        return {"ok": None, "note": f"not checked: {key.why_not}", "at": now_iso(), "of": tag(v)}
     try:
         url, headers = key.check(v, cfg)
         r = requests.get(url, headers=headers, timeout=TIMEOUT_S)
@@ -136,7 +138,17 @@ def check(cfg: dict, key: Key) -> dict:
         ok, note = None, str(e)
     except requests.RequestException as e:
         ok, note = None, f"couldn't reach it ({type(e).__name__})"
-    return {"ok": ok, "note": note, "at": now_iso()}
+    except Exception as e:  # noqa: BLE001  # one provider's surprise mustn't lose the others' answers
+        ok, note = None, f"check failed ({type(e).__name__})"
+    return {"ok": ok, "note": note, "at": now_iso(), "of": tag(v)}
+
+
+def tag(v: str) -> str:
+    """Which value an answer was about (a short hash, nothing of the key): an answer about a
+    key since replaced isn't shown as the new one's."""
+    import hashlib
+
+    return hashlib.sha256(v.encode()).hexdigest()[:8]
 
 
 def store(cfg: dict) -> Path:
@@ -177,9 +189,14 @@ def status(cfg: dict, run_checks: bool | str = False, remember: bool = True) -> 
         v, source = value(cfg, k)
         where = f"${k.env}" if source == "env" else f"file {Path(cfg['paths'][k.path]).name}" if source == "file" else ""
         used = uses.get(k.name.lower(), [])
+        answer = last.get(k.name)
+        if answer and answer.get("of") and (not v or answer["of"] != tag(v)):
+            answer = None  # about a key since replaced (or removed): ask again
+        if answer:
+            answer = {x: answer[x] for x in ("ok", "note", "at") if x in answer}
         rows.append({"name": k.name, "env": k.env, "set": bool(v), "source": where,
                      "what": k.what + (f" ({len(used)} setting{'s' * (len(used) > 1)})" if used else ""),
-                     "checkable": bool(k.check), "last": last.get(k.name)})
+                     "checkable": bool(k.check), "last": answer})
     return {"keys": rows, "held": held(cfg), "host": socket.gethostname()}
 
 
