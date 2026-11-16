@@ -233,7 +233,12 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
 and deployed 11-13: #199 PR #247, #204 PR #248, #228 PR #249,
 #205 PR #250; #201, #203 and #206 closed; 11-13 also closed #7 into #78 and #57 as built), `p2-dated` (#192 after 11-16), `p3-track` (one big track at a time, the user picks: desktop install #46 → #44/#47/#45/#78;
 Udder Truth #58-#60; archive tooling #221-#227 before the next mini-doc; b-roll #229), `waiting` (#80, #48, #45),
-`parked` (the rest). `gh issue list --label p1-now` is the queue. 11-13: #13 folded into #158, #200 closed (its
+`parked` (the rest). `gh issue list --label p1-now` is the queue. **Milestones (user, 11-16)** group the issues
+that move together, a finish line each: "Runs itself" (#259, #258, #287; due 12-06, a first guess), "Second
+channel (Sloth Beat)" (#46, #78, #44, #47, #45), "The Udder Truth: episode 1" (#58-#60), "Next mini-doc toolkit"
+(#221-#227, #229, #254); only the track in play gets a date; parked and waiting issues have none, nor do #111,
+#158, #192, #279, #286. A new issue gets a priority label, and a milestone when it belongs to one. 11-16 labels:
+#259 and #258 `p2-dated`, #254 `p3-track`, #111 parked → `p3-track`, #158 parked → `p2-dated` (both in work). 11-13: #13 folded into #158, #200 closed (its
 setup/doctor bug moved to #78), #70 narrowed to punch-ins/emphasis (tighten built). 11-15 (user): #41 and #55 closed as built, #67-#71
 folded into #66 (each a section there).
 Tracked as GitHub issues (byvfx/clipper); roadmaps are issues only: (NAS hub #14 and self-checks #185
@@ -244,7 +249,7 @@ came first: built 11-09, PR #191, `[edit] tighten`. The user found it "better th
 test stream but wants it **off** until it clearly helps; turn it on per show (`[shows.<key>.edit]`)
 only at their word. #67's model edit plan waits until edited Shorts prove themselves), crisis mode #73, setup #78,
 live clips #81, blind items #111 (steps 1-2 of 4 built and live 11-15/16, below), investigate anyone #138, agent exploration #158 (11-15 spec comment: the Clippa
-messenger. v1 built 11-16 on branch `chat/messenger-v1`, in review, **not deployed**: `/chat` on serve's page, wiki
+messenger. v1 merged (PR #285) and deployed to the hub 11-16: `/chat` on serve's page, wiki
 Clippa-messenger, `clipper/catalog.py` + `clipper/chat.py`, `[chat]`, Haiku ~$0.0005 a message, ledger `chat`; chats in
 `[paths] chats` on the share; four looks in `web/themes/`, `[chat] theme`. After it merges and deploys, a week of phone use; then a small `clipper mcp`; #13 may fold into it), Modal ideas #53, #56,
 Udder Truth #58/#59/#60, P&L #50 (revenue once monetized). Write "#77 L6" rather than "fix #77" in commit
@@ -312,6 +317,11 @@ messages: GitHub closes the issue on "fix".
   2. First run on the NAS: check that headless `claude -p` runs on the Remote Control sign-in, and that the
      `--allowedTools` rules work (`checkup.sh --dry-run` first).
   3. A week of nightly reports, then decide on hourly runs and PRs (#158's "act within limits").
+  **Self-maintenance (#287, 11-16, `p1-now`, nothing built):** `clipper checkup --fix`, repairs from a short
+  allowlist with no model (capped per finding key, a ledger, "fixed 2, need you 1" in the DM), a week of
+  would-fix reports before `[checkup] fix = true`; then the planned checks (yt-dlp, cookies and tokens, repeat
+  log errors), then PRs from the nightly run. Step 1 is the turn-on above. The worker already takes over a
+  stale lock and retries to `max_attempts`, so the repairs start past that.
 - **Bootstrap follow-up (11-07):** `deploy/bootstrap.sh` installs Homebrew `ffmpeg`, which has no `subtitles`
   (libass) filter, so a Mac worker fails Short captions; `ffmpeg-full` has it but is keg-only. Pick one:
   install `ffmpeg-full` and point clipper at it, or document it. `deploy/hub/deploy.sh` from `lofn` needs
