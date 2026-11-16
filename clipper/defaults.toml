@@ -278,6 +278,30 @@ max_posts = 5              # most stories posted per check (strong ones first)
 context_days = 7           # a queued context note no stream of its show took by then is dropped
 preshow_minutes = 60       # suggest the day's stories this long before a show's usual start; 0 = off
 
+[blinds]
+# `clipper blinds` (#111): gossip blind items (a story with the name left out, clues left in).
+# You're asked who you think each is about first; clipper investigates after (later steps).
+# Research for you alone: nothing here is ever published. Stored in [paths] news/blinds/.
+# Sources, none by default; one table each in clipper.toml:
+#   [[blinds.sources]]
+#   name = "cdan"          # lowercase; starts each blind's id
+#   feed = "https://..."   # its RSS or Atom feed
+#   kind = "blogger"       # the parser: "blogger", "wordpress" or "rss" (no paging back)
+#   blind = "^Blind Item"  # titles that are blinds (a regex); "(?i)blind" when unset
+#   reveal = "Revealed"    # titles that are reveals; "(?i)reveal" when unset (checked first)
+sources = []
+clues_model = "claude-haiku-5-5"   # reads each blind's clues (~$0.0002 a blind); "" = none
+clues_effort = "low"
+prompt_version = "v1"      # clipper/prompts/blinds_{clues,pair}_<v>.md
+max_clues = 100            # most blinds read per check (newest first; the rest wait)
+pair_days = 14             # a twin from another source this many days apart is paired
+backfill_pages = 20        # `check --backfill DAYS`: at most this many pages back per source
+keep_days = 365            # older blinds are forgotten (reveals can come months later); answered ones kept
+hide = []                  # tags never shown or alerted, e.g. ["sensitive:health", "source:cdan", "field:sports"]
+# How much each kind of clue counts when a guess is scored (a table here replaces this one;
+# kinds left out keep these).
+weights = { profession = 1, platform = 2, fame = 1, relationship = 2, when = 2, where = 2, event = 3, hint = 3, other = 1 }
+
 [costs]
 # `clipper costs` / the war room's Costs panel: what the logs can't know.
 # monthly = { "Runway Max" = 95 }   # fixed costs per month

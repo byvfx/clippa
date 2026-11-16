@@ -365,6 +365,40 @@ def cmd_news(cfg: dict, args: argparse.Namespace) -> None:
         print(f"for {e['show']}'s next stream: {e['text']}")
 
 
+def cmd_blinds(cfg: dict, args: argparse.Namespace) -> None:
+    from . import blinds
+
+    a = args.action
+    if a == "check":
+        if args.dry_run:
+            print("\n".join(blinds.estimate(cfg, args.backfill or 0)))
+            return
+        n = blinds.check(cfg, args.backfill or 0, clues=not args.no_clues)
+        print(f"{n['new']} new, {n['read']} read" + (f", {n['edited']} edited" if n["edited"] else "")
+              + (f", {n['paired']} paired" if n["paired"] else ""))
+    elif a == "list":
+        rows = blinds.listing(cfg, args.days, args.status or "", args.source or "", args.all)
+        if args.json:
+            print_json(rows)
+            return
+        for b in rows:
+            print(blinds.line(b))
+        print(f"{len(rows)} blind(s); * could be someone you follow, ! sensitive, p a private person")
+    elif a == "show":
+        b = blinds.one(cfg, args.blind)
+        print_json(b) if args.json else print(blinds.show_text(b))
+    elif a == "guess":
+        bid = blinds.add_by_hand(cfg, args.text, clues=not args.no_clues)
+        print(blinds.show_text(blinds.one(cfg, bid)))
+    elif a == "answer":
+        b = blinds.answer(cfg, args.blind, args.name or "", args.why or "", args.none, args.not_ours, who="cli")
+        print(f"{b['id']}: {b['status']}" + (f", your guess {b['guesses'][0]['name']}" if b["guesses"] else ""))
+    elif a == "sources":
+        for s in blinds.sources_report(cfg):
+            print(f"{s['name']} ({s['kind']}): {s['items'] or 0} stored, fetched {s['fetched_at'] or 'never'}"
+                  + (f", {s['error']}" if s["error"] else ""))
+
+
 def cmd_compare(cfg: dict, args: argparse.Namespace) -> None:
     from . import compare
 
@@ -1209,7 +1243,7 @@ COMMAND_GROUPS = [
     ('Pipeline (in run order)', ['fetch', 'preshow', 'transcribe', 'speakers', 'faces', 'signals', 'score', 'segments', 'cut', 'meta', 'thumbs', 'shorts', 'pick', 'run']),
     ('Review and publish', ['review', 'retake', 'schedule', 'upload', 'rumble', 'tiktok', 'x', 'analytics']),
     ('Services (long-running)', ['services', 'status', 'checkup', 'audit', 'record', 'worker', 'serve', 'bot', 'warroom', 'alert']),
-    ('Extras', ['weekly', 'cast', 'broll', 'clipart', 'doc', 'people', 'news', 'receipts', 'archive', 'investigate', 'story', 'narrate', 'perform', 'modal',
+    ('Extras', ['weekly', 'cast', 'broll', 'clipart', 'doc', 'people', 'news', 'blinds', 'receipts', 'archive', 'investigate', 'story', 'narrate', 'perform', 'modal',
                 'costs', 'compare', 'models']),
     ('Setup and checks', ['setup', 'doctor', 'config', 'shows', 'streams', 'backup', 'completion', 'cookies', 'codereview']),
 ]
@@ -2038,6 +2072,33 @@ def add_extras(sub) -> None:
     r = nsub.add_parser("context", help="these stories as the show's next stream_context")
     r.add_argument("ids", nargs="+", type=int, metavar="STORY", help="story numbers, as `clipper news list` shows them")
     r.add_argument("--show", dest="context_show", help="the show (default: the story's)")
+
+    p = sub.add_parser("blinds", help="gossip blind items: you guess who first, then clipper looks into it (#111)")
+    bsub = p.add_subparsers(dest="action", required=True, metavar="<action>")
+    p.set_defaults(fn=cmd_blinds)
+    r = bsub.add_parser("check", help="fetch each source, store new blinds and reveals, read the clues, pair twins")
+    r.add_argument("--backfill", type=float, metavar="DAYS", help="page back through each feed this many days")
+    r.add_argument("--no-clues", action="store_true", help="fetch and store only, no model call")
+    r.add_argument("--dry-run", action="store_true", help="fetch, store nothing, and price the clue pass")
+    r = bsub.add_parser("list", help="blinds, newest first")
+    r.add_argument("--days", type=float, default=14, help="how many days back (default 14)")
+    r.add_argument("--status", help="unread, waiting, answered, no_idea, not_ours or reveal")
+    r.add_argument("--source", help="only this source")
+    r.add_argument("--all", action="store_true", help="hidden, not-ours and reveals too")
+    r.add_argument("--json", action="store_true", help="the rows as JSON")
+    r = bsub.add_parser("show", help="one blind: its text, clues, tags, twin and your guess")
+    r.add_argument("blind", help="its id, as `clipper blinds list` shows it")
+    r.add_argument("--json", action="store_true", help="the blind as JSON")
+    r = bsub.add_parser("guess", help="a blind from anywhere else, pasted as text; its clues read now")
+    r.add_argument("text", help="the blind's text")
+    r.add_argument("--no-clues", action="store_true", help="store it only, no model call")
+    r = bsub.add_parser("answer", help="who you think it is about (or --none / --not-ours)")
+    r.add_argument("blind", help="its id")
+    r.add_argument("name", nargs="?", help="your guess")
+    r.add_argument("--why", help="why you think so")
+    r.add_argument("--none", action="store_true", help="no idea")
+    r.add_argument("--not-ours", action="store_true", help="not one to look into")
+    bsub.add_parser("sources", help="each source: last fetch, error, how many stored")
 
     p = sub.add_parser("costs", help="what clipper spent this month: models, Modal, fixed costs (#50)")
     p.add_argument("--month", help="YYYY-MM (default: this month, UTC)")

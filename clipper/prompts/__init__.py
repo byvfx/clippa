@@ -39,6 +39,7 @@ VERSIONS: dict[str, tuple[str, str]] = {
     "weekly": ("weekly", "prompt_version"), "weekly_article": ("weekly", "article_prompt_version"),
     "cast_label": ("cast", "prompt_version"),
     "news_judge": ("news", "prompt_version"),
+    "blinds_clues": ("blinds", "prompt_version"), "blinds_pair": ("blinds", "prompt_version"),
     "investigate_facts": ("investigate", "prompt_version"),
     "investigate_leads": ("investigate", "prompt_version"),
     "investigate_check": ("investigate", "prompt_version"),
