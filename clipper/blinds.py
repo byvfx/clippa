@@ -64,7 +64,8 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS blinds (id TEXT PRIMARY KEY, source TEXT, kind TEXT, title TEXT, url TEXT,
     published TEXT, day TEXT, seen_at TEXT, text TEXT, edited_at TEXT, status TEXT,
     clues TEXT, claim TEXT, fields TEXT, ours INTEGER, sensitive TEXT, private INTEGER, clued_at TEXT,
-    clue_model TEXT, clue_tries INTEGER DEFAULT 0, pair TEXT, pair_why TEXT, guesses TEXT, history TEXT, claim_token TEXT, claimed_at TEXT);
+    clue_model TEXT, clue_tries INTEGER DEFAULT 0, pair TEXT, pair_why TEXT, guesses TEXT, history TEXT, claim_token TEXT, claimed_at TEXT,
+    paired_at TEXT);
 CREATE INDEX IF NOT EXISTS blinds_status ON blinds(status);
 CREATE INDEX IF NOT EXISTS blinds_published ON blinds(published);
 CREATE TABLE IF NOT EXISTS sources (name TEXT PRIMARY KEY, etag TEXT, modified TEXT, fetched_at TEXT,
@@ -116,6 +117,9 @@ def connect(cfg: dict) -> sqlite3.Connection:
     db = sqlite3.connect(home(cfg) / "blinds.sqlite", timeout=30)
     db.row_factory = sqlite3.Row
     db.executescript(SCHEMA)
+    if "paired_at" not in {r["name"] for r in db.execute("PRAGMA table_info(blinds)")}:  # a store from before it
+        db.execute("ALTER TABLE blinds ADD COLUMN paired_at TEXT")
+        db.commit()
     return db
 
 
@@ -124,7 +128,7 @@ def as_dict(row: sqlite3.Row) -> dict:
     for k in ("clues", "fields", "sensitive", "guesses", "history"):
         d[k] = json.loads(d[k]) if d.get(k) else []
     d["ours"], d["private"] = bool(d["ours"]), bool(d["private"])
-    for k in ("claim_token", "claimed_at", "clue_tries"):
+    for k in ("claim_token", "claimed_at", "clue_tries", "paired_at"):
         d.pop(k, None)
     return d
 
@@ -303,6 +307,7 @@ def fetch_source(db: sqlite3.Connection, src: dict, backfill_days: float = 0, ma
             if page == 0:
                 db.execute("INSERT INTO sources (name, etag, modified) VALUES (?, ?, ?) ON CONFLICT(name) DO "
                            "UPDATE SET etag = excluded.etag, modified = excluded.modified", (src["name"], etag, modified))
+            db.commit()  # before the next page is fetched: no write lock held over the network
         error = ""
     except Exception as e:  # noqa: BLE001  one source down never stops the others
         error = f"{type(e).__name__}: {e}"[:300]
@@ -367,24 +372,37 @@ def apply_clues(db: sqlite3.Connection, rows: list, out: dict, w: dict[str, floa
     return done
 
 
-def claim_unread(db: sqlite3.Connection, limit: int) -> tuple[str, list]:
-    """Claim up to limit unread blinds for this pass (a claim over half an hour old was left by a
-    pass that died), so a check by hand while serve's runs reads other ones."""
+# Blinds whose clues are still to read: unread, or answered before the clue pass got to them (not
+# ones you said aren't ours). The clue pass and the dry run's price both use it.
+TO_READ = "kind = 'blind' AND clued_at IS NULL AND status IN ('unread', 'answered', 'no_idea')"
+
+
+def claim_unread(db: sqlite3.Connection, limit: int, only: list[str] | None = None,
+                 skip: set[str] | None = None) -> tuple[str, list]:
+    """Claim up to limit blinds still to read for this pass (a claim over half an hour old was
+    left by a pass that died), so a check by hand while serve's runs reads other ones. `only`
+    keeps to those ids; `skip` leaves out ones this check has already tried."""
     token, t = f"{os.getpid()}-{time.monotonic_ns()}", news.now()
     db.execute("UPDATE blinds SET claim_token = NULL WHERE claim_token IS NOT NULL AND claimed_at < ?",
                (news.iso(t - timedelta(minutes=30)),))
-    db.execute("UPDATE blinds SET claim_token = ?, claimed_at = ? WHERE id IN (SELECT id FROM blinds WHERE "
-               "status = 'unread' AND claim_token IS NULL ORDER BY published DESC LIMIT ?)",
-               (token, news.iso(t), limit))
+    db.execute(f"UPDATE blinds SET claim_token = ?, claimed_at = ? WHERE id IN (SELECT id FROM blinds WHERE {TO_READ} "
+               "AND claim_token IS NULL AND (? IS NULL OR id IN (SELECT value FROM json_each(?))) "
+               "AND id NOT IN (SELECT value FROM json_each(?)) ORDER BY published DESC LIMIT ?)",
+               (token, news.iso(t), None if only is None else 1, json.dumps(only or []), json.dumps(sorted(skip or ())),
+                limit))
     db.commit()
     return token, db.execute("SELECT * FROM blinds WHERE claim_token = ? ORDER BY published DESC", (token,)).fetchall()
 
 
-def read_clues(cfg: dict, db: sqlite3.Connection, claude=None, say=print) -> list[str]:
-    """The clue pass over unread blinds, newest first, at most [blinds] max_clues per check.
-    Returns the ids it read."""
+def read_clues(cfg: dict, db: sqlite3.Connection, claude=None, say=print, only: list[str] | None = None,
+               tried: set[str] | None = None) -> list[str]:
+    """The clue pass over blinds still to read, newest first, at most [blinds] max_clues a pass.
+    Returns the ids it read; every id it asked about is added to `tried`, which later passes of
+    the same check leave out (a refusal waits for the next check)."""
     bc = cfg["blinds"]
-    token, todo = claim_unread(db, bc["max_clues"])
+    token, todo = claim_unread(db, bc["max_clues"], only, tried)
+    if tried is not None:
+        tried.update(r["id"] for r in todo)
     if not todo:
         return []
     try:
@@ -441,70 +459,76 @@ def missed(db: sqlite3.Connection, rows: list, say=print) -> None:
 
 def pair_request(new: list, pool: list) -> str:
     def line(r) -> str:
-        return f"{r['claim'] or r['text'][:400]} | clues: " + "; ".join(c["text"] for c in json.loads(r["clues"] or "[]"))
+        gist = r["text"][:400] if r["clue_model"] == "refused" else r["claim"] or r["text"][:400]  # not the placeholder
+        return f"{gist} | clues: " + "; ".join(c["text"] for c in json.loads(r["clues"] or "[]"))
 
     a = "\n".join(f"[{i}] ({r['source']}, {r['day']}) {line(r)}" for i, r in enumerate(new, 1))
     b = "\n".join(f"<{r['id']}> ({r['source']}, {r['day']}) {line(r)}" for r in pool)
     return f"<new>\n{a}\n</new>\n\n<other_sources>\n{b}\n</other_sources>"
 
 
-def pair(cfg: dict, db: sqlite3.Connection, ids: list[str], claude=None, say=print) -> int:
-    """Pair the newly clued blinds with unpaired twins from other sources within pair_days
-    (feed sources only: a blind pasted by hand isn't paired)."""
+def pair(cfg: dict, db: sqlite3.Connection, claude=None, say=print) -> int:
+    """Pair each clued blind not yet compared (paired_at unset) with an unpaired twin from another
+    source published within pair_days of it (feed sources only: a blind pasted by hand isn't
+    paired). A batch is marked compared once its call returns, so one that fails (an error
+    stops the check) is asked again next check. With one feed source there is nothing to compare: all are marked."""
     bc = cfg["blinds"]
-    if not ids or db.execute("SELECT COUNT(DISTINCT source) FROM blinds WHERE kind = 'blind' "
-                             "AND source != 'hand'").fetchone()[0] < 2:
+    days = timedelta(days=bc["pair_days"])
+    todo = "kind = 'blind' AND source != 'hand' AND clued_at IS NOT NULL AND pair IS NULL AND paired_at IS NULL"
+    if db.execute("SELECT COUNT(DISTINCT source) FROM blinds WHERE kind = 'blind' AND source != 'hand'").fetchone()[0] < 2:
+        db.execute(f"UPDATE blinds SET paired_at = ? WHERE {todo}", (news.iso(news.now()),))
+        db.commit()
         return 0
     from .prompts import Prompts
 
     system, made = None, 0
-    for sid in sorted({r["source"] for r in db.execute(
-            f"SELECT source FROM blinds WHERE id IN ({','.join('?' * len(ids))})", ids)}):
-        if sid == "hand":  # a pasted blind isn't paired (step 1)
-            continue
-        new = db.execute(f"SELECT * FROM blinds WHERE source = ? AND pair IS NULL AND clued_at IS NOT NULL "
-                         f"AND id IN ({','.join('?' * len(ids))}) ORDER BY published", (sid, *ids)).fetchall()
-        cut = news.iso(news.now() - timedelta(days=bc["pair_days"]))
-        pool = db.execute("SELECT * FROM blinds WHERE source NOT IN (?, 'hand') AND kind = 'blind' AND pair IS NULL AND "
-                          "clued_at IS NOT NULL AND published > ? ORDER BY published DESC LIMIT ?",
-                          (sid, cut, PAIR_POOL)).fetchall()
-        if not new or not pool:
-            continue
-        if claude is None:
-            from .llm import Claude, preflight
-
-            claude = Claude(cfg)
-            preflight(claude, bc["clues_model"])
-        system = system or Prompts(cfg).get("blinds_pair")
+    for (sid,) in db.execute(f"SELECT DISTINCT source FROM blinds WHERE {todo} ORDER BY source").fetchall():
+        new = db.execute(f"SELECT * FROM blinds WHERE {todo} AND source = ? ORDER BY published", (sid,)).fetchall()
         for b in range(0, len(new), CLUE_BATCH):
             batch = new[b:b + CLUE_BATCH]
-            out, _meta = claude.json_call(bc["clues_model"], system, pair_request(batch, pool), PAIR_SCHEMA,
-                                          bc["clues_effort"])
-            made += apply_pairs(db, batch, {r["id"] for r in pool}, (out or {}).get("pairs", []))
+            lo = news.iso(datetime.fromisoformat(batch[0]["published"]) - days)
+            hi = news.iso(datetime.fromisoformat(batch[-1]["published"]) + days)
+            pool = db.execute("SELECT * FROM blinds WHERE source NOT IN (?, 'hand') AND kind = 'blind' AND pair IS NULL "
+                              "AND clued_at IS NOT NULL AND published BETWEEN ? AND ? ORDER BY published DESC LIMIT ?",
+                              (sid, lo, hi, PAIR_POOL)).fetchall()
+            if pool:
+                if claude is None:
+                    from .llm import Claude, preflight
+
+                    claude = Claude(cfg)
+                    preflight(claude, bc["clues_model"])
+                system = system or Prompts(cfg).get("blinds_pair")
+                out, _meta = claude.json_call(bc["clues_model"], system, pair_request(batch, pool), PAIR_SCHEMA,
+                                              bc["clues_effort"])
+                made += apply_pairs(db, batch, {r["id"]: r for r in pool}, (out or {}).get("pairs", []), days)
+            db.executemany("UPDATE blinds SET paired_at = ? WHERE id = ?",
+                           [(news.iso(news.now()), r["id"]) for r in batch])
             db.commit()
     if made:
         say(f"paired {made} blind(s) with a twin from another source")
     return made
 
 
-def apply_pairs(db: sqlite3.Connection, batch: list, pool_ids: set[str], pairs: list[dict]) -> int:
-    """Each pair links a new blind and a pool blind as one event, "e-" + the older id; a blind
-    already paired (by an earlier pair in this list) keeps its first twin."""
+def apply_pairs(db: sqlite3.Connection, batch: list, pool: dict, pairs: list[dict],
+                within: timedelta | None = None) -> int:
+    """Each pair links a new blind and a pool blind as one event, "e-" + the older id, when they
+    were published within `within` of each other. A blind already paired (by an earlier pair in
+    this list, or by another check meanwhile) keeps its first twin: the update only takes two
+    unpaired blinds, so two checks can't make a group of three."""
     made = 0
     for p in pairs:
         i, other = p.get("i"), p.get("id", "")
-        if not isinstance(i, int) or not 1 <= i <= len(batch) or other not in pool_ids:
+        if not isinstance(i, int) or not 1 <= i <= len(batch) or other not in pool:
             continue
-        mine = batch[i - 1]["id"]
-        taken = db.execute("SELECT COUNT(*) FROM blinds WHERE id IN (?, ?) AND pair IS NOT NULL",
-                           (mine, other)).fetchone()[0]
-        if taken:
+        mine = batch[i - 1]
+        a, b = datetime.fromisoformat(mine["published"]), datetime.fromisoformat(pool[other]["published"])
+        if within is not None and abs(a - b) > within:
             continue
-        older = db.execute("SELECT id FROM blinds WHERE id IN (?, ?) ORDER BY published, id LIMIT 1",
-                           (mine, other)).fetchone()["id"]
-        db.execute("UPDATE blinds SET pair = ?, pair_why = ? WHERE id IN (?, ?)",
-                   (f"e-{older}", (p.get("why") or "")[:300], mine, other))
-        made += 1
+        older = min((a, mine["id"]), (b, other))[1]
+        cur = db.execute("UPDATE blinds SET pair = ?, pair_why = ? WHERE id IN (?, ?) AND pair IS NULL AND "
+                         "(SELECT COUNT(*) FROM blinds WHERE id IN (?, ?) AND pair IS NULL) = 2",
+                         (f"e-{older}", (p.get("why") or "")[:300], mine["id"], other, mine["id"], other))
+        made += cur.rowcount == 2
     return made
 
 
@@ -524,14 +548,14 @@ def check(cfg: dict, backfill_days: float = 0, clues: bool = True, claude=None, 
             say(f"  {src['name']}: {n} new" + (f", {ed} edited" if ed else ""))
             new, edited = new + n, edited + ed
         prune(cfg, db)
-        read, paired = [], 0
+        read, paired, tried = [], 0, set()
         if clues and cfg["blinds"]["clues_model"]:
-            while True:  # max_clues a pass; a backfill reads everything it brought in
-                got = read_clues(cfg, db, claude, say)
-                read += got
-                if not got or not backfill_days:
+            while True:  # max_clues a pass; a backfill reads everything it brought in, past refusals
+                before = len(tried)
+                read += read_clues(cfg, db, claude, say, tried=tried)
+                if not backfill_days or len(tried) == before:
                     break
-            paired = pair(cfg, db, read, claude, say)
+            paired = pair(cfg, db, claude, say)
         return {"new": new, "edited": edited, "read": len(read), "paired": paired}
     finally:
         db.close()
@@ -564,7 +588,7 @@ def estimate(cfg: dict, backfill_days: float = 0, say=print) -> list[str]:
                          and not db.execute("SELECT 1 FROM blinds WHERE id = ?", (blind_id(src, "blind", e),)).fetchone()]
                 texts += [text_of(e["html"]) for e in fresh]
                 say(f"  {src['name']} page {page + 1}: {len(items)} entries, {len(fresh)} new blinds")
-        texts += [r["text"] for r in db.execute("SELECT text FROM blinds WHERE status = 'unread'")]
+        texts += [r["text"] for r in db.execute(f"SELECT text FROM blinds WHERE {TO_READ}")]
         calls = -(-len(texts) // CLUE_BATCH)
         system = tokens(Prompts(cfg).get("blinds_clues")) + tokens("\n".join(followed(cfg)))
         tin = calls * system + sum(tokens(t) + 30 for t in texts)
@@ -600,7 +624,7 @@ def add_by_hand(cfg: dict, text: str, clues: bool = True, claude=None, say=print
             taken.add(bid)
         db.commit()
         if clues and cfg["blinds"]["clues_model"]:
-            read_clues(cfg, db, claude, say)
+            read_clues(cfg, db, claude, say, only=[bid])
         return bid
     finally:
         db.close()
@@ -620,6 +644,7 @@ def answer(cfg: dict, bid: str, name: str = "", why: str = "", none: bool = Fals
         raise ClipperError("answer with a name, --none or --not-ours (one of them)")
     db = connect(cfg)
     try:
+        db.execute("BEGIN IMMEDIATE")  # two answers at once: the second reads the first, and keeps it in history
         b = get(db, bid)
         if b["kind"] == "reveal":
             raise ClipperError(f"{bid} is a reveal, not a blind")

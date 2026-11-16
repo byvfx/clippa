@@ -333,6 +333,83 @@ def test_twins_from_two_sources_become_one_event(cfg, monkeypatch):
     assert blinds.one(cfg, newer["id"])["pair"] is None
 
 
+def test_pairing_that_fails_is_asked_again_and_a_backfill_pairs_old_twins(cfg, monkeypatch):
+    # Twins from 20 days ago, read by a backfill: compared around their own dates, not today's.
+    feeds(monkeypatch, {"cdan.example": atom(("Blind Item #3", iso_days_ago(20), "The singer and the yacht.")),
+                        "bg.example": rss(("Blind: yacht", rfc(20), "That singer on the yacht again."))})
+
+    def down(user):
+        raise RuntimeError("API down")
+    with pytest.raises(RuntimeError):  # the clues are read and kept; pairing fails
+        blinds.check(cfg, backfill_days=30, claude=Fake(clue_answer(2), down))
+    rows = blinds.listing(cfg, days=30)
+    assert {b["status"] for b in rows} == {"waiting"} and {b["pair"] for b in rows} == {None}
+    cdan = next(b["id"] for b in rows if b["source"] == "cdan")
+    fake = Fake(lambda user: {"pairs": [{"i": 1, "id": cdan, "why": "same yacht"}]})
+    assert blinds.check(cfg, claude=fake)["paired"] == 1  # asked again, with no clue call
+    assert len(fake.calls) == 1 and f"<{cdan}>" in fake.calls[0]["user"]
+    assert blinds.check(cfg, claude=Fake())["paired"] == 0  # compared: not asked a third time
+
+
+def test_apply_pairs_takes_only_two_unpaired_blinds_close_in_time(cfg):
+    db = blinds.connect(cfg)
+    for bid, days in (("a", 0), ("b", 1), ("c", 40), ("d", 2)):
+        db.execute("INSERT INTO blinds (id, source, kind, published, status) VALUES (?, 'x', 'blind', ?, 'waiting')",
+                   (bid, news.iso(news.now() - timedelta(days=days))))
+    db.execute("UPDATE blinds SET pair = 'e-zz' WHERE id = 'd'")  # paired by another check meanwhile
+    rows = {r["id"]: r for r in db.execute("SELECT * FROM blinds")}
+    two_weeks = timedelta(days=14)
+    assert blinds.apply_pairs(db, [rows["a"]], {"c": rows["c"], "d": rows["d"]},
+                              [{"i": 1, "id": "c"}, {"i": 1, "id": "d"}], two_weeks) == 0  # too far apart; taken
+    assert blinds.apply_pairs(db, [rows["a"]], {"b": rows["b"]}, [{"i": 1, "id": "b"}], two_weeks) == 1
+    assert [r[0] for r in db.execute("SELECT pair FROM blinds WHERE id IN ('a', 'b', 'd') ORDER BY id")] == [
+        "e-b", "e-b", "e-zz"]
+    db.close()
+
+
+def test_an_older_store_gets_the_paired_at_column(cfg):
+    import sqlite3
+
+    old = sqlite3.connect(blinds.home(cfg) / "blinds.sqlite")
+    old.executescript(blinds.SCHEMA.replace(",\n    paired_at TEXT", ""))
+    old.close()
+    db = blinds.connect(cfg)
+    assert "paired_at" in {r["name"] for r in db.execute("PRAGMA table_info(blinds)")}
+    db.close()
+
+
+def test_a_blind_answered_before_its_clues_still_gets_them(cfg, monkeypatch):
+    feeds(monkeypatch, {"cdan.example": cdan_feed(), "bg.example": rss()})
+    blinds.check(cfg, clues=False)
+    first, second = (b["id"] for b in blinds.listing(cfg, status="unread"))
+    blinds.answer(cfg, first, none=True)
+    blinds.answer(cfg, second, not_ours=True)  # not one to look into: its clues aren't read
+    fake = Fake(clue_answer(1))
+    assert blinds.check(cfg, claude=fake)["read"] == 1
+    b = blinds.one(cfg, first)
+    assert b["status"] == "no_idea" and b["clues"] and blinds.one(cfg, second)["clued_at"] is None
+
+
+def test_a_backfill_goes_on_past_a_refusal_and_tries_it_once(cfg, monkeypatch):
+    feeds(monkeypatch, {"cdan.example": cdan_feed(), "bg.example": rss()})
+    cfg["blinds"]["max_clues"] = 1
+    fake = Fake(*[lambda user: None if "crying" in user else clue_answer(1)] * 5)
+    assert blinds.check(cfg, backfill_days=30, claude=fake)["read"] == 1
+    assert len(fake.calls) == 2  # each blind once: the refused one waits for the next check
+    db = blinds.connect(cfg)
+    assert db.execute("SELECT clue_tries FROM blinds WHERE text LIKE '%crying%'").fetchone()[0] == 1
+    db.close()
+
+
+def test_a_blind_by_hand_reads_only_itself(cfg, monkeypatch):
+    feeds(monkeypatch, {"cdan.example": cdan_feed(), "bg.example": rss()})
+    blinds.check(cfg, clues=False)
+    fake = Fake(clue_answer(1))
+    bid = blinds.add_by_hand(cfg, "Which singer was crying on the yacht?", claude=fake)
+    assert len(fake.calls) == 1 and fake.calls[0]["user"].count("[") == 1 and "yacht" in fake.calls[0]["user"]
+    assert blinds.one(cfg, bid)["status"] == "waiting" and len(blinds.listing(cfg, status="unread")) == 2
+
+
 def test_a_blind_by_hand_is_never_paired_or_a_reason_to_pair(cfg, monkeypatch):
     blinds.add_by_hand(cfg, "The singer and the yacht.", claude=Fake(clue_answer(1)))
     feeds(monkeypatch, {"cdan.example": atom(("Blind Item #3", TODAY, "That singer on the yacht.")), "bg.example": rss()})

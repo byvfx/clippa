@@ -76,8 +76,10 @@ sensitive one and `p` a private person. A blind pasted with `guess` is `hand-<da
 
 ## The clue pass
 
-`[blinds] clues_model` (Haiku, prompt `blinds_clues_v1`) reads each unread blind, ten to a call,
-newest first, at most `max_clues` per check. It returns:
+`[blinds] clues_model` (Haiku, prompt `blinds_clues_v1`) reads each blind whose clues are still
+unread, ten to a call, newest first, at most `max_clues` per check. That includes a blind you
+answered before they were read, but not one you said is not ours. A blind pasted with `guess` is
+read on its own, straight away. It returns:
 
 - **the clues**, each one typed (profession, platform, fame, relationship, when, where, event,
   hint, other) and weighted by `[blinds] weights`
@@ -92,14 +94,15 @@ It **never names or hints at who it might be**, so your guess is your own.
 
 When a call is refused, its ten blinds are asked one at a time, so one blind the model won't read
 doesn't hold up the others. A blind still refused, or left out of the answer, is tried again on
-the next check. After three tries it waits for your guess without clues (its claim says the clue
+the next check (a backfill goes on to the older ones meanwhile). After three tries it waits for your guess without clues (its claim says the clue
 pass wouldn't read it) instead of coming back every check. Reading costs about $0.0002
 a blind: a month of one busy source is well under a dollar. `check --dry-run` prices it first.
 
-**Twins.** Different sources often blind the same event. A newly read blind is compared with
-other sources' unpaired blinds from the last `pair_days` (prompt `blinds_pair_v1`, the same
-model). A pair becomes one event: asked once, and answered by either source's reveal. With only
-one feed source, no pairing call is made. Blinds pasted by hand aren't paired yet. A pair whose
+**Twins.** Different sources often blind the same event. Each newly read blind is compared, once,
+with other sources' unpaired blinds published within `pair_days` of it (prompt `blinds_pair_v1`,
+the same model), so a backfill pairs old twins too. A pair becomes one event: asked once, and
+answered by either source's reveal. A pairing call that fails is made again on the next check.
+With only one feed source, no pairing call is made. Blinds pasted by hand aren't paired yet. A pair whose
 other half is forgotten (`keep_days`) is unpaired.
 
 ## Tags and hiding
