@@ -328,6 +328,23 @@ def recheck(cfg: dict, sdir: Path, keys: list[str], now: datetime, say=print) ->
     return True
 
 
+def _mirror(sdir: Path, key: str, say=print) -> None:
+    """Kitsu has the automatic approval but the item couldn't be re-read: say "approved" in
+    review.json, so the replan after this pass places it. Under auto.json's lock, and only while
+    the approval stands (nobody has acted since: touch notes that under the same lock) and
+    review.json still has the item pending; anything newer is left for the next sync."""
+    try:
+        with jsonstate.locked(path(sdir)):
+            e = load(sdir, strict=True).get(key, {})
+            if not e.get("approved_at") or e.get("out") or e.get("undone"):
+                return
+            with jsonstate.update(sdir / "review.json", {}) as rv:
+                if (rv.get(key, {}).get("decision") or "pending") == "pending" and key in rv:
+                    rv[key]["decision"] = "approved"
+    except (OSError, ValueError) as e2:
+        say(f"  {sdir.name}/{key}: review.json not updated either: {e2}")
+
+
 def approve_due(cfg: dict, sdir: Path, keys: list[str], say=print) -> list[str]:
     """Approve the due items of one stream: Kitsu first (what a person did since the last sync
     counts), the checks again (an item re-rendered since is checked anew, a cover's vision call
@@ -377,12 +394,7 @@ def approve_due(cfg: dict, sdir: Path, keys: list[str], say=print) -> list[str]:
             actions.refresh(cfg, item)
         except Exception as e:  # noqa: BLE001  # approved in Kitsu; the next sync reads it
             say(f"  {sdir.name}/{key}: approved, but not re-read from Kitsu: {type(e).__name__}: {e}")
-            try:   # Kitsu has the decision: mirror it, so the replan after this pass places the item
-                with jsonstate.update(sdir / "review.json", {}) as rv:
-                    if key in rv:
-                        rv[key]["decision"] = "approved"
-            except (OSError, ValueError) as e2:
-                say(f"  {sdir.name}/{key}: review.json not updated either: {e2}")
+            _mirror(sdir, key, say)
         say(f"  {sdir.name}/{key}: approved ({rule})")
         done.append(key)
     return done

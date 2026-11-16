@@ -190,3 +190,21 @@ def test_kitsu_deadline_leaves_other_threads_alone_and_takes_tuple_timeouts(monk
         t.start()
         t.join()
     assert seen[0] == (3, seen[0][1]) and seen[0][1] <= 20 and seen[1] is None
+
+
+def test_set_checks_keeps_what_kitsu_took_when_a_later_write_fails(defaults, tmp_path, monkeypatch):
+    fake_kitsu(monkeypatch, [])
+    monkeypatch.setattr(review, "column_fields", lambda g, p: {("Sequence", review.CHECKS_COL): "checks",
+                                                               ("Shot", review.CHECKS_COL): "checks"})
+
+    def write(g, et, eid, data):
+        if eid == "e2":
+            raise OSError("Kitsu down")
+    monkeypatch.setattr(review, "write_data", write)
+    state = {"s01": {**STATE["s01"], "fields": {review.CHECKS_COL: "old"}},
+             "v02": {**STATE["v02"], "fields": {review.CHECKS_COL: "old"}}}
+    sdir = stream(tmp_path, state)
+    with pytest.raises(OSError):
+        review.set_checks(sdir, defaults, {"s01": "", "v02": ""})
+    fields = {k: v["fields"][review.CHECKS_COL] for k, v in jsonstate.read(sdir / "review_state.json").items()}
+    assert fields == {"s01": "", "v02": "old"}

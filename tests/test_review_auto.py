@@ -504,3 +504,19 @@ def test_an_item_gone_from_review_isnt_asked_for_every_hour(cfg, tmp_path, monke
         ch["v02_t2"]["at"] = "a2"
     review_auto.run(cfg, say=lambda *_: None, now=t + timedelta(minutes=122))
     assert asked[-1] == ["v01_t1", "v02_t2"]
+
+
+def test_the_mirror_leaves_a_newer_decision_alone(cfg, tmp_path, monkeypatch):
+    sd, _, _ = stub(cfg, tmp_path, monkeypatch)
+
+    def slow_reread_then_a_reject(c, item):   # the user rejects in the gap, then the re-read fails
+        review_auto.touch(sd, item.key, "reject", "Brandon")
+        with jsonstate.update(sd / "review.json", {}) as rv:
+            rv[item.key]["decision"] = "rejected"
+        raise TimeoutError("slow")
+    monkeypatch.setattr(actions, "refresh", slow_reread_then_a_reject)
+    review_auto.run(cfg, say=lambda *_: None)
+    assert jsonstate.read(sd / "review.json")["v01_t1"]["decision"] == "rejected"
+    jsonstate.write(review_auto.path(sd), {"v02_t2": {"approved_at": T0.isoformat()}})
+    review_auto._mirror(sd, "v02_t2")
+    assert jsonstate.read(sd / "review.json")["v02_t2"]["decision"] == "approved"

@@ -699,8 +699,10 @@ def run(sdir: Path, cfg: dict, todo: list[dict] | None = None, keys: list[str] |
     if kitsu and save and done:
         from . import review
 
-        try:
-            review.set_checks(sdir, cfg, {k: summary(v["findings"]) for k, v in done.items()})
+        try:   # what checks.json kept: a newer run's result where one finished first (merge above)
+            kept = load(sdir)
+            review.set_checks(sdir, cfg, {k: summary((kept.get(k) or v).get("findings") or [])
+                                          for k, v in done.items()})
         except Exception as e:  # noqa: BLE001  # checks.json has them; the next publish writes the column
             say(f"  Kitsu Checks column not updated: {type(e).__name__}: {e}")
     return {k: v["findings"] for k, v in done.items()}

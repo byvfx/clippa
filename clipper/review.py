@@ -753,14 +753,17 @@ def set_checks(stream_dir: Path, cfg: dict, summaries: dict[str, str]) -> list[s
     gazu = connect(cfg["review"])
     fmap = column_fields(gazu, gazu.project.get_project_by_name(project_name(cfg)))
     done = []
-    for key, s in todo.items():
-        st = state[key]
-        if set_columns(gazu, fmap, ENTITY[st["kind"]], st["entity_id"], {CHECKS_COL: s}):
-            done.append(key)
-    with jsonstate.update(state_path, {}) as now:
-        for key in done:
-            if key in now:
-                now[key].setdefault("fields", {})[CHECKS_COL] = todo[key]
+    try:
+        for key, s in todo.items():
+            st = state[key]
+            if set_columns(gazu, fmap, ENTITY[st["kind"]], st["entity_id"], {CHECKS_COL: s}):
+                done.append(key)
+    finally:   # what Kitsu took is the proposal now, even when a later write failed
+        if done:
+            with jsonstate.update(state_path, {}) as now:
+                for key in done:
+                    if key in now:
+                        now[key].setdefault("fields", {})[CHECKS_COL] = todo[key]
     return done
 
 
