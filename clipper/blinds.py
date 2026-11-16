@@ -803,10 +803,21 @@ def alertable(cfg: dict, b: dict) -> bool:
             and (cfg["blinds"]["sensitive_alerts"] or not b["sensitive"]))
 
 
+def _published(b: dict) -> datetime:
+    try:
+        t = datetime.fromisoformat(b["published"] or "")
+    except ValueError:
+        return datetime.min.replace(tzinfo=news.now().tzinfo)
+    return t if t.tzinfo else t.replace(tzinfo=news.now().tzinfo)
+
+
 def _fresh(cfg: dict, db: sqlite3.Connection, where: str) -> list[dict]:
-    cut = news.iso(news.now() - timedelta(days=ALERT_DAYS))
+    """Alertable blinds published in the last ALERT_DAYS, oldest first. Stored times keep their
+    feed's offset, so the SQL cut is a day wide and the exact one is made on the parsed times."""
+    cut = news.now() - timedelta(days=ALERT_DAYS)
     rows = [as_dict(r) for r in db.execute("SELECT * FROM blinds WHERE kind = 'blind' AND status = 'waiting' "
-                                           f"AND published > ? AND {where} ORDER BY published, id", (cut,))]
+                                           f"AND published > ? AND {where}", (news.iso(cut - timedelta(days=1)),))]
+    rows = sorted((b for b in rows if _published(b) > cut), key=lambda b: (_published(b), b["id"]))
     return [b for b in rows if alertable(cfg, b)]
 
 
@@ -816,10 +827,14 @@ def _twin_taken(db: sqlite3.Connection, b: dict, column: str) -> bool:
                                           (b["pair"], b["id"])).fetchone() is not None
 
 
-def _with_twin(db: sqlite3.Connection, b: dict) -> dict:
+def _with_twin(cfg: dict, db: sqlite3.Connection, b: dict) -> dict:
+    """The twin shown with it, unless the twin is one that would never be posted itself
+    (a private person, hidden, or sensitive without sensitive_alerts)."""
     if b["pair"]:
-        b["twin"] = next((as_dict(r) for r in db.execute("SELECT * FROM blinds WHERE pair = ? AND id != ?",
-                                                          (b["pair"], b["id"]))), None)
+        t = next((as_dict(r) for r in db.execute("SELECT * FROM blinds WHERE pair = ? AND id != ?",
+                                                  (b["pair"], b["id"]))), None)
+        if t and not t["private"] and not hidden(cfg, t) and (cfg["blinds"]["sensitive_alerts"] or not t["sensitive"]):
+            b["twin"] = t
     return b
 
 
@@ -839,7 +854,7 @@ def own_alerts(cfg: dict) -> list[dict]:
                            (news.iso(news.now()), b["id"]))
                 continue
             pairs.add(b["pair"] or b["id"])
-            out.append(_with_twin(db, b))
+            out.append(_with_twin(cfg, db, b))
         db.commit()
         return out
     finally:
@@ -902,7 +917,7 @@ def start_digest(cfg: dict, day: str) -> tuple[list[dict], int]:
         left = out[:-DIGEST_MAX] if len(out) > DIGEST_MAX else []
         for b in left:  # the oldest: the war room has them
             db.execute("UPDATE blinds SET digest_day = ? WHERE id = ?", (day, b["id"]))
-        kept = [_with_twin(db, b) for b in out[len(left):]]
+        kept = [_with_twin(cfg, db, b) for b in out[len(left):]]
         db.execute("UPDATE digests SET blinds = ? WHERE day = ?", (len(kept), day))
         db.commit()
         return kept, len(left)
@@ -935,7 +950,7 @@ def alert_text(b: dict, n: int = 0, limit: int = 1900) -> str:
     head = (f"**{n}.** " if n else "👀 **Could be someone you follow.** " if b["ours"] else "") \
         + f"{src}: {link} · {b['day']}"
     clues = [f"- {md(c['text'])} *({c['type']})*" for c in b["clues"][:8]]
-    tail = [*(["**Clues**", *clues] if clues else [])]
+    tail = ["**Clues**", *clues] if clues else []
     if b.get("twin"):
         t = b["twin"]
         tail.append(f"Twin ({t['source']}, {t['day']}): " + md(" ".join(t["text"].split())[:300]))
@@ -958,14 +973,22 @@ def answer_line(b: dict) -> str:
         return "→ No idea."
     if b["status"] == "not_ours":
         return "→ Not ours: nothing more is spent on it."
-    g = b["guesses"][0] if b["guesses"] else None
-    return f"→ Your guess: **{md(g['name'])}**" + (f", because {md(g['why'])}" if g and g["why"] else "") if g else ""
+    if not b["guesses"]:
+        return ""
+    g = b["guesses"][0]
+    why = f", because {md(g['why'])}" if g["why"] else ""
+    return f"→ Your guess: **{md(g['name'])}**{why}"
 
 
-def answered_text(content: str, b: dict) -> str:
-    """An alert's text with its answer line (the last answer's, replaced) at the end."""
-    kept = [x for x in content.split("\n") if not x.startswith("→ ")]
-    return "\n".join([*kept, answer_line(b)])[:2000]
+def answered_text(content: str, b: dict, limit: int = 2000) -> str:
+    """An alert's text with its answer line (the last answer's, replaced) at the end; the blind's
+    text gives way when the two don't fit in one message."""
+    line = answer_line(b)[:limit // 2]
+    kept = "\n".join(x for x in content.split("\n") if not x.startswith("→ "))
+    room = limit - len(line) - 1
+    if len(kept) > room:
+        kept = kept[:room - 1].rstrip() + "…"
+    return f"{kept}\n{line}"
 
 
 def digest_head(day: str, n: int, more: int) -> str:

@@ -1058,7 +1058,7 @@ def check_blind_alerts(cfg: dict) -> None:
         fail("blinds", what, hint)
     if bad:
         return
-    how ={"digest": f"a digest at {bc['digest_at']}, alerts for ones that could be ours",
+    how = {"digest": f"a digest at {bc['digest_at']}, alerts for ones that could be ours",
            "all": "an alert for each", "ours": "alerts for ones that could be ours", "off": "no alerts"}[bc["alert"]]
     ok("blinds", f"checked every {bc['check_minutes']} min; {how}"
        + ("; sensitive ones too" if bc["sensitive_alerts"] and bc["alert"] != "off" else ""))

@@ -80,7 +80,7 @@ class FakeChannel:
     """A text channel (or thread): what was sent, each message able to start a thread."""
 
     def __init__(self, cid: int = 5):
-        self.id, self.sent, self.threads = cid, [], []
+        self.id, self.name, self.sent, self.threads = cid, "blinds", [], []
 
     async def send(self, text, view=None, allowed_mentions=None):
         self.sent.append((text, [c.custom_id for c in view.children] if view else []))
@@ -147,3 +147,42 @@ def test_a_blind_button_answers_and_ends_the_message_with_it(defaults, monkeypat
     it.response.send_modal = lambda m: modal.append(m) or asyncio.sleep(0)
     asyncio.run(b.on_button(it, "blindguess", "cdan-1"))
     assert isinstance(modal[0], bot.BlindGuess) and modal[0].bid == "cdan-1"
+
+
+def test_a_bad_digest_time_or_no_threads_still_posts(defaults, monkeypatch):
+    from clipper import blinds
+
+    b, chan, posted = make_bot(defaults), FakeChannel(), []
+    monkeypatch.setattr(blinds, "own_alerts", lambda cfg: [{"id": "a"}])
+    monkeypatch.setattr(blinds, "alert_text", lambda bl, n=0: f"{n}:{bl['id']}")
+    monkeypatch.setattr(blinds, "mark_alerted", lambda cfg, bid, where: posted.append(bid))
+
+    def bad(cfg):
+        raise bot.ClipperError("[blinds] digest_at '8pm': use HH:MM")
+    monkeypatch.setattr(blinds, "digest_due", bad)
+
+    async def channel():
+        return chan
+    monkeypatch.setattr(b, "blinds_channel", channel)
+    with pytest.raises(bot.ClipperError):
+        asyncio.run(b.post_blinds())
+    assert posted == ["a"]                                       # the alert went out before the digest failed
+
+    import discord
+    monkeypatch.setattr(blinds, "own_alerts", lambda cfg: [])
+    monkeypatch.setattr(blinds, "digest_due", lambda cfg: "2026-11-15")
+    monkeypatch.setattr(blinds, "start_digest", lambda cfg, day: ([{"id": "c"}], 0))
+    monkeypatch.setattr(blinds, "mark_digested", lambda cfg, bid, day, thread: posted.append((bid, thread)))
+    chan.sent.clear()
+    real_send = chan.send
+
+    async def send(text, view=None, allowed_mentions=None):
+        msg = await real_send(text, view, allowed_mentions)
+
+        async def no_thread(name, auto_archive_duration=None):
+            raise discord.HTTPException(SimpleNamespace(status=403, reason="Forbidden"), "Missing Permissions")
+        msg.create_thread = no_thread
+        return msg
+    chan.send = send
+    asyncio.run(b.post_blinds())
+    assert [t for t, _ in chan.sent][1] == "1:c" and posted[-1] == ("c", "5")   # in the channel itself

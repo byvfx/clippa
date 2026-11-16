@@ -18,8 +18,9 @@ and edits cards whose status, hold, pin, title or schedule changed outside Disco
 (clipper/cardsync.py). Every minute it DMs the notifications other processes queued
 (clipper/alerts.py), and every few minutes it posts the stories `clipper news check`
 found and asks you about the gossip blinds `clipper blinds check` stored (#111: a digest a
-day and alerts of their own, each with I think it's…, No idea and Not ours). It logs to paths.bot_log as well as the console, only one bot runs per streams
-folder (a lock file), and it writes a heartbeat (clipper/daemon.py) that the war room's
+day and alerts of their own, each with I think it's…, No idea and Not ours). It logs to
+paths.bot_log as well as the console, only one bot runs per streams folder (a lock file),
+and it writes a heartbeat (clipper/daemon.py) that the war room's
 Health panel and `clipper services status` read. deploy/hub runs it as a container.
 
 Everything that isn't Discord is `clipper serve` (clipper/serve.py): the war room, the
@@ -205,6 +206,7 @@ class Bot(discord.Client):
         self.tree = app_commands.CommandTree(self)
         self.lock = asyncio.Lock()  # one Kitsu job at a time
         self.started_at = datetime.now(UTC).isoformat(timespec="seconds")
+        self.public_warned: set[int] = set()  # #blinds channels found public, warned about this run
         register_commands(self)
 
     async def setup_hook(self) -> None:
@@ -291,7 +293,8 @@ class Bot(discord.Client):
             channel = discord.utils.get(guild.text_channels, name=name) or await self.private_channel(guild, name)
         if not isinstance(channel, discord.TextChannel):
             raise ClipperError("[blinds] channel_id: use a text channel (a digest is a thread in it)")
-        if channel.permissions_for(channel.guild.default_role).view_channel:
+        if channel.permissions_for(channel.guild.default_role).view_channel and channel.id not in self.public_warned:
+            self.public_warned.add(channel.id)  # once per run in the log; the DM has its cooldown
             log.warning(f"blinds: everyone in the server can see #{channel.name}")
             await asyncio.to_thread(alerts.send, self.cfg, "failure",
                                     f"Everyone in the server can see #{channel.name}, where the bot asks about "
@@ -316,6 +319,9 @@ class Bot(discord.Client):
         except discord.Forbidden:
             raise ClipperError(f"couldn't make #{name}: give the bot Manage Channels, or make a private channel "
                                "by hand and set [blinds] channel_id") from None
+        except discord.HTTPException as e:  # e.g. an allowed user id that isn't on the server
+            raise ClipperError(f"couldn't make #{name} ({e.text or e.status}): check [discord] allowed_user_ids, "
+                               "or make a private channel by hand and set [blinds] channel_id") from None
         log.info(f"blinds: made #{name} (private)")
         return channel
 
@@ -324,25 +330,28 @@ class Bot(discord.Client):
         channel, and in its thread one message per blind."""
         cfg, quiet = self.cfg, discord.AllowedMentions.none()  # outside text: never a ping
         own = await asyncio.to_thread(blinds.own_alerts, cfg)
-        day = await asyncio.to_thread(blinds.digest_due, cfg)
-        if not own and not day:
-            return
-        channel = await self.blinds_channel()
-        for b in own:
-            msg = await channel.send(blinds.alert_text(b), view=blind_view(b["id"]), allowed_mentions=quiet)
-            await asyncio.to_thread(blinds.mark_alerted, cfg, b["id"], f"{channel.id}/{msg.id}")
         if own:
+            channel = await self.blinds_channel()
+            for b in own:
+                msg = await channel.send(blinds.alert_text(b), view=blind_view(b["id"]), allowed_mentions=quiet)
+                await asyncio.to_thread(blinds.mark_alerted, cfg, b["id"], f"{channel.id}/{msg.id}")
             log.info(f"blinds: {len(own)} alert(s)")
+        day = await asyncio.to_thread(blinds.digest_due, cfg)  # after: a bad digest_at stops only the digest
         if not day:
             return
+        channel = await self.blinds_channel()
         todo, more = await asyncio.to_thread(blinds.start_digest, cfg, day)
         if not todo:  # nothing new today: no digest
             return
         head = await channel.send(blinds.digest_head(day, len(todo), more), allowed_mentions=quiet)
-        thread = await head.create_thread(name=f"Blinds {day}", auto_archive_duration=10080)
+        try:
+            where = await head.create_thread(name=f"Blinds {day}", auto_archive_duration=10080)
+        except discord.HTTPException as e:  # no Create Public Threads: the channel itself
+            log.warning(f"blinds: no thread for the digest ({e.text or e.status}); posting in #{channel.name}")
+            where = channel
         for n, b in enumerate(todo, 1):
-            await thread.send(blinds.alert_text(b, n), view=blind_view(b["id"]), allowed_mentions=quiet)
-            await asyncio.to_thread(blinds.mark_digested, cfg, b["id"], day, str(thread.id))
+            await where.send(blinds.alert_text(b, n), view=blind_view(b["id"]), allowed_mentions=quiet)
+            await asyncio.to_thread(blinds.mark_digested, cfg, b["id"], day, str(where.id))
         log.info(f"blinds: digest {day}, {len(todo)} blind(s)")
 
     async def blind_answer(self, interaction: discord.Interaction, bid: str, name: str = "", why: str = "",

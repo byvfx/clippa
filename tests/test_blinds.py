@@ -797,3 +797,34 @@ def test_doctor_checks_the_alert_settings(cfg, monkeypatch):
     doctor.check_blinds(cfg, offline=True)
     assert not [w for k, w in seen if k == "fail"]
     assert any("digest at 20:00" in w for k, w in seen if k == "ok")
+
+
+def test_the_two_day_window_reads_each_feeds_offset(cfg):
+    from datetime import timezone
+
+    pst = timezone(timedelta(hours=-8))
+    put(cfg, "in", ours=1, published=(datetime.now(UTC) - timedelta(hours=47)).astimezone(pst).isoformat())
+    put(cfg, "out", ours=1, published=(datetime.now(UTC) - timedelta(hours=49)).astimezone(pst).isoformat())
+    assert [b["id"] for b in blinds.own_alerts(cfg)] == ["in"]
+
+
+def test_a_twin_that_would_never_be_posted_is_not_shown(cfg):
+    cfg["blinds"]["alert"] = "all"
+    put(cfg, "x", pair="e-x")
+    put(cfg, "y", source="bg", pair="e-x", sensitive='["health"]', text="The sensitive twin.")
+    got = blinds.own_alerts(cfg)
+    assert [b["id"] for b in got] == ["x"] and "twin" not in got[0] and "sensitive twin" not in blinds.alert_text(got[0])
+    blinds.mark_alerted(cfg, "x", "")
+    cfg["blinds"]["sensitive_alerts"] = True
+    put(cfg, "z", pair="e-z")
+    put(cfg, "w", source="bg", pair="e-z", sensitive='["health"]')
+    shown = blinds.own_alerts(cfg)
+    assert [b["id"] for b in shown] == ["w"] and shown[0]["twin"]["id"] == "z"  # sensitive ones on: both shown
+
+
+def test_a_long_why_keeps_the_whole_answer_line(cfg):
+    put(cfg, "long", text="word " * 2000)
+    text = blinds.alert_text(blinds.one(cfg, "long"))
+    got = blinds.answer(cfg, "long", "Jane Streamer", "because " * 60)
+    out = blinds.answered_text(text, got)
+    assert len(out) <= 2000 and out.endswith(blinds.answer_line(got)) and "…" in out
