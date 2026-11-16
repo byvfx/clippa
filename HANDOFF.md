@@ -166,7 +166,9 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
 - **Weekly:** issue 04 (Nov 1-7, Jer cover) in `weekly/2026-11-07/`. Issue 05 (Nov 8-14, "Lindsay's Cruise
   Hell!", the user's pick) built 2026-11-15 in `weekly/2026-11-14/`, $0.78; the cover is a real teary
   close-up of her from Wed's stream (the user wanted "very unflattering", crying), pinned by hand (log
-  11-15). Not yet in Discord `#weekly`, not posted, no X thread text yet. The faces stage still mislabels
+  11-15). Posted to YouTube 2026-11-15 as ONE image post of all ten square pages (Posts take 10 images now;
+  https://www.youtube.com/post/Ugkxr4rSrdhyE8_O5oKIz9pBoc-0k5t12ADH, the two captions joined). TikTok and the X
+  thread not yet. The faces stage still mislabels
   (her auto pick was a Disney performer from her video). Issue 06 is Saturday 2026-11-21.
 - **The Udder Truth:** storyboard complete, voice and pipeline chosen; next the newsroom set (Brass Eye refs in
   studio/mockups/udder_truth/refs/), new desk plates, then Moo's WAN renders (~1,550 Runway credits).
@@ -244,7 +246,7 @@ archive fun #63, transcript-framed edits #66 (one issue since 11-15, sections #6
 came first: built 11-09, PR #191, `[edit] tighten`. The user found it "better than I thought" on the
 test stream but wants it **off** until it clearly helps; turn it on per show (`[shows.<key>.edit]`)
 only at their word. #67's model edit plan waits until edited Shorts prove themselves), crisis mode #73, setup #78,
-live clips #81, blind items #111 (reworked 11-15: you guess first in Discord or the war room, then it investigates; a daily digest (`alert = "digest"`) to start, any drama not only ours; both guesses scored on reveals; 4 PRs planned, none built), investigate anyone #138, agent exploration #158 (on hold at the user's word 11-09; next would be a week of phone use, then
+live clips #81, blind items #111 (steps 1-2 of 4 built and live 11-15/16, below), investigate anyone #138, agent exploration #158 (on hold at the user's word 11-09; next would be a week of phone use, then
 a small `clipper mcp`; #13 may fold into it), Modal ideas #53, #56,
 Udder Truth #58/#59/#60, P&L #50 (revenue once monetized). Write "#77 L6" rather than "fix #77" in commit
 messages: GitHub closes the issue on "fix".
@@ -337,6 +339,19 @@ messages: GitHub closes the issue on "fix".
   needs `bash deploy/claude/deploy.sh` once. Since PR #248 the backup settings are `[backup]` (folder
   `backups/taste`, every 7 days by serve), and the digest and doctor read the newest zip there. Dependabot opens grouped weekly PRs (ruff ignored; no review, no secrets). Its security
   alerts are a separate repo switch, off as of 11-10.
+- **Blind items #111 (wiki Blind-items), steps 1-2 live since 11-16:** `clipper blinds` collects gossip
+  blinds, reads their clues (Haiku, never a name), pairs twins across sources, and you guess first: in the
+  war room's **Blinds** window, in Discord, or `clipper blinds answer`. Step 1 PR #277 (store, clue pass,
+  pairing), the window PR #278, step 2 PR #280 (serve's check, the bot's questions). The NAS clipper.toml has
+  one source, CDAN (Blind Gossip's site answered 500 on 11-15: add it when it's back), `[blinds]
+  check_minutes = 30` and `sensitive_alerts = true` ("no censoring for me": the user filters with `hide`);
+  backups `backups/clipper.toml.before_blinds_sources_2026-11-15` and `..._alerts_2026-11-16`. The bot made
+  a private `#blinds`; `alert = "digest"`: a thread a day at 20:00, plus an alert of its own for each that
+  could be about someone followed. Store 11-16: 722 CDAN posts, 551 waiting, 14 unread (the clue pass skips
+  some; after 3 tries they wait without clues). Costs: ~$0.0002 a blind. Not built: typed answers in the thread
+  (no Message Content intent), a Hide this kind button. **Next: step 3**, investigate after the answer (the
+  user's name first, the swarm, the judge's score), then step 4, reveals and the scorecard. The flow
+  artifact: https://claude.ai/artifact/1m3obUigUkkA5ZVdmmiLWn
 - **News watcher #110:** off since 2026-11-03 at the user's word (`[news] check_minutes = 0`, no terms); only
   `[news] watch` / `[shows.<key>.news] watch` terms are watched, `auto_watch = true` brings back the
   cast/figures/library list; `#news` exists in Discord.
