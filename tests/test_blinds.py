@@ -1,6 +1,7 @@
 """#111 step 1: `clipper blinds`: sources, storage, the clue pass, pairing, the user's answer."""
 import json
 import re
+import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from xml.sax.saxutils import escape
@@ -533,13 +534,18 @@ def test_the_command_routes_and_dry_run_spends_nothing(cfg, monkeypatch, capsys)
 
 
 def test_blinds_never_reach_anything_published():
-    """Guesses about real people are research only: no module but the command and the module
-    itself reads them (step 2 adds the bot, serve and the war room, which only show them)."""
-    allowed = {"blinds.py", "cli.py", "doctor.py"}  # doctor reads the source settings only
-    readers = sorted(p.name for p in (ROOT / "clipper").rglob("*.py")
-                     if p.name not in allowed and re.search(r"\bblinds\b\s*(import|\.)|import blinds|blinds\.sqlite",
-                                                            p.read_text(encoding="utf-8")))
+    """Guesses about real people are research only: no module but the command, the module itself
+    and the war room's Blinds window reads them (step 2 adds the bot and serve, which only show them)."""
+    allowed = {"blinds.py", "cli.py", "doctor.py",  # doctor reads the source settings only
+               "warroom/blinds.py", "warroom/__init__.py", "warroom/httpd.py"}  # the window and its routes
+    src = ROOT / "clipper"
+    readers = sorted(p.relative_to(src).as_posix() for p in src.rglob("*.py")
+                     if p.relative_to(src).as_posix() not in allowed
+                     and re.search(r"\bblinds\b\s*(import|\.)|import blinds|blinds\.sqlite", p.read_text(encoding="utf-8")))
     assert readers == []
+    for name in ("__init__.py", "httpd.py"):  # these two only route to the window's module
+        assert not re.search(r"from \.\. import.*\bblinds\b|\bblinds\.(listing|one|answer|get|connect)\(",
+                             (src / "warroom" / name).read_text(encoding="utf-8"))
 
 
 def test_doctor_checks_the_sources(cfg, monkeypatch):
@@ -563,3 +569,68 @@ def test_doctor_checks_the_sources(cfg, monkeypatch):
     cfg["blinds"]["sources"] = []
     doctor.check_blinds(cfg, offline=True)
     assert seen == []
+
+
+def test_the_war_room_window(cfg, monkeypatch):
+    import threading
+
+    from clipper import warroom
+
+    assert "/api/blinds" in warroom.GET_API
+    assert {"/api/blinds/answer", "/api/blinds/paste", "/api/blinds/check"} <= set(warroom.POST_API)
+    feeds(monkeypatch, {"cdan.example": cdan_feed(), "bg.example": rss()})
+    blinds.check(cfg, claude=Fake(clue_answer(2)))
+    out = warroom.blinds_get(cfg)
+    assert out["view"] == "waiting" and len(out["blinds"]) == 2 and out["counts"]["waiting"] == 2
+    assert out["counts"]["reveal"] == 1 and out["people"] == ["Jane Streamer"] and not out["job"]["running"]
+    assert [s["name"] for s in out["sources"]] == ["cdan", "bg"] and out["sources_error"] == ""
+    assert warroom.blinds_get(cfg, "x", "nonsense")["view"] == "waiting"       # a bad view or days: the defaults
+    assert len(warroom.blinds_get(cfg, view="all")["blinds"]) == 3 and out["counts"]["all"] == 3
+    cfg["blinds"]["hide"] = ["field:streaming"]  # hidden from every tab and count but All
+    hid = warroom.blinds_get(cfg)
+    assert hid["blinds"] == [] and hid["counts"]["waiting"] == 0 and hid["hidden"] == 2
+    assert hid["counts"]["all"] == 3 and len(warroom.blinds_get(cfg, view="all")["blinds"]) == 3
+    cfg["blinds"]["hide"] = []
+    window = sys.modules["clipper.warroom.blinds"]
+    monkeypatch.setattr(window, "SHOWN", 1)
+    capped = warroom.blinds_get(cfg)
+    assert len(capped["blinds"]) == 1 and capped["more"] == 1
+    monkeypatch.setattr(window, "SHOWN", 300)
+
+    a, b = (x["id"] for x in out["blinds"])
+    db = blinds.connect(cfg)
+    db.execute("UPDATE blinds SET pair = ? WHERE id IN (?, ?)", (f"e-{b}", a, b))
+    db.commit()
+    db.close()
+    twins = {x["id"]: x["twin_id"] for x in warroom.blinds_get(cfg)["blinds"]}
+    assert twins == {a: b, b: a}
+
+    got = warroom.blinds_answer(cfg, {"id": a, "name": "jane streamer", "why": "the crying"})["blind"]
+    assert got["status"] == "answered" and got["guesses"][0]["who"] == "war room" and "tags" in got
+    assert warroom.blinds_answer(cfg, {"id": b, "none": True})["blind"]["status"] == "no_idea"
+    assert [x["id"] for x in warroom.blinds_get(cfg, view="answered")["blinds"]] == [a]
+    with pytest.raises(ClipperError, match="id"):
+        warroom.blinds_answer(cfg, {"name": "x"})
+    with pytest.raises(ClipperError, match="one of them"):
+        warroom.blinds_answer(cfg, {"id": a})
+
+    monkeypatch.setattr(blinds, "add_by_hand", lambda cfg, text, say: ADD_BY_HAND(cfg, text, clues=False))
+    pasted = warroom.blinds_paste(cfg, {"text": "Which singer\nand the yacht?"})
+    assert pasted["id"].startswith("hand-") and pasted["blind"]["status"] == "unread"
+    with pytest.raises(ClipperError, match="at most"):
+        warroom.blinds_paste(cfg, {"text": "x" * (blinds.TEXT_MAX + 1)})
+
+    started = threading.Event()
+    monkeypatch.setattr(blinds, "check", lambda cfg, say: (say("fetched cdan"), started.wait(5),
+                                                           {"new": 1, "edited": 0, "read": 1, "paired": 0})[-1])
+    out = warroom.blinds_check(cfg, {"view": "all"})
+    assert out["job"]["running"] and out["view"] == "all"
+    with pytest.raises(ClipperError, match="already running"):
+        warroom.blinds_check(cfg, {})
+    started.set()
+    next(t for t in threading.enumerate() if t.name == "warroom-blinds").join(5)
+    job = warroom.blinds_get(cfg)["job"]
+    assert not job["running"] and job["result"]["new"] == 1 and job["log"] == ["fetched cdan"] and job["error"] == ""
+
+
+ADD_BY_HAND = blinds.add_by_hand

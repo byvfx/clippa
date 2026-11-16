@@ -285,6 +285,24 @@ input.search { margin-left: auto; width: 180px; }
 .nst .nsrc { font-size: 12px; display: grid; gap: 2px; }
 .nst .nsrc a { color: var(--dim); }
 .nctx { border-left: 3px solid var(--line); padding: 4px 10px; color: var(--dim); font-size: 13px; }
+/* #111 blinds: the blind's text, its typed clues, your guess */
+.blinds { grid-template-columns: minmax(0, 1fr); }  /* the tabs scroll on a phone; the window doesn't */
+.blinds .seg { max-width: 100%; overflow-x: auto; }
+.blinds .seg button { white-space: nowrap; }
+.blinds .seg .n { color: var(--faint); font-size: 11px; }
+.bl .nh .by { overflow-wrap: anywhere; }
+.bl .btext { white-space: pre-wrap; max-height: 9.5em; overflow: hidden; line-height: 1.45; }
+.bl .btext.full { max-height: none; }
+.bl > .lnk { justify-self: start; font-size: 12px; }
+.bclues { display: flex; flex-wrap: wrap; gap: 4px; }
+.bclue { font-size: 12px; border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; }
+.bclue i { font: 600 10px var(--mono); font-style: normal; text-transform: uppercase; color: var(--faint); margin-right: 5px; }
+.bguess { font-size: 13px; color: var(--green); }
+.bl .ba .bname { flex: 1 1 200px; } .bl .ba .bwhy { flex: 2 1 240px; }
+.tag.bo { background: #1f3326; color: var(--green); } .tag.bs { background: #3a2222; color: var(--red); } .tag.bp { background: #33301f; color: var(--amber); }
+.bl.bhit { border-color: var(--blue); }
+.blinds textarea { width: 100%; box-sizing: border-box; background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font: inherit; }
+.blog pre { margin: 4px 0 0; font: 11px var(--mono); white-space: pre-wrap; color: var(--faint); }
 /* #108 investigations: the leads dossier as markdown, to read */
 .md { padding: 12px 20px 24px; max-width: 860px; line-height: 1.5; font-size: 14px; overflow-wrap: anywhere; }
 .md h2 { font-size: 18px; margin: 4px 0 8px; }

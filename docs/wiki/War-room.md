@@ -108,6 +108,12 @@ Headlines about the shows' people (`clipper news`, #110). **News** in the header
 - **Search** asks Google News now (the last 7 days) and adds the stored headlines that match.
 - The header line says how often serve checks and how many sources are failing (hover for why).
 
+## Blinds
+
+Gossip blind items with their clues read (`clipper blinds`, #111). **Blinds** in the header opens
+it: each blind's text, its typed clues, the claim, and a box for your guess, which you give before
+clipper looks into anything. The whole of it is on [Blind items](Blind-items#the-war-room).
+
 ## Cast
 
 The cast library (#41): a few head-and-shoulders photos of each regular in `[thumbnail]
