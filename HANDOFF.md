@@ -205,7 +205,9 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   that way unless deleted and re-uploaded.
 - Content ID: check new pre-show/one-off uploads in Studio (video → Copyright; the API only sees region blocks).
 - Shorts "related video" (Studio only): a weekly scheduled Claude task sets them Sundays 10:00 while the app
-  is open (`clipper-weekly-related-videos`; 11-08 run: 7 set, 0 left due). `clipper upload --related` lists
+  is open (`clipper-weekly-related-videos`; 11-15: 12 set by hand in the session, 0 left due; the pane's Google
+  sign-in opens Studio on the byvfx channel: switch to Lolcow Cinema or every Short's page errors; the task
+  sets each Short with one in-page script and stops on a sign-in page or the wrong channel). `clipper upload --related` lists
   what's due and records what you set; six Shorts match no scheduled segment (pick one by hand or leave them).
   Verify whether `thumbnails.set` works on Shorts before turning on `[youtube] short_thumbnails`.
 - Old approved Short titles/descriptions that still say "hosts" (Kitsu text): a war-room find-and-replace dry
