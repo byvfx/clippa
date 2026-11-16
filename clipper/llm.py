@@ -391,6 +391,8 @@ class LLM:
         if resp.stop_reason == "refusal":
             meta["refusal"] = getattr(resp.stop_details, "category", None)
             return {"text": "", "tool": None}, meta
+        if resp.stop_reason == "max_tokens":   # a cut-off pick has half its inputs
+            raise RuntimeError(f"{model} hit max_tokens ({meta['request_id']})")
         text = "".join(b.text for b in resp.content if b.type == "text").strip()
         tool = next(({"name": b.name, "input": dict(b.input or {})} for b in resp.content
                      if b.type == "tool_use"), None)

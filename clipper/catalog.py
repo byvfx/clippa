@@ -428,23 +428,33 @@ def _story_estimate(cfg: dict) -> str:
     return f"{typical}, at most ${caps:.2f} ([story] and [swarm] budgets), plus Modal for the transcripts"
 
 
+def _strings(v) -> list[str]:
+    """A list input as the model may send it: a list, one string, or nothing."""
+    items = v if isinstance(v, list) else [v] if v else []
+    return [t for t in (" ".join(str(x).split()) for x in items) if t]
+
+
 def _story_prepare(cfg: dict, args: dict) -> Plan:
     brief = " ".join(str(args.get("brief") or "").split())
     if len(brief) < 8:
         return Plan("answer", text="What's the story? A sentence: who, what happened.")
-    argv = ["story", "new", brief]
-    lines = [f"brief: {brief}"]
+    argv, lines = ["story", "new"], [f"brief: {brief}"]   # --opt=value and "--": no value reads as an option
     if args.get("days"):
-        argv += ["--days", str(int(args["days"]))]
-        lines.append(f"the last {int(args['days'])} days")
-    for p in args.get("people") or []:
-        argv += ["--person", str(p)]
+        try:
+            days = int(args["days"])
+        except (TypeError, ValueError):
+            return Plan("answer", text=f"How many days back? ({args['days']!r} isn't a number.)")
+        argv.append(f"--days={days}")
+        lines.append(f"the last {days} days")
+    for p in _strings(args.get("people")):
+        argv.append(f"--person={p}")
         lines.append(f"person: {p}")
-    for u in args.get("urls") or []:
-        if not re.match(r"https?://", str(u)):
+    for u in _strings(args.get("urls")):
+        if not re.match(r"https?://", u):
             return Plan("answer", text=f"{u!r} isn't a link.")
-        argv += ["--url", str(u)]
+        argv.append(f"--url={u}")
         lines.append(f"video: {u}")
+    argv += ["--", brief]
     lines.append("then `story plan` and `story cut --no-review` are yours (it never goes to review)")
     return Plan("card", text="Start a story?", tool="story", risk=SPEND, lines=lines,
                 estimate=_story_estimate(cfg), argv=argv, args={"brief": brief})
@@ -463,18 +473,20 @@ def _cover_prepare(cfg: dict, args: dict) -> Plan:
                   if a["video"].relative_to(item.stream_dir).as_posix() == file), None)
     if not asset:
         return Plan("answer", text=f"{item.short} has no cut video to pick a cover from.")
-    tc = scfg["thumbnail"]
-    if not tc["model"]:
+    thumbnail = scfg["thumbnail"]
+    model = thumbnail["model"]
+    if not model:
         return Plan("answer", text="[thumbnail] model is off: no cover picks.")
-    _, system = cover_prompts(scfg, tc, tc["style"])
-    frames = tc["clip_frames"] if asset["kind"] == "clip" else tc["even_frames"] + tc["heat_frames"]
-    usd = llm.estimate(scfg, tc["model"], llm.tokens(system) + 300 + frames * (FRAME_TOKENS + 20), 200)
+    _, system = cover_prompts(scfg, thumbnail, thumbnail["style"])
+    frames = (thumbnail["clip_frames"] if asset["kind"] == "clip"
+              else thumbnail["even_frames"] + thumbnail["heat_frames"])
+    usd = llm.estimate(scfg, model, llm.tokens(system) + 300 + frames * (FRAME_TOKENS + 20), 200)
     row = _row(cfg, item)
-    lines = [item_line(row), f"{frames} frames to {tc['model']}"]
+    lines = [item_line(row), f"{frames} frames to {model}"]
     if row["uploaded"]:
         lines.append("already on YouTube: the new cover goes to Kitsu, Studio keeps the old one")
     return Plan("card", text=f"Pick a new cover for {item.short}?", tool="cover_redo", risk=SPEND,
-                ref=item.ref, lines=lines, estimate=f"~${usd:.3f} (one {tc['model']} pick)",
+                ref=item.ref, lines=lines, estimate=f"~${usd:.3f} (one {model} pick)",
                 argv=["thumbs", item.stream_dir.name, "--items", asset["id"], "--force"])
 
 

@@ -24,7 +24,8 @@ recorder; asked for any of those, it says it can't do that from here.
 ## How a message is read
 
 1. A box command (below) or something Clippa can match locally: "what goes out tomorrow",
-   "what's unslotted", "pin s03 kick-131151926 friday 9am", an item name alone. No model call.
+   "what's unslotted", "pin s03 kick-131151926 friday 9am", an item name alone. No model call. A bare hour
+   ("fri 3") could be morning or afternoon, so that one goes to the model.
 2. Anything else goes to the model once (`[chat] model`, Haiku by default), which may only
    pick one catalog tool or answer in a sentence. It costs about $0.0005 a message, written to
    the cost ledger as `chat` ([Costs](Costs)). Past `[chat] daily_usd` a day, only local

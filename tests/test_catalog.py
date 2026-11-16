@@ -208,10 +208,22 @@ def test_spend_cards_carry_an_estimate(cfg, monkeypatch):
     p = catalog.prepare(cfg, "story", {"brief": "the streamer banned from Kick after the call", "days": 3,
                                        "people": ["Jer"]})
     assert p.kind == "card" and p.risk == catalog.SPEND
-    assert p.argv == ["story", "new", "the streamer banned from Kick after the call", "--days", "3", "--person", "Jer"]
+    assert p.argv == ["story", "new", "--days=3", "--person=Jer", "--", "the streamer banned from Kick after the call"]
     assert "~$0.30" in p.estimate and "at most $" in p.estimate
     assert catalog.prepare(cfg, "story", {"brief": "short"}).kind == "answer"
     assert "isn't a link" in catalog.prepare(cfg, "story", {"brief": "a long enough brief", "urls": ["nope"]}).text
+    # what the model may send instead: a string for a list, words for a number, a value like an option
+    p = catalog.prepare(cfg, "story", {"brief": "--days=999", "people": "-x"})
+    assert p.argv == ["story", "new", "--person=-x", "--", "--days=999"]
+    assert "isn't a number" in catalog.prepare(cfg, "story", {"brief": "a long enough brief", "days": "a week"}).text
+
+
+def test_story_argv_parses_as_meant():
+    """A value that looks like an option stays a value for `clipper story new`."""
+    from clipper.cli import build_parser
+
+    a = build_parser().parse_args(["story", "new", "--days=3", "--person=-x", "--", "--url=https://a b"])
+    assert (a.brief, a.days, a.person, a.url) == ("--url=https://a b", 3, ["-x"], [])
 
 
 def test_spend_today_and_buddies(cfg, monkeypatch):

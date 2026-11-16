@@ -51,7 +51,11 @@ def test_parse_when():
     assert chat.parse_when("2026-11-30 9:05", MON) == "2026-11-30 09:05"
     assert chat.parse_when("2026-11-30", MON) == "2026-11-30"
     assert chat.parse_when("today at 21:00", MON) == "2026-11-16 21:00"
-    for bad in ("someday", "tonight", "fri 25:00", "2026-13-01", "frisbee 3pm"):
+    assert chat.parse_when("tonight 9", MON) == "2026-11-16 21:00"
+    assert chat.parse_when("mon 15:00", MON) == "2026-11-16 15:00"      # today's weekday, later today
+    assert chat.parse_when("monday", MON) == "2026-11-16"
+    for bad in ("someday", "tonight", "fri 25:00", "2026-13-01", "frisbee 3pm",
+                "fri 3", "tomorrow 9"):                                   # a bare 1-11: am or pm?
         assert chat.parse_when(bad, MON) is None, bad
 
 
@@ -70,6 +74,8 @@ def test_parse_when():
     ("reject c03", ("reject", {"item": "c03"})),
     ("release s04", ("hold", {"item": "s04", "release": True})),
     ("pin c03 kick-131151926 fri 15:00", ("pin", {"item": "c03 kick-131151926", "when": "2026-11-20 15:00"})),
+    ("approve s02 from kick-131151926", ("approve", {"item": "s02 kick-131151926"})),
+    ("reject s02 on kick-131151926 too long", ("reject", {"item": "s02 kick-131151926", "reason": "too long"})),
     ("unpin c03", ("pin", {"item": "c03", "unpin": True})),
     ("slot v05", ("slot", {"item": "v05"})),
     ("retitle s02 A Better Title", ("retitle", {"item": "s02", "title": "A Better Title"})),
@@ -265,6 +271,43 @@ def test_lost_jobs_after_a_restart(cfg, no_model):
     assert [j["state"] for j in chat.load(cfg)["jobs"]] == ["lost", "running"]
 
 
+def test_a_card_cut_off_by_a_restart_fails(cfg, no_model):
+    with chat._update(cfg) as c:
+        chat.ensure_topic(c, cfg)
+        m = chat.say(c, card_plan())
+        m["card"].update(state="working", boot="old")
+    assert chat.lost_jobs(cfg) == 1
+    c = chat.load(cfg)
+    assert chat.find_card(c, m["card"]["id"])["card"]["state"] == "failed"
+    assert "restart cut off" in c["messages"][-1]["text"]
+
+
+def test_a_tool_error_is_a_chat_line(cfg, monkeypatch, no_model):
+    def boom(cfg_, args):
+        raise ValueError("bad input")
+    monkeypatch.setattr(catalog, "prepare", lambda cfg_, name, args: boom(cfg_, args))
+    v = chat.handle(cfg, "approve s02")
+    assert [m["who"] for m in v["messages"]] == ["me", "clippa"]
+    assert "ValueError" in v["messages"][-1]["text"]
+
+
+def test_trim_keeps_the_open_topic(cfg, monkeypatch, no_model):
+    monkeypatch.setattr(chat, "KEEP", 4)
+    with chat._update(cfg) as c:
+        chat.ensure_topic(c, cfg)
+        for i in range(3):
+            chat._post(c, "me", f"old {i}")
+        chat.end_topic(c, "/new")
+        chat.open_topic(c)
+        card = chat.say(c, card_plan())
+        for i in range(3):
+            chat._post(c, "me", f"new {i}")
+        chat._trim(cfg, c)
+        assert chat.find_card(c, card["card"]["id"])               # the open topic's card stays
+        assert not any(m["text"].startswith("old") for m in c["messages"])
+    assert list((cfg["paths"]["chats"] / "archive").glob("*-overflow.json"))
+
+
 def test_box_commands(cfg, no_model):
     assert "approve s02" in chat.handle(cfg, "/help")["messages"][-1]["text"]
     assert "This topic: $0.000" in chat.handle(cfg, "/cost")["messages"][-1]["text"]
@@ -314,6 +357,18 @@ def test_tool_call_on_claude(defaults, monkeypatch):
     assert out == {"text": "Sure.", "tool": {"name": "pin", "input": {"item": "s02", "when": "2026-11-20 15:00"}}}
     assert sent["tool_choice"] == {"type": "auto"} and sent["tools"][0]["name"] == "pin"
     assert meta["usd"] > 0
+
+
+def test_tool_call_cut_off_is_an_error(defaults, monkeypatch):
+    monkeypatch.setattr(costs, "llm_call", lambda *a, **k: None)
+    resp = SimpleNamespace(
+        model="claude-haiku-5-5", stop_reason="max_tokens", usage=SimpleNamespace(input_tokens=900, output_tokens=1024),
+        content=[SimpleNamespace(type="tool_use", name="retitle", input={"item": "s02"})])
+    client = llm.LLM(defaults, label="chat")
+    client._client = SimpleNamespace(messages=SimpleNamespace(create=lambda **kw: resp))
+    with pytest.raises(RuntimeError, match="max_tokens"):
+        client.tool_call("claude-haiku-5-5", "sys", [{"role": "user", "content": "q"}],
+                         [{"name": "retitle", "description": "d", "input_schema": {"type": "object"}}])
 
 
 def test_tool_call_on_an_openai_compatible_server(defaults, monkeypatch):

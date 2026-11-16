@@ -170,9 +170,18 @@ def _archive(cfg: dict, data: dict, why: str) -> Path:
 
 
 def _trim(cfg: dict, chat: dict) -> None:
-    """current.json keeps the last KEEP messages; older ones go to the archive as they are."""
-    if len(chat["messages"]) > KEEP:
-        old, chat["messages"] = chat["messages"][:-KEEP], chat["messages"][-KEEP:]
+    """current.json keeps the last KEEP messages; older ones go to the archive as they are. The
+    open topic stays whole (its cards and questions can still be tapped) up to 2 x KEEP."""
+    msgs = chat["messages"]
+    if len(msgs) <= KEEP:
+        return
+    cut = len(msgs) - KEEP
+    t = current_topic(chat)
+    if t:
+        first = next((i for i, m in enumerate(msgs) if m.get("topic") == t["id"]), len(msgs))
+        cut = min(cut, first) if len(msgs) - first <= 2 * KEEP else cut
+    if cut > 0:
+        old, chat["messages"] = msgs[:cut], msgs[cut:]
         _archive(cfg, {"messages": old, "topics": [], "jobs": []}, "overflow")
 
 
@@ -219,18 +228,23 @@ def parse_when(text: str, now: datetime) -> str | None:
     elif word == "tomorrow":
         day = now.date() + timedelta(days=1)
     elif word in WEEKDAYS or word in short:
-        day = now.date() + timedelta(days=(short.index(word[:3]) - now.weekday()) % 7 or 7)
+        day = now.date() + timedelta(days=(short.index(word[:3]) - now.weekday()) % 7)
     else:
         return None
     if not hh:
         return None if word == "tonight" else f"{day:%Y-%m-%d}"
     h, mi = int(hh), int(mm or 0)
-    if ampm == "pm" and h < 12:
-        h += 12
+    if not ampm and not mm and word != "tonight" and 1 <= h <= 11:
+        return None   # "fri 3": morning or afternoon? the model asks, or reads it from the chat
+    if ampm == "pm" or (word == "tonight" and not ampm):
+        h += 12 if h < 12 else 0
     elif ampm == "am" and h == 12:
         h = 0
     if h > 23 or mi > 59:
         return None
+    if word in WEEKDAYS or word in short:   # today's weekday: today while that time is ahead
+        if day == now.date() and (h, mi) <= (now.hour, now.minute):
+            day += timedelta(days=7)
     return f"{day:%Y-%m-%d} {h:02d}:{mi:02d}"
 
 
@@ -248,8 +262,10 @@ VERBS = {  # first word(s) -> (tool, what the rest of the line is)
     "show": ("item", ""),
 }
 NEEDS_TEXT = ("reject", "retake", "retitle", "cover_text")   # prepare() asks when it's missing
+STREAM_ID = r"(?:kick-\d+|yt-[\w-]+|story-[\w-]+)"
 ITEM_REF = re.compile(r"((?:[\w.-]+/)?(?:[a-z]{1,4}\d+[\w.-]*|comp-[\w.-]+))"
-                      r"(?:\s+(kick-\d+|yt-[\w-]+|story-[\w-]+))?\s*(.*)", re.IGNORECASE)
+                      r"(?:\s+(" + STREAM_ID + r"))?\s*(.*)", re.IGNORECASE)
+STREAM_IN = re.compile(r"(?:^|\s)(?:(?:from|on|in|of)\s+)?(" + STREAM_ID + r")(?=\s|$)", re.IGNORECASE)
 
 
 def _verb(t: str, low: str, now: datetime) -> tuple[str, dict] | None:
@@ -260,8 +276,11 @@ def _verb(t: str, low: str, now: datetime) -> tuple[str, dict] | None:
         m = ITEM_REF.fullmatch(t[len(words) + 1:].strip())
         if not m:
             return None   # "approve the blade one": words, not a name; the model's turn
-        args: dict = {"item": m.group(1) + (f" {m.group(2)}" if m.group(2) else "")}
-        rest = m.group(3).strip()
+        stream, rest = m.group(2), m.group(3).strip()
+        s = None if stream or "/" in m.group(1) else STREAM_IN.search(rest)
+        if s:   # "approve s02 from kick-131151926": the stream, not a note
+            stream, rest = s.group(1), (rest[:s.start()] + " " + rest[s.end():]).strip()
+        args: dict = {"item": m.group(1) + (f" {stream}" if stream else "")}
         if words in ("release", "unhold"):
             args["release"] = True
         if words == "unpin":
@@ -275,9 +294,7 @@ def _verb(t: str, low: str, now: datetime) -> tuple[str, dict] | None:
             args[rest_name] = rest
         elif rest and not rest_name:
             return None
-        elif not rest and tool in NEEDS_TEXT:
-            return tool, args
-        return tool, args
+        return tool, args   # a write without its text (NEEDS_TEXT): prepare() asks for it
     return None
 
 
@@ -349,18 +366,17 @@ def ask_model(cfg: dict, chat: dict, topic: dict) -> tuple[str, dict | None, flo
     """(what it said, its pick {name, input} or None, $) from one call; no call past the budget."""
     from .llm import LLM
 
-    cc = cfg["chat"]
-    if not cc["model"]:
+    if not cfg["chat"]["model"]:
         return "I only know the commands here ([chat] model is off): /help.", None, 0.0
     spent = sum(catalog.spend_today(cfg, "chat").values())
-    if cc["daily_usd"] and spent >= cc["daily_usd"]:
-        return (f"I've used today's ${cc['daily_usd']:.2f} of thinking ([chat] daily_usd); "
+    if cfg["chat"]["daily_usd"] and spent >= cfg["chat"]["daily_usd"]:
+        return (f"I've used today's ${cfg['chat']['daily_usd']:.2f} of thinking ([chat] daily_usd); "
                 "the commands still work: /help."), None, 0.0
     client = LLM(cfg, label="chat")
     tools = [t.spec() for t in catalog.catalog().values()]
     now = datetime.now(ZoneInfo(cfg["schedule"]["timezone"]))
-    out, meta = client.tool_call(cc["model"], system_prompt(cfg, now), history(chat, topic, cc["history"]),
-                                 tools, cc["effort"])
+    out, meta = client.tool_call(cfg["chat"]["model"], system_prompt(cfg, now),
+                                 history(chat, topic, cfg["chat"]["history"]), tools, cfg["chat"]["effort"])
     if meta.get("refusal") is not None:
         return "I can't help with that one.", None, client.cost
     return out["text"], out["tool"], client.cost
@@ -385,6 +401,10 @@ def run_tool(cfg: dict, chat: dict, name: str, args: dict, usd: float = 0.0, pre
         plan = catalog.prepare(cfg, name, args)
     except ClipperError as e:
         return _post(chat, "clippa", (preface + "\n" if preface else "") + f"Hmm: {e}", usd=usd)
+    except Exception as e:  # noqa: BLE001 - a bad input from the model, Kitsu down: a line, not a lost message
+        log.warning(f"chat tool {name}: {type(e).__name__}: {e}")
+        return _post(chat, "clippa", (preface + "\n" if preface else "")
+                     + f"Hmm, that didn't work ({type(e).__name__}; details in the serve log).", usd=usd)
     m = say(chat, plan, usd, preface)
     if plan.kind == "ask" and plan.options:   # a tap on an option runs the same tool on that item
         m["ask"] = {"tool": name, "args": {k: v for k, v in args.items() if k != "item"}}
@@ -465,35 +485,34 @@ def handle(cfg: dict, text: str) -> dict:
         raise ClipperError("say something")
     if len(text) > MAX_TEXT:
         raise ClipperError(f"that's over {MAX_TEXT} characters")
-    with _LOCK:
-        with _update(cfg) as chat:
-            since = chat["messages"][-1]["id"] if chat["messages"] else ""
-            if text.startswith("/"):
-                command(cfg, chat, text)
-                _trim(cfg, chat)
-                return view(chat, since)
-            topic = ensure_topic(chat, cfg)
-            _post(chat, "me", text)
-            hit = match(text, datetime.now(ZoneInfo(cfg["schedule"]["timezone"])))
-            if hit:
-                run_tool(cfg, chat, *hit)
-                _trim(cfg, chat)
-                return view(chat, since)
-            seen = {"messages": list(chat["messages"])}
-        # the model call (a second or two) happens outside the file's lock; the reply goes in after
-        try:
-            said, pick, usd = ask_model(cfg, seen, topic)
-        except Exception as e:  # noqa: BLE001 - a model outage is a chat line, not a broken page
-            log.warning(f"chat model: {type(e).__name__}: {e}")
-            said, pick, usd = (f"I couldn't think just now ({type(e).__name__}); the commands still "
-                               "work: /help."), None, 0.0
-        with _update(cfg) as chat:
-            if pick:
-                run_tool(cfg, chat, pick["name"], pick["input"], usd, preface=said)
-            else:
-                _post(chat, "clippa", said or "Hmm, not sure what you mean. /help has examples.", usd=usd)
+    with _LOCK, _update(cfg) as chat:
+        since = chat["messages"][-1]["id"] if chat["messages"] else ""
+        if text.startswith("/"):
+            command(cfg, chat, text)
             _trim(cfg, chat)
             return view(chat, since)
+        topic = ensure_topic(chat, cfg)
+        _post(chat, "me", text)
+        hit = match(text, datetime.now(ZoneInfo(cfg["schedule"]["timezone"])))
+        if hit:
+            run_tool(cfg, chat, *hit)
+            _trim(cfg, chat)
+            return view(chat, since)
+        seen = {"messages": list(chat["messages"])}
+    # the model call (a second or two) holds neither lock: other sends, taps and job reports go on
+    try:
+        said, pick, usd = ask_model(cfg, seen, topic)
+    except Exception as e:  # noqa: BLE001 - a model outage is a chat line, not a broken page
+        log.warning(f"chat model: {type(e).__name__}: {e}")
+        said, pick, usd = (f"I couldn't think just now ({type(e).__name__}); the commands still "
+                           "work: /help."), None, 0.0
+    with _LOCK, _update(cfg) as chat:
+        if pick:
+            run_tool(cfg, chat, pick["name"], pick["input"], usd, preface=said)
+        else:
+            _post(chat, "clippa", said or "Hmm, not sure what you mean. /help has examples.", usd=usd)
+        _trim(cfg, chat)
+        return view(chat, since)
 
 
 # ---------- cards ----------
@@ -505,43 +524,42 @@ def find_card(chat: dict, card_id: str) -> dict | None:
 def tap(cfg: dict, card_id: str, yes: bool) -> dict:
     """A tap on a card: No closes it; Yes re-checks and acts (a write) or starts the job (a
     spend). A card from an ended topic has expired, and one already tapped is done with."""
-    with _LOCK:
-        with _update(cfg) as chat:
-            since = chat["messages"][-1]["id"] if chat["messages"] else ""
-            m = find_card(chat, card_id)
-            if not m:
-                raise ClipperError("no such card")
-            card = m["card"]
-            topic = ensure_topic(chat, cfg)   # a topic gone quiet ends here and its cards expire
-            if card["state"] == "open" and m["topic"] != topic["id"]:
-                card["state"] = "expired"
-            if card["state"] != "open":
-                _post(chat, "system", f"that card is {card['state']}" + (": ask again" if card["state"] == "expired" else ""))
-                return view(chat, since)
-            if not yes:
-                card["state"] = "cancelled"
-                _post(chat, "clippa", "OK, left alone.")
-                return view(chat, since)
-            card["state"] = "working"
-            card = dict(card)
-        try:   # the action itself (Kitsu, a replan) runs outside the file's lock
-            if card["risk"] == catalog.SPEND:
-                reply, ok = start_job(cfg, card)
-                state = "done" if ok else "failed"
-            else:
-                reply, ok = catalog.apply(cfg, card)
-                state = "done" if ok else "stale"
-        except ClipperError as e:
-            reply, state = f"Couldn't: {e}", "failed"
-        except Exception as e:  # noqa: BLE001 - Kitsu down: say so, keep the page
-            log.warning(f"chat card {card['tool']}: {type(e).__name__}: {e}")
-            reply, state = f"Couldn't ({type(e).__name__}; details in the serve log).", "failed"
-        with _update(cfg) as chat:
-            m = find_card(chat, card_id)
-            if m:
-                m["card"]["state"] = state
-            _post(chat, "clippa", reply, kind="report" if state == "done" else "text")
+    with _LOCK, _update(cfg) as chat:
+        since = chat["messages"][-1]["id"] if chat["messages"] else ""
+        m = find_card(chat, card_id)
+        if not m:
+            raise ClipperError("no such card")
+        card = m["card"]
+        topic = ensure_topic(chat, cfg)   # a topic gone quiet ends here and its cards expire
+        if card["state"] == "open" and m["topic"] != topic["id"]:
+            card["state"] = "expired"
+        if card["state"] != "open":
+            _post(chat, "system", f"that card is {card['state']}" + (": ask again" if card["state"] == "expired" else ""))
             return view(chat, since)
+        if not yes:
+            card["state"] = "cancelled"
+            _post(chat, "clippa", "OK, left alone.")
+            return view(chat, since)
+        card.update(state="working", boot=BOOT)   # cut off by a restart: lost_jobs says so
+        card = dict(card)
+    try:   # the action (Kitsu, a replan) holds neither lock; "working" keeps a second tap out
+        if card["risk"] == catalog.SPEND:
+            reply, ok = start_job(cfg, card)
+            state = "done" if ok else "failed"
+        else:
+            reply, ok = catalog.apply(cfg, card)
+            state = "done" if ok else "stale"
+    except ClipperError as e:
+        reply, state = f"Couldn't: {e}", "failed"
+    except Exception as e:  # noqa: BLE001 - Kitsu down: say so, keep the page
+        log.warning(f"chat card {card['tool']}: {type(e).__name__}: {e}")
+        reply, state = f"Couldn't ({type(e).__name__}; details in the serve log).", "failed"
+    with _LOCK, _update(cfg) as chat:
+        m = find_card(chat, card_id)
+        if m:
+            m["card"]["state"] = state
+        _post(chat, "clippa", reply, kind="report" if state == "done" else "text")
+        return view(chat, since)
 
 
 # ---------- jobs: spend cards, in the background ----------
@@ -604,9 +622,18 @@ def finish(cfg: dict, job_id: str, code: int | None, lines: list[str]) -> None:
 
 def lost_jobs(cfg: dict) -> int:
     """Jobs an earlier process on this machine started that a restart cut off: reported as lost.
-    A job another machine's process runs is left alone. The page's first poll calls it."""
+    A job another machine's process runs is left alone. A card an earlier process left
+    "working" (a restart mid-tap) is marked failed. The page's first poll calls it."""
     n = 0
     with _LOCK, _update(cfg) as chat:
+        for m in chat["messages"]:
+            card = m.get("card") or {}
+            if card.get("state") == "working" and card.get("boot") != BOOT:
+                card["state"] = "failed"
+                ensure_topic(chat, cfg)
+                _post(chat, "clippa", f"A restart cut off \"{card.get('text', '')}\": look at the item "
+                      "before asking again.", kind="report")
+                n += 1
         for j in chat["jobs"]:
             if j["state"] == "running" and j.get("host") == socket.gethostname() and j.get("boot") != BOOT:
                 j.update(state="lost", ended_at=now_iso())
