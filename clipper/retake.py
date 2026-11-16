@@ -30,7 +30,7 @@ from pathlib import Path
 
 from . import jsonstate
 from .config import base, for_stream, stream_dir
-from .errors import ClipperError
+from .errors import ClipperError, key_rejected
 
 LOCK_STALE_S = 3600
 
@@ -603,6 +603,8 @@ def run(cfg: dict, stream: str | None = None, item: str | None = None,
             lock.touch()
             try:
                 out.append(process(root, sdir, key, r["comment"], note_id(r), dry_run))
-            except Exception as e:  # noqa: BLE001 - one bad item shouldn't stop the rest
+            except Exception as e:  # one bad item shouldn't stop the rest
+                if key_rejected(e):
+                    raise  # the rest would be refused too (#281)
                 print(f"{sdir.name}/{key}: retake failed: {type(e).__name__}: {e}")
     return out

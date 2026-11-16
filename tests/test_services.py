@@ -1,6 +1,9 @@
 import json
+import os
+import shutil
 import subprocess
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 
@@ -124,3 +127,25 @@ def test_record_status_refuses_when_the_heartbeat_cannot_be_read(tmp_path, monke
     monkeypatch.setattr(services, "recorder_compose", lambda cfg, action: pytest.fail("recorder touched"))
     with pytest.raises(ClipperError, match="can't tell"):
         services.run(cfg, "restart", "recorder")
+
+
+@pytest.mark.skipif(shutil.which("bash") is None or shutil.which("powershell.exe") is not None,
+                    reason="needs bash, and reads Windows user variables where powershell.exe is")
+def test_deploy_keys_stops_on_a_key_that_differs_and_never_prints_it(tmp_path):
+    """deploy/keys.sh (2026-11-16, an old ANTHROPIC_API_KEY shipped to the hub): a key in
+    env.local that differs from this machine's stops the deploy by name; sync copies it in."""
+    keys = Path(__file__).resolve().parent.parent / "deploy" / "keys.sh"
+    env_local = tmp_path / "env.local"
+    env_local.write_text('FOO_KEY="old-secret"\nGH_TOKEN=only-here\nTS_HOSTNAME=x\n')
+    script = f'source "{keys.as_posix()}"; check_keys "{env_local.as_posix()}"; echo deployed'
+    env = {"PATH": os.environ["PATH"], "FOO_KEY": "new-secret"}
+    r = subprocess.run(["bash", "-c", script], env=env, stdin=subprocess.DEVNULL,
+                       capture_output=True, text=True)
+    assert r.returncode == 1 and "FOO_KEY" in r.stderr and "GH_TOKEN" not in r.stderr
+    assert "secret" not in r.stderr + r.stdout
+    r = subprocess.run(["bash", "-c", script], env={**env, "DEPLOY_KEYS": "sync"},
+                       stdin=subprocess.DEVNULL, capture_output=True, text=True)
+    assert r.returncode == 0 and "deployed" in r.stdout and "secret" not in r.stderr
+    assert env_local.read_text().splitlines() == ["FOO_KEY=new-secret", "GH_TOKEN=only-here", "TS_HOSTNAME=x"]
+    r = subprocess.run(["bash", "-c", script], env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True)
+    assert r.returncode == 0 and r.stderr == ""      # matching now: nothing to say

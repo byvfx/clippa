@@ -281,6 +281,18 @@ input.search { margin-left: auto; width: 180px; }
 .nbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .nst { border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; display: grid; gap: 4px; }
 .nst.off { opacity: .5; }
+.akwrap { overflow-x: auto; }
+.aktable { width: 100%; border-collapse: collapse; font-size: 13px; }
+.aktable th { text-align: left; color: var(--faint); font: 11px var(--mono); padding: 4px 8px; border-bottom: 1px solid var(--line); }
+.aktable td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.aktable tr.off { opacity: .5; }
+.aktable .akenv-sm { display: none; font-size: 11px; color: var(--dim); }
+@media (max-width: 640px) {
+  .aktable .akenv { display: none; }
+  .aktable .akenv-sm { display: block; overflow-wrap: anywhere; }
+  .aktable td { padding: 6px 4px; }
+}
+.aktable .ok { color: var(--green); } .aktable .bad { color: var(--red); } .aktable .mid { color: var(--amber); }
 .nst .nh { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
 .nst .nsrc { font-size: 12px; display: grid; gap: 2px; }
 .nst .nsrc a { color: var(--dim); }

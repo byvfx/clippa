@@ -122,6 +122,11 @@ def check_streams(cfg: dict, now: datetime) -> list[dict]:
                                    f"worker's last heartbeat was {last}: it stopped mid-run",
                                    look="the worker container's logs; it takes the stream over on its next pass",
                                    stream=d.name))
+        elif status == "failed" and run.get("key_rejected"):
+            out.append(finding(f"key:{d.name}", "streams", BAD,
+                               f"{d.name}: held, an API key was rejected: {run.get('error', '')[:300]}",
+                               look="the key in deploy/hub/env.local (then deploy.sh); the worker "
+                                    "retries by itself once a key changes", stream=d.name))
         elif status == "failed" and run.get("attempts", 0) >= wc["max_attempts"]:
             out.append(finding(f"failed:{d.name}", "streams", BAD,
                                f"{d.name}: failed with no retries left: {run.get('error', '')[:300]}",

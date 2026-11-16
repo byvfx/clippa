@@ -124,7 +124,7 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   `serve` (war room on 127.0.0.1:8765, on the tailnet as https://clipper.taile415cd.ts.net/; heartbeat
   `streams/.serve/status.json`), `bot` (`streams/.bot/status.json`) and `worker` (cuts with QSV on the iGPU).
   Code changes go out with `bash deploy/hub/deploy.sh` from a main checkout; `clipper services status|restart ...`
-  runs docker compose there (`[serve] hub`). Last deploy 2026-11-15 18:27: main as of #273. **The config and
+  runs docker compose there (`[serve] hub`). Last deploy 2026-11-15 23:14: main as of #278 (the key fix). **The config and
   all state are on the NAS:** `//192.168.0.155/docker/clipper` (`/data`) holds `clipper.toml` (the one copy;
   `CLIPPER_CONFIG` on the laptop points at it), `schedule.json`, secrets/, backups/, logs/, faces/, voices/,
   news/, weekly/, archive/, layouts/, people.json, fonts/. The laptop's old copies: `backups/laptop-state-2026-11-05/`.
@@ -186,6 +186,9 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   Moving a stage (e.g. Pass A to DeepSeek V4 Pro) is a config change whenever the user wants it.
 
 ## Waiting on the user
+- **The claude container's `ANTHROPIC_API_KEY` is the old, rejected one** (`deploy/claude/env.local`,
+  11-16), so clipper model calls from phone sessions fail. Fix: `DEPLOY_KEYS=sync bash deploy/claude/deploy.sh`
+  once #281 is merged (or copy the key by hand); the restart ends the open phone session. The hub's was fixed 11-16.
 - **`clipper streams prune`** stays by hand until you set `[streams] keep_source_days` in clipper.toml
   (111 GB would go at 30 days). The test stream is in `[streams] never_prune` (set 11-13).
 - `secrets/youtube_cookies.netscape.txt` on the share is unused since PR #195 and can be deleted.
