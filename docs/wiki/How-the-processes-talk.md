@@ -121,6 +121,14 @@ process instead and logs it to `logs/retake.log`.
 - **the worker** runs each stage as `python -m clipper.cli <stage> <stream>`, output to
   `streams/<id>/run_<stage>.log`, status in `run.json` (`stages.<name>.status`, and on a failure
   `error: "<stage> exited N: <last three lines>"`). It resumes at the first unfinished stage.
+  A failed run is tried `[worker] max_attempts` times, `retry_minutes` apart, except exit 4
+  (`KEY_REJECTED`: a provider answered 401 to the key): that one isn't counted or retried with the
+  same key. `run.json` keeps a fingerprint of the keys the stage started with, by the stream's
+  own `[paths]` (`key_rejected`, a hash, not the keys). You get a DM at once; streams held by the
+  same keys share it, at most one per `[notify] cooldown_hours`. The worker takes the stream again
+  as soon as a key it reads changes (a fixed `env.local` and a deploy, or a new key file). The
+  meta stage, the review checks and retakes pass a rejected key through rather than turning it
+  into a finding or a retry.
 - **cut** with `[cut] backend = "nas"` sshes to `[cut] nas_host` and runs a container named
   `clipper-cut-<id>`; a cut killed half way can leave it running: `ssh nas docker rm -f
   clipper-cut-<id>`.

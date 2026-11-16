@@ -21,3 +21,23 @@ class ClipperError(Exception):
     def __init__(self, message: str = "", status: int = 1):
         super().__init__(message)
         self.status = status
+
+
+KEY_REJECTED = 4  # the exit status of a stage whose API key a provider refused (HTTP 401)
+
+
+class KeyRejected(ClipperError):
+    """A provider said the key is wrong (HTTP 401). Not worth retrying with the same key: the
+    worker holds the stream until a key changes (worker.pending) instead of spending its
+    retries, and DMs at once."""
+
+    def __init__(self, message: str):
+        super().__init__(message, status=KEY_REJECTED)
+
+
+def key_rejected(e: BaseException) -> bool:
+    """A refused key: KeyRejected, or the Anthropic SDK's AuthenticationError from a call past
+    the preflight. A handler that turns errors into findings or a retry passes these through,
+    so they reach cli.main as exit KEY_REJECTED (#281)."""
+    return isinstance(e, KeyRejected) or (
+        type(e).__name__ == "AuthenticationError" and type(e).__module__.startswith("anthropic"))

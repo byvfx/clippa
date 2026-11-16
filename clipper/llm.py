@@ -38,7 +38,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from .errors import ClipperError
+from .errors import ClipperError, KeyRejected
 
 PROVIDERS = {  # prefix -> (base URL, key env var)
     "openai": ("https://api.openai.com/v1", "OPENAI_API_KEY"),
@@ -142,6 +142,25 @@ def provider_key(prov: str, paths: dict | None = None) -> str:
         return Path(path).read_text(encoding="utf-8").strip()
     except OSError:
         return ""
+
+
+def keys_fingerprint(paths: dict | None = None) -> str:
+    """A short hash of every model provider's key as this process sees it (env or file), so
+    the worker can tell a stream held for a rejected key that a key has changed since. It
+    says nothing about the keys themselves. Raises OSError when a key file is there but can't
+    be read (a NAS blip), rather than hashing it as no key and seeming to change."""
+    import hashlib
+
+    def key(prov: str) -> str:
+        env = "ANTHROPIC_API_KEY" if prov == "anthropic" else PROVIDERS[prov][1]
+        path = (paths or {}).get(f"{prov}_key")
+        k = os.environ.get(env, "").strip()
+        if k or not path or not Path(path).exists():
+            return k
+        return Path(path).read_text(encoding="utf-8").strip()
+
+    keys = "\n".join(f"{p}={key(p)}" for p in ("anthropic", *PROVIDERS))
+    return hashlib.sha256(keys.encode()).hexdigest()[:12]
 
 
 def split(model: str) -> tuple[str, str]:
@@ -412,8 +431,10 @@ class LLM:
         try:
             self.client.messages.create(model=split(model)[1], max_tokens=16,
                                         messages=[{"role": "user", "content": "Say OK."}])
-        except (anthropic.AuthenticationError, anthropic.PermissionDeniedError,
-                anthropic.BadRequestError) as e:
+        except anthropic.AuthenticationError as e:
+            raise KeyRejected(f"Claude API rejected the key (ANTHROPIC_API_KEY or [paths] anthropic_key)"
+                              f" ({e.status_code}): {e.message}") from None
+        except (anthropic.PermissionDeniedError, anthropic.BadRequestError) as e:
             raise ClipperError(f"Claude API unavailable ({e.status_code}): {e.message}") from None
 
     # ---------- Claude ----------
@@ -536,6 +557,11 @@ class LLM:
                 if (response_format or {}).get("type") == "json_schema" and (
                         "response_format" in text or "json_schema" in text):
                     raise NoSchema
+            # Gemini answers a bad key with a 400 ("API key not valid"), the others with a 401.
+            if prov != "local" and (r.status_code == 401 or (
+                    r.status_code == 400 and prov == "gemini" and "api key not valid" in r.text.lower())):
+                raise KeyRejected(f"{model}: {env} (or [paths] {prov}_key) was rejected "
+                                  f"(HTTP {r.status_code}): {r.text[:200]}")
             if not r.ok:
                 raise RuntimeError(f"{model}: HTTP {r.status_code}: {r.text[:300]}")
             break

@@ -25,6 +25,8 @@ if [ ! -f "$ENV_LOCAL" ]; then
     echo "created $ENV_LOCAL: fill in the keys, then run this again" >&2
     exit 1
 fi
+source "$HERE/../keys.sh"
+check_keys "$ENV_LOCAL"   # by name, never a value; DEPLOY_KEYS=sync|keep (deploy/keys.sh)
 # KEY's value in env.local, without the quotes a dotenv value may have (KEY="value")
 setting() {
     grep "^$1=" "$ENV_LOCAL" | tail -1 | cut -d= -f2- | sed -E "s/^\"(.*)\"\$/\1/; s/^'(.*)'\$/\1/" || true

@@ -31,6 +31,7 @@ from .data import (
 )
 from .faces import faces_enroll, faces_forget, faces_get, faces_name, faces_pick
 from .investigations import investigations_get
+from .keys import keys_check, keys_get
 from .logview import log_tail
 from .lowres import _lowres_prewarm, _lowres_worker, lowres_status
 from .news import news_context, news_dismiss, news_get, news_search
@@ -119,6 +120,7 @@ GET_API = {
     "/api/investigations": lambda cfg, qs: investigations_get(cfg, _q(qs, "subject"), _q(qs, "run")),
     "/api/chat": lambda cfg, qs: chat_get(cfg, _q(qs, "since")),
     "/api/chat/buddies": lambda cfg, qs: chat_buddies(cfg),
+    "/api/keys": lambda cfg, qs: keys_get(cfg),
 }
 
 POST_API = {
@@ -149,6 +151,7 @@ POST_API = {
     "/api/chat/send": chat_send,
     "/api/chat/card": chat_card,
     "/api/chat/pick": chat_pick,
+    "/api/keys/check": keys_check,
 }
 
 LOCAL_HOSTS = ("localhost", "127.0.0.1", "[::1]")
