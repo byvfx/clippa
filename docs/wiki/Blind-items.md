@@ -4,10 +4,10 @@ only then does clipper look into it. When a source reveals the answer, your gues
 are both scored. It works for any gossip source and any kind of drama, not only the people this
 install follows. It is research for you alone: nothing in it is ever published (#111).
 
-It is built in steps. **Step 1, this page, is in:** the sources, storage, the clue pass, pairing
-twins, and answering from the command line. Still to come: the Discord digest and the war
-room's Blinds window (step 2), the investigation after your answer (step 3), and reveals with
-the scorecard (step 4).
+It is built in steps. **In so far:** the sources, storage, the clue pass, pairing twins,
+answering from the command line, and the war room's Blinds window. Still to come: the Discord
+digest and serve's regular check (step 2), the investigation after your answer (step 3), and
+reveals with the scorecard (step 4).
 
 ## Sources
 
@@ -122,11 +122,41 @@ the alerts once there are any. A hidden blind is kept, and `--all` shows it.
 `answer` takes a name, `--none` or `--not-ours`. A name is matched to [People](People), and its
 record's id is kept. A name nobody answers to, or one that matches two records, is kept as you
 wrote it. Answering again replaces your last answer; the old one stays in the blind's history.
-In step 2, Discord and the war room answer through the same function.
+The war room answers through the same function, and in step 2 Discord will too.
+
+## The war room
+
+**Blinds** in the [war room](War-room)'s header opens the window.
+
+- **Tabs:** Waiting on you (the default), Answered, No idea, Not ours, Reveals, Unread and All,
+  each with its count. Next to them are how far back to look (1 to 365 days, 14 by default) and
+  which source.
+- **Each blind:**
+  - its title, id, day and status, and a link to the post
+  - tags for could be ours, each sensitive kind, private and hidden, plus its fields
+  - the text (**more** opens a long one) and the claim
+  - the clues, each labelled with its type (hover for its weight)
+  - its twin, if it has one: click to jump to it
+  - your current guess
+- **Answering:** type a name (the people this install follows are suggested) and, if you like,
+  why, then **That's my guess** or Enter. **No idea** and **Not ours** are the other two answers.
+  An answered blind leaves the Waiting tab. A guess can be changed from any tab.
+- **Paste a blind…** adds one from anywhere else, like `clipper blinds guess`. Its clues are
+  read straight away.
+- **Check now** fetches the sources and reads the new blinds' clues in the background, one check
+  at a time. The window shows its log until it is done.
+- **The header line** says when each source was last fetched (a failing one is red; hover for
+  why), which model reads the clues, and how many blinds `[blinds] hide` is hiding. Hidden blinds
+  are left out of every tab and count except All.
+- A tab shows the newest 300 blinds at most. Fewer days or one source shows the rest.
+
+The window only shows the blinds and answers them. A test checks that nothing else in the war room
+reads them.
 
 ## Where it lives
 
 Everything is in `[paths] news/blinds/blinds.sqlite`. The blind's text is kept, because it is
 short and it is what the clue pass reads. Linked articles are never fetched. Blinds older than
 `keep_days` (365) are forgotten, except ones you answered. A test checks that nothing but the
-command reads the blinds, so no title, description, cover, post or weekly issue can pick one up.
+command and the war room's window reads the blinds, so no title, description, cover, post or
+weekly issue can pick one up.

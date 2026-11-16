@@ -16,6 +16,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from ..config import base
 from ..errors import ClipperError
+from .blinds import blinds_answer, blinds_check, blinds_get, blinds_paste
 from .cast import cast_get, cast_label, cast_mark, cast_run, cast_set
 from .covers import cover_get, cover_post
 from .data import (
@@ -112,6 +113,7 @@ GET_API = {
     "/api/cast": lambda cfg, qs: cast_get(cfg, _q(qs, "person")),
     "/api/news": lambda cfg, qs: news_get(cfg, _q(qs, "days")),
     "/api/news/search": lambda cfg, qs: news_search(cfg, _q(qs, "q")),
+    "/api/blinds": lambda cfg, qs: blinds_get(cfg, _q(qs, "days"), _q(qs, "view"), _q(qs, "source"), _q(qs, "focus")),
     "/api/investigations": lambda cfg, qs: investigations_get(cfg, _q(qs, "subject"), _q(qs, "run")),
 }
 
@@ -137,6 +139,9 @@ POST_API = {
     "/api/cast/run": cast_run,
     "/api/news/dismiss": news_dismiss,
     "/api/news/context": news_context,
+    "/api/blinds/answer": blinds_answer,
+    "/api/blinds/paste": blinds_paste,
+    "/api/blinds/check": blinds_check,
 }
 
 LOCAL_HOSTS = ("localhost", "127.0.0.1", "[::1]")
