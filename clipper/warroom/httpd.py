@@ -18,7 +18,7 @@ from ..config import base
 from ..errors import ClipperError
 from .blinds import blinds_answer, blinds_check, blinds_get, blinds_paste
 from .cast import cast_get, cast_label, cast_mark, cast_run, cast_set
-from .chat import chat_buddies, chat_card, chat_get, chat_pick, chat_send
+from .chat import chat_buddies, chat_card, chat_get, chat_pick, chat_send, chat_themes
 from .covers import cover_get, cover_post
 from .data import (
     analytics_status,
@@ -120,6 +120,7 @@ GET_API = {
     "/api/investigations": lambda cfg, qs: investigations_get(cfg, _q(qs, "subject"), _q(qs, "run")),
     "/api/chat": lambda cfg, qs: chat_get(cfg, _q(qs, "since")),
     "/api/chat/buddies": lambda cfg, qs: chat_buddies(cfg),
+    "/api/chat/themes": lambda cfg, qs: chat_themes(cfg),
     "/api/keys": lambda cfg, qs: keys_get(cfg),
 }
 

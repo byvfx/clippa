@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import threading
 import time
+from pathlib import Path
 
 from .. import catalog, chat
 from ..errors import ClipperError
 
+THEMES = Path(__file__).resolve().parents[1] / "web" / "themes"   # one .css per look
 BUDDIES_TTL_S = 20   # the buddy list reads every stream's run.json over the share: not every poll
 _BUDDIES: dict = {"at": 0.0, "rows": []}
 _BUDDIES_LOCK = threading.Lock()
@@ -15,6 +17,18 @@ _BUDDIES_LOCK = threading.Lock()
 
 def chat_get(cfg: dict, since: str) -> dict:
     return chat.state(cfg, since)
+
+
+def themes() -> list[str]:
+    """The looks the page can wear: every file in web/themes/, so a new look needs no code."""
+    return sorted(p.stem for p in THEMES.glob("*.css"))
+
+
+def chat_themes(cfg: dict) -> dict:
+    """The looks, and [chat] theme as the default (the first one when it names none of them)."""
+    names = themes()
+    want = cfg["chat"]["theme"]
+    return {"themes": names, "default": want if want in names else (names[0] if names else "")}
 
 
 def chat_buddies(cfg: dict) -> dict:

@@ -100,7 +100,7 @@ function draw(m) {
   }
   row.appendChild(el("span", "who", m.who === "me" ? "You" : "Clippa"));
   row.appendChild(el("span", "ts", ` (${clock(m.at)})`));
-  row.appendChild(document.createTextNode(": "));
+  row.appendChild(el("span", "sep", ": "));
   if (m.kind === "card") {
     LOG.appendChild(row);
     row.appendChild(drawCard(m));
@@ -176,7 +176,8 @@ async function send(text) {
   if (!text) return;
   const echo = el("div", "msg me pending");
   echo.appendChild(el("span", "who", "You"));
-  echo.appendChild(document.createTextNode(": " + text));
+  echo.appendChild(el("span", "sep", ": "));
+  echo.appendChild(el("span", "body", text));
   LOG.appendChild(echo); LOG.scrollTop = LOG.scrollHeight;
   await post("/api/chat/send", { text });
 }
@@ -231,8 +232,49 @@ async function buddies() {
   setTimeout(buddies, 30000);
 }
 
+// ---------- the look: a stylesheet from web/themes/, picked by name; no theme is special here ----------
+const THEME = document.getElementById("theme");
+const PICK = document.getElementById("theme-pick");
+const THEME_KEY = "clippa-chat-theme";   // chat-theme.js reads it before the first paint
+
+function savedTheme() {
+  try { return localStorage.getItem(THEME_KEY) || ""; } catch (e) { return ""; }
+}
+function saveTheme(name) {
+  try { localStorage.setItem(THEME_KEY, name); } catch (e) { /* storage off: this visit only */ }
+}
+// A theme names its windows with --label-<name> (its data, not code here); its desk colours
+// the phone's browser bar.
+function labels() {
+  const css = getComputedStyle(document.documentElement);
+  const desk = css.getPropertyValue("--desk").trim();
+  if (desk && !desk.startsWith("var(")) document.getElementById("theme-color").setAttribute("content", desk);
+  document.querySelectorAll("[data-label]").forEach(e => {
+    const v = css.getPropertyValue(`--label-${e.dataset.label}`).trim().replace(/^(["'])(.*)\1$/, "$2");
+    if (v) e.textContent = v;
+  });
+}
+function useTheme(name) {
+  document.documentElement.dataset.theme = name;
+  const href = `/themes/${encodeURIComponent(name)}.css`;
+  if (THEME.getAttribute("href") === href) { labels(); return; }
+  THEME.onload = labels;
+  THEME.setAttribute("href", href);
+}
+async function themes() {
+  try {
+    const v = await api("/api/chat/themes");
+    PICK.textContent = "";
+    for (const t of v.themes) { const o = el("option", "", t); o.value = t; PICK.appendChild(o); }
+    const pick = v.themes.includes(savedTheme()) ? savedTheme() : v.default;
+    if (pick) { PICK.value = pick; useTheme(pick); }
+  } catch (e) { labels(); }
+}
+PICK.addEventListener("change", () => { saveTheme(PICK.value); useTheme(PICK.value); });
+
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { UNSEEN = 0; document.title = TITLE; } });
 if (window.matchMedia("(max-width: 720px)").matches) document.getElementById("buddies").classList.add("folded");
+themes();
 poll();
 buddies();
 BOX.focus();

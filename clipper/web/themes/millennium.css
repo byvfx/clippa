@@ -1,0 +1,82 @@
+/* millennium: an early-2000s desktop messenger. Beige windows with rounded blue title bars,
+   tooltip-yellow cards, a row of text-style marks above the box (decoration only).
+   An era look, light on purpose; on a dark system only the desk dims. */
+:root {
+  --label-buddies: "Buddy list";
+  --label-chat: "Clippa - Instant message";
+
+  --desk: #3a6ea5;
+  --desk-image: none;
+  --font: 13px/1.4 Arial, Helvetica, sans-serif;
+  --ink: #000000;
+  --muted: #5a5a5a;
+  --link: #0000d4;
+  --mono: "Courier New", Consolas, monospace;
+
+  --win: #ece9d8;
+  --win-border: 1px solid #0a246a;
+  --win-radius: 6px 6px 0 0;
+  --win-shadow: 2px 3px 8px rgb(0 0 0 / 0.35);
+  --win-pad: 0 3px 3px;
+
+  --tb: linear-gradient(180deg, #3a72e0 0%, #2457c8 45%, #1d4ab3 100%);
+  --tb-ink: #ffffff;
+  --tb-font: bold 13px Tahoma, Arial, sans-serif;
+  --tb-spacing: normal;
+  --tb-case: none;
+  --tb-radius: 5px 5px 0 0;
+  --tb-height: 26px;
+  --tb-icon: radial-gradient(circle at 40% 35%, #ffe680, #e8c000 70%);
+  --tb-btn: #d9452f;
+  --tb-btn-ink: #ffffff;
+  --tb-btn-border: 1px solid #ffffff;
+
+  --pane: #ffffff;
+  --pane-border: 1px solid #7f9db9;
+  --pane-radius: 0;
+  --pane-shadow: none;
+  --status-border: 1px solid #c5c2b2;
+
+  --group: #0a246a;
+  --group-weight: bold;
+  --on: #e8c000;
+  --idle: #9c9c9c;
+  --away: #9c9c9c;
+  --off: #d0d0d0;
+
+  --who-weight: bold;
+  --me: #d40000;
+  --them: #0000d4;
+  --system: #6b6b6b;
+  --ts: #6b6b6b;
+  --ts-font: 11px Arial, sans-serif;
+  --div: 1px solid #c5c2b2;
+
+  --card: #ffffe1;
+  --card-border: 1px solid #7f9db9;
+  --card-radius: 0;
+  --card-shadow: 1px 1px 3px rgb(0 0 0 / 0.2);
+  --write: #2457c8;
+  --spend: #8a3ab9;
+  --est: #f6efd2;
+  --report: #eef7ee;
+  --report-failed: #fbeeee;
+  --code: #f0eee4;
+
+  --btn: #f4f3ee;
+  --btn-ink: #000000;
+  --btn-font: Tahoma, Arial, sans-serif;
+  --btn-border: 1px solid #003c74;
+  --btn-radius: 3px;
+  --btn-shadow: inset 0 -2px 0 #d6d0c0;
+  --btn-down-border: 1px solid #003c74;
+  --btn-down-shadow: inset 0 2px 0 #d6d0c0;
+  color-scheme: light;
+}
+
+.compose-marks { display: flex; }
+.compose-marks b, .compose-marks i, .compose-marks u { font-family: "Times New Roman", serif; }
+
+@media (prefers-color-scheme: dark) {
+  :root { --desk: #1e3a5a; }
+}

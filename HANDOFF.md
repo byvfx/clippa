@@ -249,7 +249,7 @@ only at their word. #67's model edit plan waits until edited Shorts prove themse
 live clips #81, blind items #111 (steps 1-2 of 4 built and live 11-15/16, below), investigate anyone #138, agent exploration #158 (11-15 spec comment: the Clippa
 messenger. v1 built 11-16 on branch `chat/messenger-v1`, in review, **not deployed**: `/chat` on serve's page, wiki
 Clippa-messenger, `clipper/catalog.py` + `clipper/chat.py`, `[chat]`, Haiku ~$0.0005 a message, ledger `chat`; chats in
-`[paths] chats` on the share. After it merges and deploys, a week of phone use; then a small `clipper mcp`; #13 may fold into it), Modal ideas #53, #56,
+`[paths] chats` on the share; four looks in `web/themes/`, `[chat] theme`. After it merges and deploys, a week of phone use; then a small `clipper mcp`; #13 may fold into it), Modal ideas #53, #56,
 Udder Truth #58/#59/#60, P&L #50 (revenue once monetized). Write "#77 L6" rather than "fix #77" in commit
 messages: GitHub closes the issue on "fix".
 - **Review pre-flight checks and approval by silence (#259, 11-14):** step A, `clipper review check` (wiki

@@ -746,6 +746,7 @@ prompt_version = "v1"         # clipper/prompts/chat_<v>.md
 quiet_hours = 2               # a new topic starts by itself after this long without a message
 history = 20                  # the topic's last messages the model sees (never an older topic)
 daily_usd = 0.5               # the model's spend a day (the ledger's "chat" lines, UTC); past it, local matching only
+theme = "retro"               # the page's look a new browser starts with: a file's name in clipper/web/themes/; each viewer can pick another
 
 [warroom]
 # The dashboard at http://127.0.0.1:8765/ with which shows are live, each stream's pipeline,

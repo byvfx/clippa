@@ -1,0 +1,84 @@
+/* warroom: the war room's own look (clipper/web/warroom.css), so the two pages sit together.
+   The --wr-* values are the war room's :root palette, kept equal by tests/test_chat.py; the
+   rest of this file only maps them. Dark always, like the war room. */
+:root {
+  --wr-bg: #0b0d10; --wr-panel: #12161b; --wr-panel2: #171c22; --wr-line: #232a33;
+  --wr-text: #e6e9ee; --wr-dim: #8b95a3; --wr-accent: #ffd400; --wr-blue: #4da3ff;
+  --wr-green: #2fd17c; --wr-amber: #ffad33; --wr-red: #ff3b4e; --wr-violet: #a88bff;
+  --wr-mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+  --wr-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  --label-buddies: "Clippa";
+  --label-chat: "Chat";
+
+  --desk: var(--wr-bg);
+  --desk-image: none;
+  --font: 13px/1.45 var(--wr-sans);
+  --ink: var(--wr-text);
+  --muted: var(--wr-dim);
+  --link: var(--wr-blue);
+  --mono: var(--wr-mono);
+
+  --win: var(--wr-panel);
+  --win-border: 1px solid var(--wr-line);
+  --win-radius: 12px;
+  --win-shadow: none;
+  --win-pad: 6px;
+
+  --tb: transparent;
+  --tb-ink: var(--wr-dim);
+  --tb-font: 700 12px var(--wr-mono);
+  --tb-spacing: 0.14em;
+  --tb-case: uppercase;
+  --tb-radius: 0;
+  --tb-height: 26px;
+  --tb-icon: var(--wr-accent);
+  --tb-btn: transparent;
+  --tb-btn-ink: var(--wr-dim);
+  --tb-btn-border: 1px solid var(--wr-line);
+
+  --pane: var(--wr-bg);
+  --pane-border: 1px solid var(--wr-line);
+  --pane-radius: 8px;
+  --pane-shadow: none;
+  --status-border: 1px solid var(--wr-line);
+
+  --group: var(--wr-dim);
+  --group-weight: 700;
+  --on: var(--wr-green);
+  --idle: var(--wr-amber);
+  --away: var(--wr-violet);
+  --off: #4a525d;
+
+  --who-weight: 700;
+  --me: var(--wr-accent);
+  --them: var(--wr-blue);
+  --system: var(--wr-dim);
+  --ts: var(--wr-dim);
+  --ts-font: 11px var(--wr-mono);
+  --div: 1px solid var(--wr-line);
+
+  --card: var(--wr-panel2);
+  --card-border: 1px solid var(--wr-line);
+  --card-radius: 8px;
+  --card-shadow: none;
+  --write: #2a6db3;
+  --spend: #7a52d6;
+  --est: rgb(168 139 255 / 0.12);
+  --report: rgb(47 209 124 / 0.1);
+  --report-failed: rgb(255 59 78 / 0.12);
+  --code: var(--wr-panel2);
+
+  --btn: var(--wr-panel2);
+  --btn-ink: var(--wr-text);
+  --btn-font: var(--wr-sans);
+  --btn-border: 1px solid var(--wr-line);
+  --btn-radius: 8px;
+  --btn-shadow: none;
+  --btn-down-border: 1px solid var(--wr-accent);
+  --btn-down-shadow: none;
+  color-scheme: dark;
+}
+
+.window .titlebar { border-bottom: 1px solid var(--wr-line); margin-bottom: 4px; }
+.titlebar-icon { border-radius: 50%; width: 8px; height: 8px; }

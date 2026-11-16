@@ -3,7 +3,9 @@ jobs, the model's one call, and the page's routes."""
 from __future__ import annotations
 
 import json
+import re
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
@@ -397,3 +399,48 @@ def test_the_ledger_takes_the_clients_label(tmp_path, monkeypatch):
     assert (rows[0]["stage"], rows[0]["stream"]) == ("chat", "")
     assert (rows[1]["stage"], rows[1]["stream"]) == ("serve", "kick-1")
     costs.set_context("", "")
+
+
+# ---------- the page's looks (web/themes/) ----------
+
+WEB = Path(routes.__file__).resolve().parents[1] / "web"
+
+
+def _defined(css: str) -> dict[str, str]:
+    """--name: value pairs of a stylesheet's first :root block."""
+    block = re.search(r":root\s*\{(.*?)\n\}", css, re.S).group(1)
+    return {m[0]: " ".join(m[1].split()) for m in re.findall(r"--([\w-]+)\s*:\s*([^;]+);", block)}
+
+
+def test_every_theme_defines_every_variable():
+    used = set(re.findall(r"var\(--([\w-]+)\)", (WEB / "chat.css").read_text(encoding="utf-8")))
+    labels = {f"label-{n}" for n in re.findall(r'data-label="([\w-]+)"', (WEB / "chat.html").read_text(encoding="utf-8"))}
+    assert used and labels == {"label-buddies", "label-chat"}
+    assert {"millennium", "pager", "retro", "warroom"} <= set(routes.themes())   # a new look is just a file
+    for name in routes.themes():
+        have = set(_defined((WEB / "themes" / f"{name}.css").read_text(encoding="utf-8")))
+        assert not (used | labels) - have, (name, sorted((used | labels) - have))
+
+
+def test_the_warroom_theme_keeps_the_war_rooms_palette():
+    room = _defined((WEB / "warroom.css").read_text(encoding="utf-8"))
+    theme = _defined((WEB / "themes" / "warroom.css").read_text(encoding="utf-8"))
+    wr = {k[3:]: v for k, v in theme.items() if k.startswith("wr-")}
+    assert wr and all(room[k] == v for k, v in wr.items()), {k: (room.get(k), v) for k, v in wr.items() if room.get(k) != v}
+
+
+def test_the_default_theme_comes_from_config(cfg):
+    assert routes.chat_themes(cfg)["default"] == "retro"
+    cfg["chat"]["theme"] = "pager"
+    assert routes.chat_themes(cfg)["default"] == "pager"
+    cfg["chat"]["theme"] = "no-such-look"
+    assert routes.chat_themes(cfg)["default"] == routes.themes()[0]
+
+
+def test_the_page_names_no_real_messenger():
+    """Era homage only: the repo is public."""
+    files = [WEB / "chat.html", WEB / "chat.css", WEB / "chat.js", WEB / "chat-theme.js", *(WEB / "themes").glob("*.css")]
+    for f in files:
+        text = f.read_text(encoding="utf-8")
+        assert not re.search(r"\bAIM\b", text), f.name                 # the word "aim" is fine
+        assert not re.search(r"\b(icq|aol|msn|yahoo|trillian|messenger\.com)\b", text.lower()), f.name

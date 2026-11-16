@@ -62,9 +62,22 @@ Serve, the bot, the worker and the recorder show as buddies, from their heartbea
 ones [How the processes talk](How-the-processes-talk) describes): busy (working on a job), idle,
 away (the recorder while a show is live) or off (no fresh heartbeat).
 
+## Looks
+
+The page comes in four looks: `retro` (grey bevelled windows on a teal desk), `millennium`
+(beige windows, rounded blue title bars, tooltip-yellow cards), `pager` (green title bars, the
+sender's name on its own line) and `warroom` (the [War room](War-room)'s dark palette). Pick one
+with **Look** under the buddy list; the page remembers it in that browser. `[chat] theme` sets the
+one a new browser starts with.
+
+A look is one file in `clipper/web/themes/`: the custom properties the page's `chat.css` reads
+(colours, fonts, borders, radii, the window titles as `--label-buddies` and `--label-chat`) plus
+any rules of its own. Add a file there and it shows up in the list; a test checks that every
+look defines every property, and that `warroom` keeps the war room's colours.
+
 ## Settings
 
 `[chat]` in the config: `model` (`""` for local matching only), `effort`, `prompt_version`
 (`clipper/prompts/chat_<v>.md`), `quiet_hours`, `history` (how many of the topic's messages the
-model sees) and `daily_usd`. The chat is stored in `[paths] chats` (`chats/current.json` beside
+model sees), `daily_usd` and `theme`. The chat is stored in `[paths] chats` (`chats/current.json` beside
 the streams, on the share), written by serve only.
