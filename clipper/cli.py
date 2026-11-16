@@ -1138,6 +1138,22 @@ def cmd_doctor(cfg: dict, args: argparse.Namespace) -> None:
     raise SystemExit(doctor.main(cfg, offline=args.offline, role=args.role))
 
 
+def cmd_keys(cfg: dict, args: argparse.Namespace) -> None:
+    from . import keys
+
+    names = [k.name for k in keys.specs(cfg)]
+    if isinstance(args.check, str):
+        match = [n for n in names if n.lower() == args.check.lower()]
+        if not match:
+            raise ClipperError(f"keys --check: no key {args.check!r} ({', '.join(names)})"
+                               + (" " + did_you_mean(args.check, names) if did_you_mean(args.check, names) else ""))
+        args.check = match[0]
+    report = keys.status(cfg, run_checks=args.check, remember=False)  # the war room keeps its own answers
+    print(json.dumps(report, indent=1) if args.json else "\n".join(keys.lines(report)))
+    if any((r["last"] or {}).get("ok") is False for r in report["keys"]):
+        raise SystemExit(1)
+
+
 def cmd_cookies(cfg: dict, args: argparse.Namespace) -> None:
     from . import wiki, ytdl
 
@@ -1248,7 +1264,7 @@ COMMAND_GROUPS = [
     ('Services (long-running)', ['services', 'status', 'checkup', 'audit', 'record', 'worker', 'serve', 'bot', 'warroom', 'alert']),
     ('Extras', ['weekly', 'cast', 'broll', 'clipart', 'doc', 'people', 'news', 'blinds', 'receipts', 'archive', 'investigate', 'story', 'narrate', 'perform', 'modal',
                 'costs', 'compare', 'models']),
-    ('Setup and checks', ['setup', 'doctor', 'config', 'shows', 'streams', 'backup', 'completion', 'cookies', 'codereview']),
+    ('Setup and checks', ['setup', 'doctor', 'keys', 'config', 'shows', 'streams', 'backup', 'completion', 'cookies', 'codereview']),
 ]
 
 
@@ -2184,6 +2200,13 @@ def add_setup(sub) -> None:
     p.add_argument("--role", choices=["all", "gpu", "serve", "bot", "nas", "claude", "control"], default="all",
                    help="only what this machine runs (gpu worker, serve, bot, nas recorder, claude on the NAS)")
     p.set_defaults(fn=cmd_doctor)
+
+    p = sub.add_parser("keys", help="the API keys this machine has, where each comes from, and (--check) "
+                                    "whether its provider still takes it; never a value")
+    p.add_argument("--check", nargs="?", const=True, default=False, metavar="NAME",
+                   help="ask each provider (one free request each), or only NAME (e.g. Anthropic); exit 1 on a rejected key")
+    p.add_argument("--json", action="store_true", help="the report as JSON")
+    p.set_defaults(fn=cmd_keys)
 
     p = sub.add_parser("config", help="settings: where a value comes from (default, clipper.toml, show, ...)")
     csub = p.add_subparsers(dest="action", required=True, metavar="<action>")

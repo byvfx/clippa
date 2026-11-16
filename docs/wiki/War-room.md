@@ -114,6 +114,21 @@ Gossip blind items with their clues read (`clipper blinds`, #111). **Blinds** in
 it: each blind's text, its typed clues, the claim, and a box for your guess, which you give before
 clipper looks into anything. The whole of it is on [Blind items](Blind-items#the-war-room).
 
+## Keys
+
+The API keys serve itself has, which on the hub are the ones serve, the bot and the worker use.
+**Keys** in the header opens it. Each key shows its env var, where it was found (`$ANTHROPIC_API_KEY`,
+or its file in `secrets/`), what uses it, and the last answer from its provider: ✓ works,
+✗ rejected, or ? (no answer about the key, or not reachable). **Check** asks one provider again,
+and **Check all** asks every one that's set. Each check is one free request (a model list or a
+"who am I"); Brave, Pixabay, DVIDS and sync.so aren't asked, since there's no free way to. The
+answers are kept in `streams/.serve/keys.json`. Streams the worker holds for a rejected key
+([How the processes talk](How-the-processes-talk#child-processes)) are listed at the top.
+No key's value ever reaches the page. To change one, edit `deploy/hub/env.local` (or its file in
+`secrets/`), then run `deploy.sh`, which checks it against the laptop's own first
+([NAS-hub](NAS-hub#deploy)). `clipper keys` prints the same table for the machine it runs on
+(`--check` asks, `--check Anthropic` asks one; exit 1 on a rejected key).
+
 ## Cast
 
 The cast library (#41): a few head-and-shoulders photos of each regular in `[thumbnail]
