@@ -49,6 +49,7 @@ model_tests = "logs/model_tests"               # `clipper models test` results, 
 model_gold = "logs/model_tests/gold.json"      # labelled windows for `clipper models gold` (propose, label, run)
 warroom_undo = "logs/warroom_undo.json"        # the war room's last 20 actions, for Undo
 warroom_layouts = "logs/warroom_layouts.json"  # the war room's saved panel layouts (Layout button)
+chats = "chats"                              # the Clippa messenger's chat (current.json) and archive/ (/chat)
 weekly = "weekly"                              # clipper weekly issues, one folder per week's Saturday
 broll = "broll"                                # clipper broll: the b-roll library (clips + broll.json)
 clipart = "clipart"                            # clipper clipart: the clip art library (pictures + clipart.json)
@@ -732,6 +733,19 @@ url = ""
 # compose folder on the Docker host that deploy/hub/deploy.sh uses (relative to the ssh user's
 # home), reached over ssh like the recorder ([record] ssh_host).
 hub = ""
+
+[chat]
+# The Clippa messenger (#158): the war room's /chat page, one box where you tell Clippa what to
+# do. A message is matched locally first (commands, item names); only one that matches nothing
+# goes to the model, once, and it can only pick a catalog tool (clipper/catalog.py). Reads
+# answer at once; writes and spends wait for your tap on a card, a spend with its estimate.
+# Stored in [paths] chats; /clear moves the chat to chats/archive/. Wiki: Clippa-messenger.
+model = "claude-haiku-5-5"    # for a message nothing local matched; "" = local matching only
+effort = "low"
+prompt_version = "v1"         # clipper/prompts/chat_<v>.md
+quiet_hours = 2               # a new topic starts by itself after this long without a message
+history = 20                  # the topic's last messages the model sees (never an older topic)
+daily_usd = 0.5               # the model's spend a day (the ledger's "chat" lines, UTC); past it, local matching only
 
 [warroom]
 # The dashboard at http://127.0.0.1:8765/ with which shows are live, each stream's pipeline,

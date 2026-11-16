@@ -48,6 +48,8 @@ VERSIONS: dict[str, tuple[str, str]] = {
     "story_triage": ("story", "prompt_version"), "story_expand": ("story", "prompt_version"),
     "story_moments": ("story", "prompt_version"), "story_dossier": ("story", "prompt_version"),
     "story_edit": ("story", "edit_prompt_version"),
+    # the Clippa messenger (#158)
+    "chat": ("chat", "prompt_version"),
     # the repo's own PRs (clipper codereview)
     "codereview": ("codereview", "prompt_version"),
 }

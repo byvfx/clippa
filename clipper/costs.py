@@ -50,9 +50,11 @@ def record(path: Path | None, rec: dict) -> None:
 
 
 def llm_call(path: Path | None, provider: str, model: str, tokens_in: int, tokens_out: int,
-             usd: float) -> None:
+             usd: float, stage: str = "") -> None:
+    """stage: the client's own label (a long-running process's, e.g. serve's chat), in place of
+    the command's CONTEXT, which a threaded server can't set per request."""
     record(path, {"ts": now_iso(), "kind": "llm", "provider": provider, "model": model,
-                  "stage": CONTEXT["stage"], "stream": CONTEXT["stream"],
+                  "stage": stage or CONTEXT["stage"], "stream": "" if stage else CONTEXT["stream"],
                   "in": tokens_in, "out": tokens_out, "usd": round(usd, 6)})
 
 

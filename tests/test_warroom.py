@@ -412,3 +412,19 @@ def test_log_filters_see_only_scrubbed_text(tmp_path, defaults, monkeypatch):
         assert logview.log_tail(cfg, grep=probe)["lines"] == []
         assert logview.log_tail(cfg, grep=probe, bad="1")["lines"] == []
     assert logview.log_tail(cfg, grep="•••")["lines"]   # what is shown can be searched
+
+
+def test_the_chat_page_is_its_own(tmp_path, defaults):
+    """/chat (#158): its own markup, style and script beside the war room's, served by the same
+    server behind the same key; the war room page never loads them."""
+    from clipper.warroom import httpd
+
+    html = httpd.PAGES["/chat"].read_text(encoding="utf-8")
+    assert '<script src="/chat.js"></script>' in html and '<link rel="stylesheet" href="/chat.css">' in html
+    assert "chat.js" not in warroom.PAGE.read_text(encoding="utf-8")
+    assert httpd.static_file("/chat.js")[1].startswith("text/javascript")
+    assert httpd.static_file("/chat.css")[1].startswith("text/css")
+    broken = re.compile("[ÂÃ][\x80-\xbf]|â[€œš]")
+    for name in ("chat.html", "chat.css", "chat.js"):
+        assert not broken.search((warroom.WEB / name).read_text(encoding="utf-8")), name
+    assert "/api/chat" in httpd.GET_API and "/api/chat/send" in httpd.POST_API
