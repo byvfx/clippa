@@ -3,7 +3,8 @@ a mastered render, a leak check and a publish kit.
 
 Usage:
     clipper doc new <slug> [--title T]       the piece's folder, a starter plan.toml and banned.txt
-    clipper doc voice <slug> [--dry-run]     the narration: bought once per take, compressed, word-timed
+    clipper doc voice <slug> [--dry-run]     the narration: your own read of a take (vo/read/), else bought
+                                             once per take; compressed, word-timed
     clipper doc build <slug> [--dry-run]     the plan in frames (work/build.json), then a new timeline in Resolve
     clipper doc master <slug> [--file F] [--timeline NAME] [--no-leak]
                                              render, bring it to [doc] lufs, then the leak check
@@ -25,7 +26,9 @@ plan.toml is `[[seq]]` entries in order, one of:
 pause before each line: one performance, even with clips between its parts.
 
 Narration costs ElevenLabs characters: `voice --dry-run` says how many, and a take is bought
-again only when its words, voice or settings change. The leak check transcribes on Modal (a
+again only when its words, voice or settings change. A take you recorded yourself, as
+vo/read/<take>.wav (or .flac, .mp3, .m4a ...), is used instead and costs nothing; it goes
+through the same compressor, pause cap and word timing. The leak check transcribes on Modal (a
 few cents; `leak --dry-run` prices it). Resolve work (`build`, `master` without --file) needs
 Resolve Studio open on this machine: clipper/doc_resolve.py.
 """
@@ -35,6 +38,7 @@ from __future__ import annotations
 import functools
 import hashlib
 import json
+import os
 import re
 import subprocess
 import tomllib
@@ -54,10 +58,13 @@ A_CLIP, A_VO, A_FX, A_UNDER, A_SCORE, A_TONE = 1, 2, 3, 4, 5, 7   # the score al
 VIDEO, AUDIO = 1, 2       # Resolve's mediaType
 RATE = 48000
 LIMIT_MARGIN = 0.8        # dB the master's limiter sits under [doc] true_peak
+READ_DIR = "vo/read"      # your own recordings of takes, one file a take, named for the take
+READ_EXTS = (".wav", ".flac", ".aif", ".aiff", ".mp3", ".m4a", ".aac", ".ogg", ".opus")
 
 STARTER = '''\
 # The plan of one piece: the script and the edit. `clipper doc` reads it; nothing here is
-# sent anywhere but the narration lines (to ElevenLabs, by `clipper doc voice`).
+# sent anywhere but the narration lines (to ElevenLabs, by `clipper doc voice`), and not
+# those of a take you recorded yourself (vo/read/<take>.wav).
 title = "{title}"
 # project = "{title}"       # the Resolve project that must be open for `build`
 # voice_id = ""             # this piece's narrator; "" = [doc] voice_id
@@ -65,7 +72,7 @@ description = """
 What the piece is, for the YouTube description.
 """
 credits = []                # one line each, e.g. "Room tone: Freesound 123456 by Someone (CC0)"
-# disclosures = []          # replaces [doc] disclosures for this piece
+# disclosures = []          # replaces [doc] disclosures (own_voice_disclosures when you read it all) for this piece
 pinned = ""                 # the pinned comment
 
 # [clips.name]              # a named stretch of the subject's own video (picture and sound)
@@ -91,7 +98,7 @@ section = "COLD OPEN"
 
 # [[seq]]
 # say = "The first line of narration."
-# take = "open"             # lines sharing a take are one read
+# take = "open"             # lines sharing a take are one read; vo/read/open.wav is your own read of it
 # shots = [["reel-a", 17.8], ["reel-b", 5, "line of"]]
 
 # [[seq]]
@@ -119,7 +126,7 @@ def new(cfg: dict, slug: str, title: str = "") -> Path:
     d = piece_dir(cfg, slug)
     if (d / PLAN).exists():
         raise ClipperError(f"{d / PLAN} already exists")
-    for f in (*FOLDERS, "work", "vo", "renders"):
+    for f in (*FOLDERS, "work", READ_DIR, "renders"):
         (d / f).mkdir(parents=True, exist_ok=True)
     (d / PLAN).write_text(STARTER.format(title=(title or slug).replace('"', "'")), encoding="utf-8")
     if not (d / BANNED).exists():
@@ -358,17 +365,64 @@ def narrator(cfg: dict, plan: dict) -> dict:
             "tts_settings": dc["tts_settings"] if plan["tts_settings"] is None else plan["tts_settings"]}
 
 
-def take_keys(t: dict, nc: dict, dc: dict) -> tuple[str, str]:
+def own_reads(d: Path) -> dict[str, list[Path]]:
+    """The recordings in the piece's vo/read/, by file name without the extension. Dot files
+    aren't recordings (macOS leaves a ._name beside each file it writes to a share)."""
+    folder = d / READ_DIR
+    out: dict[str, list[Path]] = {}
+    try:
+        with os.scandir(folder) as it:
+            names = sorted((e.name for e in it if e.is_file() and not e.name.startswith(".")), key=str.lower)
+    except (FileNotFoundError, NotADirectoryError):
+        return out
+    for name in names:
+        if Path(name).suffix.lower() in READ_EXTS:
+            out.setdefault(Path(name).stem, []).append(folder / name)
+    return out
+
+
+def own_read(d: Path, take: str) -> Path | None:
+    """Your own recording of a take, vo/read/<take>.<ext>, when there is one: it is used
+    instead of a bought read. A line with no `take` has none: its id (#N) moves with the plan."""
+    if take.startswith("#"):
+        return None
+    found = own_reads(d).get(take, [])
+    if len(found) > 1:
+        raise ClipperError(f"take {take!r} has more than one recording in {found[0].parent}: "
+                           + ", ".join(p.name for p in found))
+    return found[0] if found else None
+
+
+@functools.lru_cache(maxsize=256)
+def _digest(path: str, size: int, mtime_ns: int) -> str:
+    h = hashlib.sha1()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def digest(p: Path) -> str:
+    """A file's content as a key: the same recording is the same take from any machine, by
+    whatever path the share is mounted (read once per size and time of change)."""
+    st = p.stat()
+    return _digest(str(p), st.st_size, st.st_mtime_ns)
+
+
+def take_keys(t: dict, nc: dict, dc: dict, read: Path | None = None) -> tuple[str, str]:
     """(the bought read's name, the processed take's): the first changes with the words, the
-    voice or its settings; the second also with the compressor and the pause cap."""
-    raw = key_of(t["text"], nc["voice_id"], nc["tts_model"], nc["tts_settings"])
+    voice or its settings; the second also with the compressor and the pause cap. With your
+    own recording (`read`) the first is the recording's content alone."""
+    raw = key_of("read", digest(read)) if read else key_of(t["text"], nc["voice_id"], nc["tts_model"], nc["tts_settings"])
     keep = dc["max_pause_s"] if t["max_pause"] is None else t["max_pause"]
     return raw, key_of(raw, dc["vo_filter"], keep, dc["silence_db"], dc["silence_min_s"])
 
 
 def take_files(d: Path, t: dict, nc: dict, dc: dict) -> tuple[Path, Path, Path]:
-    raw, done = take_keys(t, nc, dc)
-    return (d / "vo" / "raw" / f"{raw}.wav", d / "vo" / f"vo_{done}.wav",
+    """(the read as bought or recorded, the processed take, its word times)."""
+    read = own_read(d, t["id"])
+    raw, done = take_keys(t, nc, dc, read)
+    return (read or d / "vo" / "raw" / f"{raw}.wav", d / "vo" / f"vo_{done}.wav",
             d / "vo" / f"vo_{done}.{re.sub(r'[^A-Za-z0-9.-]+', '-', dc['words_model'])}.words.json")
 
 
@@ -446,34 +500,58 @@ def voice(cfg: dict, slug: str, dry_run: bool = False) -> None:
         raise ClipperError(f"{PLAN}: the narration has what {BANNED} lists: "
                            + "; ".join(f"{h['heard']!r} ({h['term']})" for h in hits[:8]))
     ts = takes(plan)
-    todo = [t for t in ts if not take_files(d, t, nc, dc)[0].exists()]
+    own = {t["id"]: p for t in ts if (p := own_read(d, t["id"]))}
+    todo = [t for t in ts if t["id"] not in own and not take_files(d, t, nc, dc)[0].exists()]
     if long := [t["id"] for t in todo if len(t["text"]) > nc["tts_max_chars"]]:
         raise ClipperError(f"takes over [narrate] tts_max_chars ({nc['tts_max_chars']}): {', '.join(long)}: "
                            "split them into two takes")
-    print(f"{len(ts)} takes, {len(todo)} to buy: {sum(len(t['text']) for t in todo)} characters from ElevenLabs "
+    yours = f"{len(own)} read by you, " if own else ""
+    print(f"{len(ts)} takes, {yours}{len(todo)} to buy: {sum(len(t['text']) for t in todo)} characters from ElevenLabs "
           f"(voice {nc['voice_id'] or 'not set'}, {nc['tts_model']})")
+    named = [t["id"] for t in ts if not t["id"].startswith("#")]     # a line with no take has no recording
+    if stray := sorted(set(own_reads(d)) - set(named)):
+        print(f"  in {READ_DIR} but no take by that name: {', '.join(stray)} (the plan's takes: "
+              f"{', '.join(named) or 'none named'})")
     if dry_run:
-        for t in todo:
-            print(f"  {t['id']}: {len(t['text'])} characters, {len(t['says'])} line(s)")
+        for t in ts:
+            if t["id"] in own:
+                print(f"  {t['id']}: your own read, {own[t['id']].name}")
+            elif t in todo:
+                print(f"  {t['id']}: {len(t['text'])} characters, {len(t['says'])} line(s)")
         return
     if todo and not nc["voice_id"]:
-        raise ClipperError("no narrator: set voice_id in plan.toml or [doc] voice_id (clipper narrate voices)")
+        raise ClipperError("no narrator: set voice_id in plan.toml or [doc] voice_id (clipper narrate voices), or "
+                           f"record the takes yourself into {READ_DIR} ({wiki.page('Documentaries', 'your-own-voice')})")
     for t in ts:
         raw, done, words = take_files(d, t, nc, dc)
-        raw.parent.mkdir(parents=True, exist_ok=True)
-        if not raw.exists():
+        mine = t["id"] in own
+        if not mine and not raw.exists():
+            raw.parent.mkdir(parents=True, exist_ok=True)
             narrate.speak(t["text"], nc, raw, nc["voice_id"])
         if not done.exists():
             keep = dc["max_pause_s"] if t["max_pause"] is None else t["max_pause"]
-            print(f"  {t['id']}: {wav_length(raw):.1f} -> {process_take(raw, done, dc, keep):.1f} s")
-        if not words.exists():
+            length = process_take(raw, done, dc, keep)
+            print(f"  {t['id']}: {raw.name} -> {length:.1f} s" if mine else f"  {t['id']}: {wav_length(raw):.1f} -> {length:.1f} s")
+        heard = jsonstate.read(words, None) if words.exists() else None
+        if heard is None:
             heard = hear(done, dc["words_model"])
             jsonstate.write(words, heard)
-            _, share = align(tokens(t["text"]), heard)
-            if share < 0.8:
-                print(f"  {t['id']}: only {share:.0%} of the script's words were heard; listen to {done.name}: "
-                      + " ".join(w[0] for w in heard)[:300])
+        elif not mine:
+            continue                    # a bought read was checked against its words when it was timed
+        check_read(t, heard, raw, done, mine)
     print(f"narration ready in {d / 'vo'}: listen to each take before `clipper doc build {slug}`")
+
+
+def check_read(t: dict, heard: list[list], raw: Path, done: Path, mine: bool) -> None:
+    """Say so when a take's read isn't its script: under 80% of the script's words heard."""
+    try:
+        _, share = align(tokens(t["text"]), heard)
+    except ClipperError as e:
+        raise ClipperError(f"take {t['id']}: {e} ({raw.name})") from None
+    if share < 0.8:
+        fix = "change the lines in plan.toml to what you said, or read it again" if mine else f"listen to {done.name}"
+        print(f"  {t['id']}: only {share:.0%} of the script's words were heard; {fix}: "
+              + " ".join(w[0] for w in heard)[:300])
 
 
 def narration(d: Path, plan: dict, nc: dict, dc: dict) -> dict[int, dict]:
@@ -902,9 +980,12 @@ def build(cfg: dict, slug: str, dry_run: bool = False) -> dict:
     vo = narration(d, plan, nc, dc)
     b = layout(plan, vo, dur, dc, labels, {n: stamp(media[n]) for n in names})
     add_score(b, plan, dur, dc)
+    b["bought"] = []                    # the takes whose read is bought, not your own: the kit's disclosures
     for t in takes(plan):
-        f = take_files(d, t, nc, dc)[1]
+        raw, f, _ = take_files(d, t, nc, dc)
         media[f.stem] = f
+        if raw.parent != d / READ_DIR:
+            b["bought"].append(t["id"])
     make_blends(d, b, media)
     still_movies(d, b, media)
     if plan["room_tone"]:
@@ -1148,13 +1229,23 @@ def kit_text(plan: dict, b: dict, disclosures: list[str]) -> str:
     return "\n".join(out)
 
 
+def disclosure_lines(plan: dict, dc: dict, bought: bool) -> list[str]:
+    """The description's last lines: the plan's own when it sets them, else [doc] disclosures,
+    or [doc] own_voice_disclosures when no take's read is bought (you read them all)."""
+    if plan["disclosures"] is not None:
+        return list(plan["disclosures"])
+    return list(dc["disclosures"] if bought else dc["own_voice_disclosures"])
+
+
 def kit(cfg: dict, slug: str) -> Path:
     d, plan = load_plan(cfg, slug)
     b = jsonstate.read(d / "work" / "build.json", None)
     if not b:
         raise ClipperError(f"no build yet: the chapters come from it (clipper doc build {slug} --dry-run)")
     dc = cfg["doc"]
-    text = kit_text(plan, b, dc["disclosures"] if plan["disclosures"] is None else plan["disclosures"])
+    # what the last build put on the timeline; a build from before it kept that: the recordings there now
+    bought = b["bought"] if "bought" in b else [t["id"] for t in takes(plan) if own_read(d, t["id"]) is None]
+    text = kit_text(plan, b, disclosure_lines(plan, dc, bool(bought)))
     terms, allowed = read_banned(d / BANNED)
     out = d / "kit.md"
     out.write_text(text, encoding="utf-8")

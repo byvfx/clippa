@@ -1102,7 +1102,8 @@ lufs = -14.0                   # a story cut's loudness (YouTube plays at -14); 
 
 [doc]
 # `clipper doc`: a narrated mini-documentary from a hand-written plan ([paths] documentaries/
-# <slug>/plan.toml) -> narration (ElevenLabs, [narrate]'s key and tts_model) -> a timeline in
+# <slug>/plan.toml) -> narration (ElevenLabs, [narrate]'s key and tts_model, or your own recording
+# of a take in the piece's vo/read/) -> a timeline in
 # DaVinci Resolve -> a mastered render -> a leak check (Modal) -> a publish kit. Wiki: Documentaries.
 fps = 30                       # the timeline's frame rate, unless plan.toml sets fps
 voice_id = ""                  # the narrator, unless plan.toml sets voice_id (clipper narrate voices)
@@ -1129,6 +1130,7 @@ tone_under = 38.0              # room tone, this many
 leak_fuzzy = 0.82              # how alike (0-1) heard letters and a banned term must be to count; 1 = the same letters only
 leak_gpu = ""                  # Modal GPU for the leak check's transcript; "" = [transcribe] modal_gpu
 disclosures = ["The narration is an AI voice."]   # the description's last lines, unless plan.toml sets disclosures
+own_voice_disclosures = []     # the same for a piece where every take is your own recording (vo/read/): no AI-voice line
 render_format = "mp4"          # Resolve's render format and codec
 render_codec = "H264"
 resolve_api = ""               # Resolve's scripting folder; "" = $RESOLVE_SCRIPT_API, else where the installer puts it
