@@ -266,7 +266,7 @@ messages: GitHub closes the issue on "fix".
   Channel 404's Shorts, then close #259. Segments: #258 is merged and deployed (PRs #260-#262, the worker
   scores each stream's segments). Segment floor backtest (11-15, no model calls): 527 of 529 reviewed
   segments were approved, so the floor is set by 7-day views instead. Scores 1-3 clearly
-  underperform (9 of 40 uploads above the show's median views), 4-5 are a coin flip, 6+ clearly do
+  underperform (10 of 40 uploads above the show's median views), 4-5 are a coin flip, 6+ clearly do
   better. Suggested `auto_min_segment = 4`: on Kino it holds 63 of 183 scored segments (~6 a stream), on
   Channel 404 23 of 106 (~3). Not set: after the Shorts, at the user's word. Shorts backtest: 105 of 181 approved Shorts would have approved
   themselves, and 1 of 4 rejected ones ("too much Jer", a taste call the window is for).
