@@ -41,6 +41,10 @@ def _gemini(v: str, cfg: dict) -> tuple[str, dict]:
     return "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1", {"x-goog-api-key": v}
 
 
+class NotAsked(Exception):
+    """A check that can't be made with this config; its message is ours, safe to show."""
+
+
 def _elevenlabs(v: str, cfg: dict) -> tuple[str, dict]:
     return "https://api.elevenlabs.io/v1/models", {"xi-api-key": v}
 
@@ -48,7 +52,7 @@ def _elevenlabs(v: str, cfg: dict) -> tuple[str, dict]:
 def _kitsu(v: str, cfg: dict) -> tuple[str, dict]:
     host = (cfg["review"]["host"] or "").rstrip("/")
     if not host or "<" in host:
-        raise ValueError("no [review] host to ask")
+        raise NotAsked("no [review] host to ask")
     return f"{host}/auth/authenticated", {"Authorization": f"Bearer {v}"}
 
 
@@ -134,12 +138,12 @@ def check(cfg: dict, key: Key) -> dict:
         url, headers = key.check(v, cfg)
         r = requests.get(url, headers=headers, timeout=TIMEOUT_S)
         ok, note = classify(r.status_code, r.text[:500])
-    except ValueError as e:
+    except NotAsked as e:
         ok, note = None, str(e)
-    except requests.RequestException as e:
+    except requests.RequestException as e:  # never its message: an invalid header quotes the key
         ok, note = None, f"couldn't reach it ({type(e).__name__})"
     except Exception as e:  # noqa: BLE001  # one provider's surprise mustn't lose the others' answers
-        ok, note = None, f"check failed ({type(e).__name__})"
+        ok, note = None, f"check failed ({type(e).__name__})"   # the type only, as above
     return {"ok": ok, "note": note, "at": now_iso(), "of": tag(v)}
 
 
@@ -179,10 +183,13 @@ def status(cfg: dict, run_checks: bool | str = False, remember: bool = True) -> 
     if want:
         with ThreadPoolExecutor(max_workers=8) as ex:
             got = dict(zip([k.name for k in want], ex.map(lambda k: check(cfg, k), want), strict=True))
-        last = {**last, **got}
-        if remember:
+        if remember:  # only these answers, into what's there now: a check running beside it keeps its own
             store(cfg).parent.mkdir(parents=True, exist_ok=True)
-            jsonstate.merge(store(cfg), {host: last}, [host])
+            with jsonstate.update(store(cfg), {}) as saved:
+                saved[host] = {**(saved.get(host) or {}), **got}
+                last = dict(saved[host])
+        else:
+            last = {**last, **got}
     uses = llm_providers(cfg)
     rows = []
     for k in ks:
@@ -190,8 +197,8 @@ def status(cfg: dict, run_checks: bool | str = False, remember: bool = True) -> 
         where = f"${k.env}" if source == "env" else f"file {Path(cfg['paths'][k.path]).name}" if source == "file" else ""
         used = uses.get(k.name.lower(), [])
         answer = last.get(k.name)
-        if answer and answer.get("of") and (not v or answer["of"] != tag(v)):
-            answer = None  # about a key since replaced (or removed): ask again
+        if answer and answer.get("of") != (tag(v) if v else None):
+            answer = None  # about a key since replaced, removed or (a "not set") added: ask again
         if answer:
             answer = {x: answer[x] for x in ("ok", "note", "at") if x in answer}
         rows.append({"name": k.name, "env": k.env, "set": bool(v), "source": where,

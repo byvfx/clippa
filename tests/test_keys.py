@@ -117,3 +117,35 @@ def test_an_answer_about_a_replaced_key_isnt_shown_for_the_new_one(cfg, monkeypa
 def test_a_scoped_key_without_the_permission_isnt_called_rejected():
     ok, note = keys.classify(401, '{"detail": {"status": "missing_permissions", "message": "lacks permission models_read"}}')
     assert ok is None and "may still work" in note
+
+
+def test_a_malformed_key_never_reaches_the_note(cfg, monkeypatch):
+    """Copilot on #281: requests' InvalidHeader (a ValueError too) quotes the header value."""
+    import requests
+
+    bad = SECRET + "\nX"
+    monkeypatch.setenv("ANTHROPIC_API_KEY", bad)
+
+    def invalid(url, headers, timeout):
+        raise requests.exceptions.InvalidHeader(f"Invalid leading whitespace in header value {headers['x-api-key']!r}")
+    monkeypatch.setattr(requests, "get", invalid)
+    report = warroom.keys_check(cfg, {"name": "Anthropic"})
+    assert SECRET not in json.dumps(report) and SECRET not in keys.store(cfg).read_text()
+
+
+def test_a_not_set_answer_goes_once_the_key_is_there(cfg, monkeypatch):
+    warroom.keys_check(cfg, {"name": "OpenAI"})                 # not set: answered "not set"
+    cfg["paths"]["openai_key"].write_text("now-there")
+    assert {r["name"]: r for r in warroom.keys_get(cfg)["keys"]}["OpenAI"]["last"] is None
+
+
+def test_checking_one_key_keeps_the_others_saved_answers(cfg, monkeypatch):
+    import requests
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "a")
+    monkeypatch.setenv("OPENAI_API_KEY", "b")
+    monkeypatch.setattr(requests, "get", lambda url, headers, timeout: Answer(200))
+    warroom.keys_check(cfg, {"name": "Anthropic"})
+    warroom.keys_check(cfg, {"name": "OpenAI"})
+    rows = {r["name"]: r for r in warroom.keys_get(cfg)["keys"]}
+    assert rows["Anthropic"]["last"]["ok"] is True and rows["OpenAI"]["last"]["ok"] is True
