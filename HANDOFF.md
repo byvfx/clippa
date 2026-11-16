@@ -124,7 +124,7 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   `serve` (war room on 127.0.0.1:8765, on the tailnet as https://clipper.taile415cd.ts.net/; heartbeat
   `streams/.serve/status.json`), `bot` (`streams/.bot/status.json`) and `worker` (cuts with QSV on the iGPU).
   Code changes go out with `bash deploy/hub/deploy.sh` from a main checkout; `clipper services status|restart ...`
-  runs docker compose there (`[serve] hub`). Last deploy 2026-11-15 15:49: main as of #270. **The config and
+  runs docker compose there (`[serve] hub`). Last deploy 2026-11-15 18:27: main as of #273. **The config and
   all state are on the NAS:** `//192.168.0.155/docker/clipper` (`/data`) holds `clipper.toml` (the one copy;
   `CLIPPER_CONFIG` on the laptop points at it), `schedule.json`, secrets/, backups/, logs/, faces/, voices/,
   news/, weekly/, archive/, layouts/, people.json, fonts/. The laptop's old copies: `backups/laptop-state-2026-11-05/`.
@@ -252,8 +252,8 @@ messages: GitHub closes the issue on "fix".
   (`clipper/review_auto.py`, serve's `auto` job every 10 min, wiki Review#approval-by-silence), is PR #265,
   merged and deployed 11-14 (Copilot's 9 findings fixed, and 5 of a second local review's 7; Copilot
   didn't see the two fix commits). Stale findings (PR #270, deployed 11-15): the auto job re-checks, at
-  most hourly per stream (`recheck.json`), items held only by their findings. Hardening (11-15, branch
-  `review-auto-hardening`, PR open, not deployed): the approval's Kitsu calls run under a 25 s deadline
+  most hourly per stream (`recheck.json`), items held only by their findings. Hardening (11-15, PR #273,
+  merged and deployed 11-15): the approval's Kitsu calls run under a 25 s deadline
   (`review.kitsu_deadline`), the re-read after the lock; a lost answer Kitsu took counts as automatic
   (`claimed_at`); every check run but a publish's writes the Kitsu Checks column (never read as a
   person's edit); shows without auto get the hourly recheck too (vision only when an item's inputs
