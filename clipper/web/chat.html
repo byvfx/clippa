@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en" data-theme="retro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" id="theme-color" content="#3a7a78">
+<title>Clippa chat</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/chat.css">
+<!-- the look: one file in web/themes/, swapped by chat.js (structure in chat.css, skin there) -->
+<link rel="stylesheet" href="/themes/retro.css" id="theme">
+<script src="/chat-theme.js"></script>
+</head>
+<body>
+<main class="desk">
+
+  <section class="window buddies" id="buddies" aria-label="Buddy list">
+    <header class="titlebar">
+      <span class="titlebar-icon" aria-hidden="true"></span>
+      <span class="title" data-label="buddies">Clippa's buddies</span>
+      <button class="titlebar-btn" id="fold" type="button" aria-expanded="true" title="Fold the list">_</button>
+    </header>
+    <div class="buddy-body" id="buddy-body">
+      <div class="me-line"><span class="dot" id="me-dot"></span><b>You</b> <span id="me-state">available</span></div>
+      <div class="pane">
+        <details open>
+          <summary class="group">Assistant <span class="count">(1/1)</span></summary>
+          <ul class="list">
+            <li class="buddy online"><span class="dot"></span><span class="name">Clippa</span><span class="note">here to help</span></li>
+          </ul>
+        </details>
+        <details open>
+          <summary class="group">The crew <span class="count" id="crew-count"></span></summary>
+          <ul class="list" id="crew"><li class="buddy unknown"><span class="dot"></span><span class="name">checking…</span></li></ul>
+        </details>
+      </div>
+      <p class="legend"><span class="dot online"></span>busy <span class="dot idle"></span>idle <span class="dot away"></span>away <span class="dot offline"></span>off</p>
+      <label class="theme-pick">Look <select id="theme-pick" aria-label="The page's look"></select></label>
+    </div>
+  </section>
+
+  <section class="window im" aria-label="Chat with Clippa">
+    <header class="titlebar">
+      <span class="titlebar-icon" aria-hidden="true"></span>
+      <span class="title" data-label="chat">Clippa · instant message</span>
+      <button class="titlebar-btn" id="bye" type="button" title="End this topic (/bye)">×</button>
+    </header>
+    <nav class="tools" aria-label="Chat commands">
+      <button type="button" class="btn" data-cmd="/new" title="Start a fresh topic">New topic</button>
+      <button type="button" class="btn" data-cmd="/history">History</button>
+      <button type="button" class="btn" data-cmd="/cost">Cost</button>
+      <button type="button" class="btn" id="away" data-cmd="/away">Away</button>
+      <button type="button" class="btn" data-cmd="/help">Help</button>
+    </nav>
+    <div class="log pane" id="log" role="log" aria-live="polite"></div>
+    <div class="status" id="status">Connecting…</div>
+    <!-- a theme may show this row of text-style marks above the box; they are decoration -->
+    <div class="compose-marks" aria-hidden="true"><span>Aa</span><b>B</b><i>I</i><u>U</u><span>:)</span><span>link</span></div>
+    <form class="compose" id="compose" autocomplete="off">
+      <textarea id="box" class="pane" rows="2" maxlength="2000" placeholder="Tell Clippa what to do… (Enter sends)" aria-label="Message"></textarea>
+      <button type="submit" class="btn send" id="send">Send</button>
+    </form>
+  </section>
+
+</main>
+<script src="/chat.js"></script>
+</body>
+</html>

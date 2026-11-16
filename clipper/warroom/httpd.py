@@ -18,6 +18,7 @@ from ..config import base
 from ..errors import ClipperError
 from .blinds import blinds_answer, blinds_check, blinds_get, blinds_paste
 from .cast import cast_get, cast_label, cast_mark, cast_run, cast_set
+from .chat import chat_buddies, chat_card, chat_get, chat_pick, chat_send, chat_themes
 from .covers import cover_get, cover_post
 from .data import (
     analytics_status,
@@ -56,6 +57,7 @@ log = logging.getLogger("clipper.warroom")
 WEB = Path(__file__).resolve().parents[1] / "web"
 
 PAGE = WEB / "warroom.html"   # markup only: its style is warroom.css, its code web/js/*.js
+PAGES = {"/": PAGE, "/index.html": PAGE, "/chat": WEB / "chat.html"}   # /chat: the Clippa messenger (#158)
 
 STATIC = {"/manifest.webmanifest": "application/manifest+json", "/icon.svg": "image/svg+xml",
           "/icon-192.png": "image/png", "/icon-512.png": "image/png"}  # no secrets: no key needed
@@ -116,6 +118,9 @@ GET_API = {
     "/api/news/search": lambda cfg, qs: news_search(cfg, _q(qs, "q")),
     "/api/blinds": lambda cfg, qs: blinds_get(cfg, _q(qs, "days"), _q(qs, "view"), _q(qs, "source"), _q(qs, "focus")),
     "/api/investigations": lambda cfg, qs: investigations_get(cfg, _q(qs, "subject"), _q(qs, "run")),
+    "/api/chat": lambda cfg, qs: chat_get(cfg, _q(qs, "since")),
+    "/api/chat/buddies": lambda cfg, qs: chat_buddies(cfg),
+    "/api/chat/themes": lambda cfg, qs: chat_themes(cfg),
     "/api/keys": lambda cfg, qs: keys_get(cfg),
 }
 
@@ -144,6 +149,9 @@ POST_API = {
     "/api/blinds/answer": blinds_answer,
     "/api/blinds/paste": blinds_paste,
     "/api/blinds/check": blinds_check,
+    "/api/chat/send": chat_send,
+    "/api/chat/card": chat_card,
+    "/api/chat/pick": chat_pick,
     "/api/keys/check": keys_check,
 }
 
@@ -233,7 +241,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.foreign_host():
             return self.send_json({"error": "open the war room as localhost"}, 403)
         if not self.authorized(qs):
-            if u.path in ("/", "/index.html", "/watch"):  # #206: a person, not the page's code
+            if u.path in (*PAGES, "/watch"):  # #206: a person, not the page's code
                 body = SIGNED_OUT.encode("utf-8")
                 self.send_response(401)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -246,8 +254,8 @@ class Handler(BaseHTTPRequestHandler):
         if (u.path.startswith(("/api/", "/media/", "/cast/"))) and self.cross_site():
             return self.send_json({"error": "cross-site request refused"}, 403)
         try:
-            if u.path in ("/", "/index.html"):
-                body = PAGE.read_bytes()
+            if u.path in PAGES:
+                body = PAGES[u.path].read_bytes()
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))

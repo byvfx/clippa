@@ -1,0 +1,79 @@
+/* retro: a late-90s desktop. Grey bevelled windows on a teal desk, square corners, Tahoma.
+   An era look, light on purpose; on a dark system only the desk dims.
+   Every theme defines the same variables (chat.css reads them; a test checks the set). */
+:root {
+  --label-buddies: "Clippa's buddies";
+  --label-chat: "Clippa · instant message";
+
+  --desk: #3a7a78;
+  --desk-image: radial-gradient(#367371 1px, transparent 1px);
+  --font: 13px/1.4 Tahoma, Verdana, "Segoe UI", sans-serif;
+  --ink: #111111;
+  --muted: #555555;
+  --link: #0b3fb0;
+  --mono: "Lucida Console", Consolas, monospace;
+
+  --win: #c0c0c0;
+  --win-border: 2px outset #e8e8e8;
+  --win-radius: 0;
+  --win-shadow: 4px 4px 0 rgb(0 0 0 / 0.25);
+  --win-pad: 3px;
+
+  --tb: #534ab7;
+  --tb-ink: #ffffff;
+  --tb-font: bold 13px Tahoma, Verdana, sans-serif;
+  --tb-spacing: normal;
+  --tb-case: none;
+  --tb-radius: 0;
+  --tb-height: 24px;
+  --tb-icon: conic-gradient(#ffd23f 0 25%, #ff5d5d 0 50%, #4fd1ff 0 75%, #7bff6b 0);
+  --tb-btn: #c0c0c0;
+  --tb-btn-ink: #111111;
+  --tb-btn-border: 2px outset #e8e8e8;
+
+  --pane: #ffffff;
+  --pane-border: 2px inset #e8e8e8;
+  --pane-radius: 0;
+  --pane-shadow: none;
+  --status-border: 1px inset #e8e8e8;
+
+  --group: #111111;
+  --group-weight: bold;
+  --on: #1d9e75;
+  --idle: #ef9f27;
+  --away: #888780;
+  --off: #b4b2a9;
+
+  --who-weight: bold;
+  --me: #b4231b;
+  --them: #26215c;
+  --system: #6b6b6b;
+  --ts: #555555;
+  --ts-font: 11px Tahoma, sans-serif;
+  --div: 1px dashed #999999;
+
+  --card: #eeeeee;
+  --card-border: 1px solid #888888;
+  --card-radius: 0;
+  --card-shadow: 2px 2px 0 rgb(0 0 0 / 0.15);
+  --write: #1d6fa6;
+  --spend: #8a3ab9;
+  --est: #f3e8fb;
+  --report: #eef7ee;
+  --report-failed: #fbeeee;
+  --code: #e6e6e6;
+
+  --btn: #c0c0c0;
+  --btn-ink: #111111;
+  --btn-font: Tahoma, Verdana, sans-serif;
+  --btn-border: 2px outset #e8e8e8;
+  --btn-radius: 0;
+  --btn-shadow: none;
+  --btn-down-border: 2px inset #e8e8e8;
+  --btn-down-shadow: none;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root { --desk: #1f4645; --desk-image: radial-gradient(#1c403f 1px, transparent 1px); }
+}

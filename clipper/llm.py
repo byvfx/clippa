@@ -251,9 +251,12 @@ class LLM:
     """One client for every stage; routes each call by its model string. `cost` adds up
     every call made through it (for the stages' cost lines)."""
 
-    def __init__(self, cfg: dict | str = ""):
+    def __init__(self, cfg: dict | str = "", label: str = ""):
+        """label: the ledger's stage for every call this client makes (serve's chat, "chat"),
+        instead of the running command's."""
         from .config import DEFAULTS
 
+        self.label = label
         if isinstance(cfg, dict):
             workspace_id, lc = cfg["scoring"]["workspace_id"], cfg.get("llm") or DEFAULTS["llm"]
             self.ledger = cfg["paths"].get("costs")  # [paths] costs: one line per call
@@ -292,8 +295,8 @@ class LLM:
             usd = (tokens_in * pin + tokens_out * pout) / 1e6
         with self._lock:
             self.cost += usd
-        costs.llm_call(self.ledger, split(model)[0], model, tokens_in, tokens_out, usd)
-        return {"input_tokens": tokens_in, "output_tokens": tokens_out}
+        costs.llm_call(self.ledger, split(model)[0], model, tokens_in, tokens_out, usd, stage=self.label)
+        return {"input_tokens": tokens_in, "output_tokens": tokens_out, "usd": usd}
 
     # ---------- the calls the stages make ----------
 
@@ -373,6 +376,47 @@ class LLM:
             raise RuntimeError(f"{model} hit max_tokens ({meta['request_id']})")
         return parse_json("".join(b.text for b in resp.content if b.type == "text")), meta
 
+    def tool_call(self, model: str, system: str, messages: list[dict], tools: list[dict],
+                  effort: str = "low", max_tokens: int = 1024) -> tuple[dict, dict]:
+        """One turn in which the model may pick one of `tools` (the chat, #158): never more
+        than one call, and nothing runs here: the caller checks the pick against its own
+        catalog. messages: [{"role": "user"|"assistant", "content": str}], oldest first, the
+        last one the user's. tools: [{"name", "description", "input_schema"}]. Returns
+        ({"text": what it said, "tool": {"name", "input"} or None}, meta); a refusal is
+        {"text": "", "tool": None} with meta["refusal"]."""
+        if split(model)[0] != "anthropic":
+            fns = [{"type": "function", "function": {"name": t["name"], "description": t["description"],
+                                                     "parameters": t["input_schema"]}} for t in tools]
+            msgs = [{"role": "system", "content": system}, *messages]
+            data, meta = self._compat(model, msgs, effort, max_tokens, extra={"tools": fns, "tool_choice": "auto"})
+            if meta.get("refusal") is not None:
+                return {"text": "", "tool": None}, meta
+            msg = data["choices"][0]["message"]
+            tool = None
+            for call in msg.get("tool_calls") or []:
+                fn = call.get("function") or {}
+                try:
+                    args = json.loads(fn.get("arguments") or "{}")
+                except ValueError:
+                    args = None
+                if fn.get("name") and isinstance(args, dict):
+                    tool = {"name": fn["name"], "input": args}
+                    break
+            return {"text": (msg.get("content") or "").strip(), "tool": tool}, meta
+        resp = self.client.messages.create(
+            model=split(model)[1], max_tokens=max_tokens, system=system, messages=messages,
+            tools=tools, tool_choice={"type": "auto"}, output_config={"effort": claude_effort(effort)})
+        meta = self._claude_meta(model, resp)
+        if resp.stop_reason == "refusal":
+            meta["refusal"] = getattr(resp.stop_details, "category", None)
+            return {"text": "", "tool": None}, meta
+        if resp.stop_reason == "max_tokens":   # a cut-off pick has half its inputs
+            raise RuntimeError(f"{model} hit max_tokens ({meta['request_id']})")
+        text = "".join(b.text for b in resp.content if b.type == "text").strip()
+        tool = next(({"name": b.name, "input": dict(b.input or {})} for b in resp.content
+                     if b.type == "tool_use"), None)
+        return {"text": text, "tool": tool}, meta
+
     def preflight(self, model: str) -> None:
         """One tiny call so account problems (auth, workspace, credits, a wrong URL) stop the
         run with one clear line instead of 60 identical failures."""
@@ -444,12 +488,14 @@ class LLM:
 
     def _compat(self, model: str, messages: list[dict], effort: str, max_tokens: int,  # noqa: C901
                 response_format: dict | None = None, length_ok: bool = False,
-                thinking_tokens: int | None = None, timeout_s: float | None = None) -> tuple[dict, dict]:
+                thinking_tokens: int | None = None, timeout_s: float | None = None,
+                extra: dict | None = None) -> tuple[dict, dict]:
         """One chat/completions request with retries. Returns (response JSON, meta); meta has
         "refusal" when the model refused. length_ok: running out of max_tokens isn't an error
         (the preflight, where a reasoning model can spend them all thinking). thinking_tokens,
         timeout_s: this call's own (text_call); with timeout_s, a dropped connection (a timeout, a
-        reset, a cut-off answer) or a gateway error (STARTED) is not sent again."""
+        reset, a cut-off answer) or a gateway error (STARTED) is not sent again. extra: more of
+        the request body (tool_call's tools)."""
         import requests
 
         prov, name = split(model)
@@ -470,7 +516,7 @@ class LLM:
             room = thinking_tokens or self.lc["thinking_max_tokens"]
             max_tokens = max(asked, min(room, cap or room))
         limit = "max_completion_tokens" if prov == "openai" else "max_tokens"
-        body: dict[str, Any] = {"model": name, "messages": messages, limit: max_tokens}
+        body: dict[str, Any] = {"model": name, "messages": messages, limit: max_tokens, **(extra or {})}
         if response_format:
             body["response_format"] = response_format
         if effort and model not in self._no_effort:

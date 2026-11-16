@@ -1,0 +1,192 @@
+/* The Clippa messenger (#158): the page's structure. Layout only; every colour, font, border,
+   radius and shadow is a custom property that a theme in web/themes/ defines (the look is the
+   theme's, so a new look is a new file there; tests/test_chat.py checks each defines them all).
+   A theme may add rules of its own for what a variable can't say (pager's name-on-its-own-line). */
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--desk);
+  background-image: var(--desk-image);
+  background-size: 4px 4px;
+  color: var(--ink);
+  font: var(--font);
+}
+
+.desk {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  justify-content: center;
+  height: 100%;
+  padding: 16px;
+}
+
+/* ---------- windows ---------- */
+.window {
+  display: flex;
+  flex-direction: column;
+  background: var(--win);
+  border: var(--win-border);
+  border-radius: var(--win-radius);
+  box-shadow: var(--win-shadow);
+  padding: var(--win-pad);
+  min-height: 0;
+  overflow: hidden;
+}
+.buddies { width: 240px; flex: none; }
+.im { flex: 1; max-width: 720px; min-width: 0; }
+
+.titlebar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--tb-height);
+  padding: 0 4px 0 6px;
+  background: var(--tb);
+  color: var(--tb-ink);
+  font: var(--tb-font);
+  letter-spacing: var(--tb-spacing);
+  text-transform: var(--tb-case);
+  border-radius: var(--tb-radius);
+  user-select: none;
+}
+.title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.titlebar-icon { width: 14px; height: 14px; flex: none; background: var(--tb-icon); border-radius: 3px; }
+.titlebar-btn {
+  width: 20px; height: 18px; padding: 0;
+  font: bold 11px/1 var(--btn-font);
+  color: var(--tb-btn-ink);
+  background: var(--tb-btn);
+  border: var(--tb-btn-border);
+  border-radius: var(--btn-radius);
+  cursor: pointer;
+}
+
+.pane {
+  background: var(--pane);
+  border: var(--pane-border);
+  border-radius: var(--pane-radius);
+  box-shadow: var(--pane-shadow);
+}
+
+.btn {
+  font: 12px var(--btn-font);
+  color: var(--btn-ink);
+  background: var(--btn);
+  padding: 3px 10px;
+  border: var(--btn-border);
+  border-radius: var(--btn-radius);
+  box-shadow: var(--btn-shadow);
+  cursor: pointer;
+  min-height: 26px;
+}
+.btn:active, .btn.on, .titlebar-btn:active { border: var(--btn-down-border); box-shadow: var(--btn-down-shadow); }
+.btn:disabled { opacity: 0.55; cursor: default; }
+.btn:focus-visible, .titlebar-btn:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: 1px dotted var(--ink); outline-offset: -4px;
+}
+
+/* ---------- the buddy list ---------- */
+.buddy-body { display: flex; flex-direction: column; gap: 6px; padding: 6px 3px 3px; flex: 1; min-height: 0; }
+.me-line { padding: 0 2px; }
+.me-line b { margin: 0 2px; }
+#me-state { color: var(--muted); }
+.buddy-body .pane { flex: 1; overflow: auto; padding: 4px 2px; min-height: 120px; }
+.group { cursor: pointer; color: var(--group); font-weight: var(--group-weight); padding: 2px; list-style: none; }
+.group::before { content: "▸ "; font-size: 10px; }
+details[open] > .group::before { content: "▾ "; }
+.count { color: var(--muted); font-weight: normal; }
+.list { list-style: none; margin: 0 0 6px; padding: 0 0 0 14px; }
+.buddy { display: grid; grid-template-columns: 14px auto; column-gap: 4px; padding: 2px 0; }
+.buddy .name { font-weight: bold; }
+.buddy .note { grid-column: 2; color: var(--muted); font-style: italic; font-size: 11px; }
+.buddy.offline .name, .buddy.unknown .name { color: var(--muted); font-weight: normal; }
+.buddy.away .name::after { content: " (away)"; color: var(--away); font-weight: normal; }
+.dot {
+  display: inline-block; width: 10px; height: 10px; margin-top: 3px;
+  border-radius: 50%; border: 1px solid rgb(0 0 0 / 0.3);
+  background: var(--off);
+}
+.online > .dot, .dot.online { background: var(--on); }
+.idle > .dot, .dot.idle { background: var(--idle); }
+.away > .dot, .dot.away { background: var(--away); }
+.offline > .dot, .dot.offline, .unknown > .dot { background: var(--off); }
+.legend { margin: 0; font-size: 11px; color: var(--muted); display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.legend .dot { margin: 0 0 0 4px; }
+.theme-pick { font-size: 11px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+.theme-pick select { font: 11px var(--btn-font); color: var(--btn-ink); background: var(--btn); border: var(--btn-border); border-radius: var(--btn-radius); }
+
+/* ---------- the chat ---------- */
+.tools { display: flex; gap: 4px; flex-wrap: wrap; padding: 4px 1px; }
+.log { flex: 1; overflow-y: auto; padding: 8px 10px; min-height: 0; overflow-wrap: anywhere; }
+.msg { margin: 0 0 6px; white-space: pre-wrap; }
+.msg .who { font-weight: var(--who-weight); }
+.msg.me .who { color: var(--me); }
+.msg.clippa .who { color: var(--them); }
+.msg .ts { color: var(--ts); font: var(--ts-font); }
+.msg.system { color: var(--system); font-style: italic; font-size: 12px; }
+.msg.pending { opacity: 0.55; }
+.msg code { font: 12px var(--mono); background: var(--code); padding: 0 3px; border-radius: 3px; }
+.msg.report .body { display: block; margin-top: 2px; padding: 4px 6px; background: var(--report); border-left: 3px solid var(--on); }
+.msg.report.failed .body { background: var(--report-failed); border-left-color: var(--me); }
+
+.divider { display: flex; align-items: center; gap: 8px; margin: 10px 0; color: var(--system); font-size: 11px; }
+.divider::before, .divider::after { content: ""; flex: 1; border-top: var(--div); }
+
+.options { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 2px; }
+.options .btn { text-align: left; max-width: 100%; white-space: normal; }
+
+.card {
+  position: relative;
+  margin: 4px 0 8px;
+  padding: 6px 8px 8px;
+  background: var(--card);
+  color: var(--ink);
+  border: var(--card-border);
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+  max-width: 520px;
+  white-space: normal;
+}
+.card .head { display: flex; gap: 6px; align-items: baseline; font-weight: bold; }
+.card .risk { font: bold 10px var(--btn-font); color: #fff; padding: 1px 5px; border-radius: 2px; text-transform: uppercase; letter-spacing: 0.04em; }
+.card .risk.write { background: var(--write); }
+.card .risk.spend { background: var(--spend); }
+.card ul { margin: 4px 0; padding-left: 18px; }
+.card li { margin: 1px 0; }
+.card .est { margin: 4px 0; padding: 3px 6px; background: var(--est); border-left: 3px solid var(--spend); }
+.card .buttons { display: flex; gap: 6px; margin-top: 6px; }
+.card .stamp { display: none; position: absolute; right: 8px; top: 6px; padding: 0 6px; border: 2px solid currentColor; font: bold 11px var(--btn-font); text-transform: uppercase; transform: rotate(-6deg); }
+.card:not(.open) .buttons { display: none; }
+.card:not(.open) .stamp { display: block; }
+.card.expired, .card.cancelled { filter: grayscale(1); opacity: 0.6; }
+.card.expired .stamp, .card.cancelled .stamp { color: var(--off); }
+.card.done .stamp { color: var(--on); }
+.card.working .stamp { color: var(--idle); }
+.card.stale .stamp, .card.failed .stamp { color: var(--me); }
+
+.status { padding: 3px 4px; font-size: 11px; color: var(--muted); border: var(--status-border); border-radius: var(--pane-radius); margin: 3px 0; min-height: 20px; }
+.status.typing { color: var(--them); font-style: italic; }
+.compose-marks { display: none; gap: 10px; align-items: center; padding: 2px 4px; color: var(--muted); font-size: 12px; user-select: none; }
+.compose { display: flex; gap: 6px; align-items: stretch; }
+.compose textarea { flex: 1; resize: none; font: var(--font); padding: 4px 6px; min-height: 44px; color: var(--ink); }
+.compose .send { font-weight: bold; min-width: 72px; }
+
+a { color: var(--link); }
+
+/* ---------- a phone ---------- */
+@media (max-width: 720px) {
+  .desk { flex-direction: column; gap: 8px; padding: 8px 8px calc(8px + env(safe-area-inset-bottom)); }
+  .buddies { width: auto; }
+  .buddy-body .pane { max-height: 150px; min-height: 0; }
+  .buddies.folded .buddy-body { display: none; }
+  .im { max-width: none; flex: 1; min-height: 0; }
+  .tools .btn { padding: 3px 7px; }
+  .compose textarea { font-size: 16px; }   /* no zoom-in on focus */
+}
+@media (min-width: 721px) {
+  .buddies.folded .buddy-body { display: none; }
+  .buddies.folded { align-self: flex-start; }
+}

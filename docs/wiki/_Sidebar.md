@@ -8,6 +8,7 @@
 - [Review](Review)
 - [Reviewing](Reviewing)
 - [War room](War-room)
+- [Clippa messenger](Clippa-messenger)
 - [Scheduling and uploads](Scheduling-and-uploads)
 - [Costs](Costs)
 - [Checkup](Checkup)
