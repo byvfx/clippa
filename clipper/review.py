@@ -766,21 +766,31 @@ def set_checks(stream_dir: Path, cfg: dict, summaries: dict[str, str]) -> list[s
 
 @contextmanager
 def kitsu_deadline(seconds: float) -> Iterator[None]:
-    """Every Kitsu request inside gives up once `seconds` have gone, so a caller holding a lock
-    over a few calls lets go in time (gazu itself never times out: a stalled Kitsu would hold
-    it for good). A request past the deadline raises TimeoutError before it is sent."""
+    """Every Kitsu request this thread makes inside gives up once `seconds` have gone, so a
+    caller holding a lock over a few calls lets go in time (gazu itself never times out: a
+    stalled Kitsu would hold it for good). A request past the deadline raises TimeoutError
+    before it is sent. gazu's session is shared by the process; another thread's requests pass
+    through untouched. The timeout bounds each connect and each wait for data (requests'
+    meaning), not a response that keeps trickling in."""
+    import threading
+
     import gazu
 
     session = gazu.client.default_client.session
     end = time.monotonic() + seconds
     send = session.request
     own = "request" in vars(session)   # already patched on the instance (nested)
+    mine = threading.get_ident()
 
     def request(*args, **kw):
+        if threading.get_ident() != mine:
+            return send(*args, **kw)
         left = end - time.monotonic()
         if left <= 0:
             raise TimeoutError(f"Kitsu took over {seconds:.0f} s")
-        kw["timeout"] = min(left, kw.get("timeout") or left)
+        asked = kw.get("timeout")
+        kw["timeout"] = (tuple(min(left, t or left) for t in asked) if isinstance(asked, tuple)
+                         else min(left, asked or left))
         return send(*args, **kw)
 
     session.request = request

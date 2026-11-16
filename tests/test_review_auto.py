@@ -438,20 +438,51 @@ def test_a_lost_answer_then_a_persons_decision_is_theirs(cfg, tmp_path, monkeypa
 
 
 def test_a_show_without_auto_still_has_its_findings_checked_again(cfg, tmp_path, monkeypatch):
-    from clipper import review, review_check
+    from clipper import review_check
 
     sd, approved, _ = stub(cfg, tmp_path, monkeypatch)
     cfg["review"]["auto_approve"] = False
     jsonstate.write(sd / "checks.json", {"v01_t1": {"sig": "old", "findings": [{"text": "stale"}]},
                                          "v02_t2": CLEAN, "v04_t4": {"sig": "", "findings": [{"text": "x"}]}})
-    asked, columns = [], []
-    monkeypatch.setattr(review_check, "run", lambda sdir, c, keys=None, **k:
-                        asked.append(keys) or {key: [] for key in keys})
-    monkeypatch.setattr(review, "set_checks", lambda sdir, c, summaries: columns.append(summaries) or [])
+    asked = []
+    monkeypatch.setattr(review_check, "run", lambda sdir, c, keys=None, kitsu=False, **k:
+                        asked.append((keys, kitsu)) or {key: [] for key in keys})
     assert review_auto.run(cfg, say=lambda *_: None) == {}
-    assert asked == [["v01_t1"]] and approved == []                            # v04 is rejected
-    assert columns == [{"v01_t1": ""}]                                         # the Kitsu column follows
+    assert asked == [(["v01_t1"], True)] and approved == []                    # v04 is rejected; the column follows
     assert review_auto.flagged(sd) == ["v01_t1"]                               # the fake run wrote nothing
+
+
+def test_a_check_run_brings_the_kitsu_column_in_line(defaults, tmp_path, monkeypatch):
+    from clipper import review, review_check
+
+    sd = tmp_path / "kick-9"
+    sd.mkdir()
+    it = {"key": "v01_t1", "kind": "short"}
+    monkeypatch.setattr(review_check, "select", lambda *a: [it])
+    monkeypatch.setattr(review_check, "context", lambda *a: {})
+    monkeypatch.setattr(review_check, "signature", lambda *a: "s")
+    monkeypatch.setattr(review_check, "check_item", lambda *a: ([{"text": "face cut off"}], None))
+    columns = []
+    monkeypatch.setattr(review, "set_checks", lambda sdir, c, summaries: columns.append(summaries) or [])
+    said = []
+    review_check.run(sd, defaults, say=said.append)
+    assert columns == []                                                       # a publish writes its own
+    review_check.run(sd, defaults, say=said.append, kitsu=True, force=True)
+    assert columns == [{"v01_t1": "face cut off"}]
+    monkeypatch.setattr(review, "set_checks", lambda *a: (_ for _ in ()).throw(OSError("Kitsu down")))
+    review_check.run(sd, defaults, say=said.append, kitsu=True)
+    assert said[-1] == "  Kitsu Checks column not updated: OSError: Kitsu down"
+    passed = []
+    review_auto._column_trouble(sd, passed.append)(said[-1])
+    review_auto._column_trouble(sd, passed.append)("  v01_t1: face cut off")
+    assert passed == ["  kick-9: Kitsu Checks column not updated: OSError: Kitsu down"]
+
+
+def test_a_failed_re_read_still_lets_the_replan_place_the_item(cfg, tmp_path, monkeypatch):
+    sd, approved, _ = stub(cfg, tmp_path, monkeypatch)
+    monkeypatch.setattr(actions, "refresh", lambda c, item: (_ for _ in ()).throw(TimeoutError("slow")))
+    review_auto.run(cfg, say=lambda *_: None)
+    assert approved == ["v01_t1"] and jsonstate.read(sd / "review.json")["v01_t1"]["decision"] == "approved"
 
 
 def test_an_item_gone_from_review_isnt_asked_for_every_hour(cfg, tmp_path, monkeypatch):

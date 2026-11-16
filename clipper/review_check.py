@@ -659,10 +659,13 @@ def check_item(sdir: Path, cfg: dict, it: dict, ctx: dict, claude) -> tuple[list
 
 
 def run(sdir: Path, cfg: dict, todo: list[dict] | None = None, keys: list[str] | None = None,
-        force: bool = False, vision: bool | None = None, say=print, save: bool = True) -> dict[str, list[dict]]:
+        force: bool = False, vision: bool | None = None, say=print, save: bool = True,
+        kitsu: bool = False) -> dict[str, list[dict]]:
     """Check a stream's items (todo: review.items rows, else every one of [review] include, or
     those whose key starts with one of keys); checks.json keeps the results (save=False: a
-    backtest, nothing written). Returns {key: findings} for the items checked or kept."""
+    backtest, nothing written). kitsu: also bring each published item's Kitsu Checks column in
+    line (every run but a publish's, which writes the column with the rest). Returns {key:
+    findings} for the items checked or kept."""
     cfg = for_stream(cfg, sdir)
     rc = cfg["review"]
     todo = select(sdir, cfg, todo, keys)
@@ -693,6 +696,13 @@ def run(sdir: Path, cfg: dict, todo: list[dict] | None = None, keys: list[str] |
         # `review check` may overlap) wrote after this one started: that one read newer files
         with jsonstate.update(path(sdir), {}) as state:
             state.update({k: v for k, v in fresh.items() if (state.get(k) or {}).get("at", "") <= started})
+    if kitsu and save and done:
+        from . import review
+
+        try:
+            review.set_checks(sdir, cfg, {k: summary(v["findings"]) for k, v in done.items()})
+        except Exception as e:  # noqa: BLE001  # checks.json has them; the next publish writes the column
+            say(f"  Kitsu Checks column not updated: {type(e).__name__}: {e}")
     return {k: v["findings"] for k, v in done.items()}
 
 

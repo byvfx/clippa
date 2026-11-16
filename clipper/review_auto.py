@@ -34,7 +34,9 @@ RECHECK_S = 3600       # findings are checked again at most this often per strea
 RECHECK = "recheck.json"   # per stream, {"at": the last recheck, "gone": {...}}: serve runs each pass as a new process
 WHO = "auto"           # the actions' `who` for an automatic approval
 # The approval's Kitsu calls, all of them, under auto.json's lock: a person's action waits
-# jsonstate.WAIT_S (60 s) for that lock, and one request may run up to this long again past it.
+# jsonstate.WAIT_S (60 s) for that lock. The deadline is a requests timeout, which bounds each
+# connect and each wait for data, not a whole response: one that keeps trickling in is not cut
+# (Kitsu's answers here are a few hundred bytes of JSON).
 KITSU_S = 25
 KINDS = ("short", "pick", "segment", "compilation")
 
@@ -276,14 +278,20 @@ def recheck_due(sdir: Path, now: datetime) -> bool:
     return True
 
 
-def flagged(sdir: Path, decisions: dict | None = None, checks: dict | None = None) -> list[str]:
+def _column_trouble(sdir: Path, say):
+    """review_check.run's `say` for a pass: its per-item lines dropped, a Kitsu column it
+    couldn't write passed on."""
+    return lambda s: say(f"  {sdir.name}: {s.strip()}") if s.startswith("  Kitsu Checks column") else None
+
+
+def flagged(sdir: Path) -> list[str]:
     """A show without auto_approve: its pending items with findings or a failed run, which a
     recheck keeps current (the war room's ⚠ and the card read them)."""
     from . import review_check
 
     state = jsonstate.read_or(sdir / "review_state.json", {})
-    decisions = jsonstate.read_or(sdir / "review.json", {}) if decisions is None else decisions
-    checks = review_check.load(sdir) if checks is None else checks
+    decisions = jsonstate.read_or(sdir / "review.json", {})
+    checks = review_check.load(sdir)
     return [k for k in state if (decisions.get(k, {}).get("decision") or "pending") == "pending"
             and (c := checks.get(k)) and (c.get("findings") or not c.get("sig"))]
 
@@ -298,7 +306,7 @@ def recheck(cfg: dict, sdir: Path, keys: list[str], now: datetime, say=print) ->
     What changed goes to the Kitsu Checks column too. An item that is no longer one of the
     stream's review items (review.items) can't be checked: it is left out until its checks.json
     entry changes, rather than asked for every hour."""
-    from . import review, review_check
+    from . import review_check
 
     if not keys or not cfg["review"]["checks"]:
         return False
@@ -308,18 +316,15 @@ def recheck(cfg: dict, sdir: Path, keys: list[str], now: datetime, say=print) ->
     if not keys or not recheck_due(sdir, now):
         return False
     try:
-        found = review_check.run(sdir, cfg, keys=keys, say=lambda *_: None)
+        found = review_check.run(sdir, cfg, keys=keys, kitsu=True, say=_column_trouble(sdir, say))
     except Exception as e:  # noqa: BLE001  # the due items still go; the next recheck tries again
         say(f"  {sdir.name}: checks not run again: {type(e).__name__}: {e}")
         return False
     missing = {k: (have.get(k) or {}).get("at", "") for k in keys if k not in found}
+    published = set(jsonstate.read_or(sdir / "review_state.json", {}))
     with jsonstate.update(sdir / RECHECK, {}) as st:
         st["gone"] = {k: at for k, at in {**(st.get("gone") or {}), **missing}.items()
-                      if k in missing or k not in found}
-    try:
-        review.set_checks(sdir, cfg, {k: review_check.summary(f) for k, f in found.items()})
-    except Exception as e:  # noqa: BLE001  # checks.json has them; the next publish writes the column
-        say(f"  {sdir.name}: Kitsu Checks column not updated: {type(e).__name__}: {e}")
+                      if (k in missing or k not in found) and k in published}
     return True
 
 
@@ -331,7 +336,7 @@ def approve_due(cfg: dict, sdir: Path, keys: list[str], say=print) -> list[str]:
 
     cfg = for_stream(cfg, sdir)
     review.sync(sdir, cfg, keys=keys, quiet=True)
-    review_check.run(sdir, cfg, keys=keys, say=lambda *_: None)
+    review_check.run(sdir, cfg, keys=keys, kitsu=True, say=_column_trouble(sdir, say))
     now = datetime.now(UTC)
     state = jsonstate.read_or(sdir / "review_state.json", {})
     decisions = jsonstate.read_or(sdir / "review.json", {})
@@ -372,6 +377,12 @@ def approve_due(cfg: dict, sdir: Path, keys: list[str], say=print) -> list[str]:
             actions.refresh(cfg, item)
         except Exception as e:  # noqa: BLE001  # approved in Kitsu; the next sync reads it
             say(f"  {sdir.name}/{key}: approved, but not re-read from Kitsu: {type(e).__name__}: {e}")
+            try:   # Kitsu has the decision: mirror it, so the replan after this pass places the item
+                with jsonstate.update(sdir / "review.json", {}) as rv:
+                    if key in rv:
+                        rv[key]["decision"] = "approved"
+            except (OSError, ValueError) as e2:
+                say(f"  {sdir.name}/{key}: review.json not updated either: {e2}")
         say(f"  {sdir.name}/{key}: approved ({rule})")
         done.append(key)
     return done

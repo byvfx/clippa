@@ -174,3 +174,19 @@ def test_kitsu_deadline_bounds_every_request_then_lets_go(monkeypatch):
     with review.kitsu_deadline(0), pytest.raises(TimeoutError):
         session.request("GET", "http://k")
     assert len(seen) == 2
+
+
+def test_kitsu_deadline_leaves_other_threads_alone_and_takes_tuple_timeouts(monkeypatch):
+    import threading
+
+    import gazu
+
+    session = gazu.client.default_client.session
+    seen = []
+    monkeypatch.setattr(session, "request", lambda *a, **kw: seen.append(kw.get("timeout")))
+    with review.kitsu_deadline(20):
+        session.request("GET", "http://k", timeout=(3, 60))
+        t = threading.Thread(target=lambda: session.request("GET", "http://k"))
+        t.start()
+        t.join()
+    assert seen[0] == (3, seen[0][1]) and seen[0][1] <= 20 and seen[1] is None

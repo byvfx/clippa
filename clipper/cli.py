@@ -659,10 +659,12 @@ def cmd_review(cfg: dict, args: argparse.Namespace) -> None:
             return
         if args.json:
             with to_stderr():
-                found = review_check.run(d, cfg, keys=args.items, force=args.force, vision=not args.no_vision)
+                found = review_check.run(d, cfg, keys=args.items, force=args.force, vision=not args.no_vision,
+                                         kitsu=True)
             print_json(found)
         else:
-            found = review_check.run(d, cfg, keys=args.items, force=args.force, vision=not args.no_vision)
+            found = review_check.run(d, cfg, keys=args.items, force=args.force, vision=not args.no_vision,
+                                     kitsu=True)
             print("\n".join(review_check.lines(found)))
         return
     if args.action == "auto":
