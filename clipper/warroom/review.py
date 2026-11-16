@@ -232,10 +232,11 @@ def slot_print(out: dict) -> str:
     return json.dumps([sorted((p["ref"], p["text"]) for p in out["plan"]),
                        sorted(b["ref"] for b in out["bumped"])])
 
-def do_slot(cfg: dict, body: dict) -> dict:
+def do_slot(cfg: dict, body: dict, who: str = WHO, tag: str = "") -> dict:
     """{"refs": [...]} or {"kind": "segment"} (every one without a slot); dry_run: only the
     plan, with its "print". Otherwise pin each item to its slot and replan once, if the plan
-    is still the previewed one (body "print"); if not: the new plan, "changed", nothing done."""
+    is still the previewed one (body "print"); if not: the new plan, "changed", nothing done.
+    who: the name on the Kitsu decision; tag: added to the undo label (the chat's "(chat)")."""
     refs = [checked_ref(r) for r in body["refs"]] if body.get("refs") else None
     kind = body.get("kind", "")
     if refs is None and kind not in SLOT_KINDS:
@@ -252,14 +253,14 @@ def do_slot(cfg: dict, body: dict) -> dict:
             try:
                 item = actions.resolve(cfg, p["ref"])
                 before = _before(cfg, item)
-                rows.append(row_json(item.stream_dir, _apply(cfg, item, "pin", p, WHO)))
+                rows.append(row_json(item.stream_dir, _apply(cfg, item, "pin", p, who)))
                 done.append({"ref": item.ref, "before": before})
             except Exception as e:  # noqa: BLE001  # report each, do the rest
                 failed.append({"ref": p["ref"], "error": str(e)[:200]})
         if done and cfg["discord"]["replan"]:
             schedule.run(cfg, sync_first=False)
-    uid = remember(cfg, "pin", f"pin {len(done)} to the next open slot{'s' * (len(done) > 1)}",
-                   done) if done else ""
+    uid = remember(cfg, "pin", f"pin {len(done)} to the next open slot{'s' * (len(done) > 1)}"
+                   + (f" {tag}" if tag else ""), done) if done else ""
     return {**out, "done": len(done), "failed": failed, "rows": rows, "undo": uid}
 
 def replace_plan(rows: list[dict], fields: list[str], find: str, repl: str, regex: bool,

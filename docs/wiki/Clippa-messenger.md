@@ -11,7 +11,7 @@ Clippa can only use the tools in its catalog (`clipper/catalog.py`), each with a
 |---|---|---|
 | read | releases (what goes out on a day), unslotted, items, item, retakes, health, costs | answers at once |
 | write | approve, reject, retake (a changes note), reopen, hold / release, pin / unpin, retitle, cover text, slot (next open slot) | a card; nothing changes until you tap **Yes** |
-| spend | story (a new [story dossier](Story-dossiers)), cover redo (one vision call) | a card with the cost estimate first; **Yes** starts the job |
+| spend | story (a new [story dossier](Story-dossiers)), cover redo (a vision call, a second if the first pick is unusable) | a card with the cost estimate first; **Yes** checks the item again and starts the job |
 
 A write goes through the same path as the war room's buttons (`actions.decide`, so Kitsu is
 the record), signed "Clippa chat", and is undoable from the war room's undo list, where it

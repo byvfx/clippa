@@ -23,6 +23,7 @@ through jsonstate, so the phone and the laptop see the same chat.
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -164,7 +165,7 @@ def _post(chat: dict, who: str, text: str, kind: str = "text", topic: str | None
 def _archive(cfg: dict, data: dict, why: str) -> Path:
     d = folder(cfg) / "archive"
     d.mkdir(parents=True, exist_ok=True)
-    p = d / f"{datetime.now(UTC):%Y-%m-%dT%H%M%S}-{why}.json"
+    p = d / f"{datetime.now(UTC):%Y-%m-%dT%H%M%S}-{_id('a')}-{why}.json"   # never the same name twice
     jsonstate.write(p, data)
     return p
 
@@ -362,21 +363,54 @@ def history(chat: dict, topic: dict, n: int) -> list[dict]:
     return out
 
 
+# The day's model spend as this process knows it, beside the ledger (which another process may
+# write too, and whose write is best effort): calls in flight hold their estimate, so two sends
+# at once can't both slip under [chat] daily_usd.
+_BUDGET = {"day": "", "spent": 0.0, "held": 0.0}
+_BUDGET_LOCK = threading.Lock()
+
+
+def _reserve(cfg: dict, usd: float) -> bool:
+    """Hold usd of today's budget for a call; False when it doesn't fit."""
+    cap = cfg["chat"]["daily_usd"]
+    ledger = sum(catalog.spend_today(cfg, "chat").values()) if cap else 0.0
+    with _BUDGET_LOCK:
+        day = datetime.now(UTC).strftime("%Y-%m-%d")
+        if _BUDGET["day"] != day:
+            _BUDGET.update(day=day, spent=0.0, held=0.0)
+        used = max(ledger, _BUDGET["spent"]) + _BUDGET["held"]
+        if cap and (used >= cap or used + usd > cap):   # >=: a model with no price estimates $0
+            return False
+        _BUDGET["held"] += usd
+        return True
+
+
+def _settle(held: float, usd: float) -> None:
+    """A call ended (or failed): its hold goes, what it cost stays."""
+    with _BUDGET_LOCK:
+        _BUDGET["held"] = max(0.0, _BUDGET["held"] - held)
+        _BUDGET["spent"] += usd
+
+
 def ask_model(cfg: dict, chat: dict, topic: dict) -> tuple[str, dict | None, float]:
     """(what it said, its pick {name, input} or None, $) from one call; no call past the budget."""
-    from .llm import LLM
+    from .llm import LLM, estimate, tokens
 
     if not cfg["chat"]["model"]:
         return "I only know the commands here ([chat] model is off): /help.", None, 0.0
-    spent = sum(catalog.spend_today(cfg, "chat").values())
-    if cfg["chat"]["daily_usd"] and spent >= cfg["chat"]["daily_usd"]:
+    tools = [t.spec() for t in catalog.catalog().values()]
+    now = datetime.now(ZoneInfo(cfg["schedule"]["timezone"]))
+    system, turns = system_prompt(cfg, now), history(chat, topic, cfg["chat"]["history"])
+    size = tokens(system + json.dumps(tools) + json.dumps(turns))
+    held = estimate(cfg, cfg["chat"]["model"], size, 1024)   # the most this call can cost
+    if not _reserve(cfg, held):
         return (f"I've used today's ${cfg['chat']['daily_usd']:.2f} of thinking ([chat] daily_usd); "
                 "the commands still work: /help."), None, 0.0
     client = LLM(cfg, label="chat")
-    tools = [t.spec() for t in catalog.catalog().values()]
-    now = datetime.now(ZoneInfo(cfg["schedule"]["timezone"]))
-    out, meta = client.tool_call(cfg["chat"]["model"], system_prompt(cfg, now),
-                                 history(chat, topic, cfg["chat"]["history"]), tools, cfg["chat"]["effort"])
+    try:
+        out, meta = client.tool_call(cfg["chat"]["model"], system, turns, tools, cfg["chat"]["effort"])
+    finally:
+        _settle(held, client.cost)
     if meta.get("refusal") is not None:
         return "I can't help with that one.", None, client.cost
     return out["text"], out["tool"], client.cost
@@ -507,12 +541,26 @@ def handle(cfg: dict, text: str) -> dict:
         said, pick, usd = (f"I couldn't think just now ({type(e).__name__}); the commands still "
                            "work: /help."), None, 0.0
     with _LOCK, _update(cfg) as chat:
-        if pick:
+        if (current_topic(chat) or {}).get("id") != topic["id"]:
+            late(chat, topic, said, pick, usd)
+        elif pick:
             run_tool(cfg, chat, pick["name"], pick["input"], usd, preface=said)
         else:
             _post(chat, "clippa", said or "Hmm, not sure what you mean. /help has examples.", usd=usd)
         _trim(cfg, chat)
         return view(chat, since)
+
+
+def late(chat: dict, topic: dict, said: str, pick: dict | None, usd: float) -> dict:
+    """An answer that came back after its topic ended (a /new, /bye or /clear meanwhile): it
+    stays in that topic with its cost (the receipt too), and a pick becomes no card at all."""
+    text = said or ("I had a card ready, but" if pick else "I had an answer, but")
+    m = _post(chat, "clippa", f"{text} (that topic ended before I answered: ask again)",
+              topic=topic["id"], usd=usd)
+    t = next((x for x in chat["topics"] if x["id"] == topic["id"]), None)
+    if t and t.get("receipt"):
+        t["receipt"]["usd"] = round(t["receipt"]["usd"] + usd, 4)
+    return m
 
 
 # ---------- cards ----------
@@ -544,8 +592,9 @@ def tap(cfg: dict, card_id: str, yes: bool) -> dict:
         card = dict(card)
     try:   # the action (Kitsu, a replan) holds neither lock; "working" keeps a second tap out
         if card["risk"] == catalog.SPEND:
-            reply, ok = start_job(cfg, card)
-            state = "done" if ok else "failed"
+            stale = catalog.precheck(cfg, card)   # the item may have changed since the card
+            reply, ok = (stale, False) if stale else start_job(cfg, card)
+            state = "done" if ok else "stale" if stale else "failed"
         else:
             reply, ok = catalog.apply(cfg, card)
             state = "done" if ok else "stale"

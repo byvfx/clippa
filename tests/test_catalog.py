@@ -170,6 +170,52 @@ def test_recheck_and_apply(cfg, one, monkeypatch):
     assert ok and done == [("approve", "Clippa chat")] and "scheduled 2026-11-20 15:00" in text
 
 
+def test_a_retitle_undoes_as_a_title_edit(cfg, one, monkeypatch):
+    """The war room's undo restores a title from an "edit" entry with the column's value."""
+    card = catalog.prepare(cfg, "retitle", {"item": "s02", "title": "Blade Goes Bust"}).as_dict()
+    item = actions.Item(cfg["paths"]["streams"] / "kick-1", "s02_blade", {})
+    monkeypatch.setattr(actions, "resolve", lambda cfg, ref: item)
+    monkeypatch.setattr(actions, "refresh", lambda cfg, it: row())
+    monkeypatch.setattr(actions, "decide", lambda *a, **k: row(title="Blade Goes Bust"))
+    monkeypatch.setattr(actions, "replan", lambda cfg, it, verb, r: (r, ""))
+    from clipper.warroom import review as wr
+    monkeypatch.setattr(wr, "_before", lambda cfg, it: {"title": "Blade in Vegas"})
+    kept = []
+    monkeypatch.setattr(wr, "remember", lambda cfg, action, label, done: kept.append((action, label, done)) or "u1")
+    assert catalog.apply(cfg, card)[1]
+    action, label, done = kept[0]
+    assert action == "edit" and label.endswith("(chat)")
+    assert done[0]["values"] == {"YouTube title": "Blade Goes Bust"} and done[0]["before"]["title"] == "Blade in Vegas"
+
+
+def test_a_slot_is_signed_by_the_chat(cfg, one, monkeypatch):
+    item = actions.Item(cfg["paths"]["streams"] / "kick-1", "s02_blade", {})
+    monkeypatch.setattr(actions, "resolve", lambda cfg, ref: item)
+    monkeypatch.setattr(actions, "refresh", lambda cfg, it: row())
+    from clipper.warroom import review as wr
+    seen = {}
+    monkeypatch.setattr(wr, "do_slot", lambda cfg, body, who="", tag="": seen.update(who=who, tag=tag)
+                        or {"plan": [], "failed": [], "done": 1})
+    card = {"tool": "slot", "ref": item.ref, "snapshot": catalog.snapshot(row()),
+            "args": {"verb": "pin", "text": "Fri 11-20 15:00", "print": "p"}}
+    assert catalog.apply(cfg, card)[1]
+    assert seen == {"who": "Clippa chat", "tag": "(chat)"}
+
+
+def test_a_cover_card_rechecks_its_cut(cfg, one, monkeypatch):
+    item = actions.Item(cfg["paths"]["streams"] / "kick-1", "s02_blade", {"file": "segments/s02_blade.mp4"})
+    monkeypatch.setattr(actions, "resolve", lambda cfg, ref: item)
+    monkeypatch.setattr(actions, "refresh", lambda cfg, it: row())
+    card = {"tool": "cover_redo", "ref": item.ref, "snapshot": catalog.snapshot(row()),
+            "args": {"file": "segments/s02_blade.mp4", "asset": "a"}}
+    assert catalog.precheck(cfg, card) == ""
+    item.state["file"] = "segments/s02_blade_t01.mp4"     # cut again since
+    assert "cut again" in catalog.precheck(cfg, card)
+    monkeypatch.setattr(actions, "refresh", lambda cfg, it: row(decision="rejected"))
+    assert "changed since I asked" in catalog.precheck(cfg, card)
+    assert catalog.precheck(cfg, {"tool": "story", "argv": ["story", "new"]}) == ""   # no item
+
+
 def test_schedule_read(cfg):
     tz = ZoneInfo(TZ)
     tomorrow = datetime.now(tz).replace(hour=15, minute=0, second=0, microsecond=0) + timedelta(days=1)

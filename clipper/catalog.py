@@ -367,7 +367,9 @@ def apply(cfg: dict, card: dict) -> tuple[str, bool]:
         before = _before(cfg, item)
         row = actions.decide(cfg, item, a["verb"], WHO, text=a.get("text") or "", on=a.get("on"))
         row, note = actions.replan(cfg, item, a["verb"], row)
-    remember(cfg, a["verb"], f"{a['verb']} {item.short} (chat)", [{"ref": item.ref, "before": before}])
+    # a retitle is the war room's "edit" of the title column, so its undo puts the old title back
+    action, values = ("edit", {"YouTube title": a["text"]}) if a["verb"] == "retitle" else (a["verb"], {})
+    remember(cfg, action, f"{a['verb']} {item.short} (chat)", [{"ref": item.ref, "before": before, "values": values}])
     if a["verb"] == "changes" and cfg["retake"]["auto"]:
         note = "the retake is on its way" if start_retake(cfg) else "a retake run is going; this one is next"
     done = {"approve": "Approved", "reject": "Rejected", "changes": "Sent back for a retake",
@@ -404,7 +406,7 @@ def _slot_apply(cfg: dict, card: dict) -> tuple[str, bool]:
     item, _, stale = recheck(cfg, card)
     if stale:
         return stale, False
-    out = do_slot(cfg, {"refs": [item.ref], "print": card["args"]["print"]})
+    out = do_slot(cfg, {"refs": [item.ref], "print": card["args"]["print"]}, who=WHO, tag="(chat)")
     if out.get("changed"):
         p = out["plan"][0]["text"] if out["plan"] else "none"
         return f"The schedule moved since I asked (the next slot is {p} now): nothing done. Ask again.", False
@@ -480,14 +482,35 @@ def _cover_prepare(cfg: dict, args: dict) -> Plan:
     _, system = cover_prompts(scfg, thumbnail, thumbnail["style"])
     frames = (thumbnail["clip_frames"] if asset["kind"] == "clip"
               else thumbnail["even_frames"] + thumbnail["heat_frames"])
-    usd = llm.estimate(scfg, model, llm.tokens(system) + 300 + frames * (FRAME_TOKENS + 20), 200)
+    if thumbnail["style"] == "enquirer":   # thumbs adds face frames of the people seen most
+        frames += thumbnail["face_people"] * thumbnail["face_frames"]
+    one = llm.estimate(scfg, model, llm.tokens(system) + 300 + frames * (FRAME_TOKENS + 20), 200)
+    check = llm.estimate(scfg, model, 20, 16)   # thumbs' key check before the pick
     row = _row(cfg, item)
-    lines = [item_line(row), f"{frames} frames to {model}"]
+    lines = [item_line(row), f"up to {frames} frames to {model}"]
     if row["uploaded"]:
         lines.append("already on YouTube: the new cover goes to Kitsu, Studio keeps the old one")
     return Plan("card", text=f"Pick a new cover for {item.short}?", tool="cover_redo", risk=SPEND,
-                ref=item.ref, lines=lines, estimate=f"~${usd:.3f} (one {model} pick)",
+                ref=item.ref, snapshot=snapshot(row), lines=lines,
+                estimate=(f"~${one + check:.3f} for one {model} pick; up to ~${2 * one + check:.3f} "
+                          "if the first is unusable and it asks once more"),
+                args={"file": file, "asset": asset["id"]},
                 argv=["thumbs", item.stream_dir.name, "--items", asset["id"], "--force"])
+
+
+def precheck(cfg: dict, card: dict) -> str:
+    """Before a spend card's job starts: "" to go ahead, or why not. A card about an item reads
+    it again (decision, texts, upload) and checks its cut is the one the card was made for; a
+    story has no item."""
+    if not card.get("ref"):
+        return ""
+    item, _, stale = recheck(cfg, card)
+    if stale:
+        return stale
+    want = (card.get("args") or {}).get("file")
+    if want and item.state.get("file", "").replace("\\", "/") != want:
+        return f"{item.short} was cut again since I asked: nothing spent. Ask again."
+    return ""
 
 
 # ---------- reads ----------
@@ -701,7 +724,7 @@ def build() -> dict[str, Tool]:
         Tool("slot", WRITE, "pin an approved item to the next open release slot of its kind",
              _obj({"item": ITEM}, ("item",)), _slot_prepare),
         Tool("story", SPEND, story_help, story_schema, _story_prepare),
-        Tool("cover_redo", SPEND, "pick a new cover for an item (one vision call), attached in Kitsu",
+        Tool("cover_redo", SPEND, "pick a new cover for an item (a vision call, maybe a second), attached in Kitsu",
              _obj({"item": ITEM}, ("item",)), _cover_prepare),
     ]
     return {t.name: t for t in tools}

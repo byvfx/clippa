@@ -236,7 +236,8 @@ def test_ask_options_run_the_same_tool(cfg, monkeypatch, no_model):
 def test_jobs_report_into_the_open_topic_or_wait_while_away(cfg, monkeypatch, no_model):
     started = []
     monkeypatch.setattr(chat.threading.Thread, "start", lambda self: started.append(self.name))
-    plan = card_plan(tool="story", risk=catalog.SPEND, argv=["story", "new", "a brief"], estimate="~$0.30")
+    plan = card_plan(tool="story", risk=catalog.SPEND, argv=["story", "new", "a brief"], estimate="~$0.30",
+                     ref="", snapshot={})   # a story has no item to check
     monkeypatch.setattr(catalog, "prepare", lambda cfg, name, args: plan)
     card = chat.handle(cfg, "story: something happened to someone")["messages"][-1]["card"]
     assert card["estimate"] == "~$0.30"
@@ -271,6 +272,39 @@ def test_lost_jobs_after_a_restart(cfg, no_model):
                       "started_at": chat.now_iso(), "host": "another-machine", "boot": "old"}]
     assert chat.lost_jobs(cfg) == 1
     assert [j["state"] for j in chat.load(cfg)["jobs"]] == ["lost", "running"]
+
+
+def test_archives_never_share_a_name(cfg):
+    a = chat._archive(cfg, {"messages": [1]}, "overflow")
+    b = chat._archive(cfg, {"messages": [2]}, "overflow")     # the same second
+    assert a != b and len(list(a.parent.glob("*.json"))) == 2
+
+
+def test_the_daily_budget_counts_calls_in_flight(cfg, monkeypatch):
+    monkeypatch.setattr(chat, "_BUDGET", {"day": "", "spent": 0.0, "held": 0.0})
+    cfg["chat"]["daily_usd"] = 0.01
+    assert chat._reserve(cfg, 0.006)
+    assert not chat._reserve(cfg, 0.006)          # the first is still in flight
+    chat._settle(0.006, 0.002)                    # it cost less than held
+    assert chat._reserve(cfg, 0.006)
+    chat._settle(0.006, 0.008)                    # now at the cap
+    assert not chat._reserve(cfg, 0.0)            # a model with no price still stops there
+    cfg["chat"]["daily_usd"] = 0                  # 0: no cap
+    assert chat._reserve(cfg, 5.0)
+
+
+def test_an_answer_after_its_topic_ended_is_no_card(cfg, monkeypatch):
+    def ask(cfg_, seen, topic):
+        chat.handle(cfg_, "/new")                 # another device starts a topic meanwhile
+        return "Here you go.", {"name": "approve", "input": {"item": "s02"}}, 0.001
+    monkeypatch.setattr(chat, "ask_model", ask)
+    monkeypatch.setattr(catalog, "prepare", lambda *a: card_plan())
+    chat.handle(cfg, "approve the blade one please")
+    c = chat.load(cfg)
+    last = c["messages"][-1]
+    assert not last.get("card") and "topic ended before I answered" in last["text"]
+    first = c["topics"][0]
+    assert last["topic"] == first["id"] and first["receipt"]["usd"] == 0.001
 
 
 def test_a_card_cut_off_by_a_restart_fails(cfg, no_model):
