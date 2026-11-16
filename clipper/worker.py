@@ -38,7 +38,8 @@ from pathlib import Path
 
 from . import jsonstate, stages
 from .config import for_stream, show_args, show_of_channel
-from .errors import ClipperError
+from .errors import KEY_REJECTED, ClipperError
+from .llm import keys_fingerprint
 from .states import PRESHOW_PREFIX, is_preshow
 from .timefmt import age_s, now_iso
 
@@ -157,6 +158,7 @@ class Run:
             self.data = jsonstate.read_or(self.path, {}) or self.data
             self.data.setdefault("stages", {})
             self.data.update(worker=self.me, status="running", heartbeat=now_iso(), error="")
+            self.data.pop("key_rejected", None)
             self.data["attempts"] = self.data.get("attempts", 0) + 1
             self.save()
         self._beat = threading.Thread(target=self._heartbeat, daemon=True)
@@ -310,6 +312,11 @@ def run_stream(cfg: dict, stream_dir: Path, config_path: str | None = None,  # n
                 st["status"] = "failed"
                 tail = log_path.read_text(encoding="utf-8", errors="replace").strip().splitlines()[-3:]
                 run.data.update(status="failed", error=f"{stage} exited {code}: " + " | ".join(tail))
+                if code == KEY_REJECTED:
+                    # The same key would only be refused again: hold the stream until a key
+                    # changes (pending) and give back the attempt, which wasn't the stream's fault.
+                    run.data["key_rejected"] = keys_fingerprint(cfg["paths"])
+                    run.data["attempts"] = max(0, run.data.get("attempts", 1) - 1)
                 run.save()
                 log.error("%s: %s failed (exit %s), see %s", name, stage, code, log_path)
                 return False
@@ -363,11 +370,17 @@ def pending(cfg: dict) -> list[Path]:
     # Grabbed pre-shows: meta.json is written once the download is complete.
     ready += [m.parent for m in sorted(root.glob(f"{PRESHOW_PREFIX}*/meta.json"))]
     out = []
+    keys = None
     for d in ready:
         run = jsonstate.read_or(d / "run.json", {})
         if run.get("status") in ("done", "skip"):
             continue
         if run.get("status") == "running" and age_s(run.get("heartbeat")) < wc["stale_minutes"] * 60:
+            continue
+        if run.get("status") == "failed" and run.get("key_rejected"):
+            keys = keys or keys_fingerprint(cfg["paths"])
+            if keys != run["key_rejected"]:
+                out.append(d)  # a key changed (a fixed env.local, a new key file): try now
             continue
         if run.get("status") == "failed":
             if run.get("attempts", 0) >= wc["max_attempts"]:
@@ -442,7 +455,12 @@ def watch(cfg: dict, config_path: str | None = None, once: bool = False) -> None
             log.exception("%s: run crashed", d.name)
             alert(f"clipper worker: {d.name} crashed: {e}", kind="failure", key=f"crash:{d.name}")
         run = jsonstate.read_or(d / "run.json", {})
-        if run.get("status") == "failed":
+        if run.get("status") == "failed" and run.get("key_rejected"):
+            alert(f"clipper worker: {d.name} stopped, an API key was rejected: {run.get('error', '')[:500]}"
+                  " (held, not retried, until a key changes: on the hub, fix deploy/hub/env.local and"
+                  " run deploy.sh; the worker then picks it up again by itself)",
+                  kind="failure", key="key_rejected")  # one DM for every stream it holds
+        elif run.get("status") == "failed":
             left = wc["max_attempts"] - run.get("attempts", 0)
             alert(f"clipper worker: {d.name} failed: {run.get('error', '')[:600]}"
                   + (f" (retry in {wc['retry_minutes']} min, {left} left)" if left > 0

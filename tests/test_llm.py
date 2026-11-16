@@ -6,6 +6,7 @@ import copy
 import pytest
 
 from clipper import costs, doctor, llm
+from clipper.errors import ClipperError
 
 
 class FakeResponse:
@@ -247,3 +248,32 @@ def test_prices_match_the_longest_listed_prefix():
     assert llm.price_of(prices, "openai:gpt-5-mini") == (1.0, 2.0)
     assert llm.price_of(prices, "claude-opus-5-5") is None
     assert llm.price_of({"openai:gpt-5-mini": [3.0, 4.0]}, "openai:gpt-5-mini-20260601") == (3.0, 4.0)
+
+
+def test_a_401_is_a_rejected_key_not_a_retry(posted, monkeypatch, defaults):
+    """A provider's 401 raises KeyRejected (exit KEY_REJECTED, which the worker holds a
+    stream on) after one request; other errors stay RuntimeError."""
+    from clipper.errors import KEY_REJECTED, KeyRejected
+
+    sent, replies = posted
+    monkeypatch.setenv("OPENROUTER_API_KEY", "k")
+    replies.append(FakeResponse({"error": {"message": "No auth credentials found"}}, status=401))
+    with pytest.raises(KeyRejected, match="OPENROUTER_API_KEY was rejected") as e:
+        llm.LLM(defaults).preflight("openrouter:openai/gpt-5-mini")
+    assert e.value.status == KEY_REJECTED and len(sent) == 1
+    replies.append(FakeResponse({"error": {"message": "flagged"}}, status=403))
+    with pytest.raises(ClipperError) as e:
+        llm.LLM(defaults).preflight("openrouter:openai/gpt-5-mini")
+    assert not isinstance(e.value, KeyRejected)
+
+
+def test_the_keys_fingerprint_changes_with_a_key_and_hides_it(monkeypatch, tmp_path):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-one")
+    a = llm.keys_fingerprint({})
+    assert "sk-one" not in a and len(a) == 12
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-two")
+    assert llm.keys_fingerprint({}) != a
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    (tmp_path / "openai.txt").write_text("from-a-file")
+    b = llm.keys_fingerprint({})
+    assert llm.keys_fingerprint({"openai_key": tmp_path / "openai.txt"}) != b

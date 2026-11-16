@@ -31,7 +31,8 @@ The first run copies `deploy/claude/env.template` to `deploy/claude/env.local` (
 stops. Fill in:
 
 - the same keys as `deploy/hub/env.local` (`ANTHROPIC_API_KEY`, `KITSU_TOKEN`, the Modal token,
-  the alert webhook);
+  the alert webhook); the deploy checks them against this machine's own as the hub's does
+  ([NAS-hub](NAS-hub#deploy));
 - `GH_TOKEN`: a GitHub fine-grained token for this repo only, with Contents and Pull requests
   read and write, so it can push branches and open PRs (and clone the repo, if yours is private);
 - `CLIPPER_REPO`, `GIT_USER_NAME`, `GIT_USER_EMAIL` can stay empty: the deploy fills them from

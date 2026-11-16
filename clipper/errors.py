@@ -21,3 +21,15 @@ class ClipperError(Exception):
     def __init__(self, message: str = "", status: int = 1):
         super().__init__(message)
         self.status = status
+
+
+KEY_REJECTED = 4  # the exit status of a stage whose API key a provider refused (HTTP 401)
+
+
+class KeyRejected(ClipperError):
+    """A provider said the key is wrong (HTTP 401). Not worth retrying with the same key: the
+    worker holds the stream until a key changes (worker.pending) instead of spending its
+    retries, and DMs at once."""
+
+    def __init__(self, message: str):
+        super().__init__(message, status=KEY_REJECTED)

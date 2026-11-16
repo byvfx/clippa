@@ -28,6 +28,10 @@ if [ ! -f "$ENV_LOCAL" ]; then
     echo "created $ENV_LOCAL: fill in the keys, then run this again" >&2
     exit 1
 fi
+
+source "$HERE/../keys.sh"
+check_keys "$ENV_LOCAL"   # by name, never a value; DEPLOY_KEYS=sync|keep (deploy/keys.sh)
+
 DATA=$(grep '^CLIPPER_DATA=' "$ENV_LOCAL" | cut -d= -f2-)
 DATA=${DATA:-/volume1/docker/clipper}
 

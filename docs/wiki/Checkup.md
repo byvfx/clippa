@@ -20,6 +20,7 @@ clipper checkup --json           # the report as JSON, for a script or Claude
 | streams | run.json says running but the worker stopped beating: it died mid-run | `[worker] stale_minutes` × 2 |
 | streams | a finished recording has waited `queue_hours` for the worker while nothing runs | `queue_hours` (3) |
 | streams | a run failed with no retries left (also DM'd once, when it ran out) | `[worker] max_attempts` |
+| streams | a run held because a provider rejected an API key (DM'd at once; retried when a key changes) | - |
 | schedule | a release isn't uploaded `late_hours` before its slot, or its slot has passed | `late_hours` (1) |
 | schedule | nothing at all releases in the next `gap_hours` | `gap_hours` (24; 0 = off) |
 | lint | a title, description or thumbnail text about to go out has one of `words` in it, is over YouTube's limit, or has no description. It checks what `clipper upload` would send (Kitsu's columns, then the draft) | `words` |

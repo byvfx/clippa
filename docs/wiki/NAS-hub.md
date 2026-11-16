@@ -55,7 +55,12 @@ didn't finish goes again on the next hourly run. `bash deploy/hub/deploy.sh bot`
 The first run copies `deploy/hub/env.template` to `deploy/hub/env.local` (gitignored) and
 stops: fill in the keys (`ANTHROPIC_API_KEY`, `KITSU_TOKEN`, `MODAL_TOKEN_ID` /
 `MODAL_TOKEN_SECRET` from `~/.modal.toml`, the alert webhook). The other keys are files in
-`secrets/`. There is no browser in the containers, so pre-shows use
+`secrets/`. `env.local` is a copy: before each deploy, `deploy/keys.sh` compares its keys
+(`*_KEY`, `*_TOKEN`, `*_SECRET`, `*_WEBHOOK`) with this machine's own of the same name (Windows
+user variables, else the shell's environment), by name only, and stops on one that differs.
+At a terminal it asks whether to copy this machine's values in; elsewhere set
+`DEPLOY_KEYS=sync` to copy them or `DEPLOY_KEYS=keep` to deploy as is. A key rotated on the
+laptop and not here would otherwise ship the old one, and every model call on the hub fails. There is no browser in the containers, so pre-shows use
 a private copy of `secrets/youtube_cookies.txt` (`CLIPPER_YOUTUBE_COOKIES_FROM_BROWSER` is empty
 there), which the laptop's `clipper-cookies` task copies from its Firefox profile every 4 hours
 (`clipper doctor` warns when it's a day old)
