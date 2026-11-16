@@ -55,8 +55,11 @@ A show can let its clean items approve themselves: `[shows.<key>.review] auto_ap
   re-rendered since is checked anew). Once an hour the job also checks again the items held only
   by their findings (or by a check run that failed), so a stale finding clears itself once what
   it read or the checks' version changes; one that still holds costs no vision call. That updates
-  `checks.json` (the war room, the card, `clipper status`), not the Kitsu Checks column, which
-  the next publish rewrites. An item never checked still waits for you;
+  `checks.json` (the war room, the card, `clipper status`) and the Kitsu Checks column (clipper's
+  own column: a change there never counts as your edit). Shows without auto-approval get the same
+  hourly recheck of their pending items with findings, so their ⚠ badges don't go stale, as long as
+  one show has it on (serve's job runs only then). An item that is no longer one of the stream's
+  review items is left out until its checks change. An item never checked still waits for you;
 - its score is at least its kind's floor (`auto_min_short = 6`; picks, segments and compilations
   are 0, which leaves them to you);
 - it has been in review `auto_grace_minutes` (120).
@@ -71,6 +74,11 @@ stays private until its publish time.
 A **pre-show** approves itself at publish when its checks are clean (`auto_preshow = "now"`;
 `"grace"` gives it the window, `"off"` leaves it to you). Pre-shows go public the moment they
 upload, so nobody will have seen one before it is public. Stories and one-offs always wait for you.
+
+The approval holds the stream's `auto.json` lock only for the Kitsu decision itself, and gives
+Kitsu 25 s for it, so your own action at the same moment (which waits up to 60 s for that lock)
+always lands after it and wins. If Kitsu takes the approval but its answer is lost, the next pass
+sees it in Kitsu and counts it as automatic, not as yours.
 
 `clipper doctor` (role serve) says which shows have it on and warns when serve, which does the
 approving, isn't running. A new revision of an item (a re-render) takes an automatic approval

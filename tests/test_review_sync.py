@@ -1,4 +1,6 @@
 """review.sync: Kitsu decisions and columns into review.json (a fake gazu; offline)."""
+import pytest
+
 from clipper import jsonstate, review
 
 STATUSES = [{"id": "st-done", "short_name": "done"}, {"id": "st-retake", "short_name": "retake"},
@@ -128,3 +130,81 @@ def test_sync_reads_kitsu_into_review_json_and_keeps_a_newer_local_decision(defa
     assert c01["fields"] == {"YouTube title": "New"} and c01["edited"] == ["YouTube title"]
     assert out["s02"]["updated_at"] == "2026-11-08T12:00:00" and out["s02"]["decision"] == "approved"
     assert list(out) == ["c01", "s02"] and jsonstate.read(sdir / "review.json", {}) == out
+
+
+def test_the_checks_column_is_never_taken_for_a_persons_edit(defaults, tmp_path, monkeypatch):
+    # a recheck rewrites it in Kitsu; a sync reading it before review_state.json catches up
+    # mustn't leave the item to a person for good (review_auto reads "edited" as lasting)
+    fake_kitsu(monkeypatch, [])
+    monkeypatch.setattr(review, "column_fields", lambda g, p: {
+        ("Sequence", "YouTube title"): "title", ("Sequence", review.CHECKS_COL): "checks"})
+    monkeypatch.setattr(review, "entity_data", lambda g, et, eid: {"title": "Old title", "checks": "new finding"})
+    state = {"s01": {**STATE["s01"], "fields": {"YouTube title": "Old title", review.CHECKS_COL: "old"}}}
+    out = review.sync(stream(tmp_path, state), defaults, keys=["s01"], quiet=True)
+    assert out["s01"]["edited"] == []
+
+
+def test_set_checks_writes_what_changed_and_keeps_it_as_the_proposal(defaults, tmp_path, monkeypatch):
+    fake_kitsu(monkeypatch, [])
+    monkeypatch.setattr(review, "column_fields", lambda g, p: {("Sequence", review.CHECKS_COL): "checks",
+                                                               ("Shot", review.CHECKS_COL): "checks"})
+    wrote = []
+    monkeypatch.setattr(review, "write_data", lambda g, et, eid, data: wrote.append((eid, data)))
+    state = {"s01": {**STATE["s01"], "fields": {review.CHECKS_COL: "cover cut off"}},
+             "v02": {**STATE["v02"], "fields": {review.CHECKS_COL: ""}}}
+    sdir = stream(tmp_path, state)
+    done = review.set_checks(sdir, defaults, {"s01": "", "v02": "", "gone": "x"})
+    assert done == ["s01"] and wrote == [("e1", {"checks": ""})]          # v02 already says so
+    assert jsonstate.read(sdir / "review_state.json")["s01"]["fields"][review.CHECKS_COL] == ""
+    assert review.set_checks(sdir, defaults, {"s01": ""}) == [] and len(wrote) == 1
+
+
+def test_kitsu_deadline_bounds_every_request_then_lets_go(monkeypatch):
+    import gazu
+
+    session = gazu.client.default_client.session
+    seen = []
+    monkeypatch.setattr(session, "request", lambda *a, **kw: seen.append(kw.get("timeout")) or "ok")
+    patched = session.request
+    with review.kitsu_deadline(20):
+        assert session.request("GET", "http://k") == "ok"
+        assert session.request("GET", "http://k", timeout=3) == "ok"
+    assert 0 < seen[0] <= 20 and seen[1] == 3
+    assert session.request is patched                                     # put back as it was
+    with review.kitsu_deadline(0), pytest.raises(TimeoutError):
+        session.request("GET", "http://k")
+    assert len(seen) == 2
+
+
+def test_kitsu_deadline_leaves_other_threads_alone_and_takes_tuple_timeouts(monkeypatch):
+    import threading
+
+    import gazu
+
+    session = gazu.client.default_client.session
+    seen = []
+    monkeypatch.setattr(session, "request", lambda *a, **kw: seen.append(kw.get("timeout")))
+    with review.kitsu_deadline(20):
+        session.request("GET", "http://k", timeout=(3, 60))
+        t = threading.Thread(target=lambda: session.request("GET", "http://k"))
+        t.start()
+        t.join()
+    assert seen[0] == (3, seen[0][1]) and seen[0][1] <= 20 and seen[1] is None
+
+
+def test_set_checks_keeps_what_kitsu_took_when_a_later_write_fails(defaults, tmp_path, monkeypatch):
+    fake_kitsu(monkeypatch, [])
+    monkeypatch.setattr(review, "column_fields", lambda g, p: {("Sequence", review.CHECKS_COL): "checks",
+                                                               ("Shot", review.CHECKS_COL): "checks"})
+
+    def write(g, et, eid, data):
+        if eid == "e2":
+            raise OSError("Kitsu down")
+    monkeypatch.setattr(review, "write_data", write)
+    state = {"s01": {**STATE["s01"], "fields": {review.CHECKS_COL: "old"}},
+             "v02": {**STATE["v02"], "fields": {review.CHECKS_COL: "old"}}}
+    sdir = stream(tmp_path, state)
+    with pytest.raises(OSError):
+        review.set_checks(sdir, defaults, {"s01": "", "v02": ""})
+    fields = {k: v["fields"][review.CHECKS_COL] for k, v in jsonstate.read(sdir / "review_state.json").items()}
+    assert fields == {"s01": "", "v02": "old"}

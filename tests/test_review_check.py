@@ -331,3 +331,23 @@ def test_signature_follows_what_the_checks_read(defaults, tmp_path):
     assert two != one
     cfg["meta"]["cast"] = [*cfg["meta"]["cast"], "Jerry"]     # the show's own people
     assert review_check.signature(cfg, it, review_check.context(sd, cfg), False) != two
+
+
+def test_the_kitsu_column_gets_what_checks_json_kept(defaults, tmp_path, monkeypatch):
+    # an older run finishing after a newer one: checks.json keeps the newer result, and so must Kitsu
+    from clipper import jsonstate, review
+
+    sd = tmp_path / "kick-9"
+    sd.mkdir()
+    monkeypatch.setattr(review_check, "select", lambda *a: [{"key": "v01_t1", "kind": "short"}])
+    monkeypatch.setattr(review_check, "context", lambda *a: {})
+    monkeypatch.setattr(review_check, "signature", lambda *a: "s")
+
+    def check_then_a_newer_run_lands(*a):
+        jsonstate.write(review_check.path(sd), {"v01_t1": {"sig": "s", "at": "9999", "findings": []}})
+        return [{"text": "old finding"}], None
+    monkeypatch.setattr(review_check, "check_item", check_then_a_newer_run_lands)
+    columns = []
+    monkeypatch.setattr(review, "set_checks", lambda sdir, c, summaries: columns.append(summaries) or [])
+    review_check.run(sd, defaults, say=lambda *_: None, kitsu=True)
+    assert columns == [{"v01_t1": ""}]

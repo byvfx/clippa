@@ -173,7 +173,7 @@ def test_run_approves_whats_due_and_replans_once(cfg, tmp_path, monkeypatch):
     monkeypatch.setattr(review, "sync", lambda *a, **k: {})
     monkeypatch.setattr(review_check, "run", lambda *a, **k: {})
     approved, replans = [], []
-    monkeypatch.setattr(actions, "approve", lambda c, item, comment, who: approved.append((item.key, comment, who)))
+    monkeypatch.setattr(actions, "approve", lambda c, item, comment, who, **k: approved.append((item.key, comment, who)))
     monkeypatch.setattr(schedule, "run", lambda c, sync_first: replans.append(sync_first))
 
     said = []
@@ -203,7 +203,7 @@ def test_a_person_acting_mid_run_wins(cfg, tmp_path, monkeypatch):
     monkeypatch.setattr(review, "sync", sync_then_a_reject)
     monkeypatch.setattr(review_check, "run", lambda *a, **k: {})
     approved = []
-    monkeypatch.setattr(actions, "approve", lambda c, item, comment, who: approved.append(item.key))
+    monkeypatch.setattr(actions, "approve", lambda c, item, comment, who, **k: approved.append(item.key))
     assert review_auto.approve_due(cfg, sd, ["v01_t1"], say=lambda *_: None) == [] and approved == []
 
 
@@ -252,9 +252,11 @@ def stub(cfg, tmp_path, monkeypatch, approve=None):
     sd = fake(cfg, tmp_path)
     monkeypatch.setattr(review_auto, "for_stream", lambda c, d: cfg)
     monkeypatch.setattr(review, "sync", lambda *a, **k: {})
+    monkeypatch.setattr(review, "set_checks", lambda *a, **k: [])
     monkeypatch.setattr(review_check, "run", lambda *a, **k: {})
     approved, replans = [], []
-    monkeypatch.setattr(actions, "approve", approve or (lambda c, item, comment, who: approved.append(item.key)))
+    monkeypatch.setattr(actions, "approve", approve or (lambda c, item, comment, who, **k: approved.append(item.key)))
+    monkeypatch.setattr(actions, "refresh", lambda c, item: {})
     monkeypatch.setattr(schedule, "run", lambda c, sync_first: replans.append(sync_first))
     return sd, approved, replans
 
@@ -280,7 +282,7 @@ def test_findings_are_checked_again_so_stale_ones_dont_hold_an_item_for_good(cfg
         asked.append(keys)
         with jsonstate.update(review_check.path(sdir), {}) as st:
             st.update({key: CLEAN for key in keys})
-        return {}
+        return {key: [] for key in keys}
     monkeypatch.setattr(review_check, "run", rerun)
     with jsonstate.update(sd / "review.json", {}) as rv:
         rv["v02_t2"]["fields"] = {"Hold": "true"}                                # waits for a person anyway
@@ -300,7 +302,8 @@ def test_a_recheck_is_hourly_per_stream_and_off_with_the_checks(cfg, tmp_path, m
     sd, approved, _ = stub(cfg, tmp_path, monkeypatch)
     jsonstate.write(sd / "checks.json", {"v01_t1": {"sig": "s", "findings": [{"text": "a real one"}]}})
     asked = []
-    monkeypatch.setattr(review_check, "run", lambda sdir, c, keys=None, **k: asked.append(keys) or {})
+    monkeypatch.setattr(review_check, "run", lambda sdir, c, keys=None, **k:
+                        asked.append(keys) or {key: [{"text": "a real one"}] for key in keys})
     t = datetime.now(UTC)
     for minutes in (0, 10, 50, 61):
         review_auto.run(cfg, say=lambda *_: None, now=t + timedelta(minutes=minutes))
@@ -344,7 +347,7 @@ def test_a_hold_seen_in_kitsu_keeps_it_out_after_its_release(cfg, tmp_path, monk
 def test_one_failed_approval_doesnt_lose_the_others(cfg, tmp_path, monkeypatch):
     approved = []
 
-    def approve(c, item, comment, who):
+    def approve(c, item, comment, who, **k):
         if item.key == "v01_t1":
             raise RuntimeError("Kitsu said no")
         approved.append(item.key)
@@ -379,7 +382,7 @@ def test_a_preshow_is_approved_at_publish(cfg, tmp_path, monkeypatch):
 def test_the_approval_runs_under_auto_jsons_lock(cfg, tmp_path, monkeypatch):
     held = []
 
-    def approve(c, item, comment, who):   # the file lock other processes (the bot's touch) wait on
+    def approve(c, item, comment, who, **k):   # the file lock other processes (the bot's touch) wait on
         held.append(review_auto.path(item.stream_dir).with_name("auto.json.lock").exists())
     stub(cfg, tmp_path, monkeypatch, approve)
     review_auto.run(cfg, say=lambda *_: None)
@@ -391,3 +394,129 @@ def test_clippers_own_hold_doesnt_last(cfg):
     got = v(cfg, st=st, r={"decision": "pending", "fields": {"Hold": "true"}})
     assert got.state == "person" and got.why == "held for other voices" and not got.lasting
     assert v(cfg, r={"decision": "pending", "fields": {"Hold": "true"}}).lasting   # a person's hold
+
+
+def test_the_item_is_re_read_after_the_lock_is_let_go(cfg, tmp_path, monkeypatch):
+    sd, approved, _ = stub(cfg, tmp_path, monkeypatch)
+    lock = review_auto.path(sd).with_name("auto.json.lock")
+    reread = []
+    monkeypatch.setattr(actions, "refresh", lambda c, item: reread.append(lock.exists()) or {})
+    review_auto.run(cfg, say=lambda *_: None)
+    assert approved == ["v01_t1"] and reread == [False]
+    assert "claimed_at" not in review_auto.load(sd)["v01_t1"]
+
+
+def test_an_approval_whose_answer_was_lost_counts_as_automatic_once_kitsu_shows_it(cfg, tmp_path, monkeypatch):
+    def lost(c, item, comment, who, **k):
+        raise TimeoutError("Kitsu took over 25 s")
+    sd, _, replans = stub(cfg, tmp_path, monkeypatch, lost)
+    said = []
+    review_auto.run(cfg, say=said.append)
+    e = review_auto.load(sd)["v01_t1"]
+    assert e["claimed_at"] and "approved_at" not in e and replans == []
+    assert any("v01_t1: not approved: TimeoutError" in s for s in said)
+    with jsonstate.update(sd / "review.json", {}) as rv:                       # Kitsu took it after all
+        rv["v01_t1"]["decision"] = "approved"
+    assert review_auto.verdicts(cfg, sd)["v01_t1"].state == "approved"
+    review_auto.run(cfg, say=lambda *_: None)
+    e = review_auto.load(sd)["v01_t1"]
+    assert e["approved_at"] and "claimed_at" not in e and "out" not in e      # not "approved by a person"
+    assert {h["key"] for h in review_auto.history(cfg)} == {"v01_t1"}
+
+
+def test_a_lost_answer_then_a_persons_decision_is_theirs(cfg, tmp_path, monkeypatch):
+    sd, _, _ = stub(cfg, tmp_path, monkeypatch)
+    jsonstate.write(review_auto.path(sd), {"v01_t1": {"claimed_at": T0.isoformat()}})
+    with jsonstate.update(sd / "review.json", {}) as rv:
+        rv["v01_t1"]["decision"] = "rejected"
+    review_auto.run(cfg, say=lambda *_: None)
+    assert review_auto.load(sd)["v01_t1"]["out"] == "rejected by a person"
+    jsonstate.write(review_auto.path(sd), {"v02_t2": {"claimed_at": T0.isoformat(), "out": "approve by Brandon"}})
+    with jsonstate.update(sd / "review.json", {}) as rv:
+        rv["v02_t2"]["decision"] = "approved"
+    assert review_auto.verdicts(cfg, sd)["v02_t2"].state == "decided"
+
+
+def test_a_show_without_auto_still_has_its_findings_checked_again(cfg, tmp_path, monkeypatch):
+    from clipper import review_check
+
+    sd, approved, _ = stub(cfg, tmp_path, monkeypatch)
+    cfg["review"]["auto_approve"] = False
+    jsonstate.write(sd / "checks.json", {"v01_t1": {"sig": "old", "findings": [{"text": "stale"}]},
+                                         "v02_t2": CLEAN, "v04_t4": {"sig": "", "findings": [{"text": "x"}]}})
+    asked = []
+    monkeypatch.setattr(review_check, "run", lambda sdir, c, keys=None, kitsu=False, **k:
+                        asked.append((keys, kitsu)) or {key: [] for key in keys})
+    assert review_auto.run(cfg, say=lambda *_: None) == {}
+    assert asked == [(["v01_t1"], True)] and approved == []                    # v04 is rejected; the column follows
+    assert review_auto.flagged(sd) == ["v01_t1"]                               # the fake run wrote nothing
+
+
+def test_a_check_run_brings_the_kitsu_column_in_line(defaults, tmp_path, monkeypatch):
+    from clipper import review, review_check
+
+    sd = tmp_path / "kick-9"
+    sd.mkdir()
+    it = {"key": "v01_t1", "kind": "short"}
+    monkeypatch.setattr(review_check, "select", lambda *a: [it])
+    monkeypatch.setattr(review_check, "context", lambda *a: {})
+    monkeypatch.setattr(review_check, "signature", lambda *a: "s")
+    monkeypatch.setattr(review_check, "check_item", lambda *a: ([{"text": "face cut off"}], None))
+    columns = []
+    monkeypatch.setattr(review, "set_checks", lambda sdir, c, summaries: columns.append(summaries) or [])
+    said = []
+    review_check.run(sd, defaults, say=said.append)
+    assert columns == []                                                       # a publish writes its own
+    review_check.run(sd, defaults, say=said.append, kitsu=True, force=True)
+    assert columns == [{"v01_t1": "face cut off"}]
+    monkeypatch.setattr(review, "set_checks", lambda *a: (_ for _ in ()).throw(OSError("Kitsu down")))
+    review_check.run(sd, defaults, say=said.append, kitsu=True)
+    assert said[-1] == "  Kitsu Checks column not updated: OSError: Kitsu down"
+    passed = []
+    review_auto._column_trouble(sd, passed.append)(said[-1])
+    review_auto._column_trouble(sd, passed.append)("  v01_t1: face cut off")
+    assert passed == ["  kick-9: Kitsu Checks column not updated: OSError: Kitsu down"]
+
+
+def test_a_failed_re_read_still_lets_the_replan_place_the_item(cfg, tmp_path, monkeypatch):
+    sd, approved, _ = stub(cfg, tmp_path, monkeypatch)
+    monkeypatch.setattr(actions, "refresh", lambda c, item: (_ for _ in ()).throw(TimeoutError("slow")))
+    review_auto.run(cfg, say=lambda *_: None)
+    assert approved == ["v01_t1"] and jsonstate.read(sd / "review.json")["v01_t1"]["decision"] == "approved"
+
+
+def test_an_item_gone_from_review_isnt_asked_for_every_hour(cfg, tmp_path, monkeypatch):
+    from clipper import review_check
+
+    sd, _, _ = stub(cfg, tmp_path, monkeypatch)
+    jsonstate.write(sd / "checks.json", {"v01_t1": {"sig": "s", "at": "a1", "findings": [{"text": "x"}]},
+                                         "v02_t2": {"sig": "s", "at": "a1", "findings": [{"text": "y"}]}})
+    asked = []
+    monkeypatch.setattr(review_check, "run", lambda sdir, c, keys=None, **k:   # v02 isn't a review item now
+                        asked.append(keys) or {key: [{"text": "x"}] for key in keys if key != "v02_t2"})
+    with jsonstate.update(sd / "review_state.json", {}) as st:
+        st["v02_t2"]["fields"]["Score"] = "8"
+    t = datetime.now(UTC)
+    review_auto.run(cfg, say=lambda *_: None, now=t)
+    review_auto.run(cfg, say=lambda *_: None, now=t + timedelta(minutes=61))
+    assert asked == [["v01_t1", "v02_t2"], ["v01_t1"]]
+    with jsonstate.update(sd / "checks.json", {}) as ch:                       # republished, checked anew
+        ch["v02_t2"]["at"] = "a2"
+    review_auto.run(cfg, say=lambda *_: None, now=t + timedelta(minutes=122))
+    assert asked[-1] == ["v01_t1", "v02_t2"]
+
+
+def test_the_mirror_leaves_a_newer_decision_alone(cfg, tmp_path, monkeypatch):
+    sd, _, _ = stub(cfg, tmp_path, monkeypatch)
+
+    def slow_reread_then_a_reject(c, item):   # the user rejects in the gap, then the re-read fails
+        review_auto.touch(sd, item.key, "reject", "Brandon")
+        with jsonstate.update(sd / "review.json", {}) as rv:
+            rv[item.key]["decision"] = "rejected"
+        raise TimeoutError("slow")
+    monkeypatch.setattr(actions, "refresh", slow_reread_then_a_reject)
+    review_auto.run(cfg, say=lambda *_: None)
+    assert jsonstate.read(sd / "review.json")["v01_t1"]["decision"] == "rejected"
+    jsonstate.write(review_auto.path(sd), {"v02_t2": {"approved_at": T0.isoformat()}})
+    review_auto._mirror(sd, "v02_t2")
+    assert jsonstate.read(sd / "review.json")["v02_t2"]["decision"] == "approved"

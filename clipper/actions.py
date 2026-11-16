@@ -126,10 +126,12 @@ def _touched(item: Item, what: str, who: str) -> None:
         print(f"{item.ref}: couldn't note the action for auto-approval: {e}", file=sys.stderr)
 
 
-def approve(cfg: dict, item: Item, comment: str = "", who: str = "") -> dict:
+def approve(cfg: dict, item: Item, comment: str = "", who: str = "", sync: bool = True) -> dict:
+    """sync=False: the decision only, no re-read of the item ({} back); review_auto syncs
+    after it lets go of auto.json's lock."""
     _touched(item, "approve", who)
     _status(cfg, item, "approved", comment or f"Approved{_by(who)}")
-    return refresh(cfg, item)
+    return refresh(cfg, item) if sync else {}
 
 
 def reject(cfg: dict, item: Item, reason: str, who: str = "") -> dict:

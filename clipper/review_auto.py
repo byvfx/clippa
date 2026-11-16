@@ -13,6 +13,8 @@ is a Kitsu decision like any other (actions.approve, who "auto"), its rule in th
 auto.json per stream, {key: {...}}:
     seen         when the job first saw it pending without a published_at (older publishes)
     out, out_at  why it waits for a person now, for good
+    claimed_at   an approval was sent to Kitsu and its answer never came back (a timeout): if
+                 Kitsu took it, the next pass counts it as automatic (approved_at), not a person's
     approved_at  when it approved itself; undone: what a person did to it after that
 """
 
@@ -29,8 +31,13 @@ from .config import base, for_show, for_stream
 STATE = "auto.json"
 EVERY_S = 600          # serve's job
 RECHECK_S = 3600       # findings are checked again at most this often per stream
-RECHECK = "recheck.json"   # per stream, {"at": the last recheck}: serve runs each pass as a new process
+RECHECK = "recheck.json"   # per stream, {"at": the last recheck, "gone": {...}}: serve runs each pass as a new process
 WHO = "auto"           # the actions' `who` for an automatic approval
+# The approval's Kitsu calls, all of them, under auto.json's lock: a person's action waits
+# jsonstate.WAIT_S (60 s) for that lock. The deadline is a requests timeout, which bounds each
+# connect and each wait for data, not a whole response: one that keeps trickling in is not cut
+# (Kitsu's answers here are a few hundred bytes of JSON).
+KITSU_S = 25
 KINDS = ("short", "pick", "segment", "compilation")
 
 
@@ -72,6 +79,8 @@ def republished(sdir: Path, key: str) -> None:
     try:
         with jsonstate.update(path(sdir), {}) as state:
             e = state.get(key)
+            if e:
+                e.pop("claimed_at", None)   # a lost answer about the old revision
             if not (e and e.get("approved_at")):
                 return
             e["was_approved_at"] = e.pop("approved_at")
@@ -160,11 +169,13 @@ def verdict(cfg: dict, kind_of_stream: str, key: str, st: dict, r: dict, check: 
     from .actions import is_held
 
     rc = cfg["review"]
+    decision = r.get("decision") or "pending"
     if auto.get("approved_at"):
         return Verdict(key, "approved", "approved automatically", _when(auto["approved_at"]))
+    if auto.get("claimed_at") and not auto.get("out") and decision == "approved":
+        return Verdict(key, "approved", "approved automatically", _when(auto["claimed_at"]))
     if not rc["auto_approve"]:
         return Verdict(key, "off")
-    decision = r.get("decision") or "pending"
     if decision != "pending":
         return Verdict(key, "decided", decision.replace("_", " "))
     if auto.get("out"):
@@ -239,7 +250,9 @@ def _remember(sdir: Path, vs: dict[str, Verdict], state: dict, now: datetime) ->
     acted = {k: f"{v.why} by a person" if v.state == "decided" else v.why for k, v in vs.items()
              if (v.state == "decided" or v.lasting) and not auto.get(k, {}).get("out")
              and not auto.get(k, {}).get("approved_at")}
-    if not seen and not acted:
+    # an approval whose answer was lost, that Kitsu took after all: the audit counts it as ours
+    landed = [k for k, v in vs.items() if v.state == "approved" and not auto.get(k, {}).get("approved_at")]
+    if not seen and not acted and not landed:
         return
     with jsonstate.update(path(sdir), {}) as data:
         for k in seen:
@@ -248,6 +261,10 @@ def _remember(sdir: Path, vs: dict[str, Verdict], state: dict, now: datetime) ->
             e = data.setdefault(k, {})
             if not e.get("out"):
                 e["out"], e["out_at"] = why, now_iso(now)
+        for k in landed:
+            e = data.get(k) or {}
+            if e.get("claimed_at") and not e.get("out") and not e.get("approved_at"):
+                e["approved_at"] = e.pop("claimed_at")
 
 
 def recheck_due(sdir: Path, now: datetime) -> bool:
@@ -261,25 +278,71 @@ def recheck_due(sdir: Path, now: datetime) -> bool:
     return True
 
 
-def recheck(cfg: dict, sdir: Path, vs: dict[str, Verdict], now: datetime, say=print) -> dict[str, Verdict]:
-    """Check again, at most every RECHECK_S per stream, the items that wait only on their
-    checks (findings, or a run that failed). Findings stay in checks.json until something checks
-    the item again, and only a publish or a due item did: findings from older check code
+def _column_trouble(sdir: Path, say):
+    """review_check.run's `say` for a pass: its per-item lines dropped, a Kitsu column it
+    couldn't write passed on."""
+    return lambda s: say(f"  {sdir.name}: {s.strip()}") if s.startswith("  Kitsu Checks column") else None
+
+
+def flagged(sdir: Path) -> list[str]:
+    """A show without auto_approve: its pending items with findings or a failed run, which a
+    recheck keeps current (the war room's ⚠ and the card read them)."""
+    from . import review_check
+
+    state = jsonstate.read_or(sdir / "review_state.json", {})
+    decisions = jsonstate.read_or(sdir / "review.json", {})
+    checks = review_check.load(sdir)
+    return [k for k in state if (decisions.get(k, {}).get("decision") or "pending") == "pending"
+            and (c := checks.get(k)) and (c.get("findings") or not c.get("sig"))]
+
+
+def recheck(cfg: dict, sdir: Path, keys: list[str], now: datetime, say=print) -> bool:
+    """Check these items again (those that wait only on their checks), at most every RECHECK_S
+    per stream; True when it ran. Findings stay in checks.json until something checks the item
+    again, and only a publish or a due item did: findings from older check code
     (kick-137715636's, 11-14) kept items out of the window for good. review_check.run skips an
     item whose signature is unchanged, so a finding that still holds costs no vision call. An
     item never checked waits for a person as before, and nothing runs with [review] checks off.
-    checks.json only: the Kitsu Checks column keeps what the last publish wrote."""
+    What changed goes to the Kitsu Checks column too. An item that is no longer one of the
+    stream's review items (review.items) can't be checked: it is left out until its checks.json
+    entry changes, rather than asked for every hour."""
     from . import review_check
 
-    keys = [k for k, v in vs.items() if v.on_checks]
-    if not keys or not cfg["review"]["checks"] or not recheck_due(sdir, now):
-        return vs
+    if not keys or not cfg["review"]["checks"]:
+        return False
+    have = review_check.load(sdir)
+    gone = jsonstate.read_or(sdir / RECHECK, {}).get("gone") or {}
+    keys = [k for k in keys if k not in gone or gone[k] != (have.get(k) or {}).get("at", "")]
+    if not keys or not recheck_due(sdir, now):
+        return False
     try:
-        review_check.run(sdir, cfg, keys=keys, say=lambda *_: None)
+        found = review_check.run(sdir, cfg, keys=keys, kitsu=True, say=_column_trouble(sdir, say))
     except Exception as e:  # noqa: BLE001  # the due items still go; the next recheck tries again
         say(f"  {sdir.name}: checks not run again: {type(e).__name__}: {e}")
-        return vs
-    return verdicts(cfg, sdir, now, strict=True)
+        return False
+    missing = {k: (have.get(k) or {}).get("at", "") for k in keys if k not in found}
+    published = set(jsonstate.read_or(sdir / "review_state.json", {}))
+    with jsonstate.update(sdir / RECHECK, {}) as st:
+        st["gone"] = {k: at for k, at in {**(st.get("gone") or {}), **missing}.items()
+                      if (k in missing or k not in found) and k in published}
+    return True
+
+
+def _mirror(sdir: Path, key: str, say=print) -> None:
+    """Kitsu has the automatic approval but the item couldn't be re-read: say "approved" in
+    review.json, so the replan after this pass places it. Under auto.json's lock, and only while
+    the approval stands (nobody has acted since: touch notes that under the same lock) and
+    review.json still has the item pending; anything newer is left for the next sync."""
+    try:
+        with jsonstate.locked(path(sdir)):
+            e = load(sdir, strict=True).get(key, {})
+            if not e.get("approved_at") or e.get("out") or e.get("undone"):
+                return
+            with jsonstate.update(sdir / "review.json", {}) as rv:
+                if (rv.get(key, {}).get("decision") or "pending") == "pending" and key in rv:
+                    rv[key]["decision"] = "approved"
+    except (OSError, ValueError) as e2:
+        say(f"  {sdir.name}/{key}: review.json not updated either: {e2}")
 
 
 def approve_due(cfg: dict, sdir: Path, keys: list[str], say=print) -> list[str]:
@@ -290,7 +353,7 @@ def approve_due(cfg: dict, sdir: Path, keys: list[str], say=print) -> list[str]:
 
     cfg = for_stream(cfg, sdir)
     review.sync(sdir, cfg, keys=keys, quiet=True)
-    review_check.run(sdir, cfg, keys=keys, say=lambda *_: None)
+    review_check.run(sdir, cfg, keys=keys, kitsu=True, say=_column_trouble(sdir, say))
     now = datetime.now(UTC)
     state = jsonstate.read_or(sdir / "review_state.json", {})
     decisions = jsonstate.read_or(sdir / "review.json", {})
@@ -305,19 +368,33 @@ def approve_due(cfg: dict, sdir: Path, keys: list[str], say=print) -> list[str]:
         score = score_of(state[key], decisions.get(key, {}))
         rule = (f"no action in {rc['auto_grace_minutes']} min, checks clean"
                 + (f", score {score:g}" if score is not None else ""))
+        item = actions.Item(sdir, key, state[key])
         try:
             # Under auto.json's lock: a person's action notes itself there (touch) before its Kitsu
             # write, so it either landed first and is seen here, or waits and lands after this.
+            # Only the decision itself: its Kitsu calls give up after KITSU_S, well inside the
+            # wait a person's touch allows (and the lock's stale age), and the re-read of the
+            # item happens after the lock is let go.
             with jsonstate.locked(path(sdir)):
                 if load(sdir, strict=True).get(key, {}).get("out"):
                     continue
-                actions.approve(cfg, actions.Item(sdir, key, state[key]),
-                                f"Approved automatically: {rule} ([review] auto_approve)", who=WHO)
                 with jsonstate.update(path(sdir), {}) as data:
-                    data.setdefault(key, {})["approved_at"] = now_iso()
+                    data.setdefault(key, {})["claimed_at"] = now_iso()
+                with review.kitsu_deadline(KITSU_S):
+                    actions.approve(cfg, item, f"Approved automatically: {rule} ([review] auto_approve)",
+                                    who=WHO, sync=False)
+                with jsonstate.update(path(sdir), {}) as data:
+                    e = data.setdefault(key, {})
+                    e.pop("claimed_at", None)
+                    e["approved_at"] = now_iso()
         except Exception as e:  # noqa: BLE001  # the rest still go, and what went still replans
             say(f"  {sdir.name}/{key}: not approved: {type(e).__name__}: {e}")
             continue
+        try:
+            actions.refresh(cfg, item)
+        except Exception as e:  # noqa: BLE001  # approved in Kitsu; the next sync reads it
+            say(f"  {sdir.name}/{key}: approved, but not re-read from Kitsu: {type(e).__name__}: {e}")
+            _mirror(sdir, key, say)
         say(f"  {sdir.name}/{key}: approved ({rule})")
         done.append(key)
     return done
@@ -336,11 +413,17 @@ def run(cfg: dict, stream: str | None = None, apply: bool = True, say=print,
     for sdir in dirs:
         scfg = for_stream(cfg, sdir)
         if not scfg["review"]["auto_approve"]:
+            if apply:   # its ⚠ badges still go stale: keep the findings current, nothing else
+                try:
+                    recheck(scfg, sdir, flagged(sdir), now, say)
+                except Exception as e:  # noqa: BLE001  # the next pass tries again
+                    say(f"  {sdir.name}: checks not run again: {type(e).__name__}: {e}")
             continue
         try:   # one stream's trouble (a broken auto.json, Kitsu down) mustn't stop the rest
             vs = verdicts(scfg, sdir, now, strict=apply)
             if apply:
-                vs = recheck(scfg, sdir, vs, now, say)
+                if recheck(scfg, sdir, [k for k, v in vs.items() if v.on_checks], now, say):
+                    vs = verdicts(scfg, sdir, now, strict=True)
                 _remember(sdir, vs, jsonstate.read_or(sdir / "review_state.json", {}), now)
             due = [k for k, v in vs.items() if v.state == "due"]
             if due and apply:

@@ -251,12 +251,15 @@ messages: GitHub closes the issue on "fix".
   in clipper.toml (backup `backups/clipper.toml.before_cam_marks_2026-11-14`). Step B, `clipper review auto`
   (`clipper/review_auto.py`, serve's `auto` job every 10 min, wiki Review#approval-by-silence), is PR #265,
   merged and deployed 11-14 (Copilot's 9 findings fixed, and 5 of a second local review's 7; Copilot
-  didn't see the two fix commits). Left open: the approval holds auto.json's lock over its Kitsu calls,
-  so if Kitsu stalls over 60 s a person's action can go unrecorded in auto.json (their Kitsu decision
-  still lands last, and the checkup still flags it), and over 120 s the lock goes stale and another
-  process can take it. Stale findings (PR #270, deployed 11-15): the auto job re-checks, at most hourly
-  per stream (`recheck.json`), items held only by their findings; the Kitsu Checks column and shows without
-  auto keep old findings until the next publish. **On for Kino since 11-15** (user): `[shows.kino.review] auto_approve = true` in the
+  didn't see the two fix commits). Stale findings (PR #270, deployed 11-15): the auto job re-checks, at
+  most hourly per stream (`recheck.json`), items held only by their findings. Hardening (11-15, branch
+  `review-auto-hardening`, PR open, not deployed): the approval's Kitsu calls run under a 25 s deadline
+  (`review.kitsu_deadline`), the re-read after the lock; a lost answer Kitsu took counts as automatic
+  (`claimed_at`); every check run but a publish's writes the Kitsu Checks column (never read as a
+  person's edit); shows without auto get the hourly recheck too (vision only when an item's inputs
+  changed); items gone from review aren't re-asked. Left on purpose: a response that keeps trickling
+  isn't cut by the deadline, and a person approving in Kitsu's own page right after a lost answer
+  would count as automatic. **On for Kino since 11-15** (user): `[shows.kino.review] auto_approve = true` in the
   NAS clipper.toml (backup `backups/clipper.toml.before_kino_auto_approve_2026-11-15`), serve restarted, its
   `auto` job in the heartbeat; at turn-on Kino had no open Shorts (11 segments, 5 compilations, which wait).
   Next, after a few days of Kino with nothing undone (checkup's `auto` check, `clipper review auto --dry-run`):
