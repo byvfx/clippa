@@ -74,3 +74,76 @@ def test_check_refuses_anyone_off_the_allowlist_or_in_another_guild(defaults):
     assert stranger.response.sent == ["You're not on this bot's allowlist."]
     elsewhere = interaction(7, guild_id=1, done=True)   # after a defer the answer goes by followup
     assert asyncio.run(b.check(elsewhere)) is False and elsewhere.followup.sent == ["You're not on this bot's allowlist."]
+
+
+class FakeChannel:
+    """A text channel (or thread): what was sent, each message able to start a thread."""
+
+    def __init__(self, cid: int = 5):
+        self.id, self.sent, self.threads = cid, [], []
+
+    async def send(self, text, view=None, allowed_mentions=None):
+        self.sent.append((text, [c.custom_id for c in view.children] if view else []))
+        msg = SimpleNamespace(id=100 + len(self.sent))
+
+        async def create_thread(name, auto_archive_duration=None):
+            t = FakeChannel(900 + len(self.threads))
+            self.threads.append((name, t))
+            return t
+        msg.create_thread = create_thread
+        return msg
+
+
+def test_the_bot_posts_alerts_then_the_digest_in_a_thread(defaults, monkeypatch):
+    from clipper import blinds
+
+    b, chan, marks = make_bot(defaults), FakeChannel(), []
+    own = [{"id": "cdan-1", "ours": True}]
+    monkeypatch.setattr(blinds, "own_alerts", lambda cfg: own)
+    monkeypatch.setattr(blinds, "digest_due", lambda cfg: "2026-11-15")
+    monkeypatch.setattr(blinds, "start_digest", lambda cfg, day: ([{"id": "cdan-1"}, {"id": "cdan-2"}], 3))
+    monkeypatch.setattr(blinds, "alert_text", lambda bl, n=0: f"{n}:{bl['id']}")
+    monkeypatch.setattr(blinds, "mark_alerted", lambda cfg, bid, where: marks.append(("alerted", bid, where)))
+    monkeypatch.setattr(blinds, "mark_digested", lambda cfg, bid, day, thread: marks.append(("digest", bid, thread)))
+
+    async def channel():
+        return chan
+    monkeypatch.setattr(b, "blinds_channel", channel)
+    asyncio.run(b.post_blinds())
+    assert chan.sent[0] == ("0:cdan-1", ["clipper:blindguess:cdan-1", "clipper:blindnone:cdan-1",
+                                         "clipper:blindnot:cdan-1"])
+    assert "2 new" in chan.sent[1][0] and "3 older" in chan.sent[1][0] and chan.sent[1][1] == []
+    name, thread = chan.threads[0]
+    assert name == "Blinds 2026-11-15" and [t for t, _ in thread.sent] == ["1:cdan-1", "2:cdan-2"]
+    assert marks == [("alerted", "cdan-1", "5/101"), ("digest", "cdan-1", "900"), ("digest", "cdan-2", "900")]
+    own.clear()
+    monkeypatch.setattr(blinds, "digest_due", lambda cfg: "")
+    monkeypatch.setattr(b, "blinds_channel", lambda: (_ for _ in ()).throw(AssertionError("no channel needed")))
+    asyncio.run(b.post_blinds())
+
+
+def test_a_blind_button_answers_and_ends_the_message_with_it(defaults, monkeypatch):
+    from clipper import blinds
+
+    b, got, edits = make_bot(defaults), [], []
+    monkeypatch.setattr(blinds, "answer", lambda cfg, bid, name, why, none, not_ours, who="":
+                        got.append((bid, name, why, none, not_ours, who)) or
+                        {"status": "no_idea" if none else "answered", "guesses": []})
+
+    async def edit_message(content, allowed_mentions=None):
+        edits.append(content)
+    it = interaction(7)
+    it.message = SimpleNamespace(content="1:cdan-1\n→ Your guess: **Old**")
+    it.response.edit_message = edit_message
+    asyncio.run(b.on_button(it, "blindnone", "cdan-1"))
+    assert got == [("cdan-1", "", "", True, False, "Discord @who")] and edits == ["1:cdan-1\n→ No idea."]
+
+    def refuse(*a, **k):
+        raise bot.ClipperError("no blind 'x'")
+    monkeypatch.setattr(blinds, "answer", refuse)
+    asyncio.run(b.on_button(it, "blindnot", "x"))
+    assert it.response.sent == ["Nothing changed: no blind 'x'"]
+    modal = []
+    it.response.send_modal = lambda m: modal.append(m) or asyncio.sleep(0)
+    asyncio.run(b.on_button(it, "blindguess", "cdan-1"))
+    assert isinstance(modal[0], bot.BlindGuess) and modal[0].bid == "cdan-1"

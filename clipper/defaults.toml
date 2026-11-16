@@ -290,6 +290,15 @@ preshow_minutes = 60       # suggest the day's stories this long before a show's
 #   blind = "^Blind Item"  # titles that are blinds (a regex); "(?i)blind" when unset
 #   reveal = "Revealed"    # titles that are reveals; "(?i)reveal" when unset (checked first)
 sources = []
+check_minutes = 0          # serve's `blinds check` this often (30 is plenty); 0 = off
+# The bot asks you in Discord: "digest" = one thread a day at digest_at listing every new blind,
+# plus an alert of its own for each that could be about someone you follow; "all" = an alert
+# for every blind; "ours" = only those; "off" = the war room only. Private-person blinds never.
+alert = "digest"
+digest_at = "20:00"        # [schedule] timezone
+sensitive_alerts = false   # alert blinds tagged sensitive (crime, health, sexuality, abuse, minors) too
+channel = "blinds"         # Discord text channel by name: the bot makes it if missing, seen by you and it only
+channel_id = ""            # or a channel by id (wins over channel)
 clues_model = "claude-haiku-5-5"   # reads each blind's clues (~$0.0002 a blind); "" = none
 clues_effort = "low"
 prompt_version = "v1"      # clipper/prompts/blinds_{clues,pair}_<v>.md

@@ -5,9 +5,9 @@ are both scored. It works for any gossip source and any kind of drama, not only 
 install follows. It is research for you alone: nothing in it is ever published (#111).
 
 It is built in steps. **In so far:** the sources, storage, the clue pass, pairing twins,
-answering from the command line, and the war room's Blinds window. Still to come: the Discord
-digest and serve's regular check (step 2), the investigation after your answer (step 3), and
-reveals with the scorecard (step 4).
+answering from the command line, the war room's Blinds window, serve's regular check and the
+questions in [Discord](#discord). Still to come: the investigation after your answer (step 3),
+and reveals with the scorecard (step 4).
 
 ## Sources
 
@@ -114,15 +114,60 @@ Every blind carries tags:
 - `private`
 - `ours`
 
-`[blinds] hide = ["sensitive:health", "field:sports"]` leaves those out of the list, and out of
-the alerts once there are any. A hidden blind is kept, and `--all` shows it.
+`[blinds] hide = ["sensitive:health", "field:sports"]` leaves those out of the list and out of
+Discord. A hidden blind is kept, and `--all` shows it.
 
 ## Your answer
 
 `answer` takes a name, `--none` or `--not-ours`. A name is matched to [People](People), and its
 record's id is kept. A name nobody answers to, or one that matches two records, is kept as you
 wrote it. Answering again replaces your last answer; the old one stays in the blind's history.
-The war room answers through the same function, and in step 2 Discord will too.
+The war room and Discord answer through the same function.
+
+## Discord
+
+With `[blinds] check_minutes` set (30 here; 0, the default, is off), serve runs `clipper blinds
+check` that often, and the [bot](Discord-app) asks you about what it stored. It shows the blind,
+its source and link, its clues and its tags, and **never a guess of clipper's**, so yours is your
+own. Each blind has three buttons:
+
+- **I think it's…** opens a form: the name, and why if you like ("he said he was in Vegas that
+  week").
+- **No idea**
+- **Not ours**: nothing more is spent on it.
+
+The answer goes at the end of the message. The buttons stay, so you can change it.
+
+`[blinds] alert` decides what is posted:
+
+| alert | What you get |
+|---|---|
+| `digest` (the default) | One thread a day at `digest_at` (20:00, `[schedule] timezone`) with every new blind, numbered. A blind that could be about someone you follow also gets an alert of its own as soon as its clues are read. |
+| `all` | An alert of its own for every blind. |
+| `ours` | Alerts only for blinds that could be about someone you follow. |
+| `off` | Nothing in Discord: the war room only. |
+
+**What is never posted:**
+- a blind about a private person
+- a hidden one (`[blinds] hide`)
+- one you already answered, or one whose clues aren't read yet (it comes once they are)
+- one published more than two days ago, so a backfill doesn't flood the channel
+- a twin whose other half was already asked about: a pair is asked once, the twin shown with it
+
+Sensitive blinds (crime, health, sexuality, abuse, minors) are posted only with `[blinds]
+sensitive_alerts = true`. This install has it on; the default is off. To mute one kind, add its
+tag to `hide`.
+
+A digest shows the newest 40 blinds; the war room has the rest. If the bot stops partway through,
+the blinds it didn't post come in the next day's digest. Typing an answer in the thread isn't
+read: the bot has no Message Content intent, so answer with the buttons.
+
+**The channel** is `[blinds] channel` (`blinds`), or `channel_id`. The bot makes the channel if it
+is missing, **private**: only the bot and `[discord] allowed_user_ids` can see it. That needs
+Manage Channels. If the channel is one @everyone can see, the bot still uses it, but DMs you a
+warning (at most once per `[notify] cooldown_hours`).
+
+`clipper doctor` checks `alert`, `digest_at` and the channel whenever `check_minutes` is on.
 
 ## The war room
 
@@ -158,5 +203,5 @@ reads them.
 Everything is in `[paths] news/blinds/blinds.sqlite`. The blind's text is kept, because it is
 short and it is what the clue pass reads. Linked articles are never fetched. Blinds older than
 `keep_days` (365) are forgotten, except ones you answered. A test checks that nothing but the
-command and the war room's window reads the blinds, so no title, description, cover, post or
-weekly issue can pick one up.
+command, the war room's window and the bot's questions reads the blinds, so no title,
+description, cover, post or weekly issue can pick one up.

@@ -12,8 +12,8 @@ things on Discord's side, once:
 3. **Invite it to your server.** Under **OAuth2 → URL Generator** tick the scopes `bot` and
    `applications.commands`, and the bot permissions View Channels, Send Messages, Create Public
    Threads, Send Messages in Threads, Embed Links, Attach Files and Read Message History (plus
-   Manage Channels if clipper may make `#weekly` for you). Open the URL it builds and pick the
-   server.
+   Manage Channels if clipper may make `#weekly`, `#news` or a private `#blinds` for you). Open
+   the URL it builds and pick the server.
 4. **Copy the ids.** Discord → Settings → Advanced → Developer Mode on. Then right-click → Copy
    ID on the server (`[discord] guild_id`), on the review channel, a text or forum channel
    (`review_channel_id`: one thread or post per stream), and on yourself (`allowed_user_ids`;
@@ -37,3 +37,6 @@ Settings worth knowing, all under `[discord]` and `[notify]` in `clipper/default
 to fit; `thread_name` names the threads; `replan` reruns the schedule after each decision;
 `refresh_minutes` keeps the cards in step with decisions made in Kitsu or the war room, and with
 items that [approved themselves](Review#approval-by-silence).
+
+The bot also posts the [news watcher](News-watcher)'s stories and asks you about gossip
+[blind items](Blind-items#discord), each in a channel of its own.

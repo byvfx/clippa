@@ -1010,7 +1010,7 @@ def check_news(cfg: dict, offline: bool) -> None:
 
 
 def check_blinds(cfg: dict, offline: bool) -> None:
-    """#111: the [[blinds.sources]] settings, and (online) whether each feed answers."""
+    """#111: the [[blinds.sources]] settings, the alerts', and (online) whether each feed answers."""
     if not cfg["blinds"]["sources"]:
         return
     from . import blinds, news
@@ -1020,6 +1020,7 @@ def check_blinds(cfg: dict, offline: bool) -> None:
     except ClipperError as e:
         fail("blinds", str(e), "fix the entry in clipper.toml (wiki Blind-items)")
         return
+    check_blind_alerts(cfg)
     if offline:
         ok("blinds", f"{len(srcs)} source(s): {', '.join(s['name'] for s in srcs)}")
         return
@@ -1034,6 +1035,33 @@ def check_blinds(cfg: dict, offline: bool) -> None:
         warn("blinds", "feeds not answering: " + "; ".join(bad), "check the feed in [[blinds.sources]]")
     else:
         ok("blinds", f"{len(srcs)} source(s) answer: {', '.join(s['name'] for s in srcs)}")
+
+
+def check_blind_alerts(cfg: dict) -> None:
+    """With serve's check on: the alert mode, the digest's time and the channel the bot asks in."""
+    from . import blinds
+
+    bc = cfg["blinds"]
+    if bc["check_minutes"] <= 0:
+        return
+    bad = []
+    if bc["alert"] not in blinds.ALERTS:
+        bad.append((f"[blinds] alert {bc['alert']!r}", f"use one of {', '.join(blinds.ALERTS)}"))
+    try:
+        blinds.digest_time(cfg)
+    except ClipperError as e:
+        bad.append((str(e), 'like digest_at = "20:00" ([schedule] timezone)'))
+    if bc["alert"] != "off" and not (str(bc["channel"]).strip() or bc["channel_id"]):
+        bad.append(("[blinds] alert is on but there is no channel to ask in",
+                    'set [blinds] channel (a name the bot makes, private) or channel_id, or alert = "off"'))
+    for what, hint in bad:
+        fail("blinds", what, hint)
+    if bad:
+        return
+    how ={"digest": f"a digest at {bc['digest_at']}, alerts for ones that could be ours",
+           "all": "an alert for each", "ours": "alerts for ones that could be ours", "off": "no alerts"}[bc["alert"]]
+    ok("blinds", f"checked every {bc['check_minutes']} min; {how}"
+       + ("; sensitive ones too" if bc["sensitive_alerts"] and bc["alert"] != "off" else ""))
 
 
 def check_broll(cfg: dict) -> None:

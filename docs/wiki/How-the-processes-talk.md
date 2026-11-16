@@ -114,7 +114,7 @@ process instead and logs it to `logs/retake.log`.
 ## Child processes
 
 - **serve** runs each background job as a `clipper <args>` child (upload, preshow check, retake,
-  review auto, tiktok, x, analytics, cast auto, news check) and copies its output into `logs/serve.log`
+  review auto, tiktok, x, analytics, cast auto, news check, blinds check) and copies its output into `logs/serve.log`
   (`[paths] serve_log`). A non-zero exit queues a DM (kind `upload` or `failure`) keyed on the
   command and its last line, so a different item failing the next hour isn't swallowed by the
   cooldown.

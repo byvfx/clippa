@@ -1,4 +1,5 @@
-"""`clipper blinds` (#111, step 1): collect gossip blind items, read their clues, pair twins.
+"""`clipper blinds` (#111, steps 1 and 2): collect gossip blind items, read their clues, pair
+twins, and pick what the bot asks you about in Discord.
 
     clipper blinds check [--backfill DAYS] [--no-clues] [--dry-run]
                                     fetch each source, store new blinds and reveals, read the
@@ -10,8 +11,8 @@
     clipper blinds sources          each source: last fetch, error, how many stored
 
 A blind is a gossip item with the name left out and clues left in. The user is asked first
-who it is about (an answer here; Discord and the war room in step 2), and only then does
-clipper investigate (step 3); reveals score both guesses (step 4). This step collects them.
+who it is about (here, in the war room or in Discord), and only then does clipper investigate
+(step 3); reveals score both guesses (step 4).
 
 Sources are [[blinds.sources]] entries, none by default: name, feed, kind (the parser:
 "blogger", "wordpress", "rss"), and the title patterns that pick blinds (`blind`) and reveals
@@ -27,6 +28,11 @@ a name: the user's guess comes first and must be their own. Tags (source, field,
 private, ours) are what [blinds] hide filters on. Twins from different sources within
 pair_days are paired (prompts/blinds_pair_<v>.md) so they are asked, and later answered, as
 one event.
+
+Alerts (step 2): serve runs `blinds check` every [blinds] check_minutes; the bot posts what
+own_alerts and start_digest pick ([blinds] alert: a digest a day at digest_at, an alert of its
+own for each or for the ones that could be ours) and answers through answer(). Private-person,
+hidden and (unless sensitive_alerts) sensitive blinds are never posted, nor old ones.
 
 Everything is in [paths] news/blinds/blinds.sqlite. The blind's text is kept (it is short
 and it is the input); linked articles are never fetched, and nothing here is ever published.
@@ -65,12 +71,14 @@ CREATE TABLE IF NOT EXISTS blinds (id TEXT PRIMARY KEY, source TEXT, kind TEXT, 
     published TEXT, day TEXT, seen_at TEXT, text TEXT, edited_at TEXT, status TEXT,
     clues TEXT, claim TEXT, fields TEXT, ours INTEGER, sensitive TEXT, private INTEGER, clued_at TEXT,
     clue_model TEXT, clue_tries INTEGER DEFAULT 0, pair TEXT, pair_why TEXT, guesses TEXT, history TEXT, claim_token TEXT, claimed_at TEXT,
-    paired_at TEXT);
+    paired_at TEXT, alerted_at TEXT, alert_msg TEXT, digest_day TEXT);
 CREATE INDEX IF NOT EXISTS blinds_status ON blinds(status);
 CREATE INDEX IF NOT EXISTS blinds_published ON blinds(published);
 CREATE TABLE IF NOT EXISTS sources (name TEXT PRIMARY KEY, etag TEXT, modified TEXT, fetched_at TEXT,
     error TEXT, items INTEGER DEFAULT 0);
+CREATE TABLE IF NOT EXISTS digests (day TEXT PRIMARY KEY, posted_at TEXT, thread TEXT, blinds INTEGER DEFAULT 0);
 """
+ADDED = ("paired_at", "alerted_at", "alert_msg", "digest_day")  # columns a store from before them lacks
 
 CLUES_SCHEMA = {
     "type": "object",
@@ -117,9 +125,10 @@ def connect(cfg: dict) -> sqlite3.Connection:
     db = sqlite3.connect(home(cfg) / "blinds.sqlite", timeout=30)
     db.row_factory = sqlite3.Row
     db.executescript(SCHEMA)
-    if "paired_at" not in {r["name"] for r in db.execute("PRAGMA table_info(blinds)")}:  # a store from before it
-        db.execute("ALTER TABLE blinds ADD COLUMN paired_at TEXT")
-        db.commit()
+    have = {r["name"] for r in db.execute("PRAGMA table_info(blinds)")}
+    for col in (c for c in ADDED if c not in have):
+        db.execute(f"ALTER TABLE blinds ADD COLUMN {col} TEXT")
+    db.commit()
     return db
 
 
@@ -128,7 +137,7 @@ def as_dict(row: sqlite3.Row) -> dict:
     for k in ("clues", "fields", "sensitive", "guesses", "history"):
         d[k] = json.loads(d[k]) if d.get(k) else []
     d["ours"], d["private"] = bool(d["ours"]), bool(d["private"])
-    for k in ("claim_token", "claimed_at", "clue_tries", "paired_at"):
+    for k in ("claim_token", "claimed_at", "clue_tries", "paired_at", "alerted_at", "alert_msg", "digest_day"):
         d.pop(k, None)
     return d
 
@@ -777,3 +786,191 @@ def sources_report(cfg: dict) -> list[dict]:
     return [{"name": s["name"], "feed": s["feed"], "kind": s["kind"], **{k: rows.get(s["name"], {}).get(k)
                                                                           for k in ("fetched_at", "error", "items")}}
             for s in source_list(cfg)]
+
+
+# ---------- alerts (the bot posts them in Discord) ----------
+
+ALERTS = ("digest", "all", "ours", "off")
+ALERT_DAYS = 2      # only blinds published this recently are alerted: a backfill's old ones stay in the war room
+DIGEST_MAX = 40     # blinds in one digest; the oldest past it are left to the war room
+MD = re.compile(r"([\\*_~`|\[\]()<])")  # what makes bold, spoilers, code or a link of outside text
+
+
+def alertable(cfg: dict, b: dict) -> bool:
+    """Waiting for a guess, not about a private person, not hidden by [blinds] hide, and not
+    sensitive unless [blinds] sensitive_alerts."""
+    return (b["kind"] == "blind" and b["status"] == "waiting" and not b["private"] and not hidden(cfg, b)
+            and (cfg["blinds"]["sensitive_alerts"] or not b["sensitive"]))
+
+
+def _fresh(cfg: dict, db: sqlite3.Connection, where: str) -> list[dict]:
+    cut = news.iso(news.now() - timedelta(days=ALERT_DAYS))
+    rows = [as_dict(r) for r in db.execute("SELECT * FROM blinds WHERE kind = 'blind' AND status = 'waiting' "
+                                           f"AND published > ? AND {where} ORDER BY published, id", (cut,))]
+    return [b for b in rows if alertable(cfg, b)]
+
+
+def _twin_taken(db: sqlite3.Connection, b: dict, column: str) -> bool:
+    """A pair is asked once: its other half was already alerted (or put in a digest)."""
+    return bool(b["pair"]) and db.execute(f"SELECT 1 FROM blinds WHERE pair = ? AND id != ? AND {column} IS NOT NULL",
+                                          (b["pair"], b["id"])).fetchone() is not None
+
+
+def _with_twin(db: sqlite3.Connection, b: dict) -> dict:
+    if b["pair"]:
+        b["twin"] = next((as_dict(r) for r in db.execute("SELECT * FROM blinds WHERE pair = ? AND id != ?",
+                                                          (b["pair"], b["id"]))), None)
+    return b
+
+
+def own_alerts(cfg: dict) -> list[dict]:
+    """The blinds that get an alert of their own, oldest first: with alert = "all" every one,
+    with "digest" or "ours" those that could be about someone this install follows. A blind
+    whose twin was alerted is marked and skipped (a pair is asked once)."""
+    mode = cfg["blinds"]["alert"]
+    if mode not in ("all", "digest", "ours"):
+        return []
+    db = connect(cfg)
+    try:
+        out, pairs = [], set()
+        for b in _fresh(cfg, db, "alerted_at IS NULL" + ("" if mode == "all" else " AND ours = 1")):
+            if b["pair"] in pairs or _twin_taken(db, b, "alerted_at"):
+                db.execute("UPDATE blinds SET alerted_at = ?, alert_msg = 'twin' WHERE id = ?",
+                           (news.iso(news.now()), b["id"]))
+                continue
+            pairs.add(b["pair"] or b["id"])
+            out.append(_with_twin(db, b))
+        db.commit()
+        return out
+    finally:
+        db.close()
+
+
+def mark_alerted(cfg: dict, bid: str, where: str) -> None:
+    """Its alert was posted (where: "<channel id>/<message id>")."""
+    db = connect(cfg)
+    try:
+        db.execute("UPDATE blinds SET alerted_at = ?, alert_msg = ? WHERE id = ?", (news.iso(news.now()), where, bid))
+        db.commit()
+    finally:
+        db.close()
+
+
+def digest_time(cfg: dict) -> tuple[int, int]:
+    m = re.fullmatch(r"([01]?\d|2[0-3]):([0-5]\d)", str(cfg["blinds"]["digest_at"]).strip())
+    if not m:
+        raise ClipperError(f"[blinds] digest_at {cfg['blinds']['digest_at']!r}: use HH:MM, like \"20:00\"")
+    return int(m[1]), int(m[2])
+
+
+def digest_due(cfg: dict, now: datetime | None = None) -> str:
+    """Today's date ([schedule] timezone) once it is past [blinds] digest_at and today's digest
+    hasn't been started; else ""."""
+    from zoneinfo import ZoneInfo
+
+    if cfg["blinds"]["alert"] != "digest":
+        return ""
+    local = (now or news.now()).astimezone(ZoneInfo(cfg["schedule"]["timezone"]))
+    if (local.hour, local.minute) < digest_time(cfg):
+        return ""
+    day = local.date().isoformat()
+    db = connect(cfg)
+    try:
+        return "" if db.execute("SELECT 1 FROM digests WHERE day = ?", (day,)).fetchone() else day
+    finally:
+        db.close()
+
+
+def start_digest(cfg: dict, day: str) -> tuple[list[dict], int]:
+    """Claim the day's digest (once: a second caller gets nothing) -> (its blinds, oldest first,
+    at most DIGEST_MAX; how many older ones were left out). Every blind not in a digest yet is in
+    it, the ones with an alert of their own too; the ones left out are marked as in it."""
+    db = connect(cfg)
+    try:
+        db.execute("BEGIN IMMEDIATE")
+        if db.execute("INSERT OR IGNORE INTO digests (day, posted_at) VALUES (?, ?)",
+                      (day, news.iso(news.now()))).rowcount == 0:
+            db.rollback()
+            return [], 0
+        out, pairs = [], set()
+        for b in _fresh(cfg, db, "digest_day IS NULL"):
+            if b["pair"] in pairs or _twin_taken(db, b, "digest_day"):
+                db.execute("UPDATE blinds SET digest_day = ? WHERE id = ?", (day, b["id"]))
+                continue
+            pairs.add(b["pair"] or b["id"])
+            out.append(b)
+        left = out[:-DIGEST_MAX] if len(out) > DIGEST_MAX else []
+        for b in left:  # the oldest: the war room has them
+            db.execute("UPDATE blinds SET digest_day = ? WHERE id = ?", (day, b["id"]))
+        kept = [_with_twin(db, b) for b in out[len(left):]]
+        db.execute("UPDATE digests SET blinds = ? WHERE day = ?", (len(kept), day))
+        db.commit()
+        return kept, len(left)
+    finally:
+        db.close()
+
+
+def mark_digested(cfg: dict, bid: str, day: str, thread: str = "") -> None:
+    """A blind was posted in the day's digest (thread: the digest's thread id, kept on the day)."""
+    db = connect(cfg)
+    try:
+        db.execute("UPDATE blinds SET digest_day = ? WHERE id = ?", (day, bid))
+        if thread:
+            db.execute("UPDATE digests SET thread = ? WHERE day = ?", (thread, day))
+        db.commit()
+    finally:
+        db.close()
+
+
+def md(text: str) -> str:
+    """Outside text shown as text in Discord: no markdown, no links made from it."""
+    return MD.sub(r"\\\1", text)
+
+
+def alert_text(b: dict, n: int = 0, limit: int = 1900) -> str:
+    """A blind as the bot posts it: the blind, its clues and tags, never a guess of clipper's."""
+    src = b["source"].upper() if len(b["source"]) <= 5 else b["source"].title()
+    title = md(b["title"] or "Blind")
+    link = f"[{title}](<{b['url']}>)" if re.match(r"https?://", b["url"] or "") else title
+    head = (f"**{n}.** " if n else "👀 **Could be someone you follow.** " if b["ours"] else "") \
+        + f"{src}: {link} · {b['day']}"
+    clues = [f"- {md(c['text'])} *({c['type']})*" for c in b["clues"][:8]]
+    tail = [*(["**Clues**", *clues] if clues else [])]
+    if b.get("twin"):
+        t = b["twin"]
+        tail.append(f"Twin ({t['source']}, {t['day']}): " + md(" ".join(t["text"].split())[:300]))
+    shown = [t for t in b.get("tags") or tags(b) if t.startswith(("sensitive:", "field:"))]
+    if shown:
+        tail.append("Tags: " + ", ".join(shown))
+    if b["guesses"]:
+        tail.append(answer_line(b))
+    room = max(limit - len(head) - sum(len(x) + 1 for x in tail) - 20, 200)
+    body = " ".join(b["text"].split()) if len(b["text"]) > room else b["text"].strip()
+    if len(body) > room:
+        body = body[:room].rsplit(" ", 1)[0] + "…"
+    quoted = "\n".join("> " + md(x) for x in body.splitlines() if x.strip())
+    return "\n".join([head, quoted, *tail])[:1990]
+
+
+def answer_line(b: dict) -> str:
+    """The line an answered alert ends with."""
+    if b["status"] == "no_idea":
+        return "→ No idea."
+    if b["status"] == "not_ours":
+        return "→ Not ours: nothing more is spent on it."
+    g = b["guesses"][0] if b["guesses"] else None
+    return f"→ Your guess: **{md(g['name'])}**" + (f", because {md(g['why'])}" if g and g["why"] else "") if g else ""
+
+
+def answered_text(content: str, b: dict) -> str:
+    """An alert's text with its answer line (the last answer's, replaced) at the end."""
+    kept = [x for x in content.split("\n") if not x.startswith("→ ")]
+    return "\n".join([*kept, answer_line(b)])[:2000]
+
+
+def digest_head(day: str, n: int, more: int) -> str:
+    d = datetime.fromisoformat(day)
+    text = f"🕶️ **Blinds, {d:%a %b} {d.day}:** {n} new, waiting for your guess. Who do you think each one is about?"
+    if more:
+        text += f" ({more} older ones are in the war room's Blinds window.)"
+    return text
