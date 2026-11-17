@@ -437,7 +437,7 @@ def test_kit_has_chapters_credits_and_disclosures(plan, dc):
     b["sections"] = [{"name": "OPEN", "frame": 0, "chapter": True}, {"name": "2 THE LAMP", "frame": 600, "chapter": True},
                      {"name": "CLOSE", "frame": 1200, "chapter": "What is left"}]
     b["total"] = 1800
-    text = doc.kit_text(plan, b, dc["disclosures"])
+    text = doc.kit_text(plan, b, doc.disclosure_lines(plan, dc, bought=True))
     assert "0:00 Open\n0:20 The lamp\n0:40 What is left" in text
     assert "Credits\nFootage: the keeper's own uploads\nMusic: made for this piece\nRoom tone: CC0" in text
     assert "The narration is an AI voice." in text and "Thanks for watching." in text
@@ -512,6 +512,110 @@ def test_voice_refuses_a_banned_word_and_prices_a_dry_run(defaults, tmp_path, ca
         doc.narration(d, plan, doc.narrator(defaults, plan), defaults["doc"])
     with pytest.raises(ClipperError, match="names media that isn't in reels, overlays, music, sfx: card_open, cue1"):
         doc.build(defaults, "lighthouse", dry_run=True)
+
+
+def test_your_own_recording_of_a_take_is_used_instead_of_a_bought_read(plan, dc, tmp_path):
+    nc = {"voice_id": "v1", "tts_model": "m", "tts_settings": {}}
+    (t,) = doc.takes(plan)
+    bought = doc.take_files(tmp_path, t, nc, dc)
+    assert doc.own_read(tmp_path, "open") is None and bought[0].parent.name == "raw"
+    reads = tmp_path / "vo" / "read"
+    reads.mkdir(parents=True)
+    (reads / "notes.txt").write_text("not a recording", encoding="utf-8")
+    (reads / "#3.wav").write_bytes(b"a line with no take")
+    (reads / "._open.wav").write_bytes(b"what macOS leaves on a share")
+    assert doc.own_read(tmp_path, "open") is None and doc.own_read(tmp_path, "#3") is None
+    assert list(doc.own_reads(tmp_path)) == ["#3"]
+    mine = reads / "Open.WAV"      # the name's case is the file manager's business, not the plan's
+    mine.write_bytes(b"one")
+    raw, done, words = doc.take_files(tmp_path, t, nc, dc)
+    assert raw == mine and done != bought[1] and words != bought[2]
+    # the recording is the take whatever the script and the narrator say; the compressor still counts
+    assert doc.take_files(tmp_path, {**t, "text": "Other words."}, {**nc, "voice_id": "v2"}, dc) == (raw, done, words)
+    plain = doc.take_files(tmp_path, t, nc, {**dc, "vo_filter": ""})
+    assert plain[0] == mine and plain[1] != done
+    mine.write_bytes(b"a second read")
+    assert doc.take_files(tmp_path, t, nc, dc)[1] != done
+    (reads / "open.mp3").write_bytes(b"two")
+    with pytest.raises(ClipperError, match="take 'open' has more than one recording in .*: open.mp3, Open.WAV"):
+        doc.take_files(tmp_path, t, nc, dc)
+
+
+def a_wav(path, seconds=1.0):
+    import wave
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with wave.open(str(path), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(doc.RATE)
+        w.writeframes(b"\0\0" * int(doc.RATE * seconds))
+    return seconds
+
+
+def test_voice_takes_your_recording_and_buys_nothing(defaults, tmp_path, capsys, monkeypatch):
+    from clipper import narrate
+
+    d = piece(defaults, tmp_path)
+    plan = doc.load_plan(defaults, "lighthouse")[1]
+    (t,) = doc.takes(plan)
+    said = {"text": "we drove out past a quiet coast"}
+    monkeypatch.setattr(narrate, "speak", lambda *a, **k: pytest.fail("your own read is never bought"))
+    monkeypatch.setattr(doc, "process_take", lambda raw, dst, dc, keep: a_wav(dst, 9.0))
+    monkeypatch.setattr(doc, "hear", lambda wav, model: heard_for(said["text"]))
+    (d / "vo" / "read" / "open.wav").write_bytes(b"the first read")
+    (d / "vo" / "read" / "opne.wav").write_bytes(b"a misspelled name")
+    (d / "vo" / "read" / "#3.wav").write_bytes(b"named for a line with no take")
+    doc.voice(defaults, "lighthouse", dry_run=True)
+    out = capsys.readouterr().out
+    assert "1 takes, 1 read by you, 0 to buy: 0 characters" in out and "open: your own read, open.wav" in out
+    assert "in vo/read but no take by that name: #3.wav, opne.wav (the plan's takes: open)" in out
+    doc.voice(defaults, "lighthouse")           # no narrator is set: none is needed
+    out = capsys.readouterr().out
+    assert "open: open.wav -> 9.0 s" in out
+    assert "open: only 0% of the script's words were heard; change the lines in plan.toml to what you said" in out
+    doc.voice(defaults, "lighthouse")           # said again on every run, from the words kept
+    assert "only 0% of the script's words" in capsys.readouterr().out
+    said["text"] = t["text"]
+    (d / "vo" / "read" / "open.wav").write_bytes(b"read again, as written")
+    doc.voice(defaults, "lighthouse")
+    out = capsys.readouterr().out
+    assert "open: open.wav -> 9.0 s" in out and "only" not in out
+    vo = doc.narration(d, plan, doc.narrator(defaults, plan), defaults["doc"])
+    assert sorted(vo) == t["says"] and len({v["file"] for v in vo.values()}) == 1
+    assert vo[t["says"][-1]]["end"] == 9.0
+
+
+def test_the_kit_drops_the_ai_voice_line_when_every_take_is_yours(defaults, tmp_path):
+    d = piece(defaults, tmp_path)
+    plan = doc.load_plan(defaults, "lighthouse")[1]
+    dc = defaults["doc"]
+    ai = "The narration is an AI voice."
+    assert doc.disclosure_lines(plan, dc, bought=True) == [ai]
+    assert doc.disclosure_lines(plan, dc, bought=False) == []
+    own = {**dc, "own_voice_disclosures": ["Read by the author."]}
+    assert doc.disclosure_lines(plan, own, bought=False) == ["Read by the author."]
+    assert doc.disclosure_lines({**plan, "disclosures": ["Mine."]}, own, bought=False) == ["Mine."]
+    assert doc.disclosure_lines({**plan, "disclosures": "One line."}, own, bought=True) == ["One line."]
+    assert doc.disclosure_lines({**plan, "disclosures": False}, own, bought=True) == []    # as before: none
+    assert doc.disclosure_lines({**plan, "disclosures": True}, own, bought=True) == []
+    b = doc.layout(plan, narration_of(plan), DUR, dc, {})
+
+    def kit_says_ai():
+        return ai in doc.kit(defaults, "lighthouse").read_text(encoding="utf-8")
+
+    b.pop("bought", None)
+    jsonstate.write(d / "work" / "build.json", b)       # a build from before it kept what it bought: all bought
+    assert kit_says_ai()
+    (d / "vo" / "read" / "open.flac").write_bytes(b"my read")
+    (d / "vo" / "read" / "open.mp3").write_bytes(b"and a second one")    # the kit doesn't read the folder
+    assert kit_says_ai()                                # recorded since, not yet built: still the bought read
+    (d / "vo" / "read" / "open.mp3").unlink()
+    jsonstate.write(d / "work" / "build.json", {**b, "bought": ["open"]})    # recorded after a build that bought it
+    assert kit_says_ai()
+    jsonstate.write(d / "work" / "build.json", {**b, "bought": []})
+    (d / "vo" / "read" / "open.flac").unlink()
+    assert not kit_says_ai()
 
 
 def test_leak_check_fails_on_a_heard_term_and_reads_the_kit(defaults, tmp_path, monkeypatch, capsys):

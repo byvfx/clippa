@@ -4,7 +4,7 @@
 :root {
   /* the war room (warroom.css): beige windows, rounded blue title bars */
   --panel: #ece9d8; --panel2: #ffffff; --line: #aca899; --text: #000000; --dim: #3d3d3d; --faint: #5a5a5a;
-  --accent: #2457c8; --on-accent: #ffffff; --red: #c42b1c; --green: #2b7a32; --blue: #0046d5; --amber: #a35f00;
+  --accent: #2457c8; --on-accent: #ffffff; --red: #c42b1c; --green: #2b7a32; --blue: #0046d5; --amber: #a35f00; --violet: #6a3fc4;
   --clip: #5a95e6; --short: #e8609f; --segment: #3cbf7a; --compilation: #f0a03c;
   --sans: Tahoma, Arial, Helvetica, sans-serif;
   --head: #ece9d8;
