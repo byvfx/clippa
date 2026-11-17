@@ -267,11 +267,13 @@ YouTube; chat prompt v2; YouTube's other edits (description, cover, privacy) sti
 phone use; then a small `clipper mcp`; #13 may fold into it), Modal ideas #53, #56,
 Udder Truth #58/#59/#60, P&L #50 (revenue once monetized). Write "#77 L6" rather than "fix #77" in commit
 messages: GitHub closes the issue on "fix".
-- **War room heat graph (11-16, user asked "can we see the heat graph of a stream in the war room?"):** branch
-  `warroom/heat-graph`, PR #294 open, **not merged, not deployed**, no second review yet (Copilot isn't reviewing). 🔥 heat on a stream (Pipeline panel) or in an item's
+- **War room heat graph (11-16, user asked "can we see the heat graph of a stream in the war room?"):** PR #294,
+  merged 11-16 after Grok's review, **not deployed** (it needs `deploy/hub/deploy.sh` from a checkout of main). 🔥 heat on a stream (Pipeline panel) or in an item's
   window: the signals curve, the windows, and each cut item where it sits, coloured by review state, plus the twelve
   hottest windows and what was cut from each (`/api/heat`, `clipper/warroom/heat.py`, `web/js/heat.js`, wiki
-  War-room#heat). It is also the demo video's "how it finds moments" shot. Reaches the live page with a hub deploy.
+  War-room#heat). It is also the demo video's "how it finds moments" shot. Not yet seen on the live page or on a real phone.
+  Copilot has reviewed no PR since #285 (11-16; a request by hand leaves none): until it does, ask the user per PR
+  whether Grok (`clipper codereview`, about $0.80) stands in.
 - **Review pre-flight checks and approval by silence (#259, 11-14):** step A, `clipper review check` (wiki
   Review#pre-flight-checks), is PR #263, merged and deployed 11-14; the webcam panels are marked `cam = true`
   in clipper.toml (backup `backups/clipper.toml.before_cam_marks_2026-11-14`). Step B, `clipper review auto`
@@ -301,7 +303,7 @@ messages: GitHub closes the issue on "fix".
   The script (ten takes, not locked) and the capture checklist are one private page:
   https://claude.ai/artifact/W48qW95ZPYkA7AE16F4TEX (ticks kept with the page; its Install day tab is the
   install checklist with each step tied to a tutorial chapter). The "how it finds moments" shot is the war
-  room's heat graph (below), once that is merged and deployed. Build the piece with `clipper doc`; PR #289
+  room's heat graph (above; merged, wants the hub deploy). Build the piece with `clipper doc`; PR #289
   (merged 11-16 after Grok's review, no deploy needed: `doc` runs on the laptop, pull main there) lets
   `doc voice` take a recording per take from the piece's `vo/read/`. Not tried on a real spoken take or in
   Resolve: the demo is the first. Tutorial (user, 11-16): recorded during the desktop clean install (#46/#78),
