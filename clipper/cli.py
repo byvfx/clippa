@@ -2039,9 +2039,11 @@ def add_extras(sub) -> None:
     r = dsub.add_parser("new", help="a piece's folder in [paths] documentaries, with a starter plan.toml and banned.txt")
     r.add_argument("slug", help="the piece's folder name: lower-case letters, digits and hyphens")
     r.add_argument("--title", help="the working title (default: the slug)")
-    r = dsub.add_parser("voice", help="buy the narration (ElevenLabs, once per take), compress it, time its words")
+    r = dsub.add_parser("voice", help="the narration: your own recording of a take (vo/read/), else bought from "
+                                      "ElevenLabs once per take; compress it, time its words")
     r.add_argument("slug", help="the piece (its folder in [paths] documentaries)")
-    r.add_argument("--dry-run", action="store_true", help="check the plan and say how many characters it would buy")
+    r.add_argument("--dry-run", action="store_true",
+                   help="check the plan, list the takes you recorded and say how many characters it would buy")
     r = dsub.add_parser("build", help="the plan in frames, then a new timeline version in the open Resolve project")
     r.add_argument("slug", help="the piece (its folder in [paths] documentaries)")
     r.add_argument("--dry-run", action="store_true", help="write work/build.json and stop: Resolve isn't touched")

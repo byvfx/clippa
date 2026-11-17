@@ -8,6 +8,13 @@ current state; the version is `clipper --version` (set in `clipper/__init__.py` 
 
 ### 2026-11
 
+- 11-16: `clipper doc voice` takes your own recording of a take: a file named for the take in the
+  piece's `vo/read/` (`open.wav`, also .flac, .mp3, .m4a ...) is used instead of a bought read and
+  costs nothing, with the same compressor, pause cap and word timing; a piece can mix the two.
+  `--dry-run` lists which takes are yours and any file that matches no take, and a read that
+  strays from its script is reported on every run. When the last build bought no take, the kit's
+  disclosure lines are `[doc] own_voice_disclosures` (none) in place of `[doc] disclosures` (the
+  AI-voice line), which is unchanged.
 - 11-14: the schedule's budget ranks a stream's segments by their model score, chat heat breaking
   ties, where a score covered the stream (else heat alone, as before); a compilation takes its best
   segment's score; Kitsu's Score column shows a segment's score (#258 C). Turned on for Kino and

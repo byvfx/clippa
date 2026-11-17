@@ -63,6 +63,8 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
 - Never use the word "hosts" in viewer-facing text → `[scoring] house_style` rules, appended to every
   viewer-facing prompt; put future style notes there. The cast is **Andy (Warski)** and **PPP** (never any other
   name for PPP; old drafts that say "Ashton" stay). Channel 404 = Don, a solo show. Cast per show in `[meta] cast`.
+- Kino's segment is **"WOAH Buddies"** (WOAH in capitals; user, 11-16), never the transcript's "Woe" or
+  "Whoa": a `house_style` rule since 11-16. A word Whisper mishears gets a rule there the same way.
 - Thumbnails: `[thumbnail] style = "enquirer"` (1990s tabloid: show masthead, no roundel, no barcode, small
   "AS SEEN ON LOLCOW CINEMA" badge), `enquirer_prompt_version = "v6"` (face = headline subject, cast photos
   picked by label, faces.json names trusted). Pre-show covers are one story, no side boxes (`[preshow]
@@ -289,6 +291,14 @@ messages: GitHub closes the issue on "fix".
   better. Suggested `auto_min_segment = 4`: on Kino it holds 63 of 183 scored segments (~6 a stream), on
   Channel 404 23 of 106 (~3). Not set: after the Shorts, at the user's word. Shorts backtest: 105 of 181 approved Shorts would have approved
   themselves, and 1 of 4 rejected ones ("too much Jer", a taste call the window is for).
+- **Demo videos (11-16, user):** a portfolio piece first (about 5:40, real shows on screen, none named in the
+  narration, the user reads it live; it goes on the byvfx site, linked from GitHub), then an install tutorial.
+  The script (ten takes, not locked) and the capture checklist are one private page:
+  https://claude.ai/artifact/W48qW95ZPYkA7AE16F4TEX (ticks kept with the page). The war room has no heat
+  graph: that shot is a graphic from a stream's `signals.parquet`. Build it with `clipper doc`; for that,
+  PR #289 (open, `doc/recorded-takes`) lets `doc voice` take a recording per take from the piece's `vo/read/`.
+  Not tried on a real spoken take or in Resolve: the demo is the first. Tutorial: outlined in chat only, best
+  recorded during the desktop clean install (#46/#78) and published after #207.
 - **Documentaries (11-13, PR #233, merged and deployed):** `clipper doc
   new|voice|build|master|leak|kit` (wiki Documentaries; `clipper/doc.py`, `doc_resolve.py`), the reusable form
   of the first mini-documentary's one-off Resolve scripts. A piece is `[paths] documentaries/<slug>/` on the
