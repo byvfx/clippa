@@ -38,6 +38,19 @@ def _cookie_args(cfg: dict) -> list[str]:
     return ["--cookies", str(p)] if p.is_file() else []
 
 
+def _auth_header(cfg: dict) -> dict:
+    """The signed-in viewer's token, from the cookies file, so a subscriber-only VOD's chat is
+    asked for as that viewer (the video itself is yt-dlp's, with the same cookies)."""
+    p = cfg["paths"]["twitch_cookies"]
+    if not p.is_file():
+        return {}
+    try:
+        token = next((c.value for c in ytdl.read_cookies(p) if c.name == "auth-token"), "")
+    except (OSError, ValueError, KeyError):
+        return {}
+    return {"Authorization": f"OAuth {token}"} if token else {}
+
+
 def resolve(url: str, cfg: dict) -> dict:
     vid = parse_url(url)
     r = ytdl.run(*_cookie_args(cfg), "-J", "--no-playlist", f"https://www.twitch.tv/videos/{vid}")
@@ -102,16 +115,19 @@ def fetch_chat(stream_dir: Path, meta: dict, cfg: dict) -> Path:
     if out.exists():
         return out
     t0 = datetime.fromisoformat(meta["started_at"]).timestamp()
-    headers = {"Client-ID": CLIENT_ID, "Content-Type": "application/json"}
+    headers = {"Client-ID": CLIENT_ID, "Content-Type": "application/json", **_auth_header(cfg)}
     rows: dict[str, dict] = {}
     # A pull takes minutes: what came in is kept in chat.partial.jsonl, and a rerun picks up there.
     partial = stream_dir / "chat.partial.jsonl"
     offset = 0
     if partial.exists():
         for line in partial.read_text(encoding="utf-8").splitlines():
-            row = json.loads(line)
-            rows[row["id"]] = row
-            offset = max(offset, int(row["t"]))
+            try:
+                row = json.loads(line)
+                rows[row["id"]] = row
+                offset = max(offset, int(row["t"]))
+            except (ValueError, KeyError):
+                pass                    # the line a stopped run was writing: its second is asked for again
     # Cursor pages need Twitch's integrity token, so page by offset: each request starts at the
     # last second seen (rows are de-duplicated by id), a second further when nothing new came.
     end = float(meta.get("duration_s") or 0)
