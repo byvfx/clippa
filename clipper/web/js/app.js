@@ -5,6 +5,7 @@
 function setView(v) {
   document.body.dataset.view = v; store.set("warroom.view", v);
   document.querySelectorAll("#views button").forEach(b => b.classList.toggle("on", b.dataset.view === v));
+  chatSync();  // the Chat view shows the chat (chatdock.js)
   const today = v === "schedule" && PHONE.matches && $(".day.today");
   today ? today.scrollIntoView({ block: "start" }) : scrollTo(0, 0);
 }
@@ -51,7 +52,8 @@ const KEYS = [
               ["H", "hold / release"], ["P", "pin a release time"], ["U", "reopen an approved item"]]],
   ["Video (item window)", [["Space", "play / pause"], ["← →", "back / forward 5 s"], ["F", "picture in picture"], ["O", "open the video in its own window"],
                            ["B", "box a face on the paused frame: who it is"]]],
-  ["Other", [["1 2 3 4 5 6", "queue tabs"], ["/", "search"], ["L", "watch the live show"], ["?", "this list"]]],
+  ["Other", [["1 2 3 4 5 6", "queue tabs"], ["/", "search"], ["L", "watch the live show"], ["M", "show / hide the Clippa chat (Esc in its box comes back)"],
+             ["?", "this list"]]],
 ];
 function showKeys() {
   const k = $("#keys");
@@ -120,6 +122,7 @@ document.addEventListener("keydown", e => {
     else if (video.requestPictureInPicture) video.requestPictureInPicture().catch(err => toast(err.message, true));
   }
   else if (k === "o" && (OPEN || SEL)) { take(); popOut(OPEN || SEL); }
+  else if (k === "m") { take(); toggleChat(); }
   else if (k === "b" && video) { take(); pickFace(OPEN); }
   else if (/^[1-6]$/.test(k) && !OPEN) { take(); TAB = Object.keys(TABS)[+k - 1]; SEL = null; renderQueue(); }
   else if (k === "/" && !OPEN) { take(); $("#q").focus(); }
@@ -253,6 +256,7 @@ document.addEventListener("change", e => {
 function closeLayoutMenu() { $("#layoutMenu")?.remove(); }
 async function openLayoutMenu() {
   try { SAVED = (await api("/api/layouts")).layouts || {}; } catch (e) { toast("Saved layouts: " + e.message, true); }
+  if (!LOOKS.length) await loadLooks();  // serve wasn't answering when the page opened
   closeLayoutMenu();
   const changed = LAYOUT_NAME && SAVED[LAYOUT_NAME] && !sameLayout(SAVED[LAYOUT_NAME], LAYOUT);
   const m = Object.assign(document.createElement("div"), { className: "layout-menu", id: "layoutMenu" });
@@ -262,7 +266,10 @@ async function openLayoutMenu() {
     <div class="sep"></div><div class="lbl">SAVED LAYOUTS</div>
     ${Object.keys(SAVED).sort().map(n => `<div class="row"><button data-lay="use" data-name="${esc(n)}" class="${n === LAYOUT_NAME ? "on" : ""}">${esc(n)}${n === LAYOUT_NAME && changed ? " (changed)" : ""}</button><button class="del" data-lay="del" data-name="${esc(n)}" title="Delete">×</button></div>`).join("")
       || `<div class="lbl" style="font-weight:400;letter-spacing:0">none yet</div>`}
-    <div class="sep"></div><button data-lay="default">Default layout</button>`;
+    <div class="sep"></div><button data-lay="default">Default layout</button>
+    <div class="sep"></div><div class="lbl">LOOK</div>
+    ${LOOKS.map(n => `<button data-lay="look" data-name="${esc(n)}" class="${n === ClippaTheme.current() ? "on" : ""}">${esc(n)}</button>`).join("")
+      || `<div class="lbl" style="font-weight:400;letter-spacing:0">can't list them</div>`}`;
   document.body.append(m);
   const r = $("#layoutBtn").getBoundingClientRect();
   m.style.top = `${r.bottom + 6}px`; m.style.right = `${innerWidth - r.right}px`;
@@ -284,6 +291,7 @@ document.addEventListener("click", async e => {
   else if (what === "saveas") { const n = prompt("Save this layout as", LAYOUT_NAME || "My layout"); if (n && n.trim()) saveLayoutAs(n.trim()); }
   else if (what === "use") useLayout(SAVED[name], name);
   else if (what === "default") useLayout(DEFAULT_LAYOUT, "");
+  else if (what === "look") ClippaTheme.pick(name);
   else if (what === "del" && confirm(`Delete the layout “${name}”?`)) {
     try { SAVED = (await api("/api/layouts", { name, delete: true })).layouts; if (name === LAYOUT_NAME) { LAYOUT_NAME = ""; keepLayout(); } toast(`Deleted “${name}”`); }
     catch (err) { toast(err.message, true); }
@@ -311,6 +319,14 @@ document.addEventListener("keydown", e => {
   toast(`${p.dataset.panel} → ${p.parentNode.dataset.zone}`);
 }, true);
 DESKTOP.addEventListener("change", applyLayout);
+
+// ---------- the look: a file in web/themes/ (theme.js); the war room and its chat wear one pick ----------
+let LOOKS = [];
+async function loadLooks() {
+  try { LOOKS = (await api("/api/chat/themes")).themes; ClippaTheme.settle(LOOKS); }   // the default here: <html data-theme>
+  catch (e) { /* serve unreachable: the look stays */ }
+}
+loadLooks();
 addEventListener("resize", () => { if (DESKTOP.matches !== document.body.classList.contains("layout")) applyLayout(); });
 applyLayout();
 

@@ -1,5 +1,7 @@
 // The Clippa messenger (#158): polls /api/chat for new messages, sends what you type, and
-// taps cards. The chat lives on serve (clipper/chat.py); this page only draws it.
+// taps cards. The chat lives on serve (clipper/chat.py); this page only draws it. The war room
+// shows this same page in a frame at its side (/chat?dock, web/js/chatdock.js): docked, it
+// never takes the focus by itself, and it hears from the war room whether it is on screen.
 "use strict";
 
 const LOG = document.getElementById("log");
@@ -10,7 +12,14 @@ let LAST = "";            // the newest message id drawn
 let AWAY = false;
 let BUSY = 0;             // requests waiting on Clippa (typing…)
 let UNSEEN = 0;
+let DRAWN = false;        // the page's first draw is done (the history: nothing new to count)
+const DRAWN_IDS = new Set(); // ids ever drawn, so a full redraw counts only what is new
 const TITLE = document.title;
+const DOCK = window.parent !== window && new URLSearchParams(location.search).has("dock");
+let SEEN = !DOCK;         // docked: whether the war room shows it now (it says so)
+if (DOCK) document.documentElement.classList.add("docked");
+const unseen = () => document.hidden || !SEEN;
+function toDock(msg) { if (DOCK) window.parent.postMessage({ clippa: "dock", ...msg }, location.origin); }
 
 // The link's ?key= has set the cookie by now: keep it out of the address bar.
 const URLQ = new URLSearchParams(location.search);
@@ -125,18 +134,21 @@ function draw(m) {
 
 function apply(v) {
   const atEnd = LOG.scrollHeight - LOG.scrollTop - LOG.clientHeight < 60;
+  const first = !DRAWN;
+  DRAWN = true;
   if (v.full) { LOG.textContent = ""; LAST = ""; }
   LOG.querySelectorAll(".msg.pending").forEach(e => e.remove());
   let fresh = 0;
   for (const m of v.messages || []) {
     if (LOG.querySelector(`[data-id="${CSS.escape(m.id)}"]`)) continue;
     draw(m);
-    if (m.who === "clippa") fresh++;
+    if (m.who === "clippa" && !first && !DRAWN_IDS.has(m.id)) fresh++;
+    DRAWN_IDS.add(m.id);
   }
   for (const [id, state] of Object.entries(v.cards || {})) setCard(id, state);
   if (v.last) LAST = v.last;
   setAway(!!v.away);
-  if (fresh && document.hidden && !AWAY) { UNSEEN += fresh; document.title = `(${UNSEEN}) ${TITLE}`; }
+  if (fresh && unseen() && !AWAY) { UNSEEN += fresh; document.title = `(${UNSEEN}) ${TITLE}`; toDock({ unseen: UNSEEN }); }
   if (atEnd || v.full || fresh) LOG.scrollTop = LOG.scrollHeight;
   status(v);
 }
@@ -194,6 +206,7 @@ document.getElementById("compose").addEventListener("submit", e => {
 });
 BOX.addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); SEND.click(); }
+  else if (e.key === "Escape" && DOCK) { e.preventDefault(); toDock({ leave: true }); }   // back to the war room's keys
 });
 document.querySelectorAll("[data-cmd]").forEach(b => b.addEventListener("click", () => send(b.dataset.cmd)));
 document.getElementById("bye").addEventListener("click", () => send("/bye"));
@@ -203,16 +216,27 @@ document.getElementById("fold").addEventListener("click", e => {
   e.currentTarget.setAttribute("aria-expanded", String(!w.classList.contains("folded")));
 });
 
-async function poll() {
+let POLL_T = 0, POLLING = false;
+async function poll() {   // also called to look now (back on screen): one loop either way
+  clearTimeout(POLL_T);
+  if (POLLING) return;
+  POLLING = true;
   try {
     apply(await api(`/api/chat?since=${encodeURIComponent(LAST)}`));
   } catch (e) {
     if (!BUSY) { STATUS.className = "status"; STATUS.textContent = `can't reach Clippa (${e.message})`; }
+  } finally {
+    POLLING = false;
+    POLL_T = setTimeout(poll, unseen() ? 15000 : 3000);
   }
-  setTimeout(poll, document.hidden ? 15000 : 3000);
 }
 
-async function buddies() {
+let BUDDIES_T = 0, BUDDIES_BUSY = false;
+async function buddies() {   // also called when the dock comes on screen: one loop either way
+  clearTimeout(BUDDIES_T);
+  if (BUDDIES_BUSY) return;
+  if (unseen()) { BUDDIES_T = setTimeout(buddies, 30000); return; }   // nobody is looking: the next round
+  BUDDIES_BUSY = true;
   try {
     const v = await api("/api/chat/buddies");
     const ul = document.getElementById("crew");
@@ -229,52 +253,48 @@ async function buddies() {
     }
     document.getElementById("crew-count").textContent = `(${up}/${v.buddies.length})`;
   } catch (e) { /* the chat's own status line says when serve is unreachable */ }
-  setTimeout(buddies, 30000);
+  BUDDIES_BUSY = false;
+  BUDDIES_T = setTimeout(buddies, 30000);
 }
 
-// ---------- the look: a stylesheet from web/themes/, picked by name; no theme is special here ----------
-const THEME = document.getElementById("theme");
+// ---------- the look: web/themes/, kept by theme.js (ClippaTheme); no theme is special here ----------
 const PICK = document.getElementById("theme-pick");
-const THEME_KEY = "clippa-chat-theme";   // chat-theme.js reads it before the first paint
 
-function savedTheme() {
-  try { return localStorage.getItem(THEME_KEY) || ""; } catch (e) { return ""; }
-}
-function saveTheme(name) {
-  try { localStorage.setItem(THEME_KEY, name); } catch (e) { /* storage off: this visit only */ }
-}
-// A theme names its windows with --label-<name> (its data, not code here); its desk colours
-// the phone's browser bar.
+// A theme names the windows with --label-<name> (its data, not code here).
 function labels() {
   const css = getComputedStyle(document.documentElement);
-  const desk = css.getPropertyValue("--desk").trim();
-  if (desk && !desk.startsWith("var(")) document.getElementById("theme-color").setAttribute("content", desk);
   document.querySelectorAll("[data-label]").forEach(e => {
     const v = css.getPropertyValue(`--label-${e.dataset.label}`).trim().replace(/^(["'])(.*)\1$/, "$2");
     if (v) e.textContent = v;
   });
-}
-function useTheme(name) {
-  document.documentElement.dataset.theme = name;
-  const href = `/themes/${encodeURIComponent(name)}.css`;
-  if (THEME.getAttribute("href") === href) { labels(); return; }
-  THEME.onload = labels;
-  THEME.setAttribute("href", href);
+  if (PICK.querySelector(`option[value="${CSS.escape(ClippaTheme.current())}"]`)) PICK.value = ClippaTheme.current();
 }
 async function themes() {
   try {
     const v = await api("/api/chat/themes");
     PICK.textContent = "";
     for (const t of v.themes) { const o = el("option", "", t); o.value = t; PICK.appendChild(o); }
-    const pick = v.themes.includes(savedTheme()) ? savedTheme() : v.default;
-    if (pick) { PICK.value = pick; useTheme(pick); }
-  } catch (e) { labels(); }
+    ClippaTheme.settle(v.themes, v.default);   // [chat] theme, unless this browser picked one
+  } catch (e) { /* serve unreachable: the look stays */ }
+  labels();
 }
-PICK.addEventListener("change", () => { saveTheme(PICK.value); useTheme(PICK.value); });
+document.addEventListener("clippa-theme", labels);
+PICK.addEventListener("change", () => ClippaTheme.pick(PICK.value));
 
-document.addEventListener("visibilitychange", () => { if (!document.hidden) { UNSEEN = 0; document.title = TITLE; } });
+function seenNow() { UNSEEN = 0; document.title = TITLE; toDock({ unseen: 0 }); }
+document.addEventListener("visibilitychange", () => { if (!unseen()) { seenNow(); poll(); } });
+// The war room says when it shows or hides the dock, and asks for the box (its M key).
+addEventListener("message", e => {
+  if (!DOCK || e.origin !== location.origin || e.source !== window.parent || e.data?.clippa !== "dock") return;
+  if ("seen" in e.data) {
+    SEEN = !!e.data.seen;
+    if (!unseen()) { seenNow(); LOG.scrollTop = LOG.scrollHeight; poll(); buddies(); }
+  }
+  if (e.data.focus) BOX.focus();
+});
 if (window.matchMedia("(max-width: 720px)").matches) document.getElementById("buddies").classList.add("folded");
 themes();
 poll();
 buddies();
-BOX.focus();
+if (!DOCK) BOX.focus();   // docked, the war room's keys stay the war room's
+toDock({ hello: true });   // docked: the war room answers with whether it shows the dock
