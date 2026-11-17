@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import re
 import sys
 import time
 from pathlib import Path
@@ -82,6 +83,16 @@ def refuse(args: argparse.Namespace, mode: str, *others: str) -> None:
 def cmd_fetch(cfg: dict, args: argparse.Namespace) -> None:
     from . import kick
 
+    if re.search(r"twitch\.tv/", args.url):
+        from . import twitch
+
+        twitch.fetch(cfg, args.url, args.no_video, args.no_chat)
+        return
+    if re.search(r"youtube\.com/|youtu\.be/", args.url):
+        from . import ytvod
+
+        ytvod.fetch(cfg, args.url, args.no_video, args.no_chat)
+        return
     meta = kick.resolve(args.url, cfg)
     d = cfg["paths"]["streams"] / meta["stream_id"]
     d.mkdir(parents=True, exist_ok=True)
@@ -1275,8 +1286,9 @@ def command_list() -> str:
 
 def add_pipeline(sub) -> None:
     """Pipeline: a stream from recording to review, in run order."""
-    p = sub.add_parser("fetch", help="resolve a Kick VOD url, pull chat and video")
-    p.add_argument("url", help="the Kick VOD url (kick.com/<channel>/videos/<id>)")
+    p = sub.add_parser("fetch", help="resolve a Kick, Twitch or YouTube VOD url, pull chat and video")
+    p.add_argument("url", help="the VOD url (kick.com/<channel>/videos/<id>, twitch.tv/videos/<id>, "
+                               "youtube.com/watch?v=<id>)")
     p.add_argument("--no-video", action="store_true", help="chat and meta only; no video download")
     p.add_argument("--no-chat", action="store_true", help="video and meta only; no chat replay")
     p.set_defaults(fn=cmd_fetch)
