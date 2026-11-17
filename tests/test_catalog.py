@@ -377,9 +377,11 @@ def test_stream_named_by_show_and_day(cfg):
     assert catalog.stream_named(cfg, "s02 kino 11-10") == ("kick-1", "s02")   # its UTC day too
     assert catalog.stream_named(cfg, "the kino one") == ("kick-2", "the one")  # the show's latest
     assert catalog.stream_named(cfg, "c404")[0] == "kick-3"
-    assert catalog.stream_named(cfg, "s02 11-11")[0] == "kick-3"              # one stream that day
     assert catalog.stream_named(cfg, "kino 12-25") == (None, "kino 12-25")
     assert catalog.stream_named(cfg, "the blade one") == (None, "the blade one")
+    assert catalog.stream_named(cfg, "the 11-11 truther one") == (None, "the 11-11 truther one")   # a title's
+    assert catalog.stream_named(cfg, "s02 from 11-11")[0] == "kick-3"   # one stream that day
+    assert catalog.stream_named(cfg, "the last segment") == (None, "the last segment")   # not "last night"
     assert catalog.stream_label(cfg, "kick-2") == "Kino Casino 11-14"
 
 

@@ -64,11 +64,12 @@ Anything else about a video that's up (its cover, slot, privacy) is still done i
 An item can be named by its id (`kick-131151926/s03`, `s03`, `c03_t01`) or by words from its
 title. A stream can be named by its id, or the way you'd say it: a show (its key, channel or a
 word of its name) and a month-day, "s02 from kino 11-14", the show alone for its latest stream
-("the kino one"), or "yesterday" / "last night". Replies name streams the same way ("Kino
+("from kino", "the kino one"), or "from yesterday" / "from last night". Replies name streams the same way ("Kino
 Casino 11-14"). When more than one item fits, Clippa asks "Which one?" with a button for each,
 and the stream beside any two that share a name.
 
-With exactly one card open, typing "yes", "ok do it" or "no" answers it, the same as its buttons.
+Right after a write card (the only one open, nothing said since), typing "yes", "ok do it" or
+"no" answers it, the same as its buttons. A spend card always waits for its button.
 
 ## Topics
 

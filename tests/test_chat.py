@@ -543,6 +543,9 @@ def test_the_page_names_no_real_messenger():
     ("approve s02 from kino 11-14", ("approve", {"item": "s02 kino 11-14"})),
     ("pin s01 from kino 11-14 for fri 9am", ("pin", {"item": "s01 kino 11-14", "when": "2026-11-20 09:00"})),
     ("reject c01 dupe of c02", ("reject", {"item": "c01", "reason": "dupe of c02"})),   # a reason may name one
+    ("pin s01 on friday 9am", ("pin", {"item": "s01", "when": "2026-11-20 09:00"})),   # a day, not a show
+    ("approve s02 on fire", ("approve", {"item": "s02", "note": "on fire"})),           # a note, not a show
+    ("approve s02 on the kino one", ("approve", {"item": "s02 kino"})),
     ("undo that", ("undo", {})),
     ("undo", ("undo", {})),
     ("whats waiting", ("items", {})),
@@ -581,3 +584,15 @@ def test_a_typed_yes_answers_the_one_open_card(cfg, monkeypatch, no_model):
     chat.handle(cfg, "approve s02")
     assert chat.handle(cfg, "nope")["messages"][-1]["text"] == "OK, left alone."
     assert len(applied) == 1
+    # Clippa said something after the card: an "ok" answers that, the card waits for its button
+    chat.handle(cfg, "/new")
+    chat.handle(cfg, "approve s02")
+    monkeypatch.setattr(catalog, "prepare", lambda cfg, name, args: catalog.Plan("answer", text="Nothing goes out."))
+    chat.handle(cfg, "what goes out tomorrow")
+    monkeypatch.setattr(chat, "ask_model", lambda cfg, c, t: ("Cool.", None, 0.0))
+    assert chat.handle(cfg, "ok")["messages"][-1]["text"] == "Cool." and len(applied) == 1
+    # a spend is never typed into: its button says what it costs
+    chat.handle(cfg, "/new")
+    monkeypatch.setattr(catalog, "prepare", lambda cfg, name, args: card_plan(risk=catalog.SPEND, tool="story"))
+    chat.handle(cfg, "approve s02")
+    assert chat.handle(cfg, "yes")["messages"][-1]["text"] == "Cool." and len(applied) == 1

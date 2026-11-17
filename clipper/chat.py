@@ -273,8 +273,12 @@ STREAM_IN = re.compile(r"(?:^|\s)(?:(?:from|on|in|of)\s+)?(" + STREAM_ID + r")(?
 
 REF_WORD = re.compile(r"\b(?:[\w.-]+/)?(?:[a-z]{1,4}\d+[\w.-]*|comp-[\w.-]+)", re.IGNORECASE)
 # "from kino 11-14", "on the kino one": a stream the way people name it, resolved by catalog.find_item
-SHOW_IN = re.compile(r"(?:from|on|in|of)\s+(?:the\s+)?([a-z][\w-]*)(?:\s+(\d{1,2}[-/]\d{1,2}))?"
-                     r"(?:\s+(?:one|stream|show))?(?=\s|$)\s*(.*)", re.IGNORECASE)
+# only "from <show>", "on the <show> one" or "<on|in|of> <show> 11-14": "on friday", "on fire" stay
+# a note or a pin time
+NOT_SHOW = r"(?!(?:today|tonight|tomorrow|" + "|".join(WEEKDAYS) + "|" + "|".join(d[:3] for d in WEEKDAYS) + r")\b)"
+SHOW_IN = re.compile(r"(?:from\s+(?:the\s+)?" + NOT_SHOW + r"([a-z][\w-]*)(?:\s+(\d{1,2}[-/]\d{1,2}))?(?:\s+(?:one|stream|show))?"
+                     r"|(?:on|in|of)\s+the\s+" + NOT_SHOW + r"([a-z][\w-]*)(?:\s+(\d{1,2}[-/]\d{1,2}))?\s+(?:one|stream|show)"
+                     r"|(?:on|in|of)\s+" + NOT_SHOW + r"([a-z][\w-]*)\s+(\d{1,2}[-/]\d{1,2}))(?=\s|$)\s*(.*)", re.IGNORECASE)
 
 
 def _verb(t: str, low: str, now: datetime) -> tuple[str, dict] | None:
@@ -290,7 +294,7 @@ def _verb(t: str, low: str, now: datetime) -> tuple[str, dict] | None:
         if s:   # "approve s02 from kick-131151926": the stream, not a note
             stream, rest = s.group(1), (rest[:s.start()] + " " + rest[s.end():]).strip()
         elif not stream and "/" not in m.group(1) and (n := SHOW_IN.match(rest)):
-            stream, rest = " ".join(x for x in n.groups()[:2] if x), n.group(3).strip()   # "from kino 11-14"
+            stream, rest = " ".join(x for x in n.groups()[:6] if x), n.group(7).strip()   # "from kino 11-14"
         if REF_WORD.search(rest) and words not in ("reject", "retake", "changes", "retitle", "cover text",
                                                    "cover words"):
             return None   # "approve s01 and s02 ...": a second name isn't a note; _bulk or the model
@@ -584,20 +588,23 @@ def command(cfg: dict, chat: dict, text: str) -> None:
         _post(chat, "clippa", "I know " + " ".join(COMMANDS) + ".")
 
 
-YES = {"yes", "y", "yep", "yeah", "yup", "ok", "okay", "k", "sure", "go", "go ahead", "do it", "ok do it",
-       "yes do it", "yes please", "send it", "approve it", "confirm"}
-NO = {"no", "n", "nope", "nah", "cancel", "never mind", "nevermind", "don't", "dont", "stop", "leave it"}
+YES = {"yes", "yep", "yeah", "yup", "ok", "okay", "ok do it", "do it", "yes do it", "yes please", "go ahead"}
+NO = {"no", "nope", "nah", "cancel", "never mind", "nevermind", "leave it", "no thanks"}
 
 
 def _answer(chat: dict, text: str) -> tuple[str, bool] | None:
-    """A typed yes or no while one card is open in this topic: (that card's id, yes)."""
+    """A typed yes or no right after a write card, with no other card open in the topic: (its
+    id, yes). Never for a spend (its button says what it costs), nor a card Clippa has said
+    something after: an "ok" then is an answer to that, not a tap."""
     word = " ".join(re.sub(r"[^\w' ]", " ", text.lower()).split())
     if word not in YES and word not in NO:
         return None
     t = current_topic(chat)
-    open_ = [m["card"]["id"] for m in chat["messages"]
-             if t and m.get("topic") == t["id"] and (m.get("card") or {}).get("state") == "open"]
-    return (open_[0], word in YES) if len(open_) == 1 else None
+    mine = [m for m in chat["messages"] if t and m.get("topic") == t["id"] and m["who"] == "clippa"]
+    open_ = [m for m in mine if (m.get("card") or {}).get("state") == "open"]
+    if len(open_) != 1 or open_[0] is not mine[-1] or open_[0]["card"].get("risk") != catalog.WRITE:
+        return None
+    return open_[0]["card"]["id"], word in YES
 
 
 def handle(cfg: dict, text: str) -> dict:

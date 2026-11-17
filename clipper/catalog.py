@@ -199,9 +199,12 @@ def stream_named(cfg: dict, text: str) -> tuple[str | None, str]:
     tz = ZoneInfo(cfg["schedule"]["timezone"])
     today = datetime.now(tz).date()
     rel = {"today": today, "tonight": today, "yesterday": today - timedelta(days=1),
-           "last": today - timedelta(days=1)}   # "last night"
-    day = next((m for w in low if (m := DAY.fullmatch(w))), None)
-    if not day and (w := next((w for w in low if w in rel), None)):
+           "last": today - timedelta(days=1)}   # "last night"; "the last one" isn't a day
+    # a month-day beside a show or after from/on ("kino 11-14", "from 11-14"): a "9/11" in a title isn't one
+    day = next((m for i, w in enumerate(low) if (m := DAY.fullmatch(w))
+                and (show or (i and low[i - 1] in ("from", "on", "in", "of")))), None)
+    if not day and (w := next((w for i, w in enumerate(low) if w in rel
+                               and (w != "last" or low[i + 1:i + 2] == ["night"])), None)):
         day = DAY.fullmatch(f"{rel[w]:%m-%d}")
     if not show and not day:
         return None, text
@@ -221,8 +224,8 @@ def stream_named(cfg: dict, text: str) -> tuple[str | None, str]:
         found.append((at or datetime.min.replace(tzinfo=UTC), d.name))
     if not found or (day and not show and len(found) > 1):
         return None, text
-    used = {i for i, w in enumerate(low) if (show and w in names[show]) or (day and DAY.fullmatch(w))
-            or (day and w in (*rel, "night"))}
+    used = {i for i, w in enumerate(low) if (show and w in names[show]) or (day and w == day.group(0))
+            or (day and w in (*rel, "night") and w != "last") or (w == "last" and low[i + 1:i + 2] == ["night"])}
     left = " ".join(w for i, w in enumerate(words) if i not in used)
     return max(found)[1], left
 
@@ -553,7 +556,7 @@ NOT_FIT = {"approve": "already decided", "reject": "already decided", "hold": "a
 def _bulk_rows(cfg: dict, args: dict) -> tuple[list[dict], list[tuple[str, list[str]]], str]:
     """(rows the ask names, [(a name it couldn't pin down, the streams it is in)], what it asked
     for in words)."""
-    names = [n for x in _strings(args.get("items")) for n in re.split(r"\s*(?:,|&|\band\b)\s*", x) if n]
+    names = names_of(args)
     stream = " ".join(str(args.get("stream") or "").split())
     if names:
         rows, unclear = [], []
@@ -565,9 +568,9 @@ def _bulk_rows(cfg: dict, args: dict) -> tuple[list[dict], list[tuple[str, list[
                 where = sorted({stream_label(cfg, r["stream"]) for r in maybe})
                 unclear.append((name, where))
         return rows, unclear, "those"
-    kind = str(args.get("kind") or "").strip().lower()
-    kind = next((k for k, w in KIND_WORD.items() if kind in (k, *(x.lower() for x in w))), kind)
-    kind = {"comp": "compilation", "comps": "compilation", "clip": "pick", "clips": "pick"}.get(kind, kind)
+    kind = str(args.get("kind") or "").strip().lower()   # a model may send "comps" or "Shorts"
+    kind = next((k for k, w in KIND_WORD.items() if kind in (k, *(x.lower() for x in w))),
+                {"comp": "compilation", "comps": "compilation"}.get(kind, kind))
     if kind and kind not in KINDS:
         raise ClipperError(f"no kind {kind!r}: one of {', '.join(KINDS)}")
     if stream and not (cfg["paths"]["streams"] / stream / "review_state.json").exists():
@@ -588,7 +591,8 @@ def _bulk_rows(cfg: dict, args: dict) -> tuple[list[dict], list[tuple[str, list[
 
 
 def names_of(args: dict) -> list[str]:
-    return [n for x in _strings(args.get("items")) for n in re.split(r"\s*(?:,|&|\band\b)\s*", x) if n][:4]
+    """The items a bulk ask names: a list, or one string as a model may send it ("s01, s02")."""
+    return [n for x in _strings(args.get("items")) for n in re.split(r"\s*(?:,|&|\band\b)\s*", x) if n]
 
 
 def _bulk_prepare(cfg: dict, args: dict) -> Plan:
@@ -603,14 +607,16 @@ def _bulk_prepare(cfg: dict, args: dict) -> Plan:
     rows, unclear, what = _bulk_rows(cfg, args)
     missing = [n for n, where in unclear if not where]
     if missing:
-        named = stream_named(cfg, args["stream"])[0] if args.get("stream") else None
+        given = " ".join(str(args.get("stream") or "").split())
+        named = (given if (cfg["paths"]["streams"] / given / "review_state.json").exists()
+                 else stream_named(cfg, given)[0]) if given else None
         return Plan("answer", text=f"I can't find {' or '.join(missing)}"
                                    + (f" in {stream_label(cfg, named)}" if named else "") + ".")
     if unclear:
         where = "; ".join(f"{n} is in {', '.join(w)}" for n, w in unclear)
         first = unclear[0][1][-1].split()   # "Kino Casino 11-14" -> "kino 11-14"
         return Plan("answer", text=f"Which stream? {where}. Say it like \"{args.get('verb')} "
-                                   f"{' and '.join(names_of(args))} from {first[0].lower()} {first[-1]}\".")
+                                   f"{' and '.join(names_of(args)[:4])} from {first[0].lower()} {first[-1]}\".")
     rows = [r for r in rows if not r["uploaded"]]
     fit = BULK_VERBS[verb][2]
     todo, skip = [r for r in rows if fit(r)], [r for r in rows if not fit(r)]
