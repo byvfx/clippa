@@ -63,6 +63,8 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
 - Never use the word "hosts" in viewer-facing text → `[scoring] house_style` rules, appended to every
   viewer-facing prompt; put future style notes there. The cast is **Andy (Warski)** and **PPP** (never any other
   name for PPP; old drafts that say "Ashton" stay). Channel 404 = Don, a solo show. Cast per show in `[meta] cast`.
+- Kino's segment is **"WOAH Buddies"** (WOAH in capitals; user, 11-16), never the transcript's "Woe" or
+  "Whoa": a `house_style` rule since 11-16. A word Whisper mishears gets a rule there the same way.
 - Thumbnails: `[thumbnail] style = "enquirer"` (1990s tabloid: show masthead, no roundel, no barcode, small
   "AS SEEN ON LOLCOW CINEMA" badge), `enquirer_prompt_version = "v6"` (face = headline subject, cast photos
   picked by label, faces.json names trusted). Pre-show covers are one story, no side boxes (`[preshow]
