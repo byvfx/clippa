@@ -4,6 +4,26 @@ with the background jobs (`http://localhost:8765`, `[warroom] port`); `clipper w
 shows what is live, where each stream is in the pipeline, the review queue and the upload
 schedule. Press <kbd>?</kbd> on the page for every keyboard shortcut.
 
+## The chat at the side
+
+The [Clippa messenger](Clippa-messenger) sits at the right of the page: tell Clippa what to do
+without leaving the war room. It is the `/chat` page itself in a frame, so it is the same chat
+(the same topics, history and cards) wherever you open it. **Chat** in the header, or
+<kbd>M</kbd>, shows or hides it, and the browser remembers which; <kbd>M</kbd> also puts the
+cursor in its box, and <kbd>Esc</kbd> there hands the keys back to the war room. **↗** opens
+`/chat` on a page of its own. While it is hidden, the Chat button counts Clippa's new messages.
+On a wide screen the page makes room for it; narrower, it lies over the right edge and the live
+player moves left of it. On a phone it is the **Chat** tab at the bottom instead, so it never
+covers the review cards.
+
+## Looks
+
+The war room and its chat wear one look, picked under Layout > Look (on a phone, **Look** in
+the chat's buddy list): `warroom` (the dark default), `retro`, `millennium` and `pager`, the
+same four as the [Clippa messenger](Clippa-messenger#looks). The browser remembers the pick and
+its other tabs follow it, `/chat` included. A look is one file in `clipper/web/themes/`; see
+[Looks](Clippa-messenger#looks) for what goes in one.
+
 ## Live shows
 
 Click a live show's chip to watch it in a player on the page or on kick.com in a new window;
@@ -25,6 +45,7 @@ It works from the keyboard:
 | <kbd>Space</kbd>, arrows | play, seek the video |
 | <kbd>O</kbd> | pop the video out into its own window |
 | <kbd>B</kbd> | Who's this? (a face on the paused video) |
+| <kbd>M</kbd> | show or hide the [chat](#the-chat-at-the-side) |
 
 <kbd>Tab</kbd> reaches the card titles, schedule slots and live chips too; <kbd>Enter</kbd> or
 <kbd>Space</kbd> opens them. The card buttons name their key on hover.
@@ -216,7 +237,7 @@ side column has a width. The browser keeps the arrangement; Layout > Save as nam
 
 ## On a phone
 
-It switches to one view at a time (Review, Schedule, Pipeline and Stats tabs at the bottom).
+It switches to one view at a time (Review, Schedule, Pipeline, Stats and Chat tabs at the bottom).
 Items open full screen with the decisions at the bottom and swipe to the next one, and videos
 play from a 360p copy (`lowres/` beside each preview, about a quarter of the data). It can be
 added to the home screen. Away from home it goes through Tailscale: `clipper warroom --tailnet
@@ -224,7 +245,10 @@ on` ([Phone access](Phone-access)).
 
 ## For developers
 
-The page is in `clipper/web/` (`warroom.html` and what it loads). The server is the `clipper/warroom/`
+The page is in `clipper/web/` (`warroom.html` and what it loads). `warroom.css` is structure
+only: every colour and the shape of windows, title bars, buttons and fields comes from the look's
+file in `web/themes/` (`themes/warroom.css` is the one place the default's colours live), loaded
+by `theme.js`, which the chat page shares. `js/chatdock.js` shows and hides the chat frame. The server is the `clipper/warroom/`
 package. `httpd.py` holds the route tables `GET_API` and `POST_API`, which map each `/api/...` path to
 a function; `data.py` builds the page's data, `review.py` the decisions (through `clipper/actions.py`),
 and each panel has a module of its own.

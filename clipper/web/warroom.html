@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="warroom">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -12,6 +12,10 @@
 <link rel="apple-touch-icon" href="/icon-192.png">
 <title>Clippa War Room</title>
 <link rel="stylesheet" href="warroom.css">
+<!-- the look: one file in web/themes/ (structure in warroom.css, every colour there), picked by
+     theme.js; the chat docked at the side wears the same one -->
+<link rel="stylesheet" href="themes/warroom.css" id="theme">
+<script src="theme.js"></script>
 </head>
 <body>
 <header>
@@ -28,7 +32,8 @@
     <button class="btn" id="blindsBtn" title="Gossip blind items: say who you think it is, first (clipper blinds)">Blinds</button>
     <button class="btn" id="invBtn" title="Leads from an archive subject's own videos (clipper investigate)">Investigations</button>
     <button class="btn" id="apikeysBtn" title="API keys: where each comes from, and whether its provider still takes it (clipper keys)">Keys</button>
-    <button class="btn" id="layoutBtn" title="Arrange the panels: drag them, save layouts">Layout</button>
+    <button class="btn" id="chatBtn" aria-controls="chat" title="The Clippa chat at the side: show or hide it (M)">Chat<span class="n" id="chatN"></span></button>
+    <button class="btn" id="layoutBtn" title="Arrange the panels (drag them, save layouts) and pick a look">Layout</button>
     <button class="btn" id="keysBtn" title="Keyboard shortcuts (?)">?</button>
   </div>
 </header>
@@ -69,7 +74,15 @@
   <button data-view="schedule"><b>◷</b>Schedule</button>
   <button data-view="pipeline"><b>⚙</b>Pipeline</button>
   <button data-view="stats"><b>▥</b>Stats</button>
+  <button data-view="chat"><b>✉</b>Chat <span class="n" id="vnChat"></span></button>
 </nav>
+<!-- #158: the Clippa chat is /chat itself in a frame, so the two share one code path and one store -->
+<aside id="chat" aria-label="Clippa chat">
+  <div class="c-head"><span>Clippa</span><span class="sp"></span>
+    <a class="btn" href="/chat" target="_blank" rel="noopener" title="Open the chat on a page of its own">↗</a>
+    <button class="btn" id="chatHide" type="button" title="Hide the chat (M)">×</button></div>
+  <iframe id="chatFrame" src="/chat?dock" title="Clippa chat"></iframe>
+</aside>
 
 <dialog id="modal"></dialog>
 <dialog id="keys"></dialog>
@@ -86,6 +99,7 @@
 <script src="js/blinds.js"></script>
 <script src="js/investigate.js"></script>
 <script src="js/apikeys.js"></script>
+<script src="js/chatdock.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

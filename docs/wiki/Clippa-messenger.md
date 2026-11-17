@@ -1,7 +1,8 @@
 A small chat page where you tell Clippa what you want done, in your own words, and Clippa
-answers like a buddy in an old instant messenger. `clipper serve` serves it beside the
-[War room](War-room) at `/chat` (`http://localhost:8765/chat`, same token as the war room);
-the war room itself is unchanged. It works on a phone: the buddy list folds away.
+answers like a buddy in an old instant messenger. `clipper serve` serves it at `/chat`
+(`http://localhost:8765/chat`, same token as the war room), and the [War room](War-room) shows
+the same page at its side ([the chat at the side](War-room#the-chat-at-the-side)), so it is one
+chat either way. It works on a phone: the buddy list folds away.
 
 ## What it can do
 
@@ -67,13 +68,18 @@ away (the recorder while a show is live) or off (no fresh heartbeat).
 The page comes in four looks: `retro` (grey bevelled windows on a teal desk), `millennium`
 (beige windows, rounded blue title bars, tooltip-yellow cards), `pager` (green title bars, the
 sender's name on its own line) and `warroom` (the [War room](War-room)'s dark palette). Pick one
-with **Look** under the buddy list; the page remembers it in that browser. `[chat] theme` sets the
-one a new browser starts with.
+with **Look** under the buddy list (in the war room, also Layout > Look). One pick dresses the
+war room and the chat together: the browser remembers it and its other tabs follow.
+`[chat] theme` sets the one this page starts with in a browser that never picked one; the war
+room starts as `warroom`. A look picked here before the war room had looks stays this page's
+until you pick again.
 
-A look is one file in `clipper/web/themes/`: the custom properties the page's `chat.css` reads
-(colours, fonts, borders, radii, the window titles as `--label-buddies` and `--label-chat`) plus
-any rules of its own. Add a file there and it shows up in the list; a test checks that every
-look defines every property, and that `warroom` keeps the war room's colours.
+A look is one file in `clipper/web/themes/`: the custom properties that `chat.css` and the war
+room's `warroom.css` read (colours, fonts, borders, radii, the title bars and buttons, the window
+titles as `--label-buddies` and `--label-chat`, `--scheme` for the chat's native controls) plus
+any rules of its own, which name one page's own classes. `theme.js` loads it on both pages. Add
+a file there and it shows up in both lists; a test checks that every look defines every
+property, and that the war room's colours live in `themes/warroom.css` only.
 
 ## Settings
 

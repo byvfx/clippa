@@ -5,6 +5,7 @@
 
 * { box-sizing: border-box; }
 html, body { height: 100%; }
+html { color-scheme: var(--scheme); }   /* the look says light or dark for the native controls */
 body {
   margin: 0;
   background: var(--desk);

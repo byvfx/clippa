@@ -251,7 +251,10 @@ only at their word. #67's model edit plan waits until edited Shorts prove themse
 live clips #81, blind items #111 (steps 1-2 of 4 built and live 11-15/16, below), investigate anyone #138, agent exploration #158 (11-15 spec comment: the Clippa
 messenger. v1 merged (PR #285) and deployed to the hub 11-16: `/chat` on serve's page, wiki
 Clippa-messenger, `clipper/catalog.py` + `clipper/chat.py`, `[chat]`, Haiku ~$0.0005 a message, ledger `chat`; chats in
-`[paths] chats` on the share; four looks in `web/themes/`, `[chat] theme`. After it merges and deploys, a week of phone use; then a small `clipper mcp`; #13 may fold into it), Modal ideas #53, #56,
+`[paths] chats` on the share; four looks in `web/themes/`, `[chat] theme`. In the war room (branch warroom/chat-dock,
+11-16, not merged or deployed): `/chat` docked at the right in a frame (Chat button / M, a Chat tab on a phone) and the
+looks dress the whole war room, one pick for both (`theme.js`; `themes/warroom.css` is the default and the only home of
+the war room's colours). After it deploys, a week of phone use; then a small `clipper mcp`; #13 may fold into it), Modal ideas #53, #56,
 Udder Truth #58/#59/#60, P&L #50 (revenue once monetized). Write "#77 L6" rather than "fix #77" in commit
 messages: GitHub closes the issue on "fix".
 - **Review pre-flight checks and approval by silence (#259, 11-14):** step A, `clipper review check` (wiki
@@ -450,7 +453,7 @@ no secrets). Copy one off the NAS now and then. Not in it: `deploy/*/env.local` 
 - Windows: a file open in another process can't be replaced (fork sessions render previews from cuts).
 - `deploy/common.ps1` (the worker task scripts) finds a service as a clipper.exe command line ending in its
   name and once killed its own `services restart` chain; it skips its own process chain now, keep that.
-- The war room page loads `warroom.css` and `js/*.js` from disk: a pull that changes the page before serve
+- The war room page loads `warroom.css`, `theme.js`, `themes/*.css` and `js/*.js` from disk: a pull that changes the page before serve
   restarts leaves a bare, unstyled page. Deploy or restart serve.
 - serve runs `schedule.run` in-process (the war room's and the bot's replans go through its /api/replan):
   scheduler changes need a serve restart. A bot whose serve is down still writes the decision to Kitsu and
