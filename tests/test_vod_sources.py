@@ -57,3 +57,25 @@ def test_fetch_picks_the_source(defaults, monkeypatch):
     assert [s[0] for s in seen] == ["twitch", "youtube"]
     with pytest.raises(ClipperError):
         cli.cmd_fetch(defaults, SimpleNamespace(url="https://kick.com/a/videos/b", no_video=True, no_chat=True))
+
+
+def test_twitch_ytdlp_gets_a_private_netscape_copy(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    from clipper import ytdl
+
+    jar = tmp_path / "twitch_cookies.txt"
+    jar.write_text(json.dumps([{"domain": ".twitch.tv", "path": "/", "secure": True, "name": "auth-token",
+                                "value": "x", "expirationDate": 4102444800}]), encoding="utf-8")
+    seen = {}
+
+    def run(*args):
+        seen["args"] = args
+        seen["text"] = Path(args[1]).read_text(encoding="utf-8")
+
+    monkeypatch.setattr(ytdl, "run", run)
+    twitch._ytdlp({"paths": {"twitch_cookies": jar}}, "-J", "u")
+    assert seen["args"][0] == "--cookies" and seen["args"][1] != str(jar) and seen["args"][2:] == ("-J", "u")
+    assert "auth-token" in seen["text"] and not seen["text"].lstrip().startswith("[")
+    twitch._ytdlp({"paths": {"twitch_cookies": tmp_path / "none.txt"}}, "-J", "u")
+    assert seen["args"] == ("-J", "u")

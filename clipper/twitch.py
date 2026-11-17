@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -33,9 +35,18 @@ def parse_url(url: str) -> str:
     return m.group(1)
 
 
-def _cookie_args(cfg: dict) -> list[str]:
+def _ytdlp(cfg: dict, *args: str):
+    """yt-dlp, signed in when there is a cookies file. yt-dlp reads Netscape only (a browser
+    extension's JSON export is converted) and writes its jar back on exit, so it gets a private
+    copy, never the shared file."""
     p = cfg["paths"]["twitch_cookies"]
-    return ["--cookies", str(p)] if p.is_file() else []
+    if not p.is_file():
+        return ytdl.run(*args)
+    with tempfile.TemporaryDirectory(prefix="clipper-cookies-") as scratch:
+        private = Path(scratch) / "cookies.txt"
+        if ytdl.netscape_cookies(p, private) != private:
+            shutil.copyfile(p, private)
+        return ytdl.run("--cookies", str(private), *args)
 
 
 def _auth_header(cfg: dict) -> dict:
@@ -53,7 +64,7 @@ def _auth_header(cfg: dict) -> dict:
 
 def resolve(url: str, cfg: dict) -> dict:
     vid = parse_url(url)
-    r = ytdl.run(*_cookie_args(cfg), "-J", "--no-playlist", f"https://www.twitch.tv/videos/{vid}")
+    r = _ytdlp(cfg, "-J", "--no-playlist", f"https://www.twitch.tv/videos/{vid}")
     if r.returncode:
         err = ytdl.last_error(r)
         hint = " (a subscriber-only VOD needs [paths] twitch_cookies, wiki: Fetching-VODs)" if re.search(r"subscri|sign in|login", err, re.I) else ""
@@ -79,7 +90,7 @@ def fetch_video(stream_dir: Path, meta: dict, cfg: dict) -> Path:
     if out.exists():
         return out
     tc = cfg["twitch"]
-    r = ytdl.run(*_cookie_args(cfg), "--no-playlist", "-f", f"best[height<={tc['max_height']}]/best",
+    r = _ytdlp(cfg, "--no-playlist", "-f", f"best[height<={tc['max_height']}]/best",
                  "-N", str(tc["download_fragments"]), "--merge-output-format", "mp4",
                  "--remux-video", "mp4", "-o", str(stream_dir / "source.%(ext)s"), meta["url"])
     if r.returncode or not out.exists():
