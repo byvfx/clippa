@@ -526,7 +526,7 @@ def test_your_own_recording_of_a_take_is_used_instead_of_a_bought_read(plan, dc,
     (reads / "._open.wav").write_bytes(b"what macOS leaves on a share")
     assert doc.own_read(tmp_path, "open") is None and doc.own_read(tmp_path, "#3") is None
     assert list(doc.own_reads(tmp_path)) == ["#3"]
-    mine = reads / "open.WAV"
+    mine = reads / "Open.WAV"      # the name's case is the file manager's business, not the plan's
     mine.write_bytes(b"one")
     raw, done, words = doc.take_files(tmp_path, t, nc, dc)
     assert raw == mine and done != bought[1] and words != bought[2]
@@ -537,7 +537,7 @@ def test_your_own_recording_of_a_take_is_used_instead_of_a_bought_read(plan, dc,
     mine.write_bytes(b"a second read")
     assert doc.take_files(tmp_path, t, nc, dc)[1] != done
     (reads / "open.mp3").write_bytes(b"two")
-    with pytest.raises(ClipperError, match="take 'open' has more than one recording in .*: open.mp3, open.WAV"):
+    with pytest.raises(ClipperError, match="take 'open' has more than one recording in .*: open.mp3, Open.WAV"):
         doc.take_files(tmp_path, t, nc, dc)
 
 
@@ -569,7 +569,7 @@ def test_voice_takes_your_recording_and_buys_nothing(defaults, tmp_path, capsys,
     doc.voice(defaults, "lighthouse", dry_run=True)
     out = capsys.readouterr().out
     assert "1 takes, 1 read by you, 0 to buy: 0 characters" in out and "open: your own read, open.wav" in out
-    assert "in vo/read but no take by that name: #3, opne (the plan's takes: open)" in out
+    assert "in vo/read but no take by that name: #3.wav, opne.wav (the plan's takes: open)" in out
     doc.voice(defaults, "lighthouse")           # no narrator is set: none is needed
     out = capsys.readouterr().out
     assert "open: open.wav -> 9.0 s" in out
@@ -596,15 +596,21 @@ def test_the_kit_drops_the_ai_voice_line_when_every_take_is_yours(defaults, tmp_
     own = {**dc, "own_voice_disclosures": ["Read by the author."]}
     assert doc.disclosure_lines(plan, own, bought=False) == ["Read by the author."]
     assert doc.disclosure_lines({**plan, "disclosures": ["Mine."]}, own, bought=False) == ["Mine."]
+    assert doc.disclosure_lines({**plan, "disclosures": "One line."}, own, bought=True) == ["One line."]
+    assert doc.disclosure_lines({**plan, "disclosures": False}, own, bought=True) == []    # as before: none
+    assert doc.disclosure_lines({**plan, "disclosures": True}, own, bought=True) == []
     b = doc.layout(plan, narration_of(plan), DUR, dc, {})
 
     def kit_says_ai():
         return ai in doc.kit(defaults, "lighthouse").read_text(encoding="utf-8")
 
-    jsonstate.write(d / "work" / "build.json", b)       # a build from before it kept what it bought: the files decide
+    b.pop("bought", None)
+    jsonstate.write(d / "work" / "build.json", b)       # a build from before it kept what it bought: all bought
     assert kit_says_ai()
     (d / "vo" / "read" / "open.flac").write_bytes(b"my read")
-    assert not kit_says_ai()
+    (d / "vo" / "read" / "open.mp3").write_bytes(b"and a second one")    # the kit doesn't read the folder
+    assert kit_says_ai()                                # recorded since, not yet built: still the bought read
+    (d / "vo" / "read" / "open.mp3").unlink()
     jsonstate.write(d / "work" / "build.json", {**b, "bought": ["open"]})    # recorded after a build that bought it
     assert kit_says_ai()
     jsonstate.write(d / "work" / "build.json", {**b, "bought": []})

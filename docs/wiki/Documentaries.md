@@ -123,7 +123,7 @@ The narration is refused when a line contains a term from `banned.txt`.
 
 To read a take yourself, record it and save it as `vo/read/<take>.wav` in the piece's folder,
 named for the take (`take = "open"` in the plan is `vo/read/open.wav`; `.flac`, `.aif`, `.mp3`,
-`.m4a`, `.aac`, `.ogg` and `.opus` work too). `clipper doc voice` then uses your recording for
+`.m4a`, `.aac`, `.ogg` and `.opus` work too; `Open.wav` is the same take). `clipper doc voice` then uses your recording for
 that take and buys nothing for it. A piece can mix the two: takes with a recording are yours,
 the rest are bought. `--dry-run` lists which is which, and names any file in `vo/read/` that
 matches no take.
@@ -143,7 +143,7 @@ matches no take.
   saving it, then `build`.
 
 When every take in the last build is your own, the kit leaves out the AI-voice line (see
-[Kit](#kit)). A file whose name starts with a dot is never a recording.
+[Kit](#kit)): build again after recording, since a recording counts once a build has used it. A file whose name starts with a dot is never a recording.
 
 ## Build
 
@@ -220,5 +220,5 @@ after the one before and before the end, none when there are fewer than three), 
 pinned comment and a checklist. The disclosure lines are `[doc] disclosures` ("The narration
 is an AI voice."), or `[doc] own_voice_disclosures` (none) when the last build bought no
 take because you [read them all](#your-own-voice); the plan's own `disclosures` replace
-either.
+either (`disclosures = false` for none).
 It fails when the text contains a banned term.

@@ -366,7 +366,8 @@ def narrator(cfg: dict, plan: dict) -> dict:
 
 
 def own_reads(d: Path) -> dict[str, list[Path]]:
-    """The recordings in the piece's vo/read/, by file name without the extension. Dot files
+    """The recordings in the piece's vo/read/, by file name without the extension, case folded
+    (Open.wav is take "open": Windows and a share don't tell the two apart either). Dot files
     aren't recordings (macOS leaves a ._name beside each file it writes to a share)."""
     folder = d / READ_DIR
     out: dict[str, list[Path]] = {}
@@ -377,7 +378,7 @@ def own_reads(d: Path) -> dict[str, list[Path]]:
         return out
     for name in names:
         if Path(name).suffix.lower() in READ_EXTS:
-            out.setdefault(Path(name).stem, []).append(folder / name)
+            out.setdefault(Path(name).stem.casefold(), []).append(folder / name)
     return out
 
 
@@ -386,7 +387,7 @@ def own_read(d: Path, take: str) -> Path | None:
     instead of a bought read. A line with no `take` has none: its id (#N) moves with the plan."""
     if take.startswith("#"):
         return None
-    found = own_reads(d).get(take, [])
+    found = own_reads(d).get(take.casefold(), [])
     if len(found) > 1:
         raise ClipperError(f"take {take!r} has more than one recording in {found[0].parent}: "
                            + ", ".join(p.name for p in found))
@@ -509,7 +510,8 @@ def voice(cfg: dict, slug: str, dry_run: bool = False) -> None:
     print(f"{len(ts)} takes, {yours}{len(todo)} to buy: {sum(len(t['text']) for t in todo)} characters from ElevenLabs "
           f"(voice {nc['voice_id'] or 'not set'}, {nc['tts_model']})")
     named = [t["id"] for t in ts if not t["id"].startswith("#")]     # a line with no take has no recording
-    if stray := sorted(set(own_reads(d)) - set(named)):
+    reads = own_reads(d)
+    if stray := [p.name for k in sorted(set(reads) - {n.casefold() for n in named}) for p in reads[k]]:
         print(f"  in {READ_DIR} but no take by that name: {', '.join(stray)} (the plan's takes: "
               f"{', '.join(named) or 'none named'})")
     if dry_run:
@@ -1232,8 +1234,9 @@ def kit_text(plan: dict, b: dict, disclosures: list[str]) -> str:
 def disclosure_lines(plan: dict, dc: dict, bought: bool) -> list[str]:
     """The description's last lines: the plan's own when it sets them, else [doc] disclosures,
     or [doc] own_voice_disclosures when no take's read is bought (you read them all)."""
-    if plan["disclosures"] is not None:
-        return list(plan["disclosures"])
+    own = plan["disclosures"]
+    if own is not None:    # `disclosures = false` in a plan: no lines; one string: that line
+        return [own] if isinstance(own, str) else list(own) if isinstance(own, list | tuple) else []
     return list(dc["disclosures"] if bought else dc["own_voice_disclosures"])
 
 
@@ -1243,9 +1246,9 @@ def kit(cfg: dict, slug: str) -> Path:
     if not b:
         raise ClipperError(f"no build yet: the chapters come from it (clipper doc build {slug} --dry-run)")
     dc = cfg["doc"]
-    # what the last build put on the timeline; a build from before it kept that: the recordings there now
-    bought = b["bought"] if "bought" in b else [t["id"] for t in takes(plan) if own_read(d, t["id"]) is None]
-    text = kit_text(plan, b, disclosure_lines(plan, dc, bool(bought)))
+    # what the last build put on the timeline. A build from before it kept that was all bought reads,
+    # whatever is in vo/read now: a recording counts once a build has used it.
+    text = kit_text(plan, b, disclosure_lines(plan, dc, bool(b.get("bought", True))))
     terms, allowed = read_banned(d / BANNED)
     out = d / "kit.md"
     out.write_text(text, encoding="utf-8")
