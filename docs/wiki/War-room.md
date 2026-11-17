@@ -48,7 +48,9 @@ you come back. A page whose sign-in has gone says so and asks for the `?key=` li
 
 Decisions, hold, pin, title/description/hashtag edits, find and replace and thumbnail words
 can be undone from their toast for 10 s or from "Undo…" (the last 20). Undo goes through
-Kitsu too, and an item already on YouTube keeps its live text (change it in Studio). Not on
+Kitsu too, and an item already on YouTube keeps its live text (change it in Studio), except a
+rename made from the [Clippa messenger](Clippa-messenger#renaming-a-video-thats-up), whose undo
+renames it back on YouTube. Not on
 the list: the cover editor, faces, cast, and a retake already started (undo puts the item's
 status back; the retake still runs).
 

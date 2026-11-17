@@ -77,6 +77,14 @@ A Short's "related video" (the link under it to its segment) can only be set in 
 and the segment id to search for, and `clipper upload --related <keys or links>` records the
 ones you set. The daily digest lists them too.
 
+## Renaming a video that's up
+
+`clipper review retitle <item> <new title>`, or a retitle from the
+[Clippa messenger](Clippa-messenger#renaming-a-video-thats-up), renames a video already on
+YouTube: the title gets the show name and bleeps as an upload's does, the rest of the video's
+details stay as YouTube has them, and Kitsu's title column changes after YouTube's. 51 quota
+units each, from the spare only.
+
 ## Quota
 
 Every YouTube API call is counted per Pacific day in `logs/youtube_quota.json`; the link

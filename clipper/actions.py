@@ -11,7 +11,8 @@ in Kitsu:
     hold      Hold column on or off (schedule skips held items)
     pin       Publish at column: "2026-10-20 15:00", a date (that day's first slot), or
               empty to unpin
-    retitle   YouTube title column
+    retitle   YouTube title column; once the video is up, YouTube's title too (first, so
+              a failed rename changes nothing: youtube.retitle)
     description, hashtags, tags, playlist
               YouTube description / Hashtags / Tags (comma-separated) / Playlist columns;
               checked against YouTube's limits, never emptied (an empty column falls
@@ -310,6 +311,22 @@ def edit_meta(cfg: dict, item: Item, values: dict[str, str], who: str = "") -> d
     return refresh(cfg, item)
 
 
+def retitle(cfg: dict, item: Item, text: str, who: str = "") -> dict:
+    """The YouTube title column; a video that's up is renamed on YouTube first, so the column
+    never says a title YouTube doesn't have."""
+    from . import youtube
+
+    text = META["YouTube title"][0](text)
+    live = youtube.on_youtube(cfg, item.ref)
+    if not live or live.get("gone_at"):   # not up, or deleted in Studio since: Kitsu's column only
+        return edit_meta(cfg, item, {"YouTube title": text}, who)
+    live = youtube.retitle(cfg, item.ref, text)
+    try:   # Kitsu's comment says the live video changed too
+        return edit_meta(cfg, item, {"YouTube title": text}, f"{who}, on YouTube too" if who else "on YouTube too")
+    except Exception as e:  # re-raised as one line that says what did happen: the public part
+        raise ClipperError(f"renamed on YouTube ({live['url']}), but Kitsu's title column didn't change: {e}") from e
+
+
 def thumbtext(cfg: dict, item: Item, text: str, who: str = "") -> dict:
     """The refresh's sync sees the new column value and re-renders the thumbnail."""
     cfg = for_stream(cfg, item.stream_dir)
@@ -350,6 +367,8 @@ def decide(cfg: dict, item: Item, action: str, who: str, text: str = "", on: boo
     flips it); values: {Kitsu column: new value} for "edit"."""
     if action == "hold":
         return hold(cfg, item, (not refresh(cfg, item)["hold"]) if on is None else on, who)
+    if action == "retitle":
+        return retitle(cfg, item, text, who)
     if action in EDITS:
         return edit_meta(cfg, item, {EDITS[action]: text}, who)
     fn = {"approve": lambda: approve(cfg, item, text, who),

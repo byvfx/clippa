@@ -21,6 +21,19 @@ into the open chat when it ends.
 It has no tool for uploads or publishing, config, code, deploys, `clipper services` or the
 recorder; asked for any of those, it says it can't do that from here.
 
+## Renaming a video that's up
+
+"retitle s02 A Better Title" (or "rename the Blade one to ...") works on a video that's
+already on YouTube too: the card says **Rename s02 on YouTube?**, links the video, and shows
+the title as YouTube will show it (with the show name, as an upload adds it). **Yes** renames it
+on YouTube first, then Kitsu's title column, so the two never disagree; the description, tags
+and everything else stay as they are on YouTube. Each rename is 51 of the day's API quota
+units, taken only from what the day's uploads don't need ([Scheduling and uploads](Scheduling-and-uploads#quota));
+with none spare, Clippa says so instead of making a card. The war room's undo renames it back.
+`clipper review retitle <item> <title>` does the same from a terminal.
+
+Anything else about a video that's up (its cover, slot, privacy) is still done in YouTube Studio.
+
 ## How a message is read
 
 1. A box command (below) or something Clippa can match locally: "what goes out tomorrow",

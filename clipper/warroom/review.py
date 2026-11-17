@@ -74,8 +74,12 @@ def remember(cfg: dict, action: str, label: str, done: list[dict]) -> str:
 def recent_actions(cfg: dict) -> list[dict]:
     d = jsonstate.read(undo_path(cfg), {"actions": []})
     return [{k: a[k] for k in ("id", "at", "action", "label", "undone")}
-            | {"n": len(a["items"]), "uploaded": sum(1 for x in a["items"] if x["before"].get("uploaded"))}
+            | {"n": len(a["items"]), "uploaded": _stuck(a)}
             for a in d["actions"]]
+
+def _stuck(entry: dict) -> int:
+    """Items of an action that its undo can't change on YouTube (all but a chat's rename there)."""
+    return 0 if entry["action"] == "retitle" else sum(1 for x in entry["items"] if x["before"].get("uploaded"))
 
 def _inverse(cfg: dict, item: actions.Item, action: str, before: dict, values: dict, who: str) -> dict:
     if action in ("approve", "reject", "changes", "reopen"):
@@ -84,6 +88,8 @@ def _inverse(cfg: dict, item: actions.Item, action: str, before: dict, values: d
         return actions.hold(cfg, item, before["hold"], who)
     if action == "pin":
         return actions.pin(cfg, item, before["publish_at"], who)
+    if action == "retitle":   # a rename on YouTube (the chat's): renamed back there too
+        return actions.retitle(cfg, item, before["title"], who)
     if action in ("edit", "replace"):
         return actions.edit_meta(cfg, item, {c: before[ROW_OF[c]] for c in values}, who)
     if action == "thumbtext":
@@ -114,7 +120,7 @@ def do_undo(cfg: dict, uid: str) -> dict:
         for a in d["actions"]:
             if a["id"] == uid:
                 a["undone"] = not failed
-    up = sum(1 for x in entry["items"] if x["before"].get("uploaded"))
+    up = _stuck(entry)
     note = f"{up} already on YouTube: change {'it' if up == 1 else 'those'} in Studio too" if up else ""
     return {"undone": ok, "failed": failed, "rows": rows, "note": note}
 
