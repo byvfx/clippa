@@ -90,9 +90,11 @@ def fetch_chat(stream_dir: Path, meta: dict, cfg: dict) -> Path | None:
     if out.exists():
         return out
     with tempfile.TemporaryDirectory(prefix="clipper-ytchat-") as tmp:
-        ytdl.run_retrying(cfg, "--skip-download", "--no-playlist", "--write-subs", "--sub-langs", "live_chat",
-                          "-o", str(Path(tmp) / "c.%(ext)s"), meta["url"], retry_on=ytdl.AGE + ytdl.BOT)
+        r, _ = ytdl.run_retrying(cfg, "--skip-download", "--no-playlist", "--write-subs", "--sub-langs", "live_chat",
+                                 "-o", str(Path(tmp) / "c.%(ext)s"), meta["url"], retry_on=ytdl.AGE + ytdl.BOT)
         found = list(Path(tmp).glob("*.live_chat.json"))
+        if r.returncode and not found:
+            raise ClipperError(f"yt-dlp couldn't get the chat of {meta['url']}: {ytdl.last_error(r)}")
         if not found:
             print(f"{meta['stream_id']}: no chat replay on this video")
             return None

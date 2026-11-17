@@ -3,7 +3,7 @@
 `clipper fetch https://www.twitch.tv/videos/<id>` leaves streams/twitch-<id>/ with the same
 files a Kick VOD does (meta.json, source.mp4, chat.jsonl). yt-dlp reads the VOD's details and
 downloads the video; chat comes from Twitch's own web API (the comments of a video, paged by
-cursor), since yt-dlp has no Twitch chat. A subscriber-only VOD needs [twitch] cookies.
+cursor), since yt-dlp has no Twitch chat. A subscriber-only VOD needs [paths] twitch_cookies.
 """
 
 from __future__ import annotations
@@ -34,15 +34,8 @@ def parse_url(url: str) -> str:
 
 
 def _cookie_args(cfg: dict) -> list[str]:
-    path = cfg["twitch"]["cookies"]
-    if not path:
-        return []
-    p = Path(path)
-    if not p.is_absolute():
-        p = cfg["paths"]["root"] / p
-    if not p.exists():
-        raise ClipperError(f"[twitch] cookies {p} doesn't exist")
-    return ["--cookies", str(p)]
+    p = cfg["paths"]["twitch_cookies"]
+    return ["--cookies", str(p)] if p.is_file() else []
 
 
 def resolve(url: str, cfg: dict) -> dict:
@@ -50,7 +43,7 @@ def resolve(url: str, cfg: dict) -> dict:
     r = ytdl.run(*_cookie_args(cfg), "-J", "--no-playlist", f"https://www.twitch.tv/videos/{vid}")
     if r.returncode:
         err = ytdl.last_error(r)
-        hint = " (a subscriber-only VOD needs [twitch] cookies)" if re.search(r"subscri|sign in|login", err, re.I) else ""
+        hint = " (a subscriber-only VOD needs [paths] twitch_cookies, wiki: Fetching-VODs)" if re.search(r"subscri|sign in|login", err, re.I) else ""
         raise ClipperError(f"yt-dlp couldn't read Twitch VOD {vid}: {err}{hint}")
     v = json.loads(r.stdout)
     started = datetime.fromtimestamp(v.get("timestamp") or time.time(), UTC)
@@ -111,33 +104,49 @@ def fetch_chat(stream_dir: Path, meta: dict, cfg: dict) -> Path:
     t0 = datetime.fromisoformat(meta["started_at"]).timestamp()
     headers = {"Client-ID": CLIENT_ID, "Content-Type": "application/json"}
     rows: dict[str, dict] = {}
+    # A pull takes minutes: what came in is kept in chat.partial.jsonl, and a rerun picks up there.
+    partial = stream_dir / "chat.partial.jsonl"
+    offset = 0
+    if partial.exists():
+        for line in partial.read_text(encoding="utf-8").splitlines():
+            row = json.loads(line)
+            rows[row["id"]] = row
+            offset = max(offset, int(row["t"]))
     # Cursor pages need Twitch's integrity token, so page by offset: each request starts at the
     # last second seen (rows are de-duplicated by id), a second further when nothing new came.
-    offset = 0
     end = float(meta.get("duration_s") or 0)
-    while offset <= end:
-        data = _post([{"operationName": "VideoCommentsByOffsetOrCursor",
-                       "variables": {"videoID": meta["video_id"], "contentOffsetSeconds": offset},
-                       "extensions": {"persistedQuery": {"version": 1, "sha256Hash": COMMENTS_HASH}}}],
-                     headers)[0]
-        comments = ((data.get("data") or {}).get("video") or {}).get("comments")
-        if comments is None:
-            raise ClipperError(f"Twitch chat stopped at {offset}s of VOD {meta['video_id']}: "
-                               f"{data.get('errors') or data}")
-        before = len(rows)
-        last = offset
-        for edge in comments.get("edges") or []:
-            if edge.get("node"):
-                row = comment_row(edge["node"], t0)
-                rows[row["id"]] = row
+    with open(partial, "a", encoding="utf-8") as keep:
+        while offset <= end:
+            data = _post([{"operationName": "VideoCommentsByOffsetOrCursor",
+                           "variables": {"videoID": meta["video_id"], "contentOffsetSeconds": offset},
+                           "extensions": {"persistedQuery": {"version": 1, "sha256Hash": COMMENTS_HASH}}}],
+                         headers)[0]
+            comments = ((data.get("data") or {}).get("video") or {}).get("comments")
+            if comments is None:
+                raise ClipperError(f"Twitch chat stopped at {offset}s of VOD {meta['video_id']} (rerun to resume; "
+                                   f"Twitch may have changed the chat query, wiki: Fetching-VODs): "
+                                   f"{data.get('errors') or data}")
+            before = len(rows)
+            edges = [e["node"] for e in comments.get("edges") or [] if e.get("node")]
+            last = offset
+            for node in edges:
+                row = comment_row(node, t0)
+                if row["id"] not in rows:
+                    rows[row["id"]] = row
+                    keep.write(json.dumps(row, ensure_ascii=False) + "\n")
                 last = max(last, int(row["t"]))
-        offset = last if len(rows) > before else offset + 60  # nothing new: a quiet stretch, jump on
-        if len(rows) // 5000 != before // 5000:
-            print(f"chat: {len(rows)} msgs ({offset / end:.0%})" if end else f"chat: {len(rows)} msgs", flush=True)
+            keep.flush()
+            if len(rows) > before:
+                offset = last
+            else:  # nothing new: a second on when the page was full, a minute on over a quiet stretch
+                offset += 1 if edges else 60
+            if len(rows) // 5000 != before // 5000:
+                print(f"chat: {len(rows)} msgs ({offset / end:.0%})" if end else f"chat: {len(rows)} msgs", flush=True)
     ordered = sorted(rows.values(), key=lambda m: (m["ts"], m["id"]))
     tmp = out.with_suffix(".tmp")
     tmp.write_text("".join(json.dumps(m, ensure_ascii=False) + "\n" for m in ordered), encoding="utf-8")
     tmp.replace(out)
+    partial.unlink(missing_ok=True)
     print(f"{len(ordered)} chat messages -> {out}")
     return out
 

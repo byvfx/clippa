@@ -22,8 +22,9 @@ in a show's `channels` list in `clipper.toml`, or the stream belongs to no show.
 
 - **Twitch chat** takes about 5 minutes for a 3-hour VOD: Twitch serves a minute or so of
   messages per request. A subscriber-only VOD needs the cookies of a signed-in browser as a
-  Netscape `cookies.txt`; put its path in `[twitch] cookies` (for example
-  `secrets/twitch_cookies.txt`). Never commit it.
+  Netscape `cookies.txt`; save it as `secrets/twitch_cookies.txt` (or set `[paths] twitch_cookies`); no file means
+  none. `clipper doctor` checks it. Never commit it. The chat comes from Twitch's own web
+  query, which Twitch can change; a pull that stops says so and a rerun resumes.
 - **YouTube** age and bot checks retry once signed in, as in [YouTube sign-in](YouTube-sign-in).
   A normal upload has no chat; the stream then has none, and the chat signals simply have
   nothing to score.

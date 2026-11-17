@@ -83,12 +83,12 @@ def refuse(args: argparse.Namespace, mode: str, *others: str) -> None:
 def cmd_fetch(cfg: dict, args: argparse.Namespace) -> None:
     from . import kick
 
-    if re.search(r"twitch\.tv/", args.url):
+    if re.match(r"(?:https?://)?(?:www\.|m\.)?twitch\.tv/", args.url):
         from . import twitch
 
         twitch.fetch(cfg, args.url, args.no_video, args.no_chat)
         return
-    if re.search(r"youtube\.com/|youtu\.be/", args.url):
+    if re.match(r"(?:https?://)?(?:www\.|m\.)?(?:youtube\.com|youtu\.be)/", args.url):
         from . import ytvod
 
         ytvod.fetch(cfg, args.url, args.no_video, args.no_chat)
