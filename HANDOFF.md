@@ -29,7 +29,7 @@ Project memory (`~/.claude/projects/C--clipper/memory/`, MEMORY.md first) holds 
   `export KITSU_TOKEN="$(powershell.exe -NoProfile -Command "[Environment]::GetEnvironmentVariable('KITSU_TOKEN','User')" | tr -d '\r')"`
 
 ## Pipeline (one stream = `streams/<id>/`, test stream `kick-131151926`)
-`clipper fetch <kick url>` → `signals` (chat/loudness heat) → `transcribe` (WhisperX on Modal, diarized) →
+`clipper fetch <kick, twitch or youtube url>` → `signals` (chat/loudness heat) → `transcribe` (WhisperX on Modal, diarized) →
 `score` (Haiku Pass A + transcript scan, Sonnet Pass B) → `segments` (Opus topic split + compilations) →
 `cut` (segments lossless w/ keyframe starts, compilations joined, picks re-encoded; slurs+"fuck" bleeped) →
 `meta` (SEO title/description/chapters/tags + .srt) → `thumbs` (Enquirer tabloid covers) →
@@ -186,6 +186,11 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   Moving a stage (e.g. Pass A to DeepSeek V4 Pro) is a config change whenever the user wants it.
 
 ## Waiting on the user
+- **Deploy #293** (`clipper fetch` of Twitch and YouTube VODs, merged 11-16 at the user's word, no Copilot review): the
+  hub containers run the old code until `bash deploy/hub/deploy.sh`. Still untested: a subscriber-only Twitch
+  VOD (the cookies in `secrets/twitch_cookies.txt` are the user's personal account `gadnuck`, a tier 1 sub of
+  `nmnader`, whose last stream was 4 April so no VODs are left), a full YouTube video download, and `clipper run`
+  on a `twitch-` or `youtube-` stream. A show claims one by listing the channel (`vanillamace`, `donflurgundy`) in `channels`.
 - **`clipper streams prune`** stays by hand until you set `[streams] keep_source_days` in clipper.toml
   (111 GB would go at 30 days). The test stream is in `[streams] never_prune` (set 11-13).
 - `secrets/youtube_cookies.netscape.txt` on the share is unused since PR #195 and can be deleted.

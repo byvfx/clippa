@@ -16,6 +16,7 @@ youtube_token = "secrets/youtube_token.json"   # written by clipper upload --sig
 youtube_quota = "logs/youtube_quota.json"      # YouTube Data API units spent per Pacific day
 youtube_cookies = "secrets/youtube_cookies.txt"  # optional Netscape cookies.txt for yt-dlp: age-restricted
                                                # archive items and receipts, pre-shows stopped by YouTube's bot check
+twitch_cookies = "secrets/twitch_cookies.txt"  # optional Netscape cookies.txt for a subscriber-only Twitch VOD (`clipper fetch`); no file = none
 hei_cookies = "secrets/hei_cookies.txt"        # a heinetwork.tv member's cookies (Netscape or a browser extension's JSON
                                                # export): `clipper archive add <subject> https://www.heinetwork.tv` lists with them
 tiktok_client = "secrets/tiktok_client.json"   # {"client_key": ..., "client_secret": ...}
@@ -69,6 +70,11 @@ download_fragments = 8     # parallel HLS fragment downloads
 chat_workers = 4           # parallel chat-history pagers
 chat_rps = 3.0             # total request rate across workers; Kick 429s above ~3-4/s
 user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Safari/537.36"  # sent with Kick API requests
+
+[twitch]
+# `clipper fetch <twitch.tv/videos/id>`: a Twitch VOD and its chat replay (wiki: Fetching-VODs).
+max_height = 1080          # best variant at or below this height
+download_fragments = 8     # parallel fragment downloads
 
 [record]
 # `clipper record watch` (Docker on the NAS, deploy/record): record each channel's live
@@ -832,6 +838,7 @@ priority = false
 auto_upload_minutes = 0        # the Discord bot runs `clipper upload` this often (e.g. 60); 0 = by hand
 upload_ahead_hours = 48        # upload entries whose slot is within this window
 min_lead_minutes = 30          # publishAt must still be this far in the future
+fetch_max_height = 1080       # `clipper fetch <youtube url>` downloads the best video at or below this height
 manual_publish = false         # true: every upload stays private (no publishAt, pre-shows too);
                                # you make it public in YouTube Studio at its slot
 max_per_run = 6                # quota guard per run
