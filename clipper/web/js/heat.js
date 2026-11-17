@@ -132,11 +132,12 @@ function heatTip(e) {
   if (e.clientY < box.top || e.clientY > box.bottom || e.clientX < seen.left || e.clientX > seen.right || px < g.L || px > g.W - g.R) { tip.hidden = true; cur.setAttribute("visibility", "hidden"); return; }
   const t = (px - g.L) / (g.W - g.L - g.R) * g.n, v = r.heat[Math.min(r.heat.length - 1, Math.floor(t / r.bucket_s))];
   const w = r.windows.filter(w => w.start_s <= t && t <= w.end_s).sort((a, z) => a.rank - z.rank)[0];
+  const z = v => v == null ? "?" : esc(v);  // a window whose file has no score for it
   const under = document.elementFromPoint(e.clientX, e.clientY)?.closest?.("[data-heatref]")?.dataset.heatref;
   const its = heatOver(r, t, t).sort((a, z) => (z.ref === under) - (a.ref === under)).slice(0, 4);
   cur.setAttribute("x1", px); cur.setAttribute("x2", px); cur.setAttribute("visibility", "visible");
   tip.innerHTML = `<b>${mmss(t)}</b> · ${v == null ? "no chat recorded" : "heat " + v.toFixed(1)}`
-    + (w ? `<br>window #${esc(w.rank)}: chat ${esc(w.chat_z)} · laughs ${esc(w.react_z)} · “clip” ${esc(w.clip_z)} · loud ${esc(w.loud_z)}${w.said ? `<br><i>“${esc(w.said.slice(0, 90))}”</i>` : ""}` : "")
+    + (w ? `<br>window #${esc(w.rank)}: chat ${z(w.chat_z)} · laughs ${z(w.react_z)} · “clip” ${z(w.clip_z)} · loud ${z(w.loud_z)}${w.said ? `<br><i>“${esc(w.said.slice(0, 90))}”</i>` : ""}` : "")
     + its.map(i => `<br><span class="sw" style="background:${HEAT_STATE[i.state][1]}"></span>${esc(i.title.slice(0, 60))} <span class="dimmer">${esc(heatWhat(i))}</span>`).join("");
   tip.hidden = false;
   const tw = tip.offsetWidth, th = tip.offsetHeight;

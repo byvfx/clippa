@@ -445,6 +445,15 @@ def test_heat_buckets_keep_the_hottest_second_and_the_gaps():
     assert step == 17 and len(vals) == 1177 and set(vals) == {4.0}
 
 
+def test_heat_windows_without_their_numbers_are_left_out():
+    from clipper.warroom import heat
+
+    w = {"start_s": 1, "end_s": 9, "peak_s": 5, "heat": 2.5}
+    got = heat.windows([{**w, "heat": None}, {**w, "chat_z": "7", "transcript_peak": None}, {**w, "rank": 9, "end_s": float("nan")}])
+    assert got == [{"start_s": 1, "end_s": 9, "peak_s": 5, "heat": 2.5, "rank": 2, "chat_z": None, "react_z": None,
+                    "clip_z": None, "loud_z": None, "said": ""}]
+
+
 def test_heat_state_is_one_word_for_where_an_item_is():
     from clipper.warroom import heat
 
@@ -483,7 +492,9 @@ def test_heat_window_gives_the_curve_the_windows_and_where_each_item_sits(tmp_pa
                    sdir / "signals.parquet")
     jsonstate.write(sdir / "windows.json", {"chat_coverage": 0.9, "params": {"min_heat": 1.0}, "windows": [
         {"start_s": 60, "end_s": 100, "peak_s": 99, "heat": 7.5, "rank": 1, "chat_z": 5.0, "react_z": 2.0,
-         "clip_z": 0.0, "loud_z": 1.0, "transcript_peak": "x" * 300, "chat_sample": ["lol"]}]})
+         "clip_z": 0.0, "loud_z": 1.0, "transcript_peak": "x" * 300, "chat_sample": ["lol"]},
+        {"start_s": 10, "end_s": 40, "peak_s": 30, "rank": 2},            # no heat: left out, not a crash
+        {"start_s": 20, "end_s": 50, "peak_s": 45, "heat": "<b>"}, "not a window"]})
     items = [{"key": "v01_t02", "kind": "short", "title": "A Short", "meta": {"in_s": 70.04, "out_s": 95.0}},
              {"key": "s01_a-topic", "kind": "segment", "title": "A segment",
               "meta": {"start_s": 12.0, "cut_start_s": 10.0, "end_s": 80.0}},

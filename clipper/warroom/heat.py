@@ -52,6 +52,24 @@ def spans(cfg: dict, sdir: Path) -> list[dict]:
     return sorted(out, key=lambda s: s["start_s"])
 
 
+def _number(v) -> float | int | None:
+    return v if isinstance(v, int | float) and not isinstance(v, bool) and math.isfinite(v) else None
+
+
+def windows(found: list) -> list[dict]:
+    """windows.json's windows as the page draws them: the numbers, and what was said at the peak.
+    One without its place or its heat (a file from an older stage, or edited by hand) is left out
+    rather than failing the page; one without a rank takes its place in the list."""
+    out = []
+    for k, w in enumerate(found, 1):
+        if not isinstance(w, dict) or any(_number(w.get(f)) is None for f in ("start_s", "end_s", "peak_s", "heat")):
+            continue
+        rank = _number(w.get("rank"))
+        out.append({**{f: _number(w.get(f)) for f in WINDOW_KEYS}, "rank": k if rank is None else rank,
+                    "said": str(w.get("transcript_peak") or "")[:160]})
+    return out
+
+
 def state_of(row: dict | None) -> str:
     """One word for where an item is, for its colour: cut (not in review yet), waiting, changes,
     approved, scheduled, uploaded or rejected."""
@@ -84,10 +102,9 @@ def curve(cfg: dict, sdir: Path) -> dict:
     out["bucket_s"], out["heat"] = buckets(heat)
     out["duration_s"] = len(heat)   # the curve's own length: what the page's time axis must cover
     win = jsonstate.read_or(sdir / "windows.json", {}) or {}
-    out["min_heat"] = (win.get("params") or {}).get("min_heat")
-    out["chat_coverage"] = win.get("chat_coverage")
-    out["windows"] = [{**{k: w.get(k) for k in WINDOW_KEYS}, "said": (w.get("transcript_peak") or "")[:160]}
-                      for w in win.get("windows") or []]
+    out["min_heat"] = _number((win.get("params") or {}).get("min_heat"))
+    out["chat_coverage"] = _number(win.get("chat_coverage"))
+    out["windows"] = windows(win.get("windows") or [])
     out["items"] = spans(cfg, sdir)
     return out
 
