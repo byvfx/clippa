@@ -460,6 +460,7 @@ def theme_variables() -> set[str]:
         used |= set(re.findall(r"var\(--([\w-]+)", css))
         own |= set(re.findall(r"(?<![\w-])--([\w-]+)\s*:", css))
     scripts = " ".join(p.read_text(encoding="utf-8") for p in (WEB / "js").glob("*.js"))
+    used |= set(re.findall(r"var\(--([\w-]+)", scripts))   # the war room's inline styles
     own |= set(re.findall(r"setProperty\(\"--([\w-]+)\"", scripts))
     labels = {f"label-{n}" for n in re.findall(r'data-label="([\w-]+)"', _read("chat.html"))}
     assert labels == {"label-buddies", "label-chat"}

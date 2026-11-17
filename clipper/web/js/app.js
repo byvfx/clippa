@@ -256,6 +256,7 @@ document.addEventListener("change", e => {
 function closeLayoutMenu() { $("#layoutMenu")?.remove(); }
 async function openLayoutMenu() {
   try { SAVED = (await api("/api/layouts")).layouts || {}; } catch (e) { toast("Saved layouts: " + e.message, true); }
+  if (!LOOKS.length) await loadLooks();  // serve wasn't answering when the page opened
   closeLayoutMenu();
   const changed = LAYOUT_NAME && SAVED[LAYOUT_NAME] && !sameLayout(SAVED[LAYOUT_NAME], LAYOUT);
   const m = Object.assign(document.createElement("div"), { className: "layout-menu", id: "layoutMenu" });

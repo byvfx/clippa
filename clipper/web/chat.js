@@ -132,13 +132,14 @@ function draw(m) {
 
 function apply(v) {
   const atEnd = LOG.scrollHeight - LOG.scrollTop - LOG.clientHeight < 60;
+  const first = !LAST;      // the page's first draw: the history, nothing new to count
   if (v.full) { LOG.textContent = ""; LAST = ""; }
   LOG.querySelectorAll(".msg.pending").forEach(e => e.remove());
   let fresh = 0;
   for (const m of v.messages || []) {
     if (LOG.querySelector(`[data-id="${CSS.escape(m.id)}"]`)) continue;
     draw(m);
-    if (m.who === "clippa") fresh++;
+    if (m.who === "clippa" && !first) fresh++;
   }
   for (const [id, state] of Object.entries(v.cards || {})) setCard(id, state);
   if (v.last) LAST = v.last;
@@ -226,8 +227,12 @@ async function poll() {   // also called to look now (back on screen): one loop 
   }
 }
 
-async function buddies() {
-  if (unseen()) { setTimeout(buddies, 30000); return; }   // nobody is looking: the next round
+let BUDDIES_T = 0, BUDDIES_BUSY = false;
+async function buddies() {   // also called when the dock comes on screen: one loop either way
+  clearTimeout(BUDDIES_T);
+  if (BUDDIES_BUSY) return;
+  if (unseen()) { BUDDIES_T = setTimeout(buddies, 30000); return; }   // nobody is looking: the next round
+  BUDDIES_BUSY = true;
   try {
     const v = await api("/api/chat/buddies");
     const ul = document.getElementById("crew");
@@ -244,7 +249,8 @@ async function buddies() {
     }
     document.getElementById("crew-count").textContent = `(${up}/${v.buddies.length})`;
   } catch (e) { /* the chat's own status line says when serve is unreachable */ }
-  setTimeout(buddies, 30000);
+  BUDDIES_BUSY = false;
+  BUDDIES_T = setTimeout(buddies, 30000);
 }
 
 // ---------- the look: web/themes/, kept by theme.js (ClippaTheme); no theme is special here ----------
@@ -278,7 +284,7 @@ addEventListener("message", e => {
   if (!DOCK || e.origin !== location.origin || e.source !== window.parent || e.data?.clippa !== "dock") return;
   if ("seen" in e.data) {
     SEEN = !!e.data.seen;
-    if (!unseen()) { seenNow(); LOG.scrollTop = LOG.scrollHeight; poll(); }
+    if (!unseen()) { seenNow(); LOG.scrollTop = LOG.scrollHeight; poll(); buddies(); }
   }
   if (e.data.focus) BOX.focus();
 });
