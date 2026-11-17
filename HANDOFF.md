@@ -259,6 +259,11 @@ Clippa-messenger, `clipper/catalog.py` + `clipper/chat.py`, `[chat]`, Haiku ~$0.
 `[paths] chats` on the share; four looks in `web/themes/`, `[chat] theme`. After it merges and deploys, a week of phone use; then a small `clipper mcp`; #13 may fold into it), Modal ideas #53, #56,
 Udder Truth #58/#59/#60, P&L #50 (revenue once monetized). Write "#77 L6" rather than "fix #77" in commit
 messages: GitHub closes the issue on "fix".
+- **War room heat graph (11-16, user asked "can we see the heat graph of a stream in the war room?"):** branch
+  `warroom/heat-graph`, PR open, **not merged, not deployed**. 🔥 heat on a stream (Pipeline panel) or in an item's
+  window: the signals curve, the windows, and each cut item where it sits, coloured by review state, plus the twelve
+  hottest windows and what was cut from each (`/api/heat`, `clipper/warroom/heat.py`, `web/js/heat.js`, wiki
+  War-room#heat). It is also the demo video's "how it finds moments" shot. Reaches the live page with a hub deploy.
 - **Review pre-flight checks and approval by silence (#259, 11-14):** step A, `clipper review check` (wiki
   Review#pre-flight-checks), is PR #263, merged and deployed 11-14; the webcam panels are marked `cam = true`
   in clipper.toml (backup `backups/clipper.toml.before_cam_marks_2026-11-14`). Step B, `clipper review auto`
