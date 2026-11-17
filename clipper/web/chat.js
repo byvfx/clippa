@@ -120,8 +120,11 @@ function draw(m) {
   row.appendChild(body);
   if (m.options?.length && m.ask) {
     const opts = el("div", "options");
-    for (const o of m.options) {
-      const b = el("button", "btn", `${o.ref.split("/").pop().split("_")[0]} · ${o.title}`);
+    const key = o => o.ref.split("/").pop().split("_")[0];
+    const twice = new Set(m.options.map(key).filter((k, i, all) => all.indexOf(k) !== i));
+    for (const o of m.options) {   // two s01s: which stream each is from ("Kino Casino 11-14")
+      const where = twice.has(key(o)) && o.where ? ` (${o.where})` : "";
+      const b = el("button", "btn", `${key(o)}${where} · ${o.title}`);
       b.type = "button";
       b.title = o.ref;
       b.onclick = () => post("/api/chat/pick", { msg: m.id, ref: o.ref });

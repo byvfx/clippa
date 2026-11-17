@@ -289,3 +289,113 @@ def test_spend_today_and_buddies(cfg, monkeypatch):
     b = {x["name"]: x for x in catalog.buddies(cfg)}
     assert b["serve"]["state"] == "offline" and b["recorder"]["state"] == "away"
     assert "kinocasinogaming is live" in b["recorder"]["note"] and b["worker"]["state"] == "idle"
+
+
+# ---------- several items at once ----------
+
+def rows3() -> list[dict]:
+    return [row(ref="kick-1/comp-a", short="kick-1/comp-a", key="comp-a", kind="compilation", title="A"),
+            row(ref="kick-1/comp-b", short="kick-1/comp-b", key="comp-b", kind="compilation", title="B",
+                decision="approved"),
+            row(ref="kick-1/s01_x", short="kick-1/s01", key="s01_x", kind="segment", title="X"),
+            row(ref="kick-2/comp-c", short="kick-2/comp-c", key="comp-c", stream="kick-2", kind="compilation",
+                title="C", uploaded=True)]
+
+
+@pytest.fixture
+def many(cfg, monkeypatch):
+    state = {"rows": rows3()}
+    (cfg["paths"]["streams"] / "kick-1" / "review_state.json").write_text("{}")
+    monkeypatch.setattr(catalog, "_rows", lambda cfg, stream=None: [r for r in state["rows"]
+                                                                     if not stream or r["stream"] == stream])
+    monkeypatch.setattr(catalog, "stream_label", lambda cfg, s: {"kick-1": "Kino Casino 11-14"}.get(s, s))
+    return state
+
+
+def test_bulk_card_takes_only_what_fits(cfg, many):
+    p = catalog.prepare(cfg, "bulk", {"verb": "approve", "kind": "comps"})
+    assert p.kind == "card" and p.risk == catalog.WRITE and p.text == "Approve 1 compilation?"
+    assert p.args["refs"] == ["kick-1/comp-a"] and set(p.snapshot) == {"kick-1/comp-a"}
+    assert "leaving 1 already decided" in p.lines   # comp-b; comp-c is on YouTube
+    p = catalog.prepare(cfg, "bulk", {"verb": "approve", "stream": "kick-1"})
+    assert p.text == "Approve 2 items?" and p.lines[0] == "from Kino Casino 11-14"
+    assert "already approved" not in catalog.prepare(cfg, "bulk", {"verb": "reopen", "kind": "compilation"}).text
+    assert catalog.prepare(cfg, "bulk", {"verb": "release", "kind": "compilation"}).text \
+        == "Nothing to do: none of the 2 is held (comp-a, comp-b)."
+    assert "which ones" in catalog.prepare(cfg, "bulk", {"verb": "approve"}).text
+    assert "Say why" in catalog.prepare(cfg, "bulk", {"verb": "reject", "kind": "segment"}).text
+    assert "several items" in catalog.prepare(cfg, "bulk", {"verb": "delete", "kind": "segment"}).text
+    many["rows"] = [row(ref=f"kick-1/s{n:02d}_x", short=f"kick-1/s{n:02d}", key=f"s{n:02d}_x", kind="segment")
+                    for n in range(catalog.BULK_MAX + 1)]
+    assert "at most" in catalog.prepare(cfg, "bulk", {"verb": "approve", "kind": "segment"}).text
+
+
+def test_bulk_by_name_needs_each_one_pinned_down(cfg, many, monkeypatch):
+    found = {"comp-a": (actions.Item(cfg["paths"]["streams"] / "kick-1", "comp-a", {}), []),
+             "s01": (None, [rows3()[2], {**rows3()[2], "stream": "kick-2", "ref": "kick-2/s01_y"}]),
+             "s09": (None, [])}
+    monkeypatch.setattr(catalog, "find_item", lambda cfg, text: found[text.split()[0]])
+    monkeypatch.setattr(catalog, "_row", lambda cfg, item: rows3()[0])
+    assert catalog.prepare(cfg, "bulk", {"verb": "approve", "items": ["comp-a"]}).kind == "card"
+    p = catalog.prepare(cfg, "bulk", {"verb": "approve", "items": "comp-a and s01"})   # one string, as a model may send
+    assert p.kind == "answer" and p.text.startswith("Which stream? s01 is in Kino Casino 11-14, kick-2.")
+    assert "from kino 11-14" in p.text or "from kick-2" in p.text
+    assert catalog.prepare(cfg, "bulk", {"verb": "approve", "items": ["comp-a", "s09"]}).text == "I can't find s09."
+
+
+def test_bulk_tap_rechecks_each_and_keeps_one_undo(cfg, many, monkeypatch):
+    from clipper.warroom import review as wr
+
+    card = catalog.prepare(cfg, "bulk", {"verb": "approve", "stream": "kick-1"}).as_dict()
+    decided, remembered = [], []
+    stale = {"kick-1/s01_x": "kick-1/s01 changed since I asked"}
+    monkeypatch.setattr(catalog, "recheck", lambda cfg, c: (
+        actions.Item(cfg["paths"]["streams"] / c["ref"].split("/")[0], c["ref"].split("/")[1], {}), {},
+        stale.get(c["ref"], "")))
+    monkeypatch.setattr(actions, "decide", lambda cfg, item, verb, who, text="", on=None:
+                        decided.append((item.ref, verb, who)) or {})
+    monkeypatch.setattr(wr, "_before", lambda cfg, item: {"status": "wfa"})
+    monkeypatch.setattr(wr, "remember", lambda cfg, a, label, done: remembered.append((a, label, done)))
+    cfg["discord"]["replan"] = False
+    text, ok = catalog.apply(cfg, card)
+    assert ok and decided == [("kick-1/comp-a", "approve", catalog.WHO)]
+    assert text == "Approved 1: comp-a; left s01: changed since I asked."
+    assert remembered == [("approve", "approve 1 items (chat)", [{"ref": "kick-1/comp-a", "before": {"status": "wfa"}}])]
+
+
+def test_stream_named_by_show_and_day(cfg):
+    cfg["shows"] = {"kino": {"channels": ["kinocasino"], "overrides": {"meta": {"show_name": "Kino Casino"}}},
+                    "c404": {"channels": ["channel404"], "overrides": {"meta": {"show_name": "Channel 404 News"}}}}
+    streams = cfg["paths"]["streams"]
+    for sid, ch, at in (("kick-1", "kinocasino", "2026-11-10T03:00:00+00:00"),
+                        ("kick-2", "kinocasino", "2026-11-15T03:00:00+00:00"),
+                        ("kick-3", "channel404", "2026-11-12T02:00:00+00:00")):
+        (streams / sid).mkdir(exist_ok=True)
+        (streams / sid / "meta.json").write_text(json.dumps({"channel": ch, "started_at": at}))
+        (streams / sid / "review_state.json").write_text("{}")
+    assert catalog.stream_named(cfg, "s02 kino 11-09") == ("kick-1", "s02")   # local (LA) day of 03:00 UTC
+    assert catalog.stream_named(cfg, "s02 kino 11-10") == ("kick-1", "s02")   # its UTC day too
+    assert catalog.stream_named(cfg, "the kino one") == ("kick-2", "the one")  # the show's latest
+    assert catalog.stream_named(cfg, "c404")[0] == "kick-3"
+    assert catalog.stream_named(cfg, "s02 11-11")[0] == "kick-3"              # one stream that day
+    assert catalog.stream_named(cfg, "kino 12-25") == (None, "kino 12-25")
+    assert catalog.stream_named(cfg, "the blade one") == (None, "the blade one")
+    assert catalog.stream_label(cfg, "kick-2") == "Kino Casino 11-14"
+
+
+def test_undo_is_a_card_for_the_last_action(cfg, monkeypatch):
+    from clipper.warroom import review as wr
+
+    acts = [{"id": "b", "at": "2026-11-17T23:00:00+00:00", "label": "approve 2 items (chat)", "undone": False,
+             "uploaded": 0, "n": 2, "action": "approve"}]
+    monkeypatch.setattr(wr, "recent_actions", lambda cfg: acts)
+    undone = []
+    monkeypatch.setattr(wr, "do_undo", lambda cfg, uid: undone.append(uid) or {"undone": 2, "failed": [], "note": ""})
+    p = catalog.prepare(cfg, "undo", {})
+    assert p.kind == "card" and p.text == 'Undo "approve 2 items (chat)"?' and p.args == {"id": "b"}
+    acts.insert(0, {**acts[0], "id": "c", "label": "hold kick-1/s02"})   # something newer meanwhile
+    assert catalog.apply(cfg, p.as_dict())[1] is False and not undone
+    acts.pop(0)
+    assert catalog.apply(cfg, p.as_dict()) == ("Undone: approve 2 items (chat).", True) and undone == ["b"]
+    acts[0]["undone"] = True
+    assert catalog.prepare(cfg, "undo", {}).text == "Nothing to undo."

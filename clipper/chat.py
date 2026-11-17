@@ -48,8 +48,9 @@ JOB_TIMEOUT_S = 4 * 3600
 COMMANDS = ("/new", "/bye", "/clear", "/history", "/cost", "/away", "/back", "/help")
 HELP = ("Tell me what you want done, in your own words. For example:\n"
         "what goes out tomorrow · what's waiting · unslotted · retakes · health · costs\n"
-        "approve s02 · reject c03 too long · hold s04 · release s04 · pin c03 fri 15:00 · "
-        "slot c03 · retitle s02 A Better Title\n"
+        "approve s02 · approve s02 from kino 11-14 · reject c03 too long · hold s04 · release s04 · "
+        "pin c03 fri 15:00 · slot c03 · retitle s02 A Better Title\n"
+        "approve all comps · approve s07 and s09 from kino · undo that\n"
         "story <who, what happened> · new cover s02\n"
         "/new a fresh topic · /bye end this one · /history · /cost · /away quiet mode · "
         "/back · /clear archive the chat\n"
@@ -213,6 +214,7 @@ def parse_when(text: str, now: datetime) -> str | None:
     """"YYYY-MM-DD HH:MM" (or "YYYY-MM-DD", that day's first slot) from "tomorrow 3pm",
     "fri 15:00", "2026-11-20 9:30", "today at 21:00", in now's time zone; None otherwise."""
     t = " ".join(text.lower().replace(" at ", " ").split())
+    t = re.sub(r"^(?:for|on|at) ", "", t)   # "pin s02 for fri 9am"
     m = re.fullmatch(r"(\d{4}-\d{2}-\d{2}|today|tonight|tomorrow|[a-z]{3,9})"
                      r"(?: (\d{1,2})(?::(\d{2}))? ?(am|pm)?)?", t)
     if not m:
@@ -269,6 +271,12 @@ ITEM_REF = re.compile(r"((?:[\w.-]+/)?(?:[a-z]{1,4}\d+[\w.-]*|comp-[\w.-]+))"
 STREAM_IN = re.compile(r"(?:^|\s)(?:(?:from|on|in|of)\s+)?(" + STREAM_ID + r")(?=\s|$)", re.IGNORECASE)
 
 
+REF_WORD = re.compile(r"\b(?:[\w.-]+/)?(?:[a-z]{1,4}\d+[\w.-]*|comp-[\w.-]+)", re.IGNORECASE)
+# "from kino 11-14", "on the kino one": a stream the way people name it, resolved by catalog.find_item
+SHOW_IN = re.compile(r"(?:from|on|in|of)\s+(?:the\s+)?([a-z][\w-]*)(?:\s+(\d{1,2}[-/]\d{1,2}))?"
+                     r"(?:\s+(?:one|stream|show))?(?=\s|$)\s*(.*)", re.IGNORECASE)
+
+
 def _verb(t: str, low: str, now: datetime) -> tuple[str, dict] | None:
     for words in sorted(VERBS, key=len, reverse=True):
         if not low.startswith(words + " "):
@@ -281,6 +289,11 @@ def _verb(t: str, low: str, now: datetime) -> tuple[str, dict] | None:
         s = None if stream or "/" in m.group(1) else STREAM_IN.search(rest)
         if s:   # "approve s02 from kick-131151926": the stream, not a note
             stream, rest = s.group(1), (rest[:s.start()] + " " + rest[s.end():]).strip()
+        elif not stream and "/" not in m.group(1) and (n := SHOW_IN.match(rest)):
+            stream, rest = " ".join(x for x in n.groups()[:2] if x), n.group(3).strip()   # "from kino 11-14"
+        if REF_WORD.search(rest) and words not in ("reject", "retake", "changes", "retitle", "cover text",
+                                                   "cover words"):
+            return None   # "approve s01 and s02 ...": a second name isn't a note; _bulk or the model
         args: dict = {"item": m.group(1) + (f" {stream}" if stream else "")}
         if words in ("release", "unhold"):
             args["release"] = True
@@ -299,6 +312,63 @@ def _verb(t: str, low: str, now: datetime) -> tuple[str, dict] | None:
     return None
 
 
+BULK_VERBS = {"approve": "approve", "reject": "reject", "hold": "hold", "release": "release",
+              "unhold": "release", "reopen": "reopen"}
+KIND_OF = {"comp": "compilation", "comps": "compilation", "compilation": "compilation",
+           "compilations": "compilation", "segment": "segment", "segments": "segment", "seg": "segment",
+           "segs": "segment", "short": "short", "shorts": "short", "clip": "pick", "clips": "pick",
+           "pick": "pick", "picks": "pick"}
+DAY = re.compile(r"\d{1,2}[-/]\d{1,2}")
+
+
+def _bulk(t: str) -> tuple[str, dict] | None:
+    """Several items on one card: "approve all comps", "hold the shorts from kino 11-14",
+    "approve s07 and s09 from the kino one", "reject c01, c02 too long". None for the rest."""
+    first, _, rest = t.partition(" ")
+    verb = BULK_VERBS.get(first.lower())
+    if not verb or not rest:
+        return None
+    words = re.sub(r"\s*[,&+]\s*", " , ", rest).split()
+    low = [w.lower().rstrip(".!?") for w in words]
+    i, refs, kind, every, plural = 0, [], "", False, False
+    while i < len(low) and low[i] in ("all", "every", "everything", "both", "the", "of"):
+        every |= low[i] in ("all", "every", "everything", "both")
+        i += 1
+    while i < len(low) and (low[i] in (",", "and") or REF_WORD.fullmatch(low[i])):
+        if low[i] not in (",", "and"):
+            refs.append(words[i].rstrip(".!?,"))
+        i += 1
+    if not refs and i < len(low) and low[i] in KIND_OF:
+        kind, plural = KIND_OF[low[i]], low[i].endswith("s")
+        i += 1
+    while i < len(low) and low[i] in ("waiting", "pending", "left", "open"):
+        i += 1
+    stream = ""
+    if i < len(low) and (re.fullmatch(STREAM_ID, low[i], re.IGNORECASE)
+                         or (low[i] in ("from", "on", "in", "of") and i + 1 < len(low))):
+        i += low[i] in ("from", "on", "in", "of")
+        i += i < len(low) - 1 and low[i] == "the"
+        stream, i = words[i].rstrip(".!?,"), i + 1
+        if i < len(low) and DAY.fullmatch(low[i]):
+            stream, i = f"{stream} {low[i]}", i + 1
+        i += i < len(low) and low[i] in ("one", "stream", "show", "night")   # "from last night"
+    left = re.sub(r"\b(?:pls|please|plz|thx|thanks|for me|now)\b", "", " ".join(words[i:])).strip(" ,.!")
+    if len(refs) >= 2:
+        args: dict = {"verb": verb, "items": refs}
+    elif not refs and (every or plural) and (kind or stream or every):
+        args = {"verb": verb, **({"kind": kind} if kind else {})}
+    else:
+        return None
+    if stream:
+        args["stream"] = stream
+    if verb == "reject":
+        if left:
+            args["reason"] = left
+    elif left:
+        return None   # words we don't know: the model's turn
+    return "bulk", args
+
+
 def match(text: str, now: datetime) -> tuple[str, dict] | None:
     """(tool, args) for the phrases clipper knows without a model; None for the rest."""
     t = " ".join(text.strip().split())
@@ -308,21 +378,23 @@ def match(text: str, now: datetime) -> tuple[str, dict] | None:
     if m:
         day = m.group(1) or "today"
         return "releases", {"day": "today" if day == "tonight" else day}
-    if re.fullmatch(r"(?:what(?:'s| is)\s+)?(?:unslotted|not scheduled|without a slot|not going out)", low):
+    if re.fullmatch(r"(?:what(?:'?s| is)\s+)?(?:unslotted|not scheduled|without a slot|not going out)", low):
         return "unslotted", {}
-    if re.fullmatch(r"(?:what(?:'s| is)\s+)?(?:waiting|pending|open items|items|to review|needs me)(?: on me)?", low):
+    if re.fullmatch(r"(?:what(?:'?s| is)\s+)?(?:waiting|pending|open items|items|to review|needs me)(?: on me)?", low):
         return "items", {}
     if re.fullmatch(r"(?:any\s+)?retakes?(?: waiting| pending)?", low):
         return "retakes", {}
-    if re.fullmatch(r"(?:health|status|services|who(?:'s| is) (?:up|online)|how(?:'s| is) everything)", low):
+    if re.fullmatch(r"(?:health|status|services|who(?:'?s| is) (?:up|online)|how(?:'?s| is) everything)", low):
         return "health", {}
     m = re.fullmatch(r"(?:costs?|spend|spent)(?:\s+(today|month|this month))?", low)
     if m:
         return "costs", {"period": "month" if m.group(1) and "month" in m.group(1) else "today"}
+    if re.fullmatch(r"undo(?: (?:that|it|this|last|the last one|the last thing))?", low):
+        return "undo", {}
     m = re.fullmatch(r"(?:story|new story)[: ]+(.{8,})", t, re.IGNORECASE)
     if m:
         return "story", {"brief": m.group(1).strip()}
-    hit = _verb(t, low, now)
+    hit = _bulk(t) or _verb(t, low, now)
     if hit:
         return hit
     m = ITEM_REF.fullmatch(t)
@@ -512,6 +584,22 @@ def command(cfg: dict, chat: dict, text: str) -> None:
         _post(chat, "clippa", "I know " + " ".join(COMMANDS) + ".")
 
 
+YES = {"yes", "y", "yep", "yeah", "yup", "ok", "okay", "k", "sure", "go", "go ahead", "do it", "ok do it",
+       "yes do it", "yes please", "send it", "approve it", "confirm"}
+NO = {"no", "n", "nope", "nah", "cancel", "never mind", "nevermind", "don't", "dont", "stop", "leave it"}
+
+
+def _answer(chat: dict, text: str) -> tuple[str, bool] | None:
+    """A typed yes or no while one card is open in this topic: (that card's id, yes)."""
+    word = " ".join(re.sub(r"[^\w' ]", " ", text.lower()).split())
+    if word not in YES and word not in NO:
+        return None
+    t = current_topic(chat)
+    open_ = [m["card"]["id"] for m in chat["messages"]
+             if t and m.get("topic") == t["id"] and (m.get("card") or {}).get("state") == "open"]
+    return (open_[0], word in YES) if len(open_) == 1 else None
+
+
 def handle(cfg: dict, text: str) -> dict:
     """One message from the box; the page's view of what it added."""
     text = (text or "").strip()
@@ -526,13 +614,18 @@ def handle(cfg: dict, text: str) -> dict:
             _trim(cfg, chat)
             return view(chat, since)
         topic = ensure_topic(chat, cfg)
+        answer = _answer(chat, text)
         _post(chat, "me", text)
-        hit = match(text, datetime.now(ZoneInfo(cfg["schedule"]["timezone"])))
-        if hit:
-            run_tool(cfg, chat, *hit)
-            _trim(cfg, chat)
-            return view(chat, since)
+        if not answer:
+            hit = match(text, datetime.now(ZoneInfo(cfg["schedule"]["timezone"])))
+            if hit:
+                run_tool(cfg, chat, *hit)
+                _trim(cfg, chat)
+                return view(chat, since)
         seen = {"messages": list(chat["messages"])}
+    if answer:   # "ok do it" with one card open: the same as its button
+        tap(cfg, *answer)
+        return view(load(cfg), since)
     # the model call (a second or two) holds neither lock: other sends, taps and job reports go on
     try:
         said, pick, usd = ask_model(cfg, seen, topic)

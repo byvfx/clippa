@@ -522,3 +522,62 @@ def test_the_page_names_no_real_messenger():
         text = f.read_text(encoding="utf-8")
         assert not re.search(r"\bAIM\b", text), f.name                 # the word "aim" is fine
         assert not re.search(r"\b(icq|aol|msn|yahoo|trillian|messenger\.com)\b", text.lower()), f.name
+
+
+@pytest.mark.parametrize("text,want", [
+    ("approve all comps", ("bulk", {"verb": "approve", "kind": "compilation"})),
+    ("approve comps", ("bulk", {"verb": "approve", "kind": "compilation"})),
+    ("Approve all the shorts waiting", ("bulk", {"verb": "approve", "kind": "short"})),
+    ("hold every segment from kino 11-14", ("bulk", {"verb": "hold", "kind": "segment", "stream": "kino 11-14"})),
+    ("release all comps on kick-131151926", ("bulk", {"verb": "release", "kind": "compilation",
+                                                      "stream": "kick-131151926"})),
+    ("approve all comps from last night", ("bulk", {"verb": "approve", "kind": "compilation", "stream": "last"})),
+    ("approve everything from the kino one", ("bulk", {"verb": "approve", "stream": "kino"})),
+    ("reject all clips from c404 too long", ("bulk", {"verb": "reject", "kind": "pick", "stream": "c404",
+                                                      "reason": "too long"})),
+    ("approve c01 and c02", ("bulk", {"verb": "approve", "items": ["c01", "c02"]})),
+    ("approve c01, c02 & comp-dsp", ("bulk", {"verb": "approve", "items": ["c01", "c02", "comp-dsp"]})),
+    ("approve s07 and s09 from the kino one pls", ("bulk", {"verb": "approve", "items": ["s07", "s09"],
+                                                            "stream": "kino"})),
+    ("reject c01 and c02 boring", ("bulk", {"verb": "reject", "items": ["c01", "c02"], "reason": "boring"})),
+    ("approve s02 from kino 11-14", ("approve", {"item": "s02 kino 11-14"})),
+    ("pin s01 from kino 11-14 for fri 9am", ("pin", {"item": "s01 kino 11-14", "when": "2026-11-20 09:00"})),
+    ("reject c01 dupe of c02", ("reject", {"item": "c01", "reason": "dupe of c02"})),   # a reason may name one
+    ("undo that", ("undo", {})),
+    ("undo", ("undo", {})),
+    ("whats waiting", ("items", {})),
+    ("whats unslotted", ("unslotted", {})),
+])
+def test_several_at_once_and_looser_phrases(text, want):
+    assert chat.match(text, MON) == want
+
+
+@pytest.mark.parametrize("text", [
+    "approve s01 and s02 then pin them",   # words after the names: not a note, the model's turn
+    "approve s01 dupe of s02",             # a second name in an approve's note
+    "hold the blade comps",                # title words: the model's
+    "approve comp",                        # one, not a kind: not a bulk ask
+])
+def test_unclear_bulk_goes_to_the_model(text):
+    assert chat.match(text, MON) is None
+
+
+def test_a_typed_yes_answers_the_one_open_card(cfg, monkeypatch, no_model):
+    monkeypatch.setattr(catalog, "prepare", lambda cfg, name, args: card_plan())
+    applied = []
+    monkeypatch.setattr(catalog, "apply", lambda cfg, card: applied.append(card["id"]) or ("Approved.", True))
+    chat.handle(cfg, "approve s02")
+    v = chat.handle(cfg, "ok do it")
+    assert len(applied) == 1 and [m["who"] for m in v["messages"]] == ["me", "clippa"]
+    assert v["messages"][-1]["text"] == "Approved."
+    # two open cards: a "yes" could mean either, so it goes to the model
+    chat.handle(cfg, "approve s02")
+    chat.handle(cfg, "approve s03")
+    monkeypatch.setattr(chat, "ask_model", lambda cfg, c, t: ("Which one?", None, 0.0))
+    assert chat.handle(cfg, "yes")["messages"][-1]["text"] == "Which one?"
+    assert len(applied) == 1
+    # a no closes the one open card
+    chat.handle(cfg, "/new")
+    chat.handle(cfg, "approve s02")
+    assert chat.handle(cfg, "nope")["messages"][-1]["text"] == "OK, left alone."
+    assert len(applied) == 1
