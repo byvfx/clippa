@@ -2,6 +2,7 @@
 // Loaded in <head> right after <link id="theme">, so a browser's pick is on before the first paint.
 // No look is known here by name: a look is its file, and the custom properties in it.
 //  - A pick is kept per browser ("clippa-theme" in localStorage); the browser's other tabs follow it.
+//    One kept under a page's old key (data-old-key) moves to it on the first visit to either page.
 //  - A page docked in another (the war room's chat frame) wears the outer page's look. It never
 //    keeps a pick itself: it asks the outer page to, and the outer page tells it of each change.
 //  - The page's own default is its <html data-theme>, or the one it passes to settle().
@@ -73,6 +74,10 @@ const ClippaTheme = (() => {
     tellFrames(e.newValue);
   });
 
+  // a pick kept under the old key becomes the shared one, so the war room and the dock wear it too
+  if (!outerLook() && !read(KEY) && NAME.test(read(OLD))) {
+    try { localStorage.setItem(KEY, read(OLD)); localStorage.removeItem(OLD); } catch { /* storage off */ }
+  }
   const first = outerLook() || read(KEY) || read(OLD);
   if (NAME.test(first)) { picked = true; use(first); }
   return { current, pick, settle };

@@ -12,6 +12,8 @@ let LAST = "";            // the newest message id drawn
 let AWAY = false;
 let BUSY = 0;             // requests waiting on Clippa (typing…)
 let UNSEEN = 0;
+let DRAWN = false;        // the page's first draw is done (the history: nothing new to count)
+const DRAWN_IDS = new Set(); // ids ever drawn, so a full redraw counts only what is new
 const TITLE = document.title;
 const DOCK = window.parent !== window && new URLSearchParams(location.search).has("dock");
 let SEEN = !DOCK;         // docked: whether the war room shows it now (it says so)
@@ -132,14 +134,16 @@ function draw(m) {
 
 function apply(v) {
   const atEnd = LOG.scrollHeight - LOG.scrollTop - LOG.clientHeight < 60;
-  const first = !LAST;      // the page's first draw: the history, nothing new to count
+  const first = !DRAWN;
+  DRAWN = true;
   if (v.full) { LOG.textContent = ""; LAST = ""; }
   LOG.querySelectorAll(".msg.pending").forEach(e => e.remove());
   let fresh = 0;
   for (const m of v.messages || []) {
     if (LOG.querySelector(`[data-id="${CSS.escape(m.id)}"]`)) continue;
     draw(m);
-    if (m.who === "clippa" && !first) fresh++;
+    if (m.who === "clippa" && !first && !DRAWN_IDS.has(m.id)) fresh++;
+    DRAWN_IDS.add(m.id);
   }
   for (const [id, state] of Object.entries(v.cards || {})) setCard(id, state);
   if (v.last) LAST = v.last;

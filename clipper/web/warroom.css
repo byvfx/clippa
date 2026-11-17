@@ -534,4 +534,5 @@ body { --chat-w: min(360px, 100vw); }
   #chatBtn { display: none; }
   body[data-view="chat"] #chat { display: flex; z-index: 5; width: auto; left: 0; border-left: 0;
     top: 0; padding-top: env(safe-area-inset-top); bottom: var(--views-h); }
+  body[data-view="chat"] #dock { display: none; }   /* it would sit on the compose box; it keeps playing */
 }
