@@ -255,7 +255,7 @@ function openModal(ref) {
         ${i.thumbnail_url && i.kind !== "short" ? `<div class="row" style="margin-top:6px"><button class="btn" data-cover="${esc(i.ref)}" title="Frame, face box, photos and words; re-renders without model calls">🖼 Edit cover</button></div>` : ""}
         <div class="kv">
           <b>Length</b><span>${mmss(i.duration_s)}</span>
-          <b>Stream</b><span>${esc(i.stream)} · ${esc(i.date)}</span>
+          <b>Stream</b><span>${esc(i.stream)} · ${esc(i.date)} · <button class="lnk" data-heat="${esc(i.stream)}" data-heatfocus="${esc(i.ref)}" title="Where this sits in the stream, and how hot it ran">🔥 heat</button></span>
           ${i.score ? `<b>Score</b><span>${esc(i.score)} · ${esc(i.category)} · ${esc(i.found_by)}</span>` : ""}
           <b>Revision</b><span>${esc(i.revision)} ${i.synced_at ? "· synced " + ago(i.synced_at) : ""}</span>
           <b>Links</b><span><a href="${esc(i.kitsu_url)}" target="_blank">Kitsu</a>${i.youtube_url ? ` · <a href="${esc(i.youtube_url)}" target="_blank">YouTube</a>` : ""}</span>

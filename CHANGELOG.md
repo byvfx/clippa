@@ -8,6 +8,10 @@ current state; the version is `clipper --version` (set in `clipper/__init__.py` 
 
 ### 2026-11
 
+- 11-16: the war room draws a stream's heat: **🔥 heat** on a stream or in an item's window opens
+  the curve from `clipper signals`, the windows picked from it, and each cut segment, Short and clip
+  where it sits in the stream, coloured by its review state, with the twelve hottest windows and
+  what was cut from each (`/api/heat`, `clipper/warroom/heat.py`).
 - 11-14: the schedule's budget ranks a stream's segments by their model score, chat heat breaking
   ties, where a score covered the stream (else heat alone, as before); a compilation takes its best
   segment's score; Kitsu's Score column shows a segment's score (#258 C). Turned on for Kino and
