@@ -94,6 +94,10 @@ def test_retitle_only_from_spare_quota(cfg, monkeypatch):
     with pytest.raises(ClipperError, match="no spare YouTube quota"):
         youtube.retitle(cfg, KEY, "Blade Goes Bust", yt=yt)
     assert yt.calls == []
+    # renamed already, Kitsu failed after: the retry finishes Kitsu's half without the quota
+    sched(cfg, youtube_title="KINO CASINO | Blade Goes Bust")
+    assert youtube.retitle(cfg, KEY, "Blade Goes Bust", yt=yt)["url"] == "https://youtu.be/abcdefghijk"
+    assert yt.calls == []
 
 
 # ---------- edit_meta: YouTube first, then Kitsu's columns, from every surface ----------
@@ -239,6 +243,28 @@ def test_the_tap_renames_and_its_undo_renames_back(cfg, card_row, item, monkeypa
     assert wr._stuck(entry) == 0                                # a title-only edit: nothing left behind
     assert wr._stuck({**entry, "items": [{**done[0], "values": {"YouTube title": "x", "Tags": "y"}}]}) == 1
     assert wr._stuck({"action": "approve", "items": done}) == 1
+
+
+def test_a_tap_after_the_video_was_deleted_does_nothing(cfg, card_row, item, monkeypatch):
+    sched(cfg)
+    card = catalog.prepare(cfg, "retitle", {"item": "s02", "title": "Blade Goes Bust"}).as_dict()
+    sched(cfg, gone_at="2026-11-12T00:00:00+00:00")             # serve's backfill marked it since
+    monkeypatch.setattr(actions, "resolve", lambda cfg, ref: item)
+    monkeypatch.setattr(actions, "refresh", lambda cfg, it: row())
+    monkeypatch.setattr(actions, "decide", lambda *a, **k: pytest.fail("acted on a deleted video"))
+    text, ok = catalog.apply(cfg, card)
+    assert not ok and "deleted from YouTube since I asked" in text
+
+
+def test_the_undo_note_names_only_titles_renamed_back_on_youtube():
+    up, down = {"uploaded": True}, {"uploaded": False}
+    both = {"action": "replace", "items": [{"before": up, "values": {"YouTube description": "d"}},
+                                           {"before": down, "values": {"YouTube title": "t"}}]}
+    assert wr._undo_note(both) == "1 already on YouTube: change it in Studio too"
+    mixed = {"action": "replace", "items": [{"before": up, "values": {"YouTube description": "d"}},
+                                            {"before": up, "values": {"YouTube title": "t"}}]}
+    assert wr._undo_note(mixed).endswith("(titles were renamed back there)")
+    assert wr._undo_note({"action": "edit", "items": [{"before": up, "values": {"YouTube title": "t"}}]}) == ""
 
 
 def test_the_tool_description_says_so():

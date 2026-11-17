@@ -882,6 +882,8 @@ def retitle(cfg: dict, key: str, text: str, yt=None) -> dict:
         raise ClipperError(f"{e.get('url') or key} was deleted from YouTube")
     title = live_title(for_stream(cfg, cfg["paths"]["streams"] / e["stream"]), text)
     if spare(cfg) < RETITLE_UNITS:
+        if e.get("youtube_title") == title:   # our last rename set it: a retry after Kitsu failed
+            return e                           # finishes Kitsu's half without the quota
         raise ClipperError(f"no spare YouTube quota today ({ytquota.summary(cfg['youtube'], cfg['paths']['youtube_quota'])}; "
                            "the rest is kept for uploads): try tomorrow")
     yt = yt or service(cfg["paths"])

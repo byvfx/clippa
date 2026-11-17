@@ -375,6 +375,7 @@ def recheck(cfg: dict, card: dict) -> tuple[actions.Item, dict, str]:
 
 def apply(cfg: dict, card: dict) -> tuple[str, bool]:
     """Do a write card's action (re-checked first); its outcome in a line."""
+    from . import youtube
     from .warroom.review import _before, remember, start_retake
     from .warroom.state import LOCK
 
@@ -385,6 +386,9 @@ def apply(cfg: dict, card: dict) -> tuple[str, bool]:
         item, _, stale = recheck(cfg, card)
         if stale:
             return stale, False
+        if a.get("youtube") and (youtube.on_youtube(cfg, item.ref) or {}).get("gone_at"):
+            # deleted in Studio since the card (serve's backfill marks it): not "renamed on YouTube"
+            return f"{item.short} was deleted from YouTube since I asked: nothing done.", False
         before = _before(cfg, item)
         row = actions.decide(cfg, item, a["verb"], WHO, text=a.get("text") or "", on=a.get("on"))
         row, note = actions.replan(cfg, item, a["verb"], row)

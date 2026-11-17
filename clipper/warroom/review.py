@@ -123,11 +123,18 @@ def do_undo(cfg: dict, uid: str) -> dict:
         for a in d["actions"]:
             if a["id"] == uid:
                 a["undone"] = not failed
+    return {"undone": ok, "failed": failed, "rows": rows, "note": _undo_note(entry)}
+
+
+def _undo_note(entry: dict) -> str:
+    """What an undo left as it is on YouTube, if anything."""
     up = _stuck(entry)
-    note = (f"{up} already on YouTube: change {'it' if up == 1 else 'those'} in Studio too"
-            + (" (titles were renamed back there)" if any(COLUMN_OF["title"] in (x.get("values") or {})
-                                                         for x in entry["items"]) else "")) if up else ""
-    return {"undone": ok, "failed": failed, "rows": rows, "note": note}
+    if not up:
+        return ""
+    renamed = any(x["before"].get("uploaded") and COLUMN_OF["title"] in (x.get("values") or {})
+                  for x in entry["items"])   # an item that's up had its title sent back there
+    return (f"{up} already on YouTube: change {'it' if up == 1 else 'those'} in Studio too"
+            + (" (titles were renamed back there)" if renamed else ""))
 
 REF = re.compile(r"(?:[\w.-]+/)?[\w.-]+")  # <stream>/<key> or a key: names, never paths (#76)
 
