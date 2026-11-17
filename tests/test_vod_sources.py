@@ -71,7 +71,8 @@ def test_twitch_ytdlp_gets_a_private_netscape_copy(tmp_path, monkeypatch):
 
     def run(*args):
         seen["args"] = args
-        seen["text"] = Path(args[1]).read_text(encoding="utf-8")
+        if args[0] == "--cookies":
+            seen["text"] = Path(args[1]).read_text(encoding="utf-8")
 
     monkeypatch.setattr(ytdl, "run", run)
     twitch._ytdlp({"paths": {"twitch_cookies": jar}}, "-J", "u")
