@@ -74,8 +74,14 @@ def remember(cfg: dict, action: str, label: str, done: list[dict]) -> str:
 def recent_actions(cfg: dict) -> list[dict]:
     d = jsonstate.read(undo_path(cfg), {"actions": []})
     return [{k: a[k] for k in ("id", "at", "action", "label", "undone")}
-            | {"n": len(a["items"]), "uploaded": sum(1 for x in a["items"] if x["before"].get("uploaded"))}
+            | {"n": len(a["items"]), "uploaded": _stuck(a)}
             for a in d["actions"]]
+
+def _stuck(entry: dict) -> int:
+    """Items already on YouTube whose undo leaves something there as it is: all but a title-only
+    edit, which edit_meta renames back on YouTube too."""
+    titles_only = lambda x: entry["action"] in ("edit", "replace") and set(x.get("values") or {}) <= {"YouTube title"}
+    return sum(1 for x in entry["items"] if x["before"].get("uploaded") and not titles_only(x))
 
 def _inverse(cfg: dict, item: actions.Item, action: str, before: dict, values: dict, who: str) -> dict:
     if action in ("approve", "reject", "changes", "reopen"):
@@ -85,7 +91,10 @@ def _inverse(cfg: dict, item: actions.Item, action: str, before: dict, values: d
     if action == "pin":
         return actions.pin(cfg, item, before["publish_at"], who)
     if action in ("edit", "replace"):
-        return actions.edit_meta(cfg, item, {c: before[ROW_OF[c]] for c in values}, who)
+        # renamed back on YouTube only when the edit was made on a live video: an edit from before
+        # its upload is undone in Kitsu alone, as it always was
+        return actions.edit_meta(cfg, item, {c: before[ROW_OF[c]] for c in values}, who,
+                                 rename_live=bool(before.get("uploaded")))
     if action == "thumbtext":
         return actions.thumbtext(cfg, item, before["thumb_text"], who)
     raise ClipperError(f"{action} can't be undone")
@@ -114,9 +123,18 @@ def do_undo(cfg: dict, uid: str) -> dict:
         for a in d["actions"]:
             if a["id"] == uid:
                 a["undone"] = not failed
-    up = sum(1 for x in entry["items"] if x["before"].get("uploaded"))
-    note = f"{up} already on YouTube: change {'it' if up == 1 else 'those'} in Studio too" if up else ""
-    return {"undone": ok, "failed": failed, "rows": rows, "note": note}
+    return {"undone": ok, "failed": failed, "rows": rows, "note": _undo_note(entry)}
+
+
+def _undo_note(entry: dict) -> str:
+    """What an undo left as it is on YouTube, if anything."""
+    up = _stuck(entry)
+    if not up:
+        return ""
+    renamed = any(x["before"].get("uploaded") and COLUMN_OF["title"] in (x.get("values") or {})
+                  for x in entry["items"])   # an item that's up had its title sent back there
+    return (f"{up} already on YouTube: change {'it' if up == 1 else 'those'} in Studio too"
+            + (" (titles were renamed back there)" if renamed else ""))
 
 REF = re.compile(r"(?:[\w.-]+/)?[\w.-]+")  # <stream>/<key> or a key: names, never paths (#76)
 
@@ -315,7 +333,8 @@ def do_replace(cfg: dict, body: dict) -> dict:
             try:
                 item = actions.resolve(cfg, p["ref"])
                 before = _before(cfg, item)
-                out_rows.append(row_json(item.stream_dir, actions.edit_meta(cfg, item, p["values"], WHO)))
+                out_rows.append(row_json(item.stream_dir, actions.edit_meta(cfg, item, p["values"], WHO,
+                                                                            rename_live=True)))
                 done.append({"ref": item.ref, "before": before, "values": p["values"]})
             except Exception as e:  # noqa: BLE001
                 failed.append({"ref": p["ref"], "error": str(e)[:200]})

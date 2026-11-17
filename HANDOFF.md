@@ -256,10 +256,13 @@ only at their word. #67's model edit plan waits until edited Shorts prove themse
 live clips #81, blind items #111 (steps 1-2 of 4 built and live 11-15/16, below), investigate anyone #138, agent exploration #158 (11-15 spec comment: the Clippa
 messenger. v1 merged (PR #285) and deployed to the hub 11-16: `/chat` on serve's page, wiki
 Clippa-messenger, `clipper/catalog.py` + `clipper/chat.py`, `[chat]`, Haiku ~$0.0005 a message, ledger `chat`; chats in
-`[paths] chats` on the share; four looks in `web/themes/`, `[chat] theme`. In the war room (branch warroom/chat-dock,
-11-16, not merged or deployed): `/chat` docked at the right in a frame (Chat button / M, a Chat tab on a phone) and the
-looks dress the whole war room, one pick for both (`theme.js`; `themes/warroom.css` is the default and the only home of
-the war room's colours). After it deploys, a week of phone use; then a small `clipper mcp`; #13 may fold into it), Modal ideas #53, #56,
+`[paths] chats` on the share; four looks in `web/themes/`, `[chat] theme`. In the war room (PR #290, merged 11-17):
+`/chat` docked at the right in a frame (Chat button / M, a Chat tab on a phone) and the looks dress the whole war
+room, one pick for both (`theme.js`; `themes/warroom.css` is the default and the only home of the war room's colours).
+Renaming a video that's up (user, 11-16: Clippa "really need[s] to be the point of control"): PR #291: `youtube.retitle`
+behind `actions.edit_meta`, so every title edit of a video that's up (war room, bot, chat, CLI, undo) renames it on
+YouTube; chat prompt v2; YouTube's other edits (description, cover, privacy) still Kitsu-only / Studio. Next, a week of
+phone use; then a small `clipper mcp`; #13 may fold into it), Modal ideas #53, #56,
 Udder Truth #58/#59/#60, P&L #50 (revenue once monetized). Write "#77 L6" rather than "fix #77" in commit
 messages: GitHub closes the issue on "fix".
 - **War room heat graph (11-16, user asked "can we see the heat graph of a stream in the war room?"):** branch
