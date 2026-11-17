@@ -8,6 +8,10 @@ current state; the version is `clipper --version` (set in `clipper/__init__.py` 
 
 ### 2026-11
 
+- 11-16: the war room draws a stream's heat: **🔥 heat** on a stream or in an item's window opens
+  the curve from `clipper signals`, the windows picked from it, and each cut segment, Short and clip
+  where it sits in the stream, coloured by its review state, with the twelve hottest windows and
+  what was cut from each (`/api/heat`, `clipper/warroom/heat.py`).
 - 11-16: `clipper doc voice` takes your own recording of a take: a file named for the take in the
   piece's `vo/read/` (`open.wav`, also .flac, .mp3, .m4a ...) is used instead of a bought read and
   costs nothing, with the same compressor, pause cap and word timing; a piece can mix the two.

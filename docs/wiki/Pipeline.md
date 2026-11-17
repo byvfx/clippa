@@ -31,7 +31,7 @@ publish` run on the picks alone, before the slow stages do the segments and comp
 ## Stages
 
 - **fetch / record**: a finished Kick, Twitch or YouTube VOD ([Fetching VODs](Fetching-VODs)), or a Kick stream as it happens ([NAS recorder](NAS-recorder)), with chat.
-- **signals**: chat activity and loudness into a heat curve.
+- **signals**: chat activity and loudness into a heat curve (the war room [draws it](War-room#heat)).
 - **transcribe**: WhisperX (NVIDIA, or on [Modal](Transcribe-on-Modal)'s cloud GPUs) or
   mlx-whisper (Apple Silicon) to word timestamps; with `[transcribe] diarize`, speaker turns
   too, named per show by `clipper speakers` ([Speakers](Speakers)). Once a stream has names,

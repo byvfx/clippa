@@ -122,6 +122,27 @@ Who is who on screen (#54), kept in `[paths] faces/known.json` for every show.
 The command line does the same: `clipper faces <stream> --name F03=Jer --enroll`,
 `clipper faces <stream> --at 1:23:45 --box x,y,w,h --person Jer`, `clipper faces --forget Jer`.
 
+## Heat
+
+**🔥 heat** on a stream in the Pipeline panel, or beside the stream's name in an item's window,
+opens that stream's heat graph: the curve the [signals stage](Pipeline) makes from chat and
+loudness, over the whole stream. The picker at the top changes the stream.
+
+- The shaded bands are the windows clipper looked at (`windows.json`), each with a dot at its
+  peak; the dashed line is the least heat a window needs (`[signals] min_heat`). A grey stretch
+  had no chat recorded.
+- Under the curve, each cut segment, Short and clip sits where it came from, coloured by where
+  it is: not in review yet, waiting, changes asked, approved, scheduled, uploaded or rejected.
+  The legend counts them. Opened from an item, that item is outlined.
+- Point at the graph (or tap it) for the time, the heat, the window's chat, laughing, "clip"
+  and loudness scores, and the items there. Click an item to open it; Tab reaches them too.
+- The table lists the twelve hottest windows with what was said at the peak (when the transcript
+  was there as signals ran) and what was cut from each, or "nothing cut here".
+
+A long stream is wider than a phone's screen: the graph scrolls sideways. It shows the hottest
+second of each stretch (about 1,200 across the stream), so a short peak isn't averaged away.
+Nothing here costs anything or changes anything.
+
 ## News
 
 Headlines about the shows' people (`clipper news`, #110). **News** in the header opens it.
