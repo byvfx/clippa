@@ -131,9 +131,10 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   `CLIPPER_CONFIG` on the laptop points at it), `schedule.json`, secrets/, backups/, logs/, faces/, voices/,
   news/, weekly/, archive/, layouts/, people.json, fonts/. The laptop's old copies: `backups/laptop-state-2026-11-05/`.
   The laptop's scheduled tasks are disabled, not removed (rollback: wiki NAS-hub).
-- **NAS** (192.168.0.155) also runs the recorder container (`deploy/record`, redeployed 2026-10-30 at 1e4f724,
+- **NAS** (192.168.0.155) also runs the recorder container (`deploy/record`, redeployed 2026-11-17 at 28bc0ab,
   watching kinocasinogaming + donflurgundy + chudlogic), Kitsu :8090, the cut container, the streams and photos
-  shares. The `claude` container (`deploy/claude`, wiki Claude-on-the-NAS) drives clipper from the phone.
+  shares. `kick-138291641-2` is Kino 11-17 after the show ended early (Andy playing a game): recorded only, held
+  from the worker by `run.json` `{"status": "skip"}`; delete it whenever you like. The `claude` container (`deploy/claude`, wiki Claude-on-the-NAS) drives clipper from the phone.
 - **Mac `lofn`** (Apple Silicon, setup's `control` role, 11-07): a dev/control station that runs nothing
   unattended. Clone `~/clipper`; `CLIPPER_CONFIG=/Volumes/docker/clipper/clipper.toml` and
   `CLIPPER_LOCAL_CONFIG=~/clipper/clipper.local.toml` in `~/.zshrc` (mount the share in Finder first); ssh
