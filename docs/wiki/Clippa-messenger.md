@@ -30,7 +30,9 @@ on YouTube first, then Kitsu's title column, so the two never disagree; the desc
 and everything else stay as they are on YouTube. Each rename is 51 of the day's API quota
 units, taken only from what the day's uploads don't need ([Scheduling and uploads](Scheduling-and-uploads#quota));
 with none spare, Clippa says so instead of making a card. The war room's undo renames it back.
-`clipper review retitle <item> <title>` does the same from a terminal.
+Asking for the title Kitsu has already still makes a card on a video that's up, in case it was
+renamed in Studio. The war room, the bot and `clipper review retitle` rename the same way
+([Scheduling and uploads](Scheduling-and-uploads#renaming-a-video-thats-up)).
 
 Anything else about a video that's up (its cover, slot, privacy) is still done in YouTube Studio.
 

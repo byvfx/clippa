@@ -78,8 +78,10 @@ def recent_actions(cfg: dict) -> list[dict]:
             for a in d["actions"]]
 
 def _stuck(entry: dict) -> int:
-    """Items of an action that its undo can't change on YouTube (all but a chat's rename there)."""
-    return 0 if entry["action"] == "retitle" else sum(1 for x in entry["items"] if x["before"].get("uploaded"))
+    """Items already on YouTube whose undo leaves something there as it is: all but a title-only
+    edit, which edit_meta renames back on YouTube too."""
+    titles_only = lambda x: entry["action"] in ("edit", "replace") and set(x.get("values") or {}) <= {"YouTube title"}
+    return sum(1 for x in entry["items"] if x["before"].get("uploaded") and not titles_only(x))
 
 def _inverse(cfg: dict, item: actions.Item, action: str, before: dict, values: dict, who: str) -> dict:
     if action in ("approve", "reject", "changes", "reopen"):
@@ -88,10 +90,11 @@ def _inverse(cfg: dict, item: actions.Item, action: str, before: dict, values: d
         return actions.hold(cfg, item, before["hold"], who)
     if action == "pin":
         return actions.pin(cfg, item, before["publish_at"], who)
-    if action == "retitle":   # a rename on YouTube (the chat's): renamed back there too
-        return actions.retitle(cfg, item, before["title"], who)
     if action in ("edit", "replace"):
-        return actions.edit_meta(cfg, item, {c: before[ROW_OF[c]] for c in values}, who)
+        # renamed back on YouTube only when the edit was made on a live video: an edit from before
+        # its upload is undone in Kitsu alone, as it always was
+        return actions.edit_meta(cfg, item, {c: before[ROW_OF[c]] for c in values}, who,
+                                 rename_live=bool(before.get("uploaded")))
     if action == "thumbtext":
         return actions.thumbtext(cfg, item, before["thumb_text"], who)
     raise ClipperError(f"{action} can't be undone")
@@ -121,7 +124,9 @@ def do_undo(cfg: dict, uid: str) -> dict:
             if a["id"] == uid:
                 a["undone"] = not failed
     up = _stuck(entry)
-    note = f"{up} already on YouTube: change {'it' if up == 1 else 'those'} in Studio too" if up else ""
+    note = (f"{up} already on YouTube: change {'it' if up == 1 else 'those'} in Studio too"
+            + (" (titles were renamed back there)" if any(COLUMN_OF["title"] in (x.get("values") or {})
+                                                         for x in entry["items"]) else "")) if up else ""
     return {"undone": ok, "failed": failed, "rows": rows, "note": note}
 
 REF = re.compile(r"(?:[\w.-]+/)?[\w.-]+")  # <stream>/<key> or a key: names, never paths (#76)
@@ -321,7 +326,8 @@ def do_replace(cfg: dict, body: dict) -> dict:
             try:
                 item = actions.resolve(cfg, p["ref"])
                 before = _before(cfg, item)
-                out_rows.append(row_json(item.stream_dir, actions.edit_meta(cfg, item, p["values"], WHO)))
+                out_rows.append(row_json(item.stream_dir, actions.edit_meta(cfg, item, p["values"], WHO,
+                                                                            rename_live=True)))
                 done.append({"ref": item.ref, "before": before, "values": p["values"]})
             except Exception as e:  # noqa: BLE001
                 failed.append({"ref": p["ref"], "error": str(e)[:200]})

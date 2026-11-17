@@ -1,4 +1,4 @@
-"""Renaming a video that's up: youtube.retitle, actions.retitle, Clippa's card and its undo."""
+"""Renaming a video that's up: youtube.retitle, edit_meta (every surface's title edit), Clippa's card, undo."""
 from __future__ import annotations
 
 import json
@@ -96,55 +96,79 @@ def test_retitle_only_from_spare_quota(cfg, monkeypatch):
     assert yt.calls == []
 
 
-# ---------- actions.retitle: YouTube first, then Kitsu's column ----------
+# ---------- edit_meta: YouTube first, then Kitsu's columns, from every surface ----------
 
 @pytest.fixture
 def item(cfg):
     return actions.Item(cfg["paths"]["streams"] / "kick-1", "s02_blade", {})
 
 
-def test_a_title_not_up_yet_is_kitsu_only(cfg, item, monkeypatch):
+@pytest.fixture
+def kitsu(monkeypatch):
+    """Kitsu's side of edit_meta stubbed: the columns and comment it would write."""
+    order = []
+    monkeypatch.setattr(actions, "_touched", lambda item, what, who: None)
+    monkeypatch.setattr(actions, "_columns", lambda cfg, it, values, note: order.append(("kitsu", values, note)))
+    monkeypatch.setattr(actions, "refresh", lambda cfg, it: {})
+    return order
+
+
+def test_a_title_not_up_yet_is_kitsu_only(cfg, item, kitsu, monkeypatch):
     sched(cfg, status="scheduled")
-    seen = []
-    monkeypatch.setattr(actions, "edit_meta", lambda cfg, it, v, who: seen.append(v) or {})
     monkeypatch.setattr(youtube, "retitle", lambda *a, **k: pytest.fail("not on YouTube"))
     actions.decide(cfg, item, "retitle", "me", text="New  title")
-    assert seen == [{"YouTube title": "New title"}]
+    assert kitsu == [("kitsu", {"YouTube title": "New title"}, "Retitled: New title (me)")]
 
 
-def test_a_title_thats_up_is_renamed_on_youtube_first(cfg, item, monkeypatch):
+def test_a_title_thats_up_is_renamed_on_youtube_first(cfg, item, kitsu, monkeypatch):
+    """The CLI's retitle, the war room's and the bot's edits, find and replace, undo: all edit_meta."""
     sched(cfg)
-    order = []
-    monkeypatch.setattr(youtube, "retitle", lambda cfg, key, text: order.append(("youtube", key, text))
+    monkeypatch.setattr(youtube, "retitle", lambda cfg, key, text: kitsu.append(("youtube", key, text))
                         or {"url": "https://youtu.be/abcdefghijk"})
-    monkeypatch.setattr(actions, "edit_meta", lambda cfg, it, v, who: order.append(("kitsu", v, who)) or {})
-    actions.decide(cfg, item, "retitle", "me", text="New title")
-    assert order == [("youtube", KEY, "New title"), ("kitsu", {"YouTube title": "New title"}, "me, on YouTube too")]
+    actions.decide(cfg, item, "edit", "War room", values={"YouTube title": "New title", "Tags": "a, b"})
+    assert kitsu == [("youtube", KEY, "New title"),
+                     ("kitsu", {"YouTube title": "New title", "Tags": "a, b"},
+                      "Retitled: New title; Tags: a, b; renamed on YouTube (War room)")]
+    kitsu.clear()
+    actions.decide(cfg, item, "edit", "War room", values={"Tags": "c"})   # no title: Kitsu only
+    assert kitsu == [("kitsu", {"Tags": "c"}, "Tags: c (War room)")]
 
     def no_rename(*a, **k):
         raise ClipperError("no spare YouTube quota today")
-    order.clear()
+    kitsu.clear()
     monkeypatch.setattr(youtube, "retitle", no_rename)        # a failed rename changes nothing
     with pytest.raises(ClipperError, match="quota"):
         actions.decide(cfg, item, "retitle", "me", text="New title")
-    assert order == []
+    assert kitsu == []
 
     def kitsu_down(*a, **k):
         raise OSError("Kitsu down")
     monkeypatch.setattr(youtube, "retitle", lambda *a: {"url": "https://youtu.be/abcdefghijk"})
-    monkeypatch.setattr(actions, "edit_meta", kitsu_down)     # the public part happened: said so
+    monkeypatch.setattr(actions, "_columns", kitsu_down)     # the public part happened: said so
     with pytest.raises(ClipperError, match=r"renamed on YouTube \(https://youtu.be/abcdefghijk\), but Kitsu"):
         actions.decide(cfg, item, "retitle", "me", text="New title")
 
 
-def test_a_video_deleted_since_is_kitsu_only(cfg, item, monkeypatch):
+def test_a_video_deleted_since_is_kitsu_only(cfg, item, kitsu, monkeypatch):
     """An undo (or a CLI retitle) of a video deleted in Studio still puts Kitsu's column back."""
     sched(cfg, gone_at="2026-11-12T00:00:00+00:00")
-    seen = []
-    monkeypatch.setattr(actions, "edit_meta", lambda cfg, it, v, who: seen.append((v, who)) or {})
     monkeypatch.setattr(youtube, "retitle", lambda *a, **k: pytest.fail("deleted"))
-    actions.retitle(cfg, item, "Old title", "War room (undo)")
-    assert seen == [({"YouTube title": "Old title"}, "War room (undo)")]
+    actions.edit_meta(cfg, item, {"YouTube title": "Old title"}, "War room (undo)", rename_live=True)
+    assert kitsu == [("kitsu", {"YouTube title": "Old title"}, "Retitled: Old title (War room (undo))")]
+
+
+def test_a_retakes_planned_title_never_renames_a_video_thats_up(cfg, item, kitsu, monkeypatch):
+    sched(cfg)
+    monkeypatch.setattr(youtube, "retitle", lambda *a, **k: pytest.fail("nobody saw this title"))
+    actions.edit_meta(cfg, item, {"YouTube title": "Model's idea"}, "retake")   # retake.py's call
+    assert kitsu == [("kitsu", {"YouTube title": "Model's idea"}, "Retitled: Model's idea (retake)")]
+
+
+def test_the_same_title_on_youtube_skips_the_write(cfg):
+    sched(cfg)
+    yt = FakeYT([{"snippet": SNIPPET}])
+    youtube.retitle(cfg, KEY, "Blade in Vegas", yt=yt)            # what YouTube has already
+    assert yt.calls == [("list", "abcdefghijk")] and yt.bodies == []
 
 
 # ---------- Clippa's card, its tap and its undo ----------
@@ -170,13 +194,16 @@ def test_the_card_says_it_renames_the_video_on_youtube(cfg, card_row):
     assert p.kind == "card" and p.text == "Rename kick-1/s02 on YouTube?" and p.args["youtube"] is True
     assert "YouTube shows: KINO CASINO | Blade Goes Bust" in p.lines
     assert any("https://youtu.be/abcdefghijk" in x and "for everyone" in x for x in p.lines)
-    assert "called that already" in catalog.prepare(cfg, "retitle", {"item": "s02", "title": "Blade in Vegas"}).text
+    # Kitsu's title again: a card all the same, since Studio may have renamed it
+    p = catalog.prepare(cfg, "retitle", {"item": "s02", "title": "Blade in Vegas"})
+    assert p.kind == "card" and any("unless Studio changed it" in x for x in p.lines)
     sched(cfg, gone_at="2026-11-12T00:00:00+00:00")
     assert "deleted from YouTube" in catalog.prepare(cfg, "retitle", {"item": "s02", "title": "x"}).text
     card_row["row"] = row(uploaded=False)
     sched(cfg, status="scheduled")
     p = catalog.prepare(cfg, "retitle", {"item": "s02", "title": "Blade Goes Bust"})
     assert p.text == "Retitle kick-1/s02?" and p.args["youtube"] is False
+    assert "called that already" in catalog.prepare(cfg, "retitle", {"item": "s02", "title": "Blade in Vegas"}).text
 
 
 def test_no_spare_quota_is_an_answer_not_a_card(cfg, card_row, monkeypatch):
@@ -186,7 +213,7 @@ def test_no_spare_quota_is_an_answer_not_a_card(cfg, card_row, monkeypatch):
     assert p.kind == "answer" and "quota" in p.text
 
 
-def test_the_tap_renames_and_undoes_as_a_rename(cfg, card_row, item, monkeypatch):
+def test_the_tap_renames_and_its_undo_renames_back(cfg, card_row, item, monkeypatch):
     sched(cfg)
     card = catalog.prepare(cfg, "retitle", {"item": "s02", "title": "Blade Goes Bust"}).as_dict()
     monkeypatch.setattr(actions, "resolve", lambda cfg, ref: item)
@@ -199,13 +226,19 @@ def test_the_tap_renames_and_undoes_as_a_rename(cfg, card_row, item, monkeypatch
     text, ok = catalog.apply(cfg, card)
     assert ok and text.startswith("Renamed on YouTube:")
     action, done = kept[0]
-    assert action == "retitle" and done[0]["values"] == {"YouTube title": "Blade Goes Bust"}
+    assert action == "edit" and done[0]["values"] == {"YouTube title": "Blade Goes Bust"}
     back = []
-    monkeypatch.setattr(actions, "retitle", lambda cfg, it, text, who: back.append(text) or {})
-    wr._inverse(cfg, item, "retitle", done[0]["before"], done[0]["values"], "War room (undo)")
-    assert back == ["Blade in Vegas"]                     # renamed back on YouTube too
-    entry = {"action": "retitle", "items": done}
-    assert wr._stuck(entry) == 0 and wr._stuck({**entry, "action": "edit"}) == 1
+    monkeypatch.setattr(actions, "edit_meta", lambda cfg, it, values, who, rename_live=False:
+                        back.append((values, rename_live)) or {})
+    wr._inverse(cfg, item, "edit", done[0]["before"], done[0]["values"], "War room (undo)")
+    assert back == [({"YouTube title": "Blade in Vegas"}, True)]      # edit_meta renames it back on YouTube
+    back.clear()                                                # an edit from before the upload: Kitsu only
+    wr._inverse(cfg, item, "edit", {**done[0]["before"], "uploaded": False}, done[0]["values"], "War room (undo)")
+    assert back == [({"YouTube title": "Blade in Vegas"}, False)]
+    entry = {"action": "edit", "items": done}
+    assert wr._stuck(entry) == 0                                # a title-only edit: nothing left behind
+    assert wr._stuck({**entry, "items": [{**done[0], "values": {"YouTube title": "x", "Tags": "y"}}]}) == 1
+    assert wr._stuck({"action": "approve", "items": done}) == 1
 
 
 def test_the_tool_description_says_so():

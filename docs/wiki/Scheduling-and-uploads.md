@@ -79,11 +79,16 @@ ones you set. The daily digest lists them too.
 
 ## Renaming a video that's up
 
-`clipper review retitle <item> <new title>`, or a retitle from the
-[Clippa messenger](Clippa-messenger#renaming-a-video-thats-up), renames a video already on
-YouTube: the title gets the show name and bleeps as an upload's does, the rest of the video's
-details stay as YouTube has them, and Kitsu's title column changes after YouTube's. 51 quota
-units each, from the spare only.
+A new title for an item that's already on YouTube renames the video there too, wherever it's
+made: the [War room](War-room)'s item window or find and replace, the Discord bot's details
+form, the [Clippa messenger](Clippa-messenger#renaming-a-video-thats-up), or
+`clipper review retitle <item> <new title>`. The title gets the show name and bleeps as an
+upload's does, the rest of the video's details stay as YouTube has them, and Kitsu's title
+column changes after YouTube's, so a rename that fails changes neither. Undo renames it back.
+A retake's planned title never goes to a video that's up: only a person's edit does.
+51 quota units each (1 when YouTube has that title already), from the spare only: past it the
+edit is refused with a line saying so. A video deleted in Studio gets the Kitsu change alone.
+Its description, hashtags, tags and playlist stay Kitsu-only once it's up.
 
 ## Quota
 

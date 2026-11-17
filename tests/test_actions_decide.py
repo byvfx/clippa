@@ -3,10 +3,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from clipper import actions, schedule, youtube
+from clipper import actions, schedule
 from clipper.errors import ClipperError
 
-ITEM = SimpleNamespace(stream_dir="s", key="k", ref="s/k")
+ITEM = SimpleNamespace(stream_dir="s", key="k")
 
 
 @pytest.fixture
@@ -15,9 +15,9 @@ def calls(monkeypatch):
     for name in ("approve", "reject", "changes", "reopen", "pin", "thumbtext"):
         monkeypatch.setattr(actions, name, lambda cfg, item, *a, _n=name: seen.append((_n, a)) or {})
     monkeypatch.setattr(actions, "hold", lambda cfg, item, on, who: seen.append(("hold", (on, who))) or {})
-    monkeypatch.setattr(actions, "edit_meta", lambda cfg, item, v, who: seen.append(("edit", (v, who))) or {})
+    monkeypatch.setattr(actions, "edit_meta", lambda cfg, item, v, who, rename_live=False:
+                        seen.append(("edit", (v, who))) or {} if rename_live else pytest.fail("a person's edit"))
     monkeypatch.setattr(actions, "refresh", lambda cfg, item: {"hold": True})
-    monkeypatch.setattr(youtube, "on_youtube", lambda cfg, key: None)   # not up: Kitsu only
     return seen
 
 

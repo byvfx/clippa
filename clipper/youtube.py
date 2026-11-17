@@ -890,8 +890,9 @@ def retitle(cfg: dict, key: str, text: str, yt=None) -> dict:
         mark(sched_path, key, gone_at=datetime.now(UTC).isoformat(timespec="seconds"))
         raise ClipperError(f"{e.get('url') or key} isn't on YouTube any more")
     sn = found[0]["snippet"]
-    body = {k: sn[k] for k in SNIPPET_KEEP if k in sn} | {"title": title}
-    execute_with_retry(yt.videos().update(part="snippet", body={"id": e["video_id"], "snippet": body}))
+    if sn.get("title") != title:   # already that on YouTube: the 50-unit write isn't needed
+        body = {k: sn[k] for k in SNIPPET_KEEP if k in sn} | {"title": title}
+        execute_with_retry(yt.videos().update(part="snippet", body={"id": e["video_id"], "snippet": body}))
     done = {"title": " ".join(text.split()), "youtube_title": title,
             "retitled_at": datetime.now(UTC).isoformat(timespec="seconds")}
     mark(sched_path, key, **done)   # kept as is by the replan (schedule.keep_uploaded)
