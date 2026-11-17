@@ -435,9 +435,10 @@ def test_the_ledger_takes_the_clients_label(tmp_path, monkeypatch):
     costs.set_context("", "")
 
 
-# ---------- the page's looks (web/themes/) ----------
+# ---------- the looks (web/themes/): one pick dresses the war room and the chat ----------
 
 WEB = Path(routes.__file__).resolve().parents[1] / "web"
+STRUCTURE = ("warroom.css", "chat.css")   # layout only: the look's custom properties fill them in
 
 
 def _defined(css: str) -> dict[str, str]:
@@ -446,21 +447,63 @@ def _defined(css: str) -> dict[str, str]:
     return {m[0]: " ".join(m[1].split()) for m in re.findall(r"--([\w-]+)\s*:\s*([^;]+);", block)}
 
 
+def _read(name: str) -> str:
+    return (WEB / name).read_text(encoding="utf-8")
+
+
+def theme_variables() -> set[str]:
+    """What a look must define: every property the two pages' structure reads, but those the
+    structure sets itself (the chat dock's width) and those the war room's script sets (layouts)."""
+    used, own = set(), set()
+    for name in STRUCTURE:
+        css = _read(name)
+        used |= set(re.findall(r"var\(--([\w-]+)", css))
+        own |= set(re.findall(r"(?<![\w-])--([\w-]+)\s*:", css))
+    scripts = " ".join(p.read_text(encoding="utf-8") for p in (WEB / "js").glob("*.js"))
+    used |= set(re.findall(r"var\(--([\w-]+)", scripts))   # the war room's inline styles
+    own |= set(re.findall(r"setProperty\(\"--([\w-]+)\"", scripts))
+    labels = {f"label-{n}" for n in re.findall(r'data-label="([\w-]+)"', _read("chat.html"))}
+    assert labels == {"label-buddies", "label-chat"}
+    return (used - own) | labels
+
+
 def test_every_theme_defines_every_variable():
-    used = set(re.findall(r"var\(--([\w-]+)\)", (WEB / "chat.css").read_text(encoding="utf-8")))
-    labels = {f"label-{n}" for n in re.findall(r'data-label="([\w-]+)"', (WEB / "chat.html").read_text(encoding="utf-8"))}
-    assert used and labels == {"label-buddies", "label-chat"}
+    want = theme_variables()
+    assert {"desk", "win", "tb", "btn", "panel2", "accent", "field", "sel"} <= want   # both pages' vocabulary
     assert {"millennium", "pager", "retro", "warroom"} <= set(routes.themes())   # a new look is just a file
     for name in routes.themes():
         have = set(_defined((WEB / "themes" / f"{name}.css").read_text(encoding="utf-8")))
-        assert not (used | labels) - have, (name, sorted((used | labels) - have))
+        assert not want - have, (name, sorted(want - have))
 
 
-def test_the_warroom_theme_keeps_the_war_rooms_palette():
-    room = _defined((WEB / "warroom.css").read_text(encoding="utf-8"))
-    theme = _defined((WEB / "themes" / "warroom.css").read_text(encoding="utf-8"))
-    wr = {k[3:]: v for k, v in theme.items() if k.startswith("wr-")}
-    assert wr and all(room[k] == v for k, v in wr.items()), {k: (room.get(k), v) for k, v in wr.items() if room.get(k) != v}
+# The colours warroom.css may still spell out: black behind video and covers, the dark badges
+# over them and their text, the same in every look. Anything else belongs in a theme.
+THEME_FREE = {"#000", "#05070a", "#000c", "#0007", "#000b", "#fff", "#111", "#e6e9ee"}
+
+
+def test_the_warroom_theme_is_the_one_source():
+    """The war room's colours live in themes/warroom.css only: its structure defines no palette
+    and spells out no colour a look could want to change."""
+    for name in STRUCTURE:
+        assert ":root" not in _read(name), name
+    room = re.sub(r"/\*.*?\*/", "", _read("warroom.css"), flags=re.S)
+    literal = set(re.findall(r"#[0-9a-fA-F]{3,8}\b", room)) | set(re.findall(r"\brgba?\([^)]*\)", room))
+    assert literal <= THEME_FREE, sorted(literal - THEME_FREE)
+    palette = _defined((WEB / "themes" / "warroom.css").read_text(encoding="utf-8"))
+    assert (palette["bg"], palette["panel"], palette["accent"]) == ("#0b0d10", "#12161b", "#ffd400")   # the war room as it was
+
+
+def test_both_pages_wear_a_look_through_theme_js():
+    """The look's file comes after the page's structure (so it wins) and theme.js right after it
+    (so a pick is on before the first paint); the page's default is a look that exists."""
+    for page, at in (("warroom.html", ""), ("chat.html", "/")):
+        html = _read(page)
+        m = re.search(r'<html lang="en" data-theme="([\w-]+)">', html)
+        assert m and m[1] in routes.themes(), page
+        link = f'<link rel="stylesheet" href="{at}themes/{m[1]}.css" id="theme">'
+        structure = f'<link rel="stylesheet" href="{at}{page.replace(".html", ".css")}">'
+        assert html.index(structure) < html.index(link) < html.index(f'<script src="{at}theme.js"') < html.index("</head>"), page
+    assert _read("warroom.html").count('data-theme="warroom"') == 1   # the war room as it was until a pick
 
 
 def test_the_default_theme_comes_from_config(cfg):
@@ -473,7 +516,8 @@ def test_the_default_theme_comes_from_config(cfg):
 
 def test_the_page_names_no_real_messenger():
     """Era homage only: the repo is public."""
-    files = [WEB / "chat.html", WEB / "chat.css", WEB / "chat.js", WEB / "chat-theme.js", *(WEB / "themes").glob("*.css")]
+    files = [WEB / "chat.html", WEB / "chat.css", WEB / "chat.js", WEB / "theme.js", *(WEB / "themes").glob("*.css"),
+             WEB / "warroom.html", WEB / "warroom.css", WEB / "js" / "chatdock.js"]
     for f in files:
         text = f.read_text(encoding="utf-8")
         assert not re.search(r"\bAIM\b", text), f.name                 # the word "aim" is fine

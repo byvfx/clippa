@@ -1,84 +1,115 @@
-/* warroom: the war room's own look (clipper/web/warroom.css), so the two pages sit together.
-   The --wr-* values are the war room's :root palette, kept equal by tests/test_chat.py; the
-   rest of this file only maps them. Dark always, like the war room. */
+/* warroom: the war room's own look, and its default. This file is the one place the war room's
+   colours live (clipper/web/warroom.css is only structure); the chat maps onto the same palette,
+   so the two sit together. Dark always.
+   A look is the custom properties that warroom.css and chat.css read (tests/test_chat.py checks
+   every look defines them all), plus rules of its own for what a property can't say; such a rule
+   picks out one page's own classes (the chat's .msg, .window, .compose-marks), never .card or
+   .btn, which both pages have. */
 :root {
-  --wr-bg: #0b0d10; --wr-panel: #12161b; --wr-panel2: #171c22; --wr-line: #232a33;
-  --wr-text: #e6e9ee; --wr-dim: #8b95a3; --wr-accent: #ffd400; --wr-blue: #4da3ff;
-  --wr-green: #2fd17c; --wr-amber: #ffad33; --wr-red: #ff3b4e; --wr-violet: #a88bff;
-  --wr-mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
-  --wr-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+  /* the palette */
+  --bg: #0b0d10; --panel: #12161b; --panel2: #171c22; --line: #232a33; --text: #e6e9ee;
+  --dim: #8b95a3; --faint: #7a8494; --accent: #ffd400; --on-accent: #111; --red: #ff3b4e; --green: #2fd17c;
+  --blue: #4da3ff; --amber: #ffad33; --violet: #a88bff;
+  --clip: #4da3ff; --short: #ff6fae; --segment: #2fd17c; --compilation: #ffad33;
+  --mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+  --sans: "Segoe UI", system-ui, -apple-system, sans-serif;
 
+  /* the war room (warroom.css); it also reads the windows, title bars and buttons below */
+  --head: #0e1115ee;         /* the header bar */
+  --bar: #0e1115f2;          /* a phone's bottom bars */
+  --panel-pad: 0;            /* inside a panel, around its title bar and body */
+  --tb-pad: 10px 14px;       /* a panel's title */
+  --tb-line: 1px solid var(--line);
+  --tb-sub: var(--faint);    /* the small text at a title's right */
+  --tb-tool-ink: var(--dim); /* a button on a panel's title */
+  --dlg-radius: 14px;
+  --pill: 99px;              /* chips and tabs */
+  --field: var(--panel2);    /* inputs and selects */
+  --field-border: 1px solid var(--line);
+  --sel: var(--text);        /* the queue tab that's on */
+  --sel-ink: #111;
+  --tag: #222a33;
+  --track: #262e38;          /* meters and stage bars, empty */
+  --hover-line: #3a4552;     /* a card or chip under the pointer */
+  --btn-hover: #3a4552;
+  --live-bg: #2a0e13;        /* a live show's chip */
+  --pop-shadow: 0 8px 30px #000a;
+  --float-shadow: 0 12px 40px #000c;
+  --good-bg: #123524; --good-line: #1f6b44; --good-ink: #7ff0b2;
+  --bad-bg: #3a1218; --bad-line: #7a2230; --bad-ink: #ff98a3;
+  --warn-bg: #3a2a10; --warn-line: #7a5520; --warn-ink: #ffcf85;
+
+  /* the chat (chat.css), and what the war room shares with it */
   --label-buddies: "Clippa";
   --label-chat: "Chat";
 
-  --desk: var(--wr-bg);
+  --desk: var(--bg);
   --desk-image: none;
-  --font: 13px/1.45 var(--wr-sans);
-  --ink: var(--wr-text);
-  --muted: var(--wr-dim);
-  --link: var(--wr-blue);
-  --mono: var(--wr-mono);
+  --font: 13px/1.45 var(--sans);
+  --ink: var(--text);
+  --muted: var(--dim);
+  --link: var(--blue);
 
-  --win: var(--wr-panel);
-  --win-border: 1px solid var(--wr-line);
+  --win: var(--panel);
+  --win-border: 1px solid var(--line);
   --win-radius: 12px;
   --win-shadow: none;
   --win-pad: 6px;
 
   --tb: transparent;
-  --tb-ink: var(--wr-dim);
-  --tb-font: 700 12px var(--wr-mono);
-  --tb-spacing: 0.14em;
+  --tb-ink: var(--dim);
+  --tb-font: 700 12px var(--mono);
+  --tb-spacing: 0.12em;
   --tb-case: uppercase;
   --tb-radius: 0;
   --tb-height: 26px;
-  --tb-icon: var(--wr-accent);
+  --tb-icon: var(--accent);
   --tb-btn: transparent;
-  --tb-btn-ink: var(--wr-dim);
-  --tb-btn-border: 1px solid var(--wr-line);
+  --tb-btn-ink: var(--dim);
+  --tb-btn-border: 1px solid var(--line);
 
-  --pane: var(--wr-bg);
-  --pane-border: 1px solid var(--wr-line);
+  --pane: var(--bg);
+  --pane-border: 1px solid var(--line);
   --pane-radius: 8px;
   --pane-shadow: none;
-  --status-border: 1px solid var(--wr-line);
+  --status-border: 1px solid var(--line);
 
-  --group: var(--wr-dim);
+  --group: var(--dim);
   --group-weight: 700;
-  --on: var(--wr-green);
-  --idle: var(--wr-amber);
-  --away: var(--wr-violet);
+  --on: var(--green);
+  --idle: var(--amber);
+  --away: var(--violet);
   --off: #4a525d;
 
   --who-weight: 700;
-  --me: var(--wr-accent);
-  --them: var(--wr-blue);
-  --system: var(--wr-dim);
-  --ts: var(--wr-dim);
-  --ts-font: 11px var(--wr-mono);
-  --div: 1px solid var(--wr-line);
+  --me: var(--accent);
+  --them: var(--blue);
+  --system: var(--dim);
+  --ts: var(--dim);
+  --ts-font: 11px var(--mono);
+  --div: 1px solid var(--line);
 
-  --card: var(--wr-panel2);
-  --card-border: 1px solid var(--wr-line);
-  --card-radius: 8px;
+  --card: var(--panel2);
+  --card-border: 1px solid var(--line);
+  --card-radius: 10px;
   --card-shadow: none;
   --write: #2a6db3;
   --spend: #7a52d6;
   --est: rgb(168 139 255 / 0.12);
   --report: rgb(47 209 124 / 0.1);
   --report-failed: rgb(255 59 78 / 0.12);
-  --code: var(--wr-panel2);
+  --code: var(--panel2);
 
-  --btn: var(--wr-panel2);
-  --btn-ink: var(--wr-text);
-  --btn-font: var(--wr-sans);
-  --btn-border: 1px solid var(--wr-line);
-  --btn-radius: 8px;
+  --btn: var(--panel2);
+  --btn-ink: var(--text);
+  --btn-font: var(--sans);
+  --btn-border: 1px solid var(--line);
+  --btn-radius: 7px;
   --btn-shadow: none;
-  --btn-down-border: 1px solid var(--wr-accent);
+  --btn-down-border: 1px solid var(--accent);
   --btn-down-shadow: none;
-  color-scheme: dark;
+  --scheme: dark;   /* the chat's native controls (chat.css) */
 }
 
-.window .titlebar { border-bottom: 1px solid var(--wr-line); margin-bottom: 4px; }
+.window .titlebar { border-bottom: 1px solid var(--line); margin-bottom: 4px; }
 .titlebar-icon { border-radius: 50%; width: 8px; height: 8px; }
