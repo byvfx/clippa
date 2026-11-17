@@ -130,6 +130,8 @@ class Details(discord.ui.Modal):
             shown = row.get(key) or ""
             if len(shown) > max_len:
                 continue
+            if col == "YouTube title" and row.get("uploaded"):   # edit_meta renames the live video
+                label = "YouTube title (renames the live video)"
             field = discord.ui.TextInput(
                 label=label, required=False, max_length=max_len, default=shown or None,
                 style=discord.TextStyle.paragraph if multiline else discord.TextStyle.short)

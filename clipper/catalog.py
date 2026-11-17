@@ -2,7 +2,9 @@
 
     read    answers at once: the schedule, items, retakes, health, costs
     write   a review decision through actions.decide (who "Clippa chat", so Kitsu stays the
-            record), after a tap on a confirm card; the tap checks the item again first
+            record), after a tap on a confirm card; the tap checks the item again first.
+            A retitle of a video that's up renames it on YouTube too: the one YouTube write
+            here, and its card says so
     spend   a `clipper` command that costs money, run in the background after a tap; the
             card shows its estimate (llm.estimate and the ledger) before anything is spent
 
@@ -297,10 +299,26 @@ def _pin(cfg, row, args, tz, lines):
 
 
 def _retitle(cfg, row, args, tz, lines):
+    from . import youtube
+
     text = actions.check_title(args.get("title") or "")
-    lines += [f"now: {row['title']}", f"new: {text}"]
+    live = youtube.on_youtube(cfg, row["ref"]) if row["uploaded"] else None
+    if live and live.get("gone_at"):
+        raise _No(f"{row['short']} was deleted from YouTube ({live.get('url')}).")
+    if text == row["title"] and not live:
+        raise _No(f"{row['short']} is called that already.")
+    # one that's up may still differ on YouTube (renamed in Studio): the tap sets it there
+    lines += [f"now: {row['title']}" + (" (in Kitsu; the same on YouTube unless Studio changed it)"
+                                        if text == row["title"] else ""), f"new: {text}"]
     lines += [f"⚠ {i['msg']}" for i in actions.style_issues(cfg, {"title": text})]
-    return f"Retitle {row['short']}?", text, None
+    if not live:
+        return f"Retitle {row['short']}?", text, None
+    if youtube.spare(cfg) < youtube.RETITLE_UNITS:
+        raise _No("No spare YouTube quota left today (it's kept for uploads): ask again tomorrow.")
+    shown = youtube.live_title(cfg, text)
+    lines += [*([f"YouTube shows: {shown}"] if shown != text else []),
+              f"it's up: {live.get('url')}. The tap renames it on YouTube, for everyone"]
+    return f"Rename {row['short']} on YouTube?", text, True
 
 
 def _thumbtext(cfg, row, args, tz, lines):
@@ -332,8 +350,11 @@ def _write_prepare(name: str, verb: str) -> Callable[[dict, dict], Plan]:
             return Plan("answer", text=str(e))
         if row["scheduled"]:
             lines.append(f"scheduled {when_text(row['scheduled'], tz)}")
+        args = {"verb": verb, "text": text, "on": on}
+        if verb == "retitle":   # its "on": the video is up, and the tap renames it on YouTube
+            args.update(on=None, youtube=bool(on))
         return Plan("card", text=what, tool=name, risk=WRITE, ref=item.ref, snapshot=snapshot(row),
-                    lines=lines, args={"verb": verb, "text": text, "on": on})
+                    lines=lines, args=args)
     return prepare
 
 
@@ -354,6 +375,7 @@ def recheck(cfg: dict, card: dict) -> tuple[actions.Item, dict, str]:
 
 def apply(cfg: dict, card: dict) -> tuple[str, bool]:
     """Do a write card's action (re-checked first); its outcome in a line."""
+    from . import youtube
     from .warroom.review import _before, remember, start_retake
     from .warroom.state import LOCK
 
@@ -364,10 +386,14 @@ def apply(cfg: dict, card: dict) -> tuple[str, bool]:
         item, _, stale = recheck(cfg, card)
         if stale:
             return stale, False
+        if a.get("youtube") and (youtube.on_youtube(cfg, item.ref) or {}).get("gone_at"):
+            # deleted in Studio since the card (serve's backfill marks it): not "renamed on YouTube"
+            return f"{item.short} was deleted from YouTube since I asked: nothing done.", False
         before = _before(cfg, item)
         row = actions.decide(cfg, item, a["verb"], WHO, text=a.get("text") or "", on=a.get("on"))
         row, note = actions.replan(cfg, item, a["verb"], row)
     # a retitle is the war room's "edit" of the title column, so its undo puts the old title back
+    # (and renames a video that's up back on YouTube: edit_meta)
     action, values = ("edit", {"YouTube title": a["text"]}) if a["verb"] == "retitle" else (a["verb"], {})
     remember(cfg, action, f"{a['verb']} {item.short} (chat)", [{"ref": item.ref, "before": before, "values": values}])
     if a["verb"] == "changes" and cfg["retake"]["auto"]:
@@ -375,7 +401,8 @@ def apply(cfg: dict, card: dict) -> tuple[str, bool]:
     done = {"approve": "Approved", "reject": "Rejected", "changes": "Sent back for a retake",
             "reopen": "Reopened", "hold": "Held" if a.get("on") else "Released",
             "pin": f"Pinned for {a.get('text')}" if a.get("text") else "Unpinned",
-            "retitle": "Retitled", "thumbtext": "Cover words changed"}[a["verb"]]
+            "retitle": "Renamed on YouTube" if a.get("youtube") else "Retitled",
+            "thumbtext": "Cover words changed"}[a["verb"]]
     return f"{done}: {item_line(row)}" + (f"; {note}" if note else "") + ".", True
 
 

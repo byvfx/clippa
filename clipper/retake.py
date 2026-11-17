@@ -392,7 +392,7 @@ def apply(cfg: dict, sdir: Path, key: str, st: dict, p: dict, who: str) -> tuple
                                                    ("description", "YouTube description"),
                                                    ("hashtags", "Hashtags")) if p.get(k)}
     if meta_values:
-        actions.edit_meta(cfg, item, meta_values, who)
+        actions.edit_meta(cfg, item, meta_values, who)   # never renames a video that's up: nobody saw it
         done.append("new " + ", ".join(c.replace("YouTube ", "").lower() for c in meta_values))
     th = p.get("thumbnail") or {}
     if th.get("redo") and st["kind"] != "short":

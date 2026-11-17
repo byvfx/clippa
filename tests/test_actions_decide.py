@@ -15,7 +15,8 @@ def calls(monkeypatch):
     for name in ("approve", "reject", "changes", "reopen", "pin", "thumbtext"):
         monkeypatch.setattr(actions, name, lambda cfg, item, *a, _n=name: seen.append((_n, a)) or {})
     monkeypatch.setattr(actions, "hold", lambda cfg, item, on, who: seen.append(("hold", (on, who))) or {})
-    monkeypatch.setattr(actions, "edit_meta", lambda cfg, item, v, who: seen.append(("edit", (v, who))) or {})
+    monkeypatch.setattr(actions, "edit_meta", lambda cfg, item, v, who, rename_live=False:
+                        seen.append(("edit", (v, who))) or {} if rename_live else pytest.fail("a person's edit"))
     monkeypatch.setattr(actions, "refresh", lambda cfg, item: {"hold": True})
     return seen
 
