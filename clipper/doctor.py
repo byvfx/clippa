@@ -566,6 +566,26 @@ def check_hei_cookies(cfg: dict, now: float | None = None) -> None:
              "sign in at heinetwork.tv (Remember me) and export the cookies again; " + hint)
 
 
+def check_twitch_cookies(cfg: dict) -> None:
+    """[paths] twitch_cookies, when there is a file (a subscriber-only VOD for `clipper fetch`):
+    it is a readable Netscape cookies file. No file: nothing to check, the cookies are optional."""
+    from . import ytdl
+
+    f = cfg["paths"]["twitch_cookies"]
+    if not f.is_file():
+        return
+    try:
+        live = [c for c in ytdl.live(ytdl.read_cookies(f), None) if "twitch.tv" in c.domain]
+    except (OSError, ValueError, KeyError) as e:
+        fail("keys", f"Twitch cookies {f.name} unreadable: {e}", wiki.page("Fetching-VODs", "notes"))
+        return
+    if live:
+        ok("keys", f"Twitch cookies {f.name}: {len(live)} live twitch.tv cookies")
+    else:
+        warn("keys", f"Twitch cookies {f.name} hold no live twitch.tv cookie",
+             "sign in at twitch.tv and export the cookies again; " + wiki.page("Fetching-VODs", "notes"))
+
+
 def check_youtube_cookies(cfg: dict) -> None:
     """[youtube] cookies_from_browser, when set: the profile is there and still signed in to
     YouTube (its cookie database on disk, no network). Unset: the cookies file instead."""
@@ -1398,6 +1418,7 @@ def main(cfg: dict, offline: bool = False, role: str = "all") -> int:
     if role not in ("nas", "control"):
         check_youtube_cookies(cfg)  # archive fetches; a control station doesn't run them
         check_hei_cookies(cfg)
+        check_twitch_cookies(cfg)
     if role in ("all", "gpu", "claude"):
         check_narrate(cfg)
         check_broll(cfg)
