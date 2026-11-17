@@ -346,7 +346,7 @@ def test_page_scripts_parse():
     node = shutil.which("node")
     if not node:
         pytest.skip("no node on PATH")
-    for p in sorted((warroom.WEB / "js").glob("*.js")):
+    for p in sorted([*(warroom.WEB / "js").glob("*.js"), *warroom.WEB.glob("*.js")]):   # the war room's, the chat's, theme.js
         r = subprocess.run([node, "--check", str(p)], capture_output=True, text=True)
         assert r.returncode == 0, f"{p.name}: {r.stderr[-500:]}"
 
@@ -416,16 +416,19 @@ def test_log_filters_see_only_scrubbed_text(tmp_path, defaults, monkeypatch):
 
 def test_the_chat_page_is_its_own(tmp_path, defaults):
     """/chat (#158): its own markup, style and script beside the war room's, served by the same
-    server behind the same key; the war room page never loads them."""
+    server behind the same key. The war room shows that same page in a frame at its side, so the
+    two share one code path; it never loads the chat's script or style itself."""
     from clipper.warroom import httpd
 
     html = httpd.PAGES["/chat"].read_text(encoding="utf-8")
     assert '<script src="/chat.js"></script>' in html and '<link rel="stylesheet" href="/chat.css">' in html
-    assert "chat.js" not in warroom.PAGE.read_text(encoding="utf-8")
+    room = warroom.PAGE.read_text(encoding="utf-8")
+    assert "chat.js" not in room and "chat.css" not in room
+    assert re.search(r'<iframe id="chatFrame" src="/chat\?dock"', room)
     assert httpd.static_file("/chat.js")[1].startswith("text/javascript")
     assert httpd.static_file("/chat.css")[1].startswith("text/css")
     broken = re.compile("[ÂÃ][\x80-\xbf]|â[€œš]")
-    for name in ("chat.html", "chat.css", "chat.js"):
+    for name in ("chat.html", "chat.css", "chat.js", "theme.js", "js/chatdock.js", *(f"themes/{p.name}" for p in (warroom.WEB / "themes").glob("*.css"))):
         assert not broken.search((warroom.WEB / name).read_text(encoding="utf-8")), name
     assert "/api/chat" in httpd.GET_API and "/api/chat/send" in httpd.POST_API
 

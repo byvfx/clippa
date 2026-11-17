@@ -2,6 +2,36 @@
    name on its own line with the time to the right. An era look, light on purpose; on a dark
    system only the desk dims. */
 :root {
+  /* the war room (warroom.css): plain grey windows, green title bars */
+  --panel: #d4d0c8; --panel2: #ffffff; --line: #808080; --text: #111111; --dim: #3f3f3f; --faint: #5f5f5f;
+  --accent: #3b7d3b; --on-accent: #ffffff; --red: #a82828; --green: #2a7a2a; --blue: #1f5fa6; --amber: #9a6000; --violet: #6b3fa0;
+  --clip: #5a95e6; --short: #e8609f; --segment: #3cbf7a; --compilation: #f0a03c;
+  --sans: Tahoma, Verdana, sans-serif;
+  --head: #d4d0c8;
+  --bar: #d4d0c8;
+  --panel-pad: 2px;
+  --tb-pad: 3px 6px;
+  --tb-line: none;
+  --tb-sub: #d8ecd8;
+  --tb-tool-ink: #111111;
+  --dlg-radius: 0;
+  --pill: 0;
+  --field: #ffffff;
+  --field-border: 1px solid #808080;
+  --sel: #3b7d3b;
+  --sel-ink: #ffffff;
+  --tag: #e6e3dc;
+  --track: #a9a59d;
+  --hover-line: #3b7d3b;
+  --btn-hover: #3b7d3b;
+  --live-bg: #f3dcdc;
+  --pop-shadow: 2px 2px 0 rgb(0 0 0 / 0.25);
+  --float-shadow: 3px 3px 0 rgb(0 0 0 / 0.25);
+  --good-bg: #dcefdc; --good-line: #2a7a2a; --good-ink: #164a16;
+  --bad-bg: #f3dcdc; --bad-line: #a82828; --bad-ink: #6e1616;
+  --warn-bg: #f3e6cc; --warn-line: #9a6000; --warn-ink: #5c3a00;
+
+  /* the chat (chat.css), and what the war room shares with it */
   --label-buddies: "Contacts";
   --label-chat: "Message session: Clippa";
 
@@ -71,7 +101,7 @@
   --btn-shadow: none;
   --btn-down-border: 1px solid #3b7d3b;
   --btn-down-shadow: inset 1px 1px 0 #a9a59d;
-  color-scheme: light;
+  --scheme: light;   /* the chat's native controls (chat.css) */
 }
 
 /* the sender on a line of their own, the time at the right of it */
