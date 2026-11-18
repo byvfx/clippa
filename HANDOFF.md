@@ -273,8 +273,8 @@ messages: GitHub closes the issue on "fix".
   window: the signals curve, the windows, and each cut item where it sits, coloured by review state, plus the twelve
   hottest windows and what was cut from each (`/api/heat`, `clipper/warroom/heat.py`, `web/js/heat.js`, wiki
   War-room#heat). It is also the demo video's "how it finds moments" shot. Not yet seen on the live page or on a real phone.
-  Copilot has reviewed no PR since #285 (11-16; a request by hand leaves none): until it does, ask the user per PR
-  whether Grok (`clipper codereview`, about $0.80) stands in.
+  Copilot has reviewed no PR since #285 (11-16; a request by hand leaves none): Grok is the backup (CLAUDE.md,
+  11-18): offer `clipper codereview --pr N` (about $0.80) per PR as soon as CI is green.
 - **Review pre-flight checks and approval by silence (#259, 11-14):** step A, `clipper review check` (wiki
   Review#pre-flight-checks), is PR #263, merged and deployed 11-14; the webcam panels are marked `cam = true`
   in clipper.toml (backup `backups/clipper.toml.before_cam_marks_2026-11-14`). Step B, `clipper review auto`

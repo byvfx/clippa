@@ -60,7 +60,7 @@ class Plan:
     lines: list[str] = field(default_factory=list)   # the card's details
     estimate: str = ""            # a spend card: what it will cost
     argv: list[str] = field(default_factory=list)    # a spend card: the clipper command
-    options: list[dict] = field(default_factory=list)  # "ask": [{ref, title}]
+    options: list[dict] = field(default_factory=list)  # "ask": [{ref, title, where}]
 
     def as_dict(self) -> dict:
         return {k: v for k, v in self.__dict__.items() if v not in ("", [], {})}
@@ -169,6 +169,129 @@ def match_rows(rows: list[dict], text: str, limit: int = 6) -> list[dict]:
 
 REF_LIKE = re.compile(r"(?:[\w.-]+/)?(?:[a-z]{1,4}\d+[\w.-]*|comp-[\w.-]+)", re.IGNORECASE)
 STREAM_LIKE = re.compile(r"[a-z]+-[\w-]+", re.IGNORECASE)   # kick-131151926, yt-<id>, story-<slug>
+STREAM_ID = r"(?:kick-\d+|yt-[\w-]+|story-[\w-]+)"           # the ids a chat can name a stream by
+
+
+DAY = re.compile(r"(\d{1,2})[-/](\d{1,2})")
+SHOW_STOP = STOP | {"show", "news", "live", "casino", "channel", "podcast", "stream", "streams"}
+
+
+@dataclass(frozen=True)
+class ShowNames:
+    """How people name each show: naming words (its key, its channels, the words of its name that
+    aren't generic) and the rest of its name, which may follow one ("casino" in "Kino Casino")."""
+    naming: dict[str, frozenset[str]] = field(default_factory=dict)
+    rest: dict[str, frozenset[str]] = field(default_factory=dict)
+
+    def show_of(self, word: str) -> str | None:
+        return next((k for k, ws in self.naming.items() if word in ws), None)
+
+    def end(self, low: list[str], at: int) -> int:
+        """The index after the show's name that starts at low[at] ("kino casino" is two words)."""
+        show, i = self.show_of(low[at]), at + 1
+        while show and i < len(low) and (low[i] in self.naming[show] or low[i] in self.rest.get(show, ())):
+            i += 1
+        return i
+
+
+def show_names(cfg: dict) -> ShowNames:
+    naming, rest = {}, {}
+    for key, show in (cfg.get("shows") or {}).items():
+        name = ((show.get("overrides") or {}).get("meta") or {}).get("show_name") or ""
+        words = set(WORD.findall(name.lower()))
+        naming[key] = frozenset({key.lower(), *(c.lower() for c in show.get("channels") or []),
+                                 *(w for w in words if len(w) > 2 and w not in SHOW_STOP)})
+        rest[key] = frozenset(words - naming[key])
+    return ShowNames(naming, rest)
+
+
+PREP = ("from", "on", "in", "of")
+REL_DAYS = {"today": 0, "tonight": 0, "yesterday": 1}   # and "last night"
+
+
+def _aware(at: datetime) -> datetime:
+    return at if at.tzinfo else at.replace(tzinfo=UTC)   # an old meta.json without an offset is UTC
+
+
+def stream_named(cfg: dict, text: str, whole: bool = False) -> tuple[str | None, str]:
+    """A stream named the way people say it: a show (by a word of its name) with a month-day right
+    after its name ("kino 11-14", "kino casino 11-14"), the show alone (its latest stream in
+    review), or "from 11-14", "from yesterday", "from last night". (stream id, the text without
+    those words); (None, text) when it names none. A show or a from-day that fits no stream in
+    review, or several, raises: never a quiet fall back to every stream. A month-day elsewhere
+    ("anniversary of 9/11") is a title's. whole: the text is only a stream's name ("kino 11-14",
+    "last night"), so a day needs no from."""
+    from .config import show_of_channel, stream_channel
+
+    words = (text or "").split()
+    low = [w.lower().strip(".,;:!?()'\"") for w in words]
+    names = show_names(cfg)
+    show_at = next((i for i, w in enumerate(low) if names.show_of(w)), None)
+    show = names.show_of(low[show_at]) if show_at is not None else None
+    name_end = names.end(low, show_at) if show_at is not None else -1
+    tz = ZoneInfo(cfg["schedule"]["timezone"])
+    today = datetime.now(tz).date()
+    used = set(range(show_at, name_end)) if show else set()
+    day = None
+    for i, w in enumerate(low):
+        if not (whole or i == name_end or (i > 0 and low[i - 1] == "from")):
+            continue
+        rel = REL_DAYS.get(w)
+        if w == "last" and low[i + 1:i + 2] == ["night"]:
+            rel, used = 1, used | {i + 1}
+        if (m := DAY.fullmatch(w)) or rel is not None:
+            d = today - timedelta(days=rel or 0)
+            day, used = ((int(m.group(1)), int(m.group(2))) if m else (d.month, d.day)), used | {i}
+            break
+    if show is None and day is None:
+        return None, text
+    rows = []
+    for d in actions.review_dirs(cfg):
+        if show and show_of_channel(cfg, stream_channel(d)) != show:
+            continue
+        try:
+            at = _aware(datetime.fromisoformat(jsonstate.read(d / "meta.json", {}).get("started_at") or ""))
+        except ValueError:
+            at = None
+        rows.append((at, d.name))
+    what = " ".join(x for x in (show or "", f"{day[0]:02d}-{day[1]:02d}" if day else "") if x)
+    if day:   # the local day first; the UTC day only when no stream has it locally
+        on = lambda r, zone: r[0] and (r[0].astimezone(zone).month, r[0].astimezone(zone).day) == day
+        rows = [r for r in rows if on(r, tz)] or [r for r in rows if on(r, UTC)]
+        if len(rows) > 1:
+            fits = ", ".join(f"{sid} ({at.astimezone(tz):%m-%d %H:%M})" for at, sid in sorted(rows))
+            raise ClipperError(f"{len(rows)} streams fit {what!r}: {fits}; name it by its id")
+    if not rows:
+        before = low[max(0, (show_at or 0) - 2):show_at or 0]
+        if not (whole or day or set(before) & set(PREP)):
+            return None, text   # a show's word in a title ("the kino recap"), its show not in review
+        raise ClipperError(f"no stream in review fits {what!r}")
+    left = " ".join(w for i, w in enumerate(words) if i not in used)
+    return max(rows, key=lambda r: (r[0] or datetime.min.replace(tzinfo=UTC), r[1]))[1], left
+
+
+def stream_span(words: list[str], shows: ShowNames) -> int:
+    """How many of `words` name a stream after from/on/in/of, as stream_named reads it: "from kino
+    casino 11-14", "on the kino one", "from last night", "from kick-1"; 0 for any other word, so
+    "on friday" stays a pin time and "from memory" a note."""
+    low = [w.lower().strip(".,;:!?()'\"") for w in words]
+    if not low or low[0] not in PREP:
+        return 0
+    i = 1 + (low[1:2] == ["the"])
+    if i >= len(low):
+        return 0
+    if re.fullmatch(STREAM_ID, low[i]):   # not any hyphenated word: "from co-host" stays a note
+        return i + 1
+    if low[0] == "from" and low[i] == "last" and low[i + 1:i + 2] == ["night"]:
+        i += 2
+    elif low[0] == "from" and (low[i] in REL_DAYS or DAY.fullmatch(low[i])):
+        i += 1
+    elif shows.show_of(low[i]):
+        i = shows.end(low, i)
+        i += i < len(low) and bool(DAY.fullmatch(low[i]))
+    else:
+        return 0
+    return i + (i < len(low) and low[i] in ("one", "stream", "show"))
 
 
 def find_item(cfg: dict, text: str) -> tuple[actions.Item | None, list[dict]]:
@@ -179,6 +302,10 @@ def find_item(cfg: dict, text: str) -> tuple[actions.Item | None, list[dict]]:
     streams = cfg["paths"]["streams"]
     stream = next((w for w in words if STREAM_LIKE.fullmatch(w) and not REF_LIKE.fullmatch(w)
                    and (streams / w / "review_state.json").exists()), None)
+    if not stream:   # "s02 from kino 11-14", "the blade one on kino"
+        stream, rest = stream_named(cfg, " ".join(words))
+        if stream:
+            words = [w for w in rest.split() if w.lower() not in (*PREP, "the")]
     ref = next((w for w in words if w != stream and REF_LIKE.fullmatch(w) and ".." not in w), "")
     if ref:
         try:
@@ -196,11 +323,12 @@ def find_item(cfg: dict, text: str) -> tuple[actions.Item | None, list[dict]]:
     return None, found
 
 
-def _which(text: str, rows: list[dict], verb: str) -> Plan:
+def _which(cfg: dict, text: str, rows: list[dict], verb: str) -> Plan:
     if not rows:
         return Plan("answer", text=f"I can't find an item that matches {text!r}.")
     return Plan("ask", text=f"Which one do you want to {verb}?",
-                options=[{"ref": r["ref"], "title": r["title"]} for r in rows])
+                options=[{"ref": r["ref"], "title": r["title"], "where": stream_label(cfg, r["stream"])}
+                         for r in rows])
 
 
 def _row(cfg: dict, item: actions.Item) -> dict:
@@ -213,6 +341,28 @@ def snapshot(row: dict) -> dict:
 
 def item_line(row: dict) -> str:
     return f"{row['short']} ({row['kind']}): {row['title']}"
+
+
+def stream_label(cfg: dict, stream: str) -> str:
+    """A stream the way people say it: its show's name and its local month-day ("Kino Casino
+    11-14"); the id when its show or date is unknown."""
+    from .config import show_of_channel, stream_channel
+
+    sdir = cfg["paths"]["streams"] / stream
+    show = show_of_channel(cfg, stream_channel(sdir))
+    name = (((cfg.get("shows") or {}).get(show) or {}).get("overrides") or {}).get("meta", {}).get("show_name") or show
+    try:
+        at = datetime.fromisoformat(jsonstate.read(sdir / "meta.json", {}).get("started_at") or "")
+    except ValueError:
+        return stream
+    return f"{name} {at.astimezone(ZoneInfo(cfg['schedule']['timezone'])):%m-%d}" if name else stream
+
+
+def short_line(cfg: dict, row: dict, label: bool = True, kind: bool = True) -> str:
+    """An item for a list: "comp-dsp (compilation): its title · Kino Casino 11-14"."""
+    word = f" ({KIND_WORD.get(row['kind'], (row['kind'],))[0]})" if kind else ""
+    return (f"{row['key'].split('_')[0]}{word}: {row['title']}"
+            + (f" · {stream_label(cfg, row['stream'])}" if label else ""))
 
 
 def when_text(iso: str, tz: ZoneInfo) -> str:
@@ -250,7 +400,10 @@ class _No(Exception):
 def _approve(cfg, row, args, tz, lines):
     if row["decision"] == "approved":
         raise _No(f"{row['short']} is already approved.")
-    return f"Approve {row['short']}?", (args.get("note") or "").strip(), None
+    note = (args.get("note") or "").strip()
+    if note:
+        lines.append(f"note: {note}")
+    return f"Approve {row['short']}?", note, None
 
 
 def _reject(cfg, row, args, tz, lines, verb="reject"):
@@ -337,7 +490,7 @@ def _write_prepare(name: str, verb: str) -> Callable[[dict, dict], Plan]:
     def prepare(cfg: dict, args: dict) -> Plan:
         item, rows = find_item(cfg, args.get("item", ""))
         if not item:
-            return _which(args.get("item", ""), rows, VERB_WORD[verb])
+            return _which(cfg, args.get("item", ""), rows, VERB_WORD[verb])
         row = _row(cfg, item)
         scfg = for_stream(cfg, item.stream_dir)
         tz = ZoneInfo(scfg["schedule"]["timezone"])
@@ -381,6 +534,10 @@ def apply(cfg: dict, card: dict) -> tuple[str, bool]:
 
     if card["tool"] == "slot":
         return _slot_apply(cfg, card)
+    if card["tool"] == "bulk":
+        return _bulk_apply(cfg, card)
+    if card["tool"] == "undo":
+        return _undo_apply(cfg, card)
     a = card["args"]
     with LOCK:
         item, _, stale = recheck(cfg, card)
@@ -413,7 +570,7 @@ def _slot_prepare(cfg: dict, args: dict) -> Plan:
 
     item, rows = find_item(cfg, args.get("item", ""))
     if not item:
-        return _which(args.get("item", ""), rows, "slot")
+        return _which(cfg, args.get("item", ""), rows, "slot")
     out = slot_plan(cfg, [item.ref])
     if not out["plan"]:
         why = out["refused"][0]["why"] if out["refused"] else "no open slot"
@@ -440,6 +597,194 @@ def _slot_apply(cfg: dict, card: dict) -> tuple[str, bool]:
     if out["failed"]:
         raise ClipperError(f"couldn't pin {item.short}: {out['failed'][0]['error']}")
     return f"Pinned {item.short} for {card['args']['text']}.", True
+
+
+# ---------- several items at once: one card, one tap (the war room's bulk actions) ----------
+
+BULK_MAX = 25            # items on one card; more and the ask has to be narrower
+KINDS = ("compilation", "segment", "short", "pick")
+KIND_WORD = {"compilation": ("compilation", "compilations"), "segment": ("segment", "segments"),
+             "short": ("Short", "Shorts"), "pick": ("clip", "clips")}
+# verb -> (what decide gets, on, which rows it fits, the card's word, the reply's word)
+BULK_VERBS: dict[str, tuple[str, bool | None, Callable[[dict], bool], str, str]] = {
+    "approve": ("approve", None, lambda r: r["decision"] in actions.OPEN, "Approve", "Approved"),
+    "reject": ("reject", None, lambda r: r["decision"] in actions.OPEN, "Reject", "Rejected"),
+    "hold": ("hold", True, lambda r: not r["hold"], "Hold", "Held"),
+    "release": ("hold", False, lambda r: r["hold"], "Release", "Released"),
+    "reopen": ("reopen", None, lambda r: r["decision"] in ("approved", "rejected"), "Reopen", "Reopened"),
+}
+NOT_FIT = {"approve": "already decided", "reject": "already decided", "hold": "already held",
+           "release": "that aren't held", "reopen": "still waiting on you"}
+
+
+def _bulk_rows(cfg: dict, args: dict) -> tuple[list[dict], list[tuple[str, list[str]]], str, str]:
+    """(rows the ask names, [(a name it couldn't pin down, the streams it is in)], what it asked
+    for in words, the stream id it named or "")."""
+    names = names_of(args)
+    stream = " ".join(str(args.get("stream") or "").split())
+    if stream and not (cfg["paths"]["streams"] / stream / "review_state.json").exists():
+        named, _ = stream_named(cfg, stream, whole=True)   # "kino 11-14", "last night"; raises if not in review
+        if not named:
+            raise ClipperError(f"I can't tell which stream {stream!r} is: try a show and its "
+                               "month-day, like kino 11-14")
+        stream = named
+    if names:
+        rows, unclear = [], []
+        for name in names:
+            item, maybe = find_item(cfg, f"{name} {stream}".strip())
+            if item:
+                rows.append(_row(cfg, item))
+            else:
+                where = sorted({stream_label(cfg, r["stream"]) for r in maybe})
+                unclear.append((name, where))
+        return rows, unclear, "those", stream
+    kind = str(args.get("kind") or "").strip().lower()   # a model may send "comps" or "Shorts"
+    kind = next((k for k, w in KIND_WORD.items() if kind in (k, *(x.lower() for x in w))),
+                {"comp": "compilation", "comps": "compilation"}.get(kind, kind))
+    if kind and kind not in KINDS:
+        raise ClipperError(f"no kind {kind!r}: one of {', '.join(KINDS)}")
+    rows = _rows(cfg, stream or None)
+    if kind:
+        rows = [r for r in rows if r["kind"] == kind]
+    query = " ".join(str(args.get("query") or "").split())
+    if query:
+        rows = match_rows(rows, query, limit=10_000)
+    what = " ".join(x for x in (f"{query!r}" if query else "", KIND_WORD.get(kind, ("", "items"))[1],
+                                f"from {stream}" if stream else "") if x)
+    return rows, [], what, stream
+
+
+def names_of(args: dict) -> list[str]:
+    """The items a bulk ask names: a list, or one string as a model may send it ("s01, s02")."""
+    return [n for x in _strings(args.get("items")) for n in re.split(r"\s*(?:,|&|\band\b)\s*", x) if n]
+
+
+def _bulk_prepare(cfg: dict, args: dict) -> Plan:
+    verb = str(args.get("verb") or "")
+    if verb not in BULK_VERBS:
+        return Plan("answer", text=f"I can do {', '.join(BULK_VERBS)} to several items at once.")
+    if not any(args.get(k) for k in ("items", "kind", "stream", "query")):
+        return Plan("answer", text=f"{BULK_VERBS[verb][3]} which ones? Name them, a kind (all comps) or a stream.")
+    reason = " ".join(str(args.get("reason") or "").split())
+    if verb == "reject" and not reason:
+        return Plan("answer", text="Say why: the reason becomes a scoring example.")
+    rows, unclear, what, where = _bulk_rows(cfg, args)
+    missing = [n for n, places in unclear if not places]
+    if missing:
+        return Plan("answer", text=f"I can't find {' or '.join(missing)}"
+                                   + (f" in {stream_label(cfg, where)}" if where else "") + ".")
+    if unclear:
+        where = "; ".join(f"{n} is in {', '.join(w)}" for n, w in unclear)
+        first = unclear[0][1][-1].split()   # "Kino Casino 11-14" -> "kino 11-14"
+        return Plan("answer", text=f"Which stream? {where}. Say it like \"{args.get('verb')} "
+                                   f"{' and '.join(names_of(args)[:4])} from {first[0].lower()} {first[-1]}\".")
+    rows = [r for r in rows if not r["uploaded"]]
+    fit = BULK_VERBS[verb][2]
+    todo, skip = [r for r in rows if fit(r)], [r for r in rows if not fit(r)]
+    if not todo:
+        if not rows:
+            return Plan("answer", text=f"I can't find any {what} that aren't on YouTube already.")
+        n = len(skip)
+        names = f" ({', '.join(short_line(cfg, r).split(' (')[0] for r in skip)})" if n <= 3 else ""
+        text = (f"none of the {n} is held" if verb == "release" and n > 1 else "it isn't held" if verb == "release"
+                else f"{'that one is' if n == 1 else f'all {n} are'} {NOT_FIT[verb]}")
+        return Plan("answer", text=f"Nothing to do: {text}{names}.")
+    if len(todo) > BULK_MAX:
+        return Plan("answer", text=f"That's {len(todo)} items; I do at most {BULK_MAX} on one card. "
+                                   "Narrow it: a stream, a kind or words from the titles.")
+    tz = ZoneInfo(cfg["schedule"]["timezone"])
+    many, one_kind = len({r["stream"] for r in todo}) > 1, len({r["kind"] for r in todo}) == 1
+    lines = [short_line(cfg, r, many, not one_kind)
+             + (f" (scheduled {when_text(r['scheduled'], tz)})" if r["scheduled"] else "") for r in todo]
+    if not many:
+        lines.insert(0, f"from {stream_label(cfg, todo[0]['stream'])}")
+    if skip:
+        lines.append(f"leaving {len(skip)} {NOT_FIT[verb]}")
+    if reason:
+        lines.append(f"reason: {reason}")
+    n = len(todo)
+    kinds = {r["kind"] for r in todo}
+    noun = KIND_WORD.get(kinds.pop(), ("item", "items")) if len(kinds) == 1 else ("item", "items")
+    head = f"{BULK_VERBS[verb][3]} {n} {noun[n > 1]}?"
+    return Plan("card", text=head, tool="bulk", risk=WRITE, lines=lines,
+                snapshot={r["ref"]: snapshot(r) for r in todo},
+                args={"verb": verb, "text": reason, "refs": [r["ref"] for r in todo]})
+
+
+def _names(cfg: dict, refs: list[str]) -> str:
+    """comp-dsp, s01: short names, with the stream's label where two share a name."""
+    keys = [r.split("/")[-1].split("_")[0] for r in refs]
+    return ", ".join(k + (f" ({stream_label(cfg, r.split('/')[0])})" if keys.count(k) > 1 else "")
+                     for k, r in zip(keys, refs, strict=True))
+
+
+def _bulk_apply(cfg: dict, card: dict) -> tuple[str, bool]:
+    """Each item re-checked, then decided as the war room's bulk action does; one undo entry."""
+    from . import schedule
+    from .warroom.review import _before, remember
+    from .warroom.state import LOCK
+
+    a = card["args"]
+    action, on, _, _, done_word = BULK_VERBS[a["verb"]]
+    done, changed, failed = [], [], []
+    with LOCK:
+        for ref in a["refs"]:
+            try:
+                item, _, stale = recheck(cfg, {"ref": ref, "snapshot": card["snapshot"].get(ref, {})})
+                if stale:
+                    changed.append(item.ref)
+                    continue
+                before = _before(cfg, item)
+                actions.decide(cfg, item, action, WHO, text=a.get("text") or "", on=on)
+                done.append({"ref": item.ref, "before": before})
+            except Exception as e:  # noqa: BLE001 - one item's Kitsu error: report it, do the rest
+                failed.append(f"{ref.split('/')[-1]} ({str(e)[:80]})")
+        note = ""
+        if done and cfg["discord"]["replan"] and action in actions.REPLANS:
+            schedule.run(cfg, sync_first=False)
+            note = "replanned"
+    if done:
+        remember(cfg, action, f"{a['verb']} {len(done)} items (chat)",
+                 [{k: x[k] for k in ("ref", "before")} for x in done])
+    parts = []
+    if done:
+        parts.append(f"{done_word} {len(done)}: {_names(cfg, [x['ref'] for x in done])}")
+    if changed:
+        parts.append(f"left {_names(cfg, changed)}: changed since I asked")
+    if failed:
+        parts.append(f"couldn't do {len(failed)}: {'; '.join(failed)}")
+    if note:
+        parts.append(note)
+    return ("; ".join(parts) or "Nothing done.") + ".", bool(done)
+
+
+# ---------- undo: the war room's Undo, its last action ----------
+
+def _undo_prepare(cfg: dict, args: dict) -> Plan:
+    from .warroom.review import recent_actions
+
+    last = next((a for a in recent_actions(cfg) if not a["undone"]), None)
+    if not last:
+        return Plan("answer", text="Nothing to undo.")
+    tz = ZoneInfo(cfg["schedule"]["timezone"])
+    lines = [f"done {when_text(last['at'], tz)}"]
+    if last["uploaded"]:
+        lines.append(f"{last['uploaded']} already on YouTube: those stay as they are there")
+    return Plan("card", text=f"Undo \"{last['label']}\"?", tool="undo", risk=WRITE, lines=lines,
+                args={"id": last["id"]})
+
+
+def _undo_apply(cfg: dict, card: dict) -> tuple[str, bool]:
+    from .warroom.review import do_undo, recent_actions
+
+    last = next((a for a in recent_actions(cfg) if not a["undone"]), None)
+    if not last or last["id"] != card["args"]["id"]:
+        return "Something else was done or undone since I asked: nothing done. Ask again.", False
+    out = do_undo(cfg, last["id"])
+    text = f"Undone: {last['label']}"
+    if out["failed"]:
+        text += f"; {len(out['failed'])} couldn't be: {out['failed'][0]['error'][:80]}"
+    return text + (f"; {out['note']}" if out.get("note") else "") + ".", bool(out["undone"])
 
 
 # ---------- spends: `clipper <command>` in the background ----------
@@ -495,7 +840,7 @@ def _cover_prepare(cfg: dict, args: dict) -> Plan:
 
     item, rows = find_item(cfg, args.get("item", ""))
     if not item:
-        return _which(args.get("item", ""), rows, "make a new cover for")
+        return _which(cfg, args.get("item", ""), rows, "make a new cover for")
     scfg = for_stream(cfg, item.stream_dir)
     file = item.state["file"].replace("\\", "/")
     asset = next((a for a in load_assets(item.stream_dir)
@@ -601,6 +946,9 @@ def _unslotted(cfg: dict, args: dict) -> Plan:
     return Plan("answer", text=f"{len(rows)} approved items without a slot:\n" + "\n".join(lines))
 
 
+ITEMS_SHOWN = 4   # per stream, in "what's waiting"
+
+
 def _items(cfg: dict, args: dict) -> Plan:
     query = " ".join(str(args.get("query") or "").split())
     if query:
@@ -612,20 +960,28 @@ def _items(cfg: dict, args: dict) -> Plan:
     rows = [r for r in s["streams"] if r["open"] or r["held"]]
     if not rows:
         return Plan("answer", text="Nothing is waiting on you.")
+    waiting: dict[str, list[dict]] = {}
+    for r in _rows(cfg):
+        if r["decision"] in actions.OPEN:
+            waiting.setdefault(r["stream"], []).append(r)
     lines = []
-    for r in rows:
+    for r in reversed(rows):   # the newest stream first
         c = r["counts"]
         parts = [f"{c[k]} {k.replace('_', ' ')}" for k in actions.OPEN if c.get(k)]
         if r["held"]:
             parts.append(f"{r['held']} held")
-        lines.append(f"{r['stream']} ({r['date']}): {', '.join(parts)}")
+        lines.append(f"{stream_label(cfg, r['stream'])}: {', '.join(parts)}")
+        mine = waiting.get(r["stream"], [])
+        lines += [f"  {short_line(cfg, x, label=False)}" for x in mine[:ITEMS_SHOWN]]
+        if len(mine) > ITEMS_SHOWN:
+            lines.append(f"  and {len(mine) - ITEMS_SHOWN} more")
     return Plan("answer", text="Waiting on you:\n" + "\n".join(lines))
 
 
 def _item(cfg: dict, args: dict) -> Plan:
     item, rows = find_item(cfg, args.get("item", ""))
     if not item:
-        return _which(args.get("item", ""), rows, "see")
+        return _which(cfg, args.get("item", ""), rows, "see")
     r = _row(cfg, item)
     tz = _tz(cfg)
     lines = [item_line(r), f"{actions.decision_text(r)}"]
@@ -748,6 +1104,19 @@ def build() -> dict[str, Tool]:
         Tool("costs", READ, "what was spent today (UTC) or this month, by stage",
              _obj({"period": {"type": "string", "enum": ["today", "month"]}}), _costs),
         *(_write_tool(n) for n in CLI_WRITES),
+        Tool("bulk", WRITE, "approve, reject, hold, release or reopen several items on one card: named "
+             "items, or every item of a kind, from a stream, or matching words (only those it fits)",
+             _obj({"verb": {"type": "string", "enum": list(BULK_VERBS)},
+                   "items": {"type": "array", "items": {"type": "string"},
+                             "description": "item names (s02, c03, comp-dsp), when they named them"},
+                   "kind": {"type": "string", "enum": list(KINDS),
+                            "description": "comps/compilations, segments, Shorts, clips (pick)"},
+                   "stream": {"type": "string", "description": "a stream id, kick-131151926"},
+                   "query": {"type": "string", "description": "words from the titles"},
+                   "reason": {"type": "string", "description": "reject only: why"}}, ("verb",)),
+             _bulk_prepare),
+        Tool("undo", WRITE, "undo the last review action made here or in the war room, as "
+             "the war room's Undo does", _obj({}), _undo_prepare),
         Tool("slot", WRITE, "pin an approved item to the next open release slot of its kind",
              _obj({"item": ITEM}, ("item",)), _slot_prepare),
         Tool("story", SPEND, story_help, story_schema, _story_prepare),

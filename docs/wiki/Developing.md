@@ -86,8 +86,13 @@ reviews (since 2026-11-13):
    requests it when the PR opens.
 
 Copilot doesn't review later pushes on its own, so Claude reviews what each later push adds;
-for a big one, ask Copilot again with `gh pr edit N --add-reviewer @copilot`. Merge once
-Copilot's review is in, each finding is fixed or answered, and CI is green on both systems.
+for a big one, ask Copilot again with `gh pr edit N --add-reviewer @copilot`.
+
+When Copilot's review doesn't come (out of credits; a request by hand then leaves none either),
+Grok is the backup: Claude says so once CI is green and offers
+[`clipper codereview --pr N`](#clipper-codereview-by-hand) (about $0.80-1 and 25 minutes), and
+runs it on your yes. Merge once Copilot's or Grok's review is in, each finding is fixed or
+answered, and CI is green on both systems.
 
 Until 2026-11-13 a `review` workflow ran Grok (below) on every commit Copilot hadn't reviewed.
 It found real bugs but took about 25 minutes a PR, so it was removed; a branch made before then

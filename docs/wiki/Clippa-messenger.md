@@ -11,7 +11,7 @@ Clippa can only use the tools in its catalog (`clipper/catalog.py`), each with a
 | Risk | Tools | What happens |
 |---|---|---|
 | read | releases (what goes out on a day), unslotted, items, item, retakes, health, costs | answers at once |
-| write | approve, reject, retake (a changes note), reopen, hold / release, pin / unpin, retitle, cover text, slot (next open slot) | a card; nothing changes until you tap **Yes** |
+| write | approve, reject, retake (a changes note), reopen, hold / release, pin / unpin, retitle, cover text, slot (next open slot), bulk (several items on one card), undo | a card; nothing changes until you tap **Yes** |
 | spend | story (a new [story dossier](Story-dossiers)), cover redo (a vision call, a second if the first pick is unusable) | a card with the cost estimate first; **Yes** checks the item again and starts the job |
 
 A write goes through the same path as the war room's buttons (`actions.decide`, so Kitsu is
@@ -21,6 +21,19 @@ into the open chat when it ends.
 
 It has no tool for uploads or publishing, config, code, deploys, `clipper services` or the
 recorder; asked for any of those, it says it can't do that from here.
+
+## Several at once
+
+"approve all comps", "hold the shorts from kino 11-14", "approve s07 and s09 from the kino one"
+or "reject all clips from c404 too long" make one card that lists every item it covers; **Yes**
+does them all. It takes only the items the action fits (an approve skips what is decided
+already, a release what isn't held; nothing that's on YouTube) and says how many it left. Up to
+25 on a card: more, and it asks you to narrow it to a stream, a kind or words from the titles.
+The tap checks each item again, does the ones that haven't changed, and names the ones it
+left. The whole card is one entry in the war room's undo list.
+
+"undo that" makes a card for the last action made here or in the war room (the war room's
+**Undo**, newest first).
 
 ## Renaming a video that's up
 
@@ -40,7 +53,8 @@ Anything else about a video that's up (its cover, slot, privacy) is still done i
 ## How a message is read
 
 1. A box command (below) or something Clippa can match locally: "what goes out tomorrow",
-   "what's unslotted", "pin s03 kick-131151926 friday 9am", an item name alone. No model call. A bare hour
+   "what's unslotted", "pin s03 kick-131151926 friday 9am", "approve all comps", "undo that",
+   an item name alone. No model call. A bare hour
    ("fri 3") could be morning or afternoon, so that one goes to the model.
 2. Anything else goes to the model once (`[chat] model`, Haiku by default), which may only
    pick one catalog tool or answer in a sentence. It costs about $0.0005 a message, written to
@@ -48,8 +62,14 @@ Anything else about a video that's up (its cover, slot, privacy) is still done i
    matching works.
 
 An item can be named by its id (`kick-131151926/s03`, `s03`, `c03_t01`) or by words from its
-title; give the stream id too and it finds it faster. When more than one item fits, Clippa
-asks "Which one?" with a button for each.
+title. A stream can be named by its id, or the way you'd say it: a show (its key, channel or a
+word of its name) and a month-day, "s02 from kino 11-14", the show alone for its latest stream
+("from kino", "the kino one"), or "from yesterday" / "from last night". Replies name streams the same way ("Kino
+Casino 11-14"). When more than one item fits, Clippa asks "Which one?" with a button for each,
+and the stream beside any two that share a name.
+
+Right after a write card (the only one open, nothing said since), typing "yes", "ok do it" or
+"no" answers it, the same as its buttons. A spend card always waits for its button.
 
 ## Topics
 
@@ -99,6 +119,7 @@ property, and that the war room's colours live in `themes/warroom.css` only.
 ## Settings
 
 `[chat]` in the config: `model` (`""` for local matching only), `effort`, `prompt_version`
-(`clipper/prompts/chat_<v>.md`), `quiet_hours`, `history` (how many of the topic's messages the
+(`clipper/prompts/chat_<v>.md`; v3 knows bulk and undo, and says so when it can't do a thing
+rather than answering with a list), `quiet_hours`, `history` (how many of the topic's messages the
 model sees), `daily_usd` and `theme`. The chat is stored in `[paths] chats` (`chats/current.json` beside
 the streams, on the share), written by serve only.
