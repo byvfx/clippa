@@ -327,8 +327,8 @@ messages: GitHub closes the issue on "fix".
   `clippa_intro` (24 fps, 1080p), media in `demo-intro/` on the NAS share (`W:\clipper\demo-intro`), bins
   Plate/Screen/Sound/Reference, timeline `intro_v1` (the elements stacked, beat markers) and `intro_v2_comp`,
   where plate and screen clip are one Fusion clip: the picture pinned into the tube on a fitted path, matted
-  by the plate's own static, the room lit by the picture's mean, a CRT look (soften, scanlines, lifted
-  blacks, the tube's own shading, bloom), and rough 5's push and fade: the plate retimed and pushed so the
+  by the plate's own static, the room lit by the picture's mean, a CRT look (soften, phosphor stripes and
+  scanlines that grow with the push, a vignette, the tube's own shading, bloom), and rough 5's push and fade: the plate retimed and pushed so the
   picture fills the frame at 12.5 s, black up around the letters over the same picture (12-15 s), plain
   letters at 20 s. Picture and letters carry a barrel bulge; from 20.4 to 21.9 s the letters' bulge, soft
   edge, scanlines and glow ease to nothing, leaving flat clean text. Built by script and checked on stills
