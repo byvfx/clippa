@@ -330,7 +330,9 @@ messages: GitHub closes the issue on "fix".
   by the plate's own static, the room lit by the picture's mean, a CRT look (soften, scanlines, lifted
   blacks, the tube's own shading, bloom), and rough 5's push and fade: the plate retimed and pushed so the
   picture fills the frame at 12.5 s, black up around the letters over the same picture (12-15 s), plain
-  letters at 20 s. Built by script and checked on stills only, not played. The sources are in `mockups/demo-intro/` on the laptop (gitignored): `kit/` (the chosen plate
+  letters at 20 s. Picture and letters carry a barrel bulge; from 20.4 to 21.9 s the letters' bulge, soft
+  edge, scanlines and glow ease to nothing, leaving flat clean text. Built by script and checked on stills
+  only, not played. The sources are in `mockups/demo-intro/` on the laptop (gitignored): `kit/` (the chosen plate
   `plate_move_720_take2_antenna.mp4`, 15 s 720p 24 fps, its still and the tube's track; the channels as a flat
   4:3 clip, the light they throw, the title matte, sound stems, seven set sounds, times; at 24 and 30 fps),
   `work/` (clips, stills and the scripts that re-make the kit: `kit5.py`), `wall.py`, `measure_plate.py`.
