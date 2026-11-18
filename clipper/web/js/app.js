@@ -139,8 +139,10 @@ document.addEventListener("keydown", e => {
 // A layout is {zones: {zone: [panel, ...]}, widths: {left: px, right: px}}. The one in use is
 // kept by this browser; named ones are saved in clipper (/api/layouts, every machine sees them).
 const ZONES = ["top", "left", "middle", "right", "bottom", "hidden"];
-const DEFAULT_LAYOUT = { zones: { left: ["pipeline", "retakes", "health", "modal", "costs", "usage"], middle: ["queue"],
-  right: ["schedule"], bottom: ["stats"] }, widths: { left: 300, right: 340 } };
+// The columns are balanced by height: the review queue is short when little waits, so Retakes, Health and
+// API usage sit under it, Modal (tall) goes under the pipeline and Costs under the schedule.
+const DEFAULT_LAYOUT = { zones: { left: ["pipeline", "modal"], middle: ["queue", "retakes", "health", "usage"],
+  right: ["schedule", "costs"], bottom: ["stats"] }, widths: { left: 300, right: 340 } };
 const WIDTHS = [260, 300, 340, 420, 520, 640];  // side column widths, px
 const DESKTOP = matchMedia("(min-width: 701px)");
 const HOME = [...document.querySelectorAll("[data-panel]")].map(p => [p, p.parentNode]);  // the page as written (phones)
