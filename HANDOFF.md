@@ -330,8 +330,8 @@ messages: GitHub closes the issue on "fix".
   by the plate's own static (keyed, then grown a few pixels onto the tube's dark edge), the room lit by the picture's mean, a CRT look (soften, phosphor stripes and
   scanlines that grow with the push, a vignette, the tube's own shading, bloom), and rough 5's push and fade: the plate retimed and pushed so the
   picture fills the frame at 12.5 s, black up around the letters over the same picture (12-15 s), the letters
-  filled with static from 19.5 s, folding to a line at 20 s under the plain letters coming up (the sound
-  doesn't follow yet: channel audio runs to 20 s, no hiss, no switch-off). Picture and letters carry a barrel bulge; from 20.4 to 21.9 s the letters' bulge, soft
+  filled with static from 19.5 s, folding to a line at 20 s under the plain letters coming up; the
+  two placeholder stems are re-cut to match (`_v2` in the kit, from `work/sound6.py`), not listened to. Picture and letters carry a barrel bulge; from 20.4 to 21.9 s the letters' bulge, soft
   edge, scanlines and glow ease to nothing, leaving flat clean text. Built by script and checked on stills
   only, not played. The sources are in `mockups/demo-intro/` on the laptop (gitignored): `kit/` (the chosen plate
   `plate_move_720_take2_antenna.mp4`, 15 s 720p 24 fps, its still and the tube's track; the channels as a flat
