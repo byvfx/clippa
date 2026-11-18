@@ -28,6 +28,10 @@ file in Studio (private, no details), then `clipper upload --attach <item> <link
 the title, description and tags, adds thumbnail, captions, playlist and Kitsu link, and
 records it as uploaded so it never goes up twice.
 
+A video that's up can be renamed with `clipper review retitle <item> <title>` (or Clippa's
+retitle card): retitle() reads its snippet, swaps the title (show name and bleeps as an upload
+does) and writes it back, 51 quota units, only from the day's spare (ytquota.spare).
+
 A Short's "related video" (the link under it to the longer video) can only be set in Studio:
 `clipper upload --related` lists uploaded Shorts whose segment is out, with the Studio link
 and the segment's id to search for; `--related ITEM ...` records them as done (the daily
@@ -843,6 +847,58 @@ def upload_one(cfg: dict, yt, e: dict, sched: dict, sched_path: Path, sources: d
     print(f"  {url} ({time.time() - t:.0f}s)" + (f", links {links!r}" if links else ""), flush=True)
     ytquota.uploaded(cfg["paths"]["youtube_quota"])
     finish(yt, cfg, e, m, vid, playlists, cache_path, sched_path)
+
+
+# ---------- renaming a video that's up ----------
+
+RETITLE_UNITS = 51   # videos.list (1) + videos.update (50)
+SNIPPET_KEEP = ("description", "categoryId", "tags", "defaultLanguage", "defaultAudioLanguage")
+
+
+def on_youtube(cfg: dict, key: str) -> dict | None:
+    """The schedule entry of an item that went up (uploaded, with a video id), else None. One
+    deleted in Studio since (gone_at) is returned too: retitle() says so."""
+    sched = jsonstate.read(cfg["paths"]["schedule"], {}) or {}
+    return next((e for e in sched.get("entries", []) if e.get("key") == key
+                 and e.get("status") == "uploaded" and e.get("video_id")), None)
+
+
+def live_title(cfg: dict, text: str) -> str:
+    """A title as an upload sends it: the show name ([meta] title_format), bleeped words
+    masked, cut to YouTube's 100 characters. cfg: the stream's own (for_stream)."""
+    title = Bleeper({**cfg["bleep"], "mode": "bleep"}).mask(full_title(cfg, text))
+    return clean(title, 100)
+
+
+def retitle(cfg: dict, key: str, text: str, yt=None) -> dict:
+    """Rename a video that's up to `text`; returns its entry ({url, ...}) with youtube_title
+    as set. An update replaces the whole snippet, so the rest of it goes back as YouTube has
+    it (the description with its source links, the tags). Refused past the day's spare quota."""
+    sched_path: Path = cfg["paths"]["schedule"]
+    e = on_youtube(cfg, key)
+    if not e:
+        raise ClipperError(f"{key} isn't on YouTube")
+    if e.get("gone_at"):
+        raise ClipperError(f"{e.get('url') or key} was deleted from YouTube")
+    title = live_title(for_stream(cfg, cfg["paths"]["streams"] / e["stream"]), text)
+    if spare(cfg) < RETITLE_UNITS:
+        if e.get("youtube_title") == title:   # our last rename set it: a retry after Kitsu failed
+            return e                           # finishes Kitsu's half without the quota
+        raise ClipperError(f"no spare YouTube quota today ({ytquota.summary(cfg['youtube'], cfg['paths']['youtube_quota'])}; "
+                           "the rest is kept for uploads): try tomorrow")
+    yt = yt or service(cfg["paths"])
+    found = execute_with_retry(yt.videos().list(part="snippet", id=e["video_id"])).get("items", [])
+    if not found:
+        mark(sched_path, key, gone_at=datetime.now(UTC).isoformat(timespec="seconds"))
+        raise ClipperError(f"{e.get('url') or key} isn't on YouTube any more")
+    sn = found[0]["snippet"]
+    if sn.get("title") != title:   # already that on YouTube: the 50-unit write isn't needed
+        body = {k: sn[k] for k in SNIPPET_KEEP if k in sn} | {"title": title}
+        execute_with_retry(yt.videos().update(part="snippet", body={"id": e["video_id"], "snippet": body}))
+    done = {"title": " ".join(text.split()), "youtube_title": title,
+            "retitled_at": datetime.now(UTC).isoformat(timespec="seconds")}
+    mark(sched_path, key, **done)   # kept as is by the replan (schedule.keep_uploaded)
+    return {**e, **done}
 
 
 # ---------- videos uploaded by hand ----------

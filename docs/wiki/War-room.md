@@ -4,6 +4,26 @@ with the background jobs (`http://localhost:8765`, `[warroom] port`); `clipper w
 shows what is live, where each stream is in the pipeline, the review queue and the upload
 schedule. Press <kbd>?</kbd> on the page for every keyboard shortcut.
 
+## The chat at the side
+
+The [Clippa messenger](Clippa-messenger) sits at the right of the page: tell Clippa what to do
+without leaving the war room. It is the `/chat` page itself in a frame, so it is the same chat
+(the same topics, history and cards) wherever you open it. **Chat** in the header, or
+<kbd>M</kbd>, shows or hides it, and the browser remembers which; <kbd>M</kbd> also puts the
+cursor in its box, and <kbd>Esc</kbd> there hands the keys back to the war room. **↗** opens
+`/chat` on a page of its own. While it is hidden, the Chat button counts Clippa's new messages.
+On a wide screen the page makes room for it; narrower, it lies over the right edge and the live
+player moves left of it. On a phone it is the **Chat** tab at the bottom instead, so it never
+covers the review cards.
+
+## Looks
+
+The war room and its chat wear one look, picked under Layout > Look (on a phone, **Look** in
+the chat's buddy list): `warroom` (the dark default), `retro`, `millennium` and `pager`, the
+same four as the [Clippa messenger](Clippa-messenger#looks). The browser remembers the pick and
+its other tabs follow it, `/chat` included. A look is one file in `clipper/web/themes/`; see
+[Looks](Clippa-messenger#looks) for what goes in one.
+
 ## Live shows
 
 Click a live show's chip to watch it in a player on the page or on kick.com in a new window;
@@ -25,6 +45,7 @@ It works from the keyboard:
 | <kbd>Space</kbd>, arrows | play, seek the video |
 | <kbd>O</kbd> | pop the video out into its own window |
 | <kbd>B</kbd> | Who's this? (a face on the paused video) |
+| <kbd>M</kbd> | show or hide the [chat](#the-chat-at-the-side) |
 
 <kbd>Tab</kbd> reaches the card titles, schedule slots and live chips too; <kbd>Enter</kbd> or
 <kbd>Space</kbd> opens them. The card buttons name their key on hover.
@@ -46,9 +67,16 @@ toast when it starts and one when serve is back; before the first answer the pan
 Loading… or why they are empty. A tab in the background stops polling and catches up when
 you come back. A page whose sign-in has gone says so and asks for the `?key=` link again.
 
+A new title for an item that's already on YouTube renames the video there too
+([Scheduling and uploads](Scheduling-and-uploads#renaming-a-video-thats-up)): the item window
+says so above the title box and asks before it saves, and find and replace's preview marks
+which items it would rename. Its description and hashtags stay Kitsu-only.
+
 Decisions, hold, pin, title/description/hashtag edits, find and replace and thumbnail words
 can be undone from their toast for 10 s or from "Undo…" (the last 20). Undo goes through
-Kitsu too, and an item already on YouTube keeps its live text (change it in Studio). Not on
+Kitsu too, and an item already on YouTube keeps its live text (change it in Studio), except its
+title: undoing a title change made while it was up renames the video back on YouTube (one made
+before the upload is undone in Kitsu alone). Not on
 the list: the cover editor, faces, cast, and a retake already started (undo puts the item's
 status back; the retake still runs).
 
@@ -93,6 +121,27 @@ Who is who on screen (#54), kept in `[paths] faces/known.json` for every show.
 
 The command line does the same: `clipper faces <stream> --name F03=Jer --enroll`,
 `clipper faces <stream> --at 1:23:45 --box x,y,w,h --person Jer`, `clipper faces --forget Jer`.
+
+## Heat
+
+**🔥 heat** on a stream in the Pipeline panel, or beside the stream's name in an item's window,
+opens that stream's heat graph: the curve the [signals stage](Pipeline) makes from chat and
+loudness, over the whole stream. The picker at the top changes the stream.
+
+- The shaded bands are the windows clipper looked at (`windows.json`), each with a dot at its
+  peak; the dashed line is the least heat a window needs (`[signals] min_heat`). A grey stretch
+  had no chat recorded.
+- Under the curve, each cut segment, Short and clip sits where it came from, coloured by where
+  it is: not in review yet, waiting, changes asked, approved, scheduled, uploaded or rejected.
+  The legend counts them. Opened from an item, that item is outlined.
+- Point at the graph (or tap it) for the time, the heat, the window's chat, laughing, "clip"
+  and loudness scores, and the items there. Click an item to open it; Tab reaches them too.
+- The table lists the twelve hottest windows with what was said at the peak (when the transcript
+  was there as signals ran) and what was cut from each, or "nothing cut here".
+
+A long stream is wider than a phone's screen: the graph scrolls sideways. It shows the hottest
+second of each stretch (about 1,200 across the stream), so a short peak isn't averaged away.
+Nothing here costs anything or changes anything.
 
 ## News
 
@@ -216,7 +265,7 @@ side column has a width. The browser keeps the arrangement; Layout > Save as nam
 
 ## On a phone
 
-It switches to one view at a time (Review, Schedule, Pipeline and Stats tabs at the bottom).
+It switches to one view at a time (Review, Schedule, Pipeline, Stats and Chat tabs at the bottom).
 Items open full screen with the decisions at the bottom and swipe to the next one, and videos
 play from a 360p copy (`lowres/` beside each preview, about a quarter of the data). It can be
 added to the home screen. Away from home it goes through Tailscale: `clipper warroom --tailnet
@@ -224,7 +273,10 @@ on` ([Phone access](Phone-access)).
 
 ## For developers
 
-The page is in `clipper/web/` (`warroom.html` and what it loads). The server is the `clipper/warroom/`
+The page is in `clipper/web/` (`warroom.html` and what it loads). `warroom.css` is structure
+only: every colour and the shape of windows, title bars, buttons and fields comes from the look's
+file in `web/themes/` (`themes/warroom.css` is the one place the default's colours live), loaded
+by `theme.js`, which the chat page shares. `js/chatdock.js` shows and hides the chat frame. The server is the `clipper/warroom/`
 package. `httpd.py` holds the route tables `GET_API` and `POST_API`, which map each `/api/...` path to
 a function; `data.py` builds the page's data, `review.py` the decisions (through `clipper/actions.py`),
 and each panel has a module of its own.

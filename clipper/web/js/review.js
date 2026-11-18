@@ -138,7 +138,7 @@ function showReplace() {
       const r = await api("/api/replace", body);
       const lines = r.items.reduce((s, it) => s + it.lines.length, 0);
       $("#rList").innerHTML = `<div class="f">${r.items.length} of ${r.checked} items would change, ${lines} lines:</div>` + r.items.map(it => `<div class="it">
-        <b>${esc(it.short)}</b>${it.uploaded ? ` <span style="color:var(--amber)">· on YouTube already (Kitsu only; the live video keeps its text)</span>` : ""}
+        <b>${esc(it.short)}</b>${it.uploaded ? ` <span style="color:var(--amber)">· on YouTube already: ${"YouTube title" in it.values ? `the title is renamed there too${Object.keys(it.values).length > 1 ? "; the rest is Kitsu only" : ""}` : "Kitsu only; the live video keeps its text"}</span>` : ""}
         ${it.lines.map(l => `<div><span class="f">${esc(l.field)}</span> <del>${esc(l.before)}</del><br><span class="f">${" ".repeat(l.field.length)}</span> <ins>${esc(l.after)}</ins></div>`).join("")}</div>`).join("");
       REP_LAST = JSON.stringify(body);
       $("#rApply").disabled = !r.items.length;
@@ -255,7 +255,7 @@ function openModal(ref) {
         ${i.thumbnail_url && i.kind !== "short" ? `<div class="row" style="margin-top:6px"><button class="btn" data-cover="${esc(i.ref)}" title="Frame, face box, photos and words; re-renders without model calls">🖼 Edit cover</button></div>` : ""}
         <div class="kv">
           <b>Length</b><span>${mmss(i.duration_s)}</span>
-          <b>Stream</b><span>${esc(i.stream)} · ${esc(i.date)}</span>
+          <b>Stream</b><span>${esc(i.stream)} · ${esc(i.date)} · <button class="lnk" data-heat="${esc(i.stream)}" data-heatfocus="${esc(i.ref)}" title="Where this sits in the stream, and how hot it ran">🔥 heat</button></span>
           ${i.score ? `<b>Score</b><span>${esc(i.score)} · ${esc(i.category)} · ${esc(i.found_by)}</span>` : ""}
           <b>Revision</b><span>${esc(i.revision)} ${i.synced_at ? "· synced " + ago(i.synced_at) : ""}</span>
           <b>Links</b><span><a href="${esc(i.kitsu_url)}" target="_blank">Kitsu</a>${i.youtube_url ? ` · <a href="${esc(i.youtube_url)}" target="_blank">YouTube</a>` : ""}</span>
@@ -269,7 +269,7 @@ function openModal(ref) {
         <label for="fChanges">Ask for changes (Clippa does the retake${STATE.retake_cost?.auto && STATE.retake_cost.avg_usd != null ? `, about ${usd(STATE.retake_cost.avg_usd)}` : ""})</label>
         <textarea id="fChanges" placeholder="e.g. start 5 s earlier · the thumbnail shows the back of his head · use the cams layout"></textarea>
         <div class="row"><button class="btn warn" id="bChanges">✎ Send retake note</button><button class="btn bad" id="bReject">✕ Reject with this as the reason</button></div>
-        <label for="fTitle">YouTube title</label><input id="fTitle" maxlength="100" data-check="title"><div class="warn-line" id="w_title"></div>
+        <label for="fTitle">YouTube title${i.uploaded ? ` <span style="color:var(--amber)">· on YouTube: saving a new one renames the video there too</span>` : ""}</label><input id="fTitle" maxlength="100" data-check="title"><div class="warn-line" id="w_title"></div>
         <label for="fDesc">Description</label><textarea id="fDesc" style="min-height:120px" data-check="description"></textarea><div class="warn-line" id="w_description"></div>
         <label for="fTags">Hashtags</label><input id="fTags" data-check="hashtags"><div class="warn-line" id="w_hashtags"></div>
         <div class="row"><button class="btn" id="bSave">Save title / description / hashtags</button></div>
@@ -290,6 +290,9 @@ function openModal(ref) {
     if ($("#fDesc").value.trim() !== (cur.description || "").trim()) values["YouTube description"] = $("#fDesc").value;
     if ($("#fTags").value.trim() !== (cur.hashtags || "").trim()) values["Hashtags"] = $("#fTags").value;
     if (!Object.keys(values).length) return toast("Nothing changed.");
+    const live = cur.uploaded && "YouTube title" in values;   // a public change: asked first
+    if (live && !confirm(`Rename ${cur.short} on YouTube to “${values["YouTube title"].trim()}”?\n\nEveryone sees the new title at once`
+      + (Object.keys(values).length > 1 ? "; the description and hashtags change in Kitsu only." : ".") + " Undo renames it back.")) return;
     act(ref, "edit", { values });
   };
   if ($("#bThumb")) $("#bThumb").onclick = () => act(ref, "thumbtext", { text: $("#fThumb").value });

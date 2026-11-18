@@ -18,7 +18,9 @@ in Kitsu:
               back to the generated metadata)
     thumbtext Thumbnail text column (2-4 words); the sync re-renders the .jpg
 Column changes also leave a "[clipper] ..." comment on the task, so Kitsu shows who
-changed what.
+changed what. A person's title change on a video that's up renames it on YouTube first
+(edit_meta's rename_live, youtube.retitle): the CLI, the bot, the war room (its edits, find
+and replace, undo) and the chat. A retake's planned title never does.
 
 Items are named <stream>/<key>, e.g. kick-131151926/c03_t01. The key's first part (c03,
 s02) or any unique prefix works too, with the stream left out when only one stream has
@@ -287,8 +289,15 @@ META = {"YouTube title": (check_title, "Retitled"),
         "Playlist": (check_playlist, "Playlist")}
 
 
-def edit_meta(cfg: dict, item: Item, values: dict[str, str], who: str = "") -> dict:
-    """Write some of the META columns (checked and normalized) in one Kitsu update."""
+def edit_meta(cfg: dict, item: Item, values: dict[str, str], who: str = "",
+              rename_live: bool = False) -> dict:
+    """Write some of the META columns (checked and normalized) in one Kitsu update.
+    rename_live (a person's edit): a new title for a video that's up renames it on YouTube
+    first, so a failed rename (no spare quota) changes nothing and the column never names a
+    title YouTube doesn't have. Off for what no one looks at first (a retake's plan). The
+    other columns of a video that's up stay Kitsu-only."""
+    from . import youtube
+
     cfg = for_stream(cfg, item.stream_dir)
     values = {name: META[name][0](v) for name, v in values.items()}
     if not values:
@@ -305,8 +314,19 @@ def edit_meta(cfg: dict, item: Item, values: dict[str, str], who: str = "") -> d
     for name, v in values.items():
         label = META[name][1]
         notes.append(f"{label} edited" if "\n" in v or len(v) > 120 else f"{label}: {v}")
+    live = youtube.on_youtube(cfg, item.ref) if rename_live and "YouTube title" in values else None
+    if live and not live.get("gone_at"):   # deleted in Studio since: the column only
+        live = youtube.retitle(cfg, item.ref, values["YouTube title"])
+        notes.append("renamed on YouTube")
+    else:
+        live = None
     _touched(item, "edit", who)
-    _columns(cfg, item, values, "; ".join(notes) + _by(who))
+    try:
+        _columns(cfg, item, values, "; ".join(notes) + _by(who))
+    except Exception as e:
+        if live:   # re-raised as one line that says what did happen: the public part
+            raise ClipperError(f"renamed on YouTube ({live.get('url')}), but Kitsu's columns didn't change: {e}") from e
+        raise
     return refresh(cfg, item)
 
 
@@ -350,14 +370,14 @@ def decide(cfg: dict, item: Item, action: str, who: str, text: str = "", on: boo
     flips it); values: {Kitsu column: new value} for "edit"."""
     if action == "hold":
         return hold(cfg, item, (not refresh(cfg, item)["hold"]) if on is None else on, who)
-    if action in EDITS:
-        return edit_meta(cfg, item, {EDITS[action]: text}, who)
+    if action in EDITS:   # a person's: a new title renames a video that's up
+        return edit_meta(cfg, item, {EDITS[action]: text}, who, rename_live=True)
     fn = {"approve": lambda: approve(cfg, item, text, who),
           "reject": lambda: reject(cfg, item, text, who),
           "changes": lambda: changes(cfg, item, text, who),
           "reopen": lambda: reopen(cfg, item, who),
           "pin": lambda: pin(cfg, item, text, who),
-          "edit": lambda: edit_meta(cfg, item, values or {}, who),
+          "edit": lambda: edit_meta(cfg, item, values or {}, who, rename_live=True),
           "thumbtext": lambda: thumbtext(cfg, item, text, who)}.get(action)
     if not fn:
         raise ClipperError(f"unknown action {action!r}")

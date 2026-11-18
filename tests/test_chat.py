@@ -435,9 +435,10 @@ def test_the_ledger_takes_the_clients_label(tmp_path, monkeypatch):
     costs.set_context("", "")
 
 
-# ---------- the page's looks (web/themes/) ----------
+# ---------- the looks (web/themes/): one pick dresses the war room and the chat ----------
 
 WEB = Path(routes.__file__).resolve().parents[1] / "web"
+STRUCTURE = ("warroom.css", "chat.css")   # layout only: the look's custom properties fill them in
 
 
 def _defined(css: str) -> dict[str, str]:
@@ -446,21 +447,63 @@ def _defined(css: str) -> dict[str, str]:
     return {m[0]: " ".join(m[1].split()) for m in re.findall(r"--([\w-]+)\s*:\s*([^;]+);", block)}
 
 
+def _read(name: str) -> str:
+    return (WEB / name).read_text(encoding="utf-8")
+
+
+def theme_variables() -> set[str]:
+    """What a look must define: every property the two pages' structure reads, but those the
+    structure sets itself (the chat dock's width) and those the war room's script sets (layouts)."""
+    used, own = set(), set()
+    for name in STRUCTURE:
+        css = _read(name)
+        used |= set(re.findall(r"var\(--([\w-]+)", css))
+        own |= set(re.findall(r"(?<![\w-])--([\w-]+)\s*:", css))
+    scripts = " ".join(p.read_text(encoding="utf-8") for p in (WEB / "js").glob("*.js"))
+    used |= set(re.findall(r"var\(--([\w-]+)", scripts))   # the war room's inline styles
+    own |= set(re.findall(r"setProperty\(\"--([\w-]+)\"", scripts))
+    labels = {f"label-{n}" for n in re.findall(r'data-label="([\w-]+)"', _read("chat.html"))}
+    assert labels == {"label-buddies", "label-chat"}
+    return (used - own) | labels
+
+
 def test_every_theme_defines_every_variable():
-    used = set(re.findall(r"var\(--([\w-]+)\)", (WEB / "chat.css").read_text(encoding="utf-8")))
-    labels = {f"label-{n}" for n in re.findall(r'data-label="([\w-]+)"', (WEB / "chat.html").read_text(encoding="utf-8"))}
-    assert used and labels == {"label-buddies", "label-chat"}
+    want = theme_variables()
+    assert {"desk", "win", "tb", "btn", "panel2", "accent", "field", "sel"} <= want   # both pages' vocabulary
     assert {"millennium", "pager", "retro", "warroom"} <= set(routes.themes())   # a new look is just a file
     for name in routes.themes():
         have = set(_defined((WEB / "themes" / f"{name}.css").read_text(encoding="utf-8")))
-        assert not (used | labels) - have, (name, sorted((used | labels) - have))
+        assert not want - have, (name, sorted(want - have))
 
 
-def test_the_warroom_theme_keeps_the_war_rooms_palette():
-    room = _defined((WEB / "warroom.css").read_text(encoding="utf-8"))
-    theme = _defined((WEB / "themes" / "warroom.css").read_text(encoding="utf-8"))
-    wr = {k[3:]: v for k, v in theme.items() if k.startswith("wr-")}
-    assert wr and all(room[k] == v for k, v in wr.items()), {k: (room.get(k), v) for k, v in wr.items() if room.get(k) != v}
+# The colours warroom.css may still spell out: black behind video and covers, the dark badges
+# over them and their text, the same in every look. Anything else belongs in a theme.
+THEME_FREE = {"#000", "#05070a", "#000c", "#0007", "#000b", "#fff", "#111", "#e6e9ee"}
+
+
+def test_the_warroom_theme_is_the_one_source():
+    """The war room's colours live in themes/warroom.css only: its structure defines no palette
+    and spells out no colour a look could want to change."""
+    for name in STRUCTURE:
+        assert ":root" not in _read(name), name
+    room = re.sub(r"/\*.*?\*/", "", _read("warroom.css"), flags=re.S)
+    literal = set(re.findall(r"#[0-9a-fA-F]{3,8}\b", room)) | set(re.findall(r"\brgba?\([^)]*\)", room))
+    assert literal <= THEME_FREE, sorted(literal - THEME_FREE)
+    palette = _defined((WEB / "themes" / "warroom.css").read_text(encoding="utf-8"))
+    assert (palette["bg"], palette["panel"], palette["accent"]) == ("#0b0d10", "#12161b", "#ffd400")   # the war room as it was
+
+
+def test_both_pages_wear_a_look_through_theme_js():
+    """The look's file comes after the page's structure (so it wins) and theme.js right after it
+    (so a pick is on before the first paint); the page's default is a look that exists."""
+    for page, at in (("warroom.html", ""), ("chat.html", "/")):
+        html = _read(page)
+        m = re.search(r'<html lang="en" data-theme="([\w-]+)">', html)
+        assert m and m[1] in routes.themes(), page
+        link = f'<link rel="stylesheet" href="{at}themes/{m[1]}.css" id="theme">'
+        structure = f'<link rel="stylesheet" href="{at}{page.replace(".html", ".css")}">'
+        assert html.index(structure) < html.index(link) < html.index(f'<script src="{at}theme.js"') < html.index("</head>"), page
+    assert _read("warroom.html").count('data-theme="warroom"') == 1   # the war room as it was until a pick
 
 
 def test_the_default_theme_comes_from_config(cfg):
@@ -473,8 +516,99 @@ def test_the_default_theme_comes_from_config(cfg):
 
 def test_the_page_names_no_real_messenger():
     """Era homage only: the repo is public."""
-    files = [WEB / "chat.html", WEB / "chat.css", WEB / "chat.js", WEB / "chat-theme.js", *(WEB / "themes").glob("*.css")]
+    files = [WEB / "chat.html", WEB / "chat.css", WEB / "chat.js", WEB / "theme.js", *(WEB / "themes").glob("*.css"),
+             WEB / "warroom.html", WEB / "warroom.css", WEB / "js" / "chatdock.js"]
     for f in files:
         text = f.read_text(encoding="utf-8")
         assert not re.search(r"\bAIM\b", text), f.name                 # the word "aim" is fine
         assert not re.search(r"\b(icq|aol|msn|yahoo|trillian|messenger\.com)\b", text.lower()), f.name
+
+
+SHOWS = catalog.ShowNames({"kino": frozenset({"kino", "kinocasino"}), "c404": frozenset({"c404", "404"})},
+                          {"kino": frozenset({"casino"}), "c404": frozenset({"channel", "news"})})
+
+
+@pytest.mark.parametrize("text,want", [
+    ("approve all comps", ("bulk", {"verb": "approve", "kind": "compilation"})),
+    ("approve comps", ("bulk", {"verb": "approve", "kind": "compilation"})),
+    ("Approve all the shorts waiting", ("bulk", {"verb": "approve", "kind": "short"})),
+    ("hold every segment from kino 11-14", ("bulk", {"verb": "hold", "kind": "segment", "stream": "kino 11-14"})),
+    ("approve all comps from the start", None),   # not a show: the model's turn
+    ("release all comps on kick-131151926", ("bulk", {"verb": "release", "kind": "compilation",
+                                                      "stream": "kick-131151926"})),
+    ("approve all comps from last night", ("bulk", {"verb": "approve", "kind": "compilation",
+                                                    "stream": "last night"})),
+    ("approve everything from the kino one", ("bulk", {"verb": "approve", "stream": "kino"})),
+    ("reject all clips from c404 too long", ("bulk", {"verb": "reject", "kind": "pick", "stream": "c404",
+                                                      "reason": "too long"})),
+    ("approve c01 and c02", ("bulk", {"verb": "approve", "items": ["c01", "c02"]})),
+    ("approve c01, c02 & comp-dsp", ("bulk", {"verb": "approve", "items": ["c01", "c02", "comp-dsp"]})),
+    ("approve s07 and s09 from the kino one pls", ("bulk", {"verb": "approve", "items": ["s07", "s09"],
+                                                            "stream": "kino"})),
+    ("reject c01 and c02 boring", ("bulk", {"verb": "reject", "items": ["c01", "c02"], "reason": "boring"})),
+    ("approve s02 from kino 11-14", ("approve", {"item": "s02 from kino 11-14"})),
+    ("approve s02 from last night", ("approve", {"item": "s02 from last night"})),
+    ("approve s02 from memory", ("approve", {"item": "s02", "note": "from memory"})),   # not a show: a note
+    ("approve s02 from co-host", ("approve", {"item": "s02", "note": "from co-host"})),
+    ("approve s02 from kino casino 11-14", ("approve", {"item": "s02 from kino casino 11-14"})),   # its label
+    ("approve s02 from tonight", ("approve", {"item": "s02 from tonight"})),
+    ("approve s07 and s09 from last night", ("bulk", {"verb": "approve", "items": ["s07", "s09"],
+                                                      "stream": "last night"})),
+    ("reject all clips from kino casino 11-14 boring", ("bulk", {"verb": "reject", "kind": "pick",
+                                                                 "stream": "kino casino 11-14", "reason": "boring"})),
+    ("reject s02 from the start too long", ("reject", {"item": "s02", "reason": "from the start too long"})),
+    ("pin s01 from kino 11-14 for fri 9am", ("pin", {"item": "s01 from kino 11-14", "when": "2026-11-20 09:00"})),
+    ("reject c01 dupe of c02", ("reject", {"item": "c01", "reason": "dupe of c02"})),   # a reason may name one
+    ("pin s01 on friday 9am", ("pin", {"item": "s01", "when": "2026-11-20 09:00"})),   # a day, not a show
+    ("approve s02 on fire", ("approve", {"item": "s02", "note": "on fire"})),           # a note, not a show
+    ("approve s02 on the kino one", ("approve", {"item": "s02 from kino"})),
+    ("undo that", ("undo", {})),
+    ("undo", ("undo", {})),
+    ("whats waiting", ("items", {})),
+    ("whats unslotted", ("unslotted", {})),
+])
+def test_several_at_once_and_looser_phrases(text, want):
+    assert chat.match(text, MON, SHOWS) == want
+
+
+@pytest.mark.parametrize("text", [
+    "approve s01 and s02 then pin them",   # words after the names: not a note, the model's turn
+    "approve s01 dupe of s02",             # a second name in an approve's note
+    "hold the blade comps",                # title words: the model's
+    "approve comp",                        # one, not a kind: not a bulk ask
+])
+def test_unclear_bulk_goes_to_the_model(text):
+    assert chat.match(text, MON) is None
+
+
+def test_a_typed_yes_answers_the_one_open_card(cfg, monkeypatch, no_model):
+    monkeypatch.setattr(catalog, "prepare", lambda cfg, name, args: card_plan())
+    applied = []
+    monkeypatch.setattr(catalog, "apply", lambda cfg, card: applied.append(card["id"]) or ("Approved.", True))
+    chat.handle(cfg, "approve s02")
+    v = chat.handle(cfg, "ok do it")
+    assert len(applied) == 1 and [m["who"] for m in v["messages"]] == ["me", "clippa"]
+    assert v["messages"][-1]["text"] == "Approved."
+    # two open cards: a "yes" could mean either, so it goes to the model
+    chat.handle(cfg, "approve s02")
+    chat.handle(cfg, "approve s03")
+    monkeypatch.setattr(chat, "ask_model", lambda cfg, c, t: ("Which one?", None, 0.0))
+    assert chat.handle(cfg, "yes")["messages"][-1]["text"] == "Which one?"
+    assert len(applied) == 1
+    # a no closes the one open card
+    chat.handle(cfg, "/new")
+    chat.handle(cfg, "approve s02")
+    assert chat.handle(cfg, "nope")["messages"][-1]["text"] == "OK, left alone."
+    assert len(applied) == 1
+    # Clippa said something after the card: an "ok" answers that, the card waits for its button
+    chat.handle(cfg, "/new")
+    chat.handle(cfg, "approve s02")
+    monkeypatch.setattr(catalog, "prepare", lambda cfg, name, args: catalog.Plan("answer", text="Nothing goes out."))
+    chat.handle(cfg, "what goes out tomorrow")
+    monkeypatch.setattr(chat, "ask_model", lambda cfg, c, t: ("Cool.", None, 0.0))
+    assert chat.handle(cfg, "ok")["messages"][-1]["text"] == "Cool." and len(applied) == 1
+    # a spend is never typed into: its button says what it costs
+    chat.handle(cfg, "/new")
+    monkeypatch.setattr(catalog, "prepare", lambda cfg, name, args: card_plan(risk=catalog.SPEND, tool="story"))
+    chat.handle(cfg, "approve s02")
+    assert chat.handle(cfg, "yes")["messages"][-1]["text"] == "Cool." and len(applied) == 1

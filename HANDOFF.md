@@ -63,6 +63,8 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
 - Never use the word "hosts" in viewer-facing text → `[scoring] house_style` rules, appended to every
   viewer-facing prompt; put future style notes there. The cast is **Andy (Warski)** and **PPP** (never any other
   name for PPP; old drafts that say "Ashton" stay). Channel 404 = Don, a solo show. Cast per show in `[meta] cast`.
+- Kino's segment is **"WOAH Buddies"** (WOAH in capitals; user, 11-16), never the transcript's "Woe" or
+  "Whoa": a `house_style` rule since 11-16. A word Whisper mishears gets a rule there the same way.
 - Thumbnails: `[thumbnail] style = "enquirer"` (1990s tabloid: show masthead, no roundel, no barcode, small
   "AS SEEN ON LOLCOW CINEMA" badge), `enquirer_prompt_version = "v6"` (face = headline subject, cast photos
   picked by label, faces.json names trusted). Pre-show covers are one story, no side boxes (`[preshow]
@@ -112,8 +114,9 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   enough. Reviews since 11-13 (user; Grok's `review` workflow removed, ~25 min a PR was too slow): Claude
   runs the `code-review` skill locally before the first push and fixes what it finds, then Copilot reviews
   when the PR opens (repo ruleset "Copilot reviews new PRs", not on later pushes: Claude reviews those, or
-  `gh pr edit N --add-reviewer @copilot`). Wiki Developing#code-review-on-prs. `clipper codereview` (Grok on
-  OpenRouter, ~$1) stays for a by-hand second opinion. Code means a PR touching `clipper/`, `tests/`,
+  `gh pr edit N --add-reviewer @copilot`). Wiki Developing#code-review-on-prs. Grok is the backup (user,
+  11-18): when Copilot's review isn't in once CI is green, offer `clipper codereview --pr N` (OpenRouter,
+  ~$0.80) and run it on a yes; its review then stands in for Copilot's. Code means a PR touching `clipper/`, `tests/`,
   `deploy/`, `.github/` or `pyproject.toml`: any other PR (the wiki, `uv.lock` alone,
   `clipper.example.toml`, `streamers.json`) has CI but no review, and a notes-only one (e.g. HANDOFF and the
   log) has neither since 11-10 (`check.yml` paths); both merge on the user's word, the first once CI is green.
@@ -129,9 +132,10 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   `CLIPPER_CONFIG` on the laptop points at it), `schedule.json`, secrets/, backups/, logs/, faces/, voices/,
   news/, weekly/, archive/, layouts/, people.json, fonts/. The laptop's old copies: `backups/laptop-state-2026-11-05/`.
   The laptop's scheduled tasks are disabled, not removed (rollback: wiki NAS-hub).
-- **NAS** (192.168.0.155) also runs the recorder container (`deploy/record`, redeployed 2026-10-30 at 1e4f724,
+- **NAS** (192.168.0.155) also runs the recorder container (`deploy/record`, redeployed 2026-11-17 at 28bc0ab,
   watching kinocasinogaming + donflurgundy + chudlogic), Kitsu :8090, the cut container, the streams and photos
-  shares. The `claude` container (`deploy/claude`, wiki Claude-on-the-NAS) drives clipper from the phone.
+  shares. `kick-138291641-2` is Kino 11-17 after the show ended early (Andy playing a game): recorded only, held
+  from the worker by `run.json` `{"status": "skip"}`; delete it whenever you like. The `claude` container (`deploy/claude`, wiki Claude-on-the-NAS) drives clipper from the phone.
 - **Mac `lofn`** (Apple Silicon, setup's `control` role, 11-07): a dev/control station that runs nothing
   unattended. Clone `~/clipper`; `CLIPPER_CONFIG=/Volumes/docker/clipper/clipper.toml` and
   `CLIPPER_LOCAL_CONFIG=~/clipper/clipper.local.toml` in `~/.zshrc` (mount the share in Finder first); ssh
@@ -186,6 +190,12 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   Moving a stage (e.g. Pass A to DeepSeek V4 Pro) is a config change whenever the user wants it.
 
 ## Waiting on the user
+- **Deploy #299** (Clippa chat: several items on one card, undo, streams by show and day; merged 11-18 after Grok's
+  review): the hub runs the old chat until `bash deploy/hub/deploy.sh`. Then send a few real messages ("approve all
+  comps", "approve s02 from kino 11-14", "undo that", "whats waiting"): chat prompt v3 has only been tried against a
+  scripted stand-in for Haiku, not the model itself (about $0.0005 a message).
+- A cloud environment named "clipper" (11-18) holds an OpenRouter key so cloud sessions can run Grok reviews; it
+  was made for a Haiku test that cloud sessions can't do (Anthropic keys can't be saved there). Keep or delete it.
 - **Deploy #293** (`clipper fetch` of Twitch and YouTube VODs, merged 11-16 at the user's word, no Copilot review): the
   hub containers run the old code until `bash deploy/hub/deploy.sh`. Still untested: a subscriber-only Twitch
   VOD (the cookies in `secrets/twitch_cookies.txt` are the user's personal account `gadnuck`, a tier 1 sub of
@@ -256,9 +266,26 @@ only at their word. #67's model edit plan waits until edited Shorts prove themse
 live clips #81, blind items #111 (steps 1-2 of 4 built and live 11-15/16, below), investigate anyone #138, agent exploration #158 (11-15 spec comment: the Clippa
 messenger. v1 merged (PR #285) and deployed to the hub 11-16: `/chat` on serve's page, wiki
 Clippa-messenger, `clipper/catalog.py` + `clipper/chat.py`, `[chat]`, Haiku ~$0.0005 a message, ledger `chat`; chats in
-`[paths] chats` on the share; four looks in `web/themes/`, `[chat] theme`. After it merges and deploys, a week of phone use; then a small `clipper mcp`; #13 may fold into it), Modal ideas #53, #56,
+`[paths] chats` on the share; four looks in `web/themes/`, `[chat] theme`. In the war room (PR #290, merged and deployed 11-17):
+`/chat` docked at the right in a frame (Chat button / M, a Chat tab on a phone) and the looks dress the whole war
+room, one pick for both (`theme.js`; `themes/warroom.css` is the default and the only home of the war room's colours).
+Renaming a video that's up (user, 11-16: Clippa "really need[s] to be the point of control"): PR #291 (merged and deployed 11-17): `youtube.retitle`
+behind `actions.edit_meta`, so every title edit of a video that's up (war room, bot, chat, CLI, undo) renames it on
+YouTube; chat prompt v2; YouTube's other edits (description, cover, privacy) still Kitsu-only / Studio. PR #299 (merged
+11-18, not deployed) after "approve all comps" came back as a list: the `bulk` tool (several items on one card, one
+undo entry), `undo`, streams named "kino 11-14" / "the kino one" / "from last night" (`catalog.stream_named`,
+`stream_span`, `ShowNames`), "what's waiting" listing items, a typed yes/no for the one fresh write card, prompt v3.
+Next, a week of phone use; #300 (access levels and a local Jev-like classifier in front of the model, a lab first);
+then a small `clipper mcp`; #13 may fold into it), Modal ideas #53, #56,
 Udder Truth #58/#59/#60, P&L #50 (revenue once monetized). Write "#77 L6" rather than "fix #77" in commit
 messages: GitHub closes the issue on "fix".
+- **War room heat graph (11-16, user asked "can we see the heat graph of a stream in the war room?"):** PR #294,
+  merged 11-16 after Grok's review, **not deployed** (it needs `deploy/hub/deploy.sh` from a checkout of main). 🔥 heat on a stream (Pipeline panel) or in an item's
+  window: the signals curve, the windows, and each cut item where it sits, coloured by review state, plus the twelve
+  hottest windows and what was cut from each (`/api/heat`, `clipper/warroom/heat.py`, `web/js/heat.js`, wiki
+  War-room#heat). It is also the demo video's "how it finds moments" shot. Not yet seen on the live page or on a real phone.
+  Copilot has reviewed no PR since #285 (11-16; a request by hand leaves none): Grok is the backup (CLAUDE.md,
+  11-18): offer `clipper codereview --pr N` (about $0.80) per PR as soon as CI is green.
 - **Review pre-flight checks and approval by silence (#259, 11-14):** step A, `clipper review check` (wiki
   Review#pre-flight-checks), is PR #263, merged and deployed 11-14; the webcam panels are marked `cam = true`
   in clipper.toml (backup `backups/clipper.toml.before_cam_marks_2026-11-14`). Step B, `clipper review auto`
@@ -283,6 +310,37 @@ messages: GitHub closes the issue on "fix".
   better. Suggested `auto_min_segment = 4`: on Kino it holds 63 of 183 scored segments (~6 a stream), on
   Channel 404 23 of 106 (~3). Not set: after the Shorts, at the user's word. Shorts backtest: 105 of 181 approved Shorts would have approved
   themselves, and 1 of 4 rejected ones ("too much Jer", a taste call the window is for).
+- **Demo videos (11-16, user):** a portfolio piece first (about 5:40, real shows on screen, none named in the
+  narration, the user reads it live; it goes on the byvfx site, linked from GitHub), then an install tutorial.
+  The script (ten takes, not locked) and the capture checklist are one private page:
+  https://claude.ai/artifact/W48qW95ZPYkA7AE16F4TEX (ticks kept with the page; its Install day tab is the
+  install checklist with each step tied to a tutorial chapter). The "how it finds moments" shot is the war
+  room's heat graph (above; merged, wants the hub deploy). Build the piece with `clipper doc`; PR #289
+  (merged 11-16 after Grok's review, no deploy needed: `doc` runs on the laptop, pull main there) lets
+  `doc voice` take a recording per take from the piece's `vo/read/`. Not tried on a real spoken take or in
+  Resolve: the demo is the first. Tutorial (user, 11-16): recorded during the desktop clean install (#46/#78),
+  one continuous capture with the microphone on; published after #207.
+  **Its intro (11-17, 25 s under the first take):** a console TV in a dark room comes on, static for a second,
+  channels change faster and faster while the camera pushes in, black comes up everywhere but the letters of
+  "Clippa" (12-15 s), the set cuts off at 0:20 (user: keep it there), plain letters to 0:25. Rough 5 is the
+  locked cut. The user finishes it in Fusion and Resolve on a generated moving plate: Resolve project
+  `clippa_intro` (24 fps, 1080p), media in `demo-intro/` on the NAS share (`W:\clipper\demo-intro`), bins
+  Plate/Screen/Sound/Reference, timeline `intro_v1` (the elements stacked, beat markers) and `intro_v2_comp`,
+  where plate and screen clip are one Fusion clip: the picture pinned into the tube on a fitted path, matted
+  by the plate's own static (keyed, then grown a few pixels onto the tube's dark edge), the room lit by the picture's mean, a CRT look (soften, phosphor stripes and
+  scanlines that grow with the push to about 10 px a cell, a vignette, the tube's own shading, bloom), a finish on everything (`FinalTint`, `FinalTone`,
+  `FinalVignette`, `FinalGrain`: cool shadows, less colour, dark corners, light grain), and rough 5's push and fade: the plate retimed and pushed so the
+  picture fills the frame at 12.5 s, black up around the letters over the same picture (12-15 s), the letters
+  filled with static from 19.5 s, folding to a line at 20 s under the plain letters coming up. The
+  sound is the seven generated set sounds cut to the same plan (`stem_set_real_24.wav` and the channels alone, `stem_clips_24_v3.wav`, from `work/sound7.py`; `set_sound_cues.txt` says what is where), placed by measurement and never heard. Picture and letters carry a barrel bulge; from 20.4 to 21.9 s the letters' bulge, soft
+  edge, scanlines and glow ease to nothing, leaving flat clean text. Built by script and checked on stills
+  only, not played. The sources are in `mockups/demo-intro/` on the laptop (gitignored): `kit/` (the chosen plate
+  `plate_move_720_take2_antenna.mp4`, 15 s 720p 24 fps, its still and the tube's track; the channels as a flat
+  4:3 clip, the light they throw, the title matte, sound stems, seven set sounds, times; at 24 and 30 fps),
+  `work/` (clips, stills and the scripts that re-make the kit: `kit5.py`), `wall.py`, `measure_plate.py`.
+  Open: the last 1.78x of the push is a blow-up of the 720p plate (soft bezel just before the picture fills
+  the frame); the look's and the finish's amounts are first guesses for the user to judge; nobody has played it or heard the sound; 1080p waits until the 720p cut is right.
+  The set's floor is open again (11-17). The shag version went all the way (still `mockups/demo-intro/tv/set_spot_shag_endless.png`, passes `tv/aov/endless_*.png`, take 3 `kit/plate_move_720_take3_spot.mp4` with its track, and `kit/plate_move_720_take3_spot_locked.mp4` from `work/carpet_lock.py`, which projects the still's carpet on the floor plane to stop it crawling) and the user then dropped shag: video models crawl on fine dense texture. The user picked the stage: black-painted boards, a patch worn to bare wood in front of the screen, same set, framing, overhead spot and black void, clear air, no cord (the black-water alternative is `tv/set_water.png`). The antenna's foil, which the user said looked like diamonds, is the model's doing: it speckles foil in every still, however it is worded (six of six), so don't ask it for foil again. `tv/set_stage_rods.png` has plain chrome rabbit ears instead and is the set (the user: "bare rods"); `tv/set_stage_foil.png` is the last foil try. What carries over whatever the floor: stills are made whole in one pass, never joined from layers; the move is made from a clear-air plate and the haze is its own element over everything, tube picture included (`work/haze_dial.py` wrote a still one for the shag set; a moving one built in Fusion is the better end); light passes by edit are the same scene within 2 px, not exactly additive, so mix from the spot pass to the full picture on the set's on-curve; `work/track_take.py` tracks a take's tube; the still's utility passes come from the user's ComfyUI (they asked for "a traditional vfx pipeline" and allowed its downloads): `tv/aov/stage_{beauty,depth,matte_tube,matte_cabinet,matte_antenna,matte_floor,matte_worn_patch}.exr`, 32-bit, made by the workflow `clippa_aov_passes` in the ComfyUI app (Depth Anything V2 for depth, relative and soft-edged; Segment Anything 2.1 for tube, cabinet and floor; keys in a garbage box for the antenna and the worn patch, which the segmenter can't hold) or by `work/comfy_passes.py` against a running ComfyUI, sheet from `work/passes_sheet.py`, the workflow file from `work/comfy_ui_graph.py`. ComfyUI here is 0.44 under `AppData/Local/Comfy-Desktop/ComfyUI-Installs/ComfyUI`, venv and custom nodes in `Documents/ComfyUI`; never start the old copy under `AppData/Local/Programs/@comfyorgcomfyui-electron`, whose Manager downgrades numpy at startup (the log has the day's account and what was installed). The move is generated (the user chose it over a camera projection in Fusion): take 4, `kit/plate_move_720_take4_stage.mp4` with `kit/plate_take4_track_24.csv`, tube 17% of the frame's width at 0 s, 49% at 12 s, 91% at 15 s, set and void held, the floor steady in stabilised crops; with the user to watch at speed. The still's passes match the take's first frame only, so for the take the tube key comes from the track and the other mattes need re-making per frame (SAM2's video mode in the same pack) if the comp wants them. The comp on take 4 is timeline `intro_v3_stage` (11-18), a copy of `intro_v2_comp`, which stays as the old set's: take 4 through a Loader as a PNG sequence (`kit/plate_take4_seq/` on the NAS share), the path refitted (`work/fit_take4.py`: the approved push with only a 1.25x blow-up at the end where the old one had 1.78x), the key at 0.62-0.70 with the still's SAM tube matte filling its inside (`TubeFill`; take 4's static is dark in the tube's top corners), the spot on at frame 8 before the set at 1.2 s (`LightMix`: the plate lit by spot x (1 - share) + screen light x share, the share `kit/stage_tv_share.png` being my guess from the mattes), the dead tube as dark grey glass until the set comes on, the haze as its own element over everything (`HazeAdd`; `HazeLevel.Gain` 0.12 turns it), and a stand-in spot switch sound on A3 (`kit/spot_on_cue_24.wav`, cut from the existing sounds). A render of it is `mockups/demo-intro/renders/intro_v3_stage_preview.mp4` (with a 720p copy; 45 minutes to render, about 4.5 s a frame), checked on frames by `work/check_render.py`. Guesses for the user to judge: the share map, the haze's amount and shape, the spot's flicker and its sound. Not yet said yes to: a spot-only light pass of the still to replace the guessed share (6 Runway credits; all three passes 18), a generated spot sound (1 credit a second). The user watched it and said it works (11-18); the shoot page (version 16, source kept at `mockups/demo-intro/clippa-demo-shoot.html`) describes this version.
 - **Documentaries (11-13, PR #233, merged and deployed):** `clipper doc
   new|voice|build|master|leak|kit` (wiki Documentaries; `clipper/doc.py`, `doc_resolve.py`), the reusable form
   of the first mini-documentary's one-off Resolve scripts. A piece is `[paths] documentaries/<slug>/` on the
@@ -455,7 +513,7 @@ no secrets). Copy one off the NAS now and then. Not in it: `deploy/*/env.local` 
 - Windows: a file open in another process can't be replaced (fork sessions render previews from cuts).
 - `deploy/common.ps1` (the worker task scripts) finds a service as a clipper.exe command line ending in its
   name and once killed its own `services restart` chain; it skips its own process chain now, keep that.
-- The war room page loads `warroom.css` and `js/*.js` from disk: a pull that changes the page before serve
+- The war room page loads `warroom.css`, `theme.js`, `themes/*.css` and `js/*.js` from disk: a pull that changes the page before serve
   restarts leaves a bare, unstyled page. Deploy or restart serve.
 - serve runs `schedule.run` in-process (the war room's and the bot's replans go through its /api/replan):
   scheduler changes need a serve restart. A bot whose serve is down still writes the decision to Kitsu and

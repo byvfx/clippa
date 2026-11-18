@@ -141,12 +141,15 @@ Windows notes above don't apply.
   `code-review` skill at high effort on the branch against main before the first push, findings
   fixed before the PR opens; then Copilot's, which a repo ruleset requests when the PR opens.
   Copilot doesn't review later pushes on its own: run `code-review` again on what each push adds
-  (or ask Copilot with `gh pr edit N --add-reviewer @copilot` for a big one). Merge once Copilot's
-  review is in, each finding checked against the code, handled and shown to the user, and CI is
-  green. Green CI alone isn't enough. A PR that touches none of those (the wiki, `uv.lock` alone,
+  (or ask Copilot with `gh pr edit N --add-reviewer @copilot` for a big one). Grok is the backup
+  (user, 2026-11-18): when Copilot's review isn't in once CI is green (it has reviewed no PR since
+  #285, out of credits, and a request by hand leaves none), say so at once and offer
+  `clipper codereview --pr N` (Grok through OpenRouter, ~$0.80-1, ~25 min; it needs
+  `OPENROUTER_API_KEY`), and run it on the user's yes. Merge once Copilot's or Grok's review is in,
+  each finding checked against the code, handled and shown to the user, and CI is green. Green CI
+  alone isn't enough. A PR that touches none of those (the wiki, `uv.lock` alone,
   `clipper.example.toml`, `streamers.json`, notes) or comes from Dependabot needs no review: merge on
   green CI where it runs and the user's word. A fork's PR: read its diff yourself, tell the user
-  what you found, and merge only on their word. `clipper codereview` (Grok through OpenRouter, ~$1
-  and ~25 min) is still there as a by-hand second opinion; say the cost first.
+  what you found, and merge only on their word.
   Avoid `uv run`/`uv sync` while serve or the bot is up: they re-sync and cannot replace the running
   clipper.exe (`uv pip install --python .venv/Scripts/python.exe pytest` installs pytest alone).

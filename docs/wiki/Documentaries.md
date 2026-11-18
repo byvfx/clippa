@@ -1,6 +1,6 @@
 `clipper doc` builds a narrated mini-documentary from a plan you write by hand: your script,
-the subject's own clips, cover shots cut to the words. It buys the narration, builds the
-timeline in DaVinci Resolve, masters the render to YouTube's loudness, checks the result for
+the subject's own clips, cover shots cut to the words. It buys the narration (or takes
+[your own recording](#your-own-voice) of it), builds the timeline in DaVinci Resolve, masters the render to YouTube's loudness, checks the result for
 anything that must not be in it, and writes the publish kit.
 
 It differs from a [story cut](Story-dossiers): a story is planned by a model and rendered
@@ -14,6 +14,7 @@ Research for one still comes from `clipper story run`, [archives](Archives) and
 2. Fill in `banned.txt` and write `plan.toml`. Lock the script before buying narration: most
    rebuilds are narration changes.
 3. `clipper doc voice <slug> --dry-run`, then without `--dry-run`. Listen to every take.
+   Reading it yourself: record each take into `vo/read/` first ([Your own voice](#your-own-voice)).
 4. `clipper doc build <slug>`: a new timeline version in Resolve. Watch it, change the plan,
    build again.
 5. `clipper doc master <slug>`: the render, the loudness, the leak check.
@@ -28,6 +29,7 @@ A piece is `[paths] documentaries/<slug>/`, beside `clipper.toml` and never in t
 - `reels/`: the subject's own video. `overlays/`: cards, labels, text. `music/`, `sfx/`.
   A file is named in the plan by its name without the extension. A file kept elsewhere
   goes in the plan's `[media]` table (`name = "path"`).
+- `vo/read/`: your own recordings of takes, when you read the narration yourself.
 - `vo/` (the narration), `work/` (the build, caches), `renders/`, `kit.md`: written by the commands.
 
 ## The plan
@@ -105,7 +107,7 @@ no fade. A line with no `take` is a read of its own.
 ## Narration
 
 `clipper doc voice` buys each take from ElevenLabs once (`[narrate]`'s key and `tts_model`,
-the plan's `voice_id` or `[doc] voice_id`). `--dry-run` checks the plan and prints how many
+the plan's `voice_id` or `[doc] voice_id`), unless you [recorded it yourself](#your-own-voice). `--dry-run` checks the plan and prints how many
 characters it would buy. A take is bought again only when its words, the voice or the voice
 settings change.
 
@@ -116,6 +118,32 @@ which the `gpu` extra installs). Changing the compressor or the pause cap proces
 again without buying them.
 
 The narration is refused when a line contains a term from `banned.txt`.
+
+### Your own voice
+
+To read a take yourself, record it and save it as `vo/read/<take>.wav` in the piece's folder,
+named for the take (`take = "open"` in the plan is `vo/read/open.wav`; `.flac`, `.aif`, `.mp3`,
+`.m4a`, `.aac`, `.ogg` and `.opus` work too; `Open.wav` is the same take). `clipper doc voice` then uses your recording for
+that take and buys nothing for it. A piece can mix the two: takes with a recording are yours,
+the rest are bought. `--dry-run` lists which is which, and names any file in `vo/read/` that
+matches no take.
+
+- Give every line you read a `take`. A line with none can't have a recording, because its
+  place in the plan is its only name.
+- Read the take's lines in script order, in one file, with a clear pause between lines: the
+  file is cut apart in those pauses.
+- Your read gets the same treatment as a bought one: the compressor, pauses cut down to
+  `[doc] max_pause_s` (`max_pause = 1.2` on a line keeps longer ones in its take), and word
+  times from the local Whisper. In a room louder than `[doc] silence_db` no pause is found
+  and nothing is trimmed: raise it (towards 0) until the pauses are.
+- The words are matched to the script. When under 80% of a take's words are heard,
+  `clipper doc voice` says so each time it runs: change the lines in `plan.toml` to what you
+  said, or read the take again.
+- A new recording under the same name is processed again; run `clipper doc voice` after
+  saving it, then `build`.
+
+When every take in the last build is your own, the kit leaves out the AI-voice line (see
+[Kit](#kit)): build again after recording, since a recording counts once a build has used it. A file whose name starts with a dot is never a recording.
 
 ## Build
 
@@ -188,6 +216,9 @@ are yours to read.
 `clipper doc kit` writes `kit.md` from the plan and the last build: the title, the
 description with chapters (from the sections: the first at 0:00, each at least ten seconds
 after the one before and before the end, none when there are fewer than three), the credits (the plan's
-`credits` and each `credit` on a music cue or the room tone), the disclosure lines
-(`[doc] disclosures`, or the plan's own `disclosures`), the pinned comment and a checklist.
+`credits` and each `credit` on a music cue or the room tone), the disclosure lines, the
+pinned comment and a checklist. The disclosure lines are `[doc] disclosures` ("The narration
+is an AI voice."), or `[doc] own_voice_disclosures` (none) when the last build bought no
+take because you [read them all](#your-own-voice); the plan's own `disclosures` replace
+either (`disclosures = false` for none).
 It fails when the text contains a banned term.

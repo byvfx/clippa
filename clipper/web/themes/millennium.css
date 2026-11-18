@@ -2,6 +2,36 @@
    tooltip-yellow cards, a row of text-style marks above the box (decoration only).
    An era look, light on purpose; on a dark system only the desk dims. */
 :root {
+  /* the war room (warroom.css): beige windows, rounded blue title bars */
+  --panel: #ece9d8; --panel2: #ffffff; --line: #aca899; --text: #000000; --dim: #3d3d3d; --faint: #5a5a5a;
+  --accent: #2457c8; --on-accent: #ffffff; --red: #c42b1c; --green: #2b7a32; --blue: #0046d5; --amber: #a35f00; --violet: #6a3fc4;
+  --clip: #5a95e6; --short: #e8609f; --segment: #3cbf7a; --compilation: #f0a03c;
+  --sans: Tahoma, Arial, Helvetica, sans-serif;
+  --head: #ece9d8;
+  --bar: #ece9d8;
+  --panel-pad: 0 3px 3px;
+  --tb-pad: 4px 8px;
+  --tb-line: none;
+  --tb-sub: #dfe8ff;
+  --tb-tool-ink: #000000;
+  --dlg-radius: 6px 6px 0 0;
+  --pill: 10px;
+  --field: #ffffff;
+  --field-border: 1px solid #7f9db9;
+  --sel: #316ac5;
+  --sel-ink: #ffffff;
+  --tag: #e3e0d0;
+  --track: #c9c6b6;
+  --hover-line: #316ac5;
+  --btn-hover: #e5a03a;
+  --live-bg: #fbe3df;
+  --pop-shadow: 2px 3px 8px rgb(0 0 0 / 0.35);
+  --float-shadow: 2px 3px 10px rgb(0 0 0 / 0.4);
+  --good-bg: #dcefd9; --good-line: #2b7a32; --good-ink: #17491b;
+  --bad-bg: #f8dcd8; --bad-line: #c42b1c; --bad-ink: #7d1a10;
+  --warn-bg: #f9ead0; --warn-line: #a35f00; --warn-ink: #5e3700;
+
+  /* the chat (chat.css), and what the war room shares with it */
   --label-buddies: "Buddy list";
   --label-chat: "Clippa - Instant message";
 
@@ -71,7 +101,7 @@
   --btn-shadow: inset 0 -2px 0 #d6d0c0;
   --btn-down-border: 1px solid #003c74;
   --btn-down-shadow: inset 0 2px 0 #d6d0c0;
-  color-scheme: light;
+  --scheme: light;   /* the chat's native controls (chat.css) */
 }
 
 .compose-marks { display: flex; }

@@ -1,7 +1,37 @@
 /* retro: a late-90s desktop. Grey bevelled windows on a teal desk, square corners, Tahoma.
    An era look, light on purpose; on a dark system only the desk dims.
-   Every theme defines the same variables (chat.css reads them; a test checks the set). */
+   Every theme defines the same variables (warroom.css and chat.css read them; a test checks the set). */
 :root {
+  /* the war room (warroom.css): grey windows on the desk, purple title bars */
+  --panel: #c0c0c0; --panel2: #dcdcdc; --line: #808080; --text: #111111; --dim: #3c3c3c; --faint: #5e5e5e;
+  --accent: #534ab7; --on-accent: #ffffff; --red: #b4231b; --green: #1a7f52; --blue: #0b3fb0; --amber: #9a5c00; --violet: #8a2f8a;
+  --clip: #5a95e6; --short: #e8609f; --segment: #3cbf7a; --compilation: #f0a03c;
+  --sans: Tahoma, Verdana, "Segoe UI", sans-serif;
+  --head: #c0c0c0;
+  --bar: #c0c0c0;
+  --panel-pad: 3px;
+  --tb-pad: 3px 6px;
+  --tb-line: none;
+  --tb-sub: #dcd9f5;
+  --tb-tool-ink: #111111;
+  --dlg-radius: 0;
+  --pill: 0;
+  --field: #ffffff;
+  --field-border: 2px inset #e8e8e8;
+  --sel: #000080;
+  --sel-ink: #ffffff;
+  --tag: #e4e4e4;
+  --track: #9a9a9a;
+  --hover-line: #111111;
+  --btn-hover: #e8e8e8;
+  --live-bg: #f4d9d7;
+  --pop-shadow: 3px 3px 0 rgb(0 0 0 / 0.35);
+  --float-shadow: 4px 4px 0 rgb(0 0 0 / 0.35);
+  --good-bg: #d6eedf; --good-line: #1a7f52; --good-ink: #0d4d31;
+  --bad-bg: #f4d9d7; --bad-line: #b4231b; --bad-ink: #7a140e;
+  --warn-bg: #f6e6c8; --warn-line: #9a5c00; --warn-ink: #5c3700;
+
+  /* the chat (chat.css), and what the war room shares with it */
   --label-buddies: "Clippa's buddies";
   --label-chat: "Clippa · instant message";
 
@@ -71,7 +101,7 @@
   --btn-shadow: none;
   --btn-down-border: 2px inset #e8e8e8;
   --btn-down-shadow: none;
-  color-scheme: light;
+  --scheme: light;   /* the chat's native controls (chat.css) */
 }
 
 @media (prefers-color-scheme: dark) {

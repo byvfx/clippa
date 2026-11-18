@@ -1506,7 +1506,8 @@ def add_review(sub) -> None:
             ("reopen", "back to waiting for approval", None),
             ("hold", "keep an item out of the schedule", None),
             ("pin", "pin a release time (Kitsu Publish at)", "YYYY-MM-DD HH:MM or YYYY-MM-DD"),
-            ("retitle", "change the YouTube title", "the new title"),
+            ("retitle", "change the YouTube title (a video that's up is renamed on YouTube too)",
+             "the new title"),
             ("thumbtext", "change the words on the YouTube thumbnail", "2-4 words"),
             ("description", "change the YouTube description (without its hashtag line)",
              "the new description (or --file)"),
@@ -2038,9 +2039,11 @@ def add_extras(sub) -> None:
     r = dsub.add_parser("new", help="a piece's folder in [paths] documentaries, with a starter plan.toml and banned.txt")
     r.add_argument("slug", help="the piece's folder name: lower-case letters, digits and hyphens")
     r.add_argument("--title", help="the working title (default: the slug)")
-    r = dsub.add_parser("voice", help="buy the narration (ElevenLabs, once per take), compress it, time its words")
+    r = dsub.add_parser("voice", help="the narration: your own recording of a take (vo/read/), else bought from "
+                                      "ElevenLabs once per take; compress it, time its words")
     r.add_argument("slug", help="the piece (its folder in [paths] documentaries)")
-    r.add_argument("--dry-run", action="store_true", help="check the plan and say how many characters it would buy")
+    r.add_argument("--dry-run", action="store_true",
+                   help="check the plan, list the takes you recorded and say how many characters it would buy")
     r = dsub.add_parser("build", help="the plan in frames, then a new timeline version in the open Resolve project")
     r.add_argument("slug", help="the piece (its folder in [paths] documentaries)")
     r.add_argument("--dry-run", action="store_true", help="write work/build.json and stop: Resolve isn't touched")

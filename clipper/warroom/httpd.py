@@ -30,6 +30,7 @@ from .data import (
     usage_status,
 )
 from .faces import faces_enroll, faces_forget, faces_get, faces_name, faces_pick
+from .heat import heat_get
 from .investigations import investigations_get
 from .keys import keys_check, keys_get
 from .logview import log_tail
@@ -113,6 +114,7 @@ GET_API = {
     "/api/search": lambda cfg, qs: search_transcripts(cfg, _q(qs, "q")),
     "/api/layouts": lambda cfg, qs: layouts(cfg),
     "/api/faces": lambda cfg, qs: faces_get(cfg, _q(qs, "stream")),
+    "/api/heat": lambda cfg, qs: heat_get(cfg, _q(qs, "stream")),
     "/api/cast": lambda cfg, qs: cast_get(cfg, _q(qs, "person")),
     "/api/news": lambda cfg, qs: news_get(cfg, _q(qs, "days")),
     "/api/news/search": lambda cfg, qs: news_search(cfg, _q(qs, "q")),

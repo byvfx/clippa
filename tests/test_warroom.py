@@ -346,7 +346,7 @@ def test_page_scripts_parse():
     node = shutil.which("node")
     if not node:
         pytest.skip("no node on PATH")
-    for p in sorted((warroom.WEB / "js").glob("*.js")):
+    for p in sorted([*(warroom.WEB / "js").glob("*.js"), *warroom.WEB.glob("*.js")]):   # the war room's, the chat's, theme.js
         r = subprocess.run([node, "--check", str(p)], capture_output=True, text=True)
         assert r.returncode == 0, f"{p.name}: {r.stderr[-500:]}"
 
@@ -416,15 +416,113 @@ def test_log_filters_see_only_scrubbed_text(tmp_path, defaults, monkeypatch):
 
 def test_the_chat_page_is_its_own(tmp_path, defaults):
     """/chat (#158): its own markup, style and script beside the war room's, served by the same
-    server behind the same key; the war room page never loads them."""
+    server behind the same key. The war room shows that same page in a frame at its side, so the
+    two share one code path; it never loads the chat's script or style itself."""
     from clipper.warroom import httpd
 
     html = httpd.PAGES["/chat"].read_text(encoding="utf-8")
     assert '<script src="/chat.js"></script>' in html and '<link rel="stylesheet" href="/chat.css">' in html
-    assert "chat.js" not in warroom.PAGE.read_text(encoding="utf-8")
+    room = warroom.PAGE.read_text(encoding="utf-8")
+    assert "chat.js" not in room and "chat.css" not in room
+    assert re.search(r'<iframe id="chatFrame" src="/chat\?dock"', room)
     assert httpd.static_file("/chat.js")[1].startswith("text/javascript")
     assert httpd.static_file("/chat.css")[1].startswith("text/css")
     broken = re.compile("[ÂÃ][\x80-\xbf]|â[€œš]")
-    for name in ("chat.html", "chat.css", "chat.js"):
+    for name in ("chat.html", "chat.css", "chat.js", "theme.js", "js/chatdock.js", *(f"themes/{p.name}" for p in (warroom.WEB / "themes").glob("*.css"))):
         assert not broken.search((warroom.WEB / name).read_text(encoding="utf-8")), name
     assert "/api/chat" in httpd.GET_API and "/api/chat/send" in httpd.POST_API
+
+
+def test_heat_buckets_keep_the_hottest_second_and_the_gaps():
+    from clipper.warroom import heat
+
+    nan = float("nan")
+    assert heat.buckets([]) == (1, [])
+    assert heat.buckets([0.5, 2.0, nan]) == (1, [0.5, 2.0, None])   # short enough: second by second
+    # 7 seconds into 3 points: 3 s a bucket, the peak kept, a bucket with no chat at all stays a gap
+    assert heat.buckets([1, 9.126, 2, nan, nan, nan, 3], points=3) == (3, [9.13, None, 3.0])
+    step, vals = heat.buckets([nan, 4, nan, nan] * 5000, points=1200)
+    assert step == 17 and len(vals) == 1177 and set(vals) == {4.0}
+
+
+def test_heat_windows_without_their_numbers_are_left_out():
+    from clipper.warroom import heat
+
+    w = {"start_s": 1, "end_s": 9, "peak_s": 5, "heat": 2.5}
+    got = heat.windows([{**w, "heat": None}, {**w, "chat_z": "7", "transcript_peak": None}, {**w, "rank": 9, "end_s": float("nan")}])
+    assert got == [{"start_s": 1, "end_s": 9, "peak_s": 5, "heat": 2.5, "rank": 2, "chat_z": None, "react_z": None,
+                    "clip_z": None, "loud_z": None, "said": ""}]
+
+
+def test_heat_state_is_one_word_for_where_an_item_is():
+    from clipper.warroom import heat
+
+    row = lambda **kw: {"decision": "pending", "scheduled": "", "uploaded": False, **kw}
+    assert heat.state_of(None) == "cut"
+    assert heat.state_of(row()) == "waiting"
+    assert heat.state_of(row(decision="changes_requested")) == "changes"
+    assert heat.state_of(row(decision="approved")) == "approved"
+    assert heat.state_of(row(decision="approved", scheduled="2026-11-20T10:00:00-08:00")) == "scheduled"
+    assert heat.state_of(row(decision="approved", scheduled="x", uploaded=True)) == "uploaded"
+    assert heat.state_of(row(decision="rejected", scheduled="x")) == "rejected"
+
+
+def test_heat_window_gives_the_curve_the_windows_and_where_each_item_sits(tmp_path, defaults, monkeypatch):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    from clipper import jsonstate
+
+    cfg = {**defaults, "paths": {**defaults["paths"], "streams": tmp_path, "schedule": tmp_path / "schedule.json"}}
+    monkeypatch.setattr(warroom.heat, "for_stream", lambda c, sdir: cfg)
+    warroom.CACHE.clear()
+    sdir = tmp_path / "kick-1"
+    sdir.mkdir()
+    with pytest.raises(ClipperError):
+        warroom.heat_get(cfg, "kick-1")   # no meta.json: not a stream
+    with pytest.raises(ClipperError):
+        warroom.heat_get(cfg, "../kick-1")
+    jsonstate.write(sdir / "meta.json", {"title": "A show", "duration_s": 90})
+    got = warroom.heat_get(cfg, "kick-1")
+    assert got["heat"] == [] and got["items"] == [] and got["duration_s"] == 90 and not got["error"]
+
+    (sdir / "signals.parquet").write_bytes(b"not a parquet file")
+    assert "clipper signals" in warroom.heat_get(cfg, "kick-1")["error"]
+    pq.write_table(pa.table({"t": list(range(100)), "heat": [float("nan")] * 10 + [1.0] * 89 + [7.5]}),
+                   sdir / "signals.parquet")
+    jsonstate.write(sdir / "windows.json", {"chat_coverage": 0.9, "params": {"min_heat": 1.0}, "windows": [
+        {"start_s": 60, "end_s": 100, "peak_s": 99, "heat": 7.5, "rank": 1, "chat_z": 5.0, "react_z": 2.0,
+         "clip_z": 0.0, "loud_z": 1.0, "transcript_peak": "x" * 300, "chat_sample": ["lol"]},
+        {"start_s": 10, "end_s": 40, "peak_s": 30, "rank": 2},            # no heat: left out, not a crash
+        {"start_s": 20, "end_s": 50, "peak_s": 45, "heat": "<b>"}, "not a window"]})
+    items = [{"key": "v01_t02", "kind": "short", "title": "A Short", "meta": {"in_s": 70.04, "out_s": 95.0}},
+             {"key": "s01_a-topic", "kind": "segment", "title": "A segment",
+              "meta": {"start_s": 12.0, "cut_start_s": 10.0, "end_s": 80.0}},
+             {"key": "v02_t09", "kind": "short", "title": "An old sidecar, no in and out", "meta": {}}]
+    asked = []
+    monkeypatch.setattr(warroom.heat.review, "items", lambda d, include, c: asked.append(include) or items)
+    got = warroom.heat_get(cfg, "kick-1")
+    assert got["duration_s"] == 100 and got["bucket_s"] == 1 and got["heat"][:11] == [None] * 10 + [1.0]
+    assert got["heat"][-1] == 7.5 and got["min_heat"] == 1.0 and got["chat_coverage"] == 0.9
+    assert got["windows"] == [{"start_s": 60, "end_s": 100, "peak_s": 99, "heat": 7.5, "rank": 1, "chat_z": 5.0,
+                               "react_z": 2.0, "clip_z": 0.0, "loud_z": 1.0, "said": "x" * 160}]
+    assert "compilations" not in asked[0] and "shorts" in asked[0]
+    # not published: every item is "cut", with no window to open; a segment starts where its cut does
+    assert [(i["key"], i["start_s"], i["end_s"], i["state"], i["ref"]) for i in got["items"]] == [
+        ("s01_a-topic", 10.0, 80.0, "cut", ""), ("v01_t02", 70.0, 95.0, "cut", "")]
+
+    jsonstate.write(sdir / "review_state.json", {})
+    monkeypatch.setattr(warroom.heat, "stream_rows", lambda c, d: [
+        {"key": "v01_t02", "ref": "kick-1/v01_t02", "title": "The title you edited", "decision": "approved",
+         "scheduled": "2026-11-20T10:00:00-08:00", "uploaded": False, "hold": True},
+        {"key": "s01_a-topic", "ref": "kick-1/s01_a-topic", "title": "A segment", "decision": "approved",
+         "scheduled": "", "uploaded": False, "hold": False, "dropped": "over the stream's segment budget (1)"}])
+    got = {i["key"]: i for i in warroom.heat_get(cfg, "kick-1")["items"]}
+    assert got["v01_t02"] == {"key": "v01_t02", "kind": "short", "title": "The title you edited", "start_s": 70.0,
+                              "end_s": 95.0, "state": "scheduled", "hold": True, "dropped": "", "ref": "kick-1/v01_t02"}
+    assert (got["s01_a-topic"]["state"], got["s01_a-topic"]["dropped"]) == ("approved", "over the stream's segment budget (1)")
+    assert len(asked) == 2   # the curve and the spans were read again only because a file was added
+
+    monkeypatch.setattr(warroom.heat.review, "items", lambda d, include, c: (_ for _ in ()).throw(FileNotFoundError()))
+    (sdir / "segments.json").write_text("{}", encoding="utf-8")   # a changed folder: read again
+    assert warroom.heat_get(cfg, "kick-1")["items"] == []   # nothing cut yet
