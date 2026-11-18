@@ -320,6 +320,18 @@ messages: GitHub closes the issue on "fix".
   `doc voice` take a recording per take from the piece's `vo/read/`. Not tried on a real spoken take or in
   Resolve: the demo is the first. Tutorial (user, 11-16): recorded during the desktop clean install (#46/#78),
   one continuous capture with the microphone on; published after #207.
+  **Its intro (11-17, 25 s under the first take):** a console TV in a dark room comes on, static for a second,
+  channels change faster and faster while the camera pushes in, black comes up everywhere but the letters of
+  "Clippa" (12-15 s), the set cuts off at 0:20 (user: keep it there), plain letters to 0:25. Rough 5 is the
+  locked cut. The user finishes it in Fusion and Resolve on a generated moving plate: Resolve project
+  `clippa_intro` (24 fps, 1080p), media in `demo-intro/` on the NAS share (`W:\clipper\demo-intro`), bins
+  Plate/Screen/Sound/Reference and a starting timeline `intro_v1` (plate, the screen clip above it, beat
+  markers; no Fusion comp yet). The sources are in `mockups/demo-intro/` on the laptop (gitignored): `kit/` (the chosen plate
+  `plate_move_720_take2_antenna.mp4`, 15 s 720p 24 fps, its still and the tube's track; the channels as a flat
+  4:3 clip, the light they throw, the title matte, sound stems, seven set sounds, times; at 24 and 30 fps),
+  `work/` (clips, stills and the scripts that re-make the kit: `kit5.py`), `wall.py`, `measure_plate.py`.
+  Open: no comp was tried on the plate; it ends with the screen at 88% of the frame's height, so the last
+  1.15x is a push in Fusion; the sounds were not listened to; 1080p waits until the 720p cut is right.
 - **Documentaries (11-13, PR #233, merged and deployed):** `clipper doc
   new|voice|build|master|leak|kit` (wiki Documentaries; `clipper/doc.py`, `doc_resolve.py`), the reusable form
   of the first mini-documentary's one-off Resolve scripts. A piece is `[paths] documentaries/<slug>/` on the
