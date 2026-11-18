@@ -10,7 +10,8 @@ called clipper; the command, package, config files and containers still are.)
 
 > [!TIP]
 > New here? Start with **[Getting started](Getting-started)**: install a machine, run one
-> stream end to end, and know where to look when something breaks.
+> stream end to end, and know where to look when something breaks. Want the tour first? The
+> **[Overview](Overview)** covers what Clippa does, how it is built and what it has done so far.
 
 ```mermaid
 flowchart TB

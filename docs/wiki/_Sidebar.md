@@ -1,6 +1,7 @@
 ### [Clippa](Home)
 
 **Run it**
+- [Overview](Overview)
 - [Getting started](Getting-started)
 - [Roles and services](Roles-and-services)
 - [Configuration](Configuration)
