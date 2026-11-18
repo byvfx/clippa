@@ -59,7 +59,7 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
 - Titles/descriptions/cut points approved as-is; fun descriptions are liked. Long video per recurring topic
   (compilations) plus segments plus short picks. `third_party_audio = "allow_reactions"`,
   `audience_knowledge = "fans"`, Victor/blackjack segments stay; Kino's gambling is commentary, not play
-  (`[scoring] gambling = "commentary"` for kino and c404, prompt v7, 11-05).
+  (`[scoring] gambling = "commentary"` for kino and c404; prompt v7 from 11-05, v8 on kino from 11-09 and on c404 from 11-18 after v8 found 21 approved clips to v7's 9 on three Kino streams, wiki Model-trials).
 - Never use the word "hosts" in viewer-facing text → `[scoring] house_style` rules, appended to every
   viewer-facing prompt; put future style notes there. The cast is **Andy (Warski)** and **PPP** (never any other
   name for PPP; old drafts that say "Ashton" stay). Channel 404 = Don, a solo show. Cast per show in `[meta] cast`.
