@@ -27,7 +27,7 @@ the decision order, hard rejections, examples, output rules) and numbered output
 keeps everything v7 decides on: the per-show gambling and third-party rules, reading aloud as
 the show's own audio, the order payoff, context, quality, the four examples, crude is not a
 reason to reject, and about one window in eight. A kept clip scores 5-10. The rule files are
-copies of v7, so only the main prompt differs. Config stays on v7 (kino, c404) and v5 (base).
+copies of v7, so only the main prompt differs. Config: kino ran v8 for a week, then c404 moved to it too (see below); base stays v5.
 
 | Haiku, prompt | approved (of 18) | same (of 194) | kept | rej>kept | labels right (of 66) | keep-or-not | Cost |
 |---|---|---|---|---|---|---|---|
@@ -44,6 +44,17 @@ main miss: 13 of the 45 keeps called needs-context (v7: 8), so the context step 
 too hard. Neither gap is bigger than a rerun's, so v8 is a candidate, not a winner yet: the
 next test is a week of live streams on one show.
 
+## 2026-11-18: v8's week on Kino, then Channel 404
+
+Kino ran on v8 from 11-09. On its three reviewed streams since (11-12, 11-14, 11-17) each was
+rescored on v7 with `compare score --prompt-version v7` (Haiku Pass A, Sonnet Pass B, about
+$0.3 by the estimate, 218 windows). Of the moments you approved, v8 picked 21 (7+9+5) and v7
+picked 9 (4+3+2). v7 added 13 picks of its own that nobody reviewed, so it can't be scored
+either way: reviews only cover what v8 surfaced, so this shows how many approved clips v7
+found, not how many good ones v8 missed. Where both picked the same moment the titles are
+nearly the same. v8 was kept on Kino and Channel 404 moved to it on 11-18 (user). The base
+`[scoring]` stays on v5.
+
 ## Prompt v9, built, not tried yet
 
 `score_a_v9` is v8 with two changes. `why` is the first field of the answer (from v9 on the
@@ -53,7 +64,7 @@ Claude and OpenAI keep schema order; a provider on JSON mode, or Gemini, may not
 on Claude. And the prompt says where the cuts may go: a cut may start in the lead-in when the
 setup is said there, and ends by the window's last timestamp (the model sees nothing after
 it). The rule files are copies of v8. No show is on it; it gets the same three streams and
-the labels, next to v8's week on Kino.
+the labels, next to v8, which now runs on kino and c404.
 
 ## 2026-11-09: DeepSeek V4.1 Flash, the 10-17 snapshot
 
