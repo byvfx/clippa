@@ -265,43 +265,24 @@ VERBS = {  # first word(s) -> (tool, what the rest of the line is)
     "show": ("item", ""),
 }
 NEEDS_TEXT = ("reject", "retake", "retitle", "cover_text")   # prepare() asks when it's missing
-STREAM_ID = r"(?:kick-\d+|yt-[\w-]+|story-[\w-]+)"
+STREAM_ID = catalog.STREAM_ID
 ITEM_REF = re.compile(r"((?:[\w.-]+/)?(?:[a-z]{1,4}\d+[\w.-]*|comp-[\w.-]+))"
                       r"(?:\s+(" + STREAM_ID + r"))?\s*(.*)", re.IGNORECASE)
 STREAM_IN = re.compile(r"(?:^|\s)(?:(?:from|on|in|of)\s+)?(" + STREAM_ID + r")(?=\s|$)", re.IGNORECASE)
 
 
 REF_WORD = re.compile(r"\b(?:[\w.-]+/)?(?:[a-z]{1,4}\d+[\w.-]*|comp-[\w.-]+)", re.IGNORECASE)
-PREPS = ("from", "on", "in", "of")
-DAY = re.compile(r"\d{1,2}[-/]\d{1,2}")
-
-
-def _stream_words(words: list[str], shows: frozenset[str]) -> tuple[str, int] | None:
-    """A stream named after from/on/in/of at the start of `words`: a stream id, a show the config
-    knows ("from kino 11-14", "on the kino one"), "from yesterday" or "from last night". (its
-    words, prefixed "from", for catalog.find_item; how many words it took); None for any other
-    word, so "on friday" stays a pin time and "from memory" a note."""
-    low = [w.lower().rstrip(".!?,") for w in words]
-    if not low or low[0] not in PREPS:
+def _stream_words(words: list[str], shows: catalog.ShowNames) -> tuple[str, int] | None:
+    """A stream named after from/on/in/of at the start of `words` (catalog.stream_span reads it
+    as catalog.stream_named does): (its words for find_item, as "from <words>"; how many it took)."""
+    n = catalog.stream_span(words, shows)
+    if not n:
         return None
-    i = 1 + (low[1:2] == ["the"])
-    if i >= len(low):
-        return None
-    if re.fullmatch(STREAM_ID, low[i], re.IGNORECASE):
-        return words[i].rstrip(".!?,"), i + 1
-    if low[i] == "last" and low[i + 1:i + 2] == ["night"]:
-        name, i = "last night", i + 2
-    elif low[i] in shows or low[i] == "yesterday":
-        name, i = low[i], i + 1
-        if i < len(low) and DAY.fullmatch(low[i]):
-            name, i = f"{name} {low[i]}", i + 1
-    else:
-        return None
-    i += i < len(low) and low[i] in ("one", "stream", "show")
-    return f"from {name}", i
+    named = [w.rstrip(".!?,") for w in words[1:n] if w.lower() not in ("the", "one", "stream", "show")]
+    return "from " + " ".join(named), n
 
 
-def _verb(t: str, low: str, now: datetime, shows: frozenset[str] = frozenset()) -> tuple[str, dict] | None:
+def _verb(t: str, low: str, now: datetime, shows: catalog.ShowNames) -> tuple[str, dict] | None:
     for words in sorted(VERBS, key=len, reverse=True):
         if not low.startswith(words + " "):
             continue
@@ -344,7 +325,7 @@ KIND_OF = {"comp": "compilation", "comps": "compilation", "compilation": "compil
            "pick": "pick", "picks": "pick"}
 
 
-def _bulk(t: str, shows: frozenset[str] = frozenset()) -> tuple[str, dict] | None:
+def _bulk(t: str, shows: catalog.ShowNames) -> tuple[str, dict] | None:
     """Several items on one card: "approve all comps", "hold the shorts from kino 11-14",
     "approve s07 and s09 from the kino one", "reject c01, c02 too long". None for the rest."""
     first, _, rest = t.partition(" ")
@@ -369,7 +350,7 @@ def _bulk(t: str, shows: frozenset[str] = frozenset()) -> tuple[str, dict] | Non
     stream = ""
     if i < len(low) and re.fullmatch(STREAM_ID, low[i], re.IGNORECASE):
         stream, i = words[i].rstrip(".!?,"), i + 1
-    elif i < len(low) and low[i] in PREPS:
+    elif i < len(low) and low[i] in catalog.PREP:
         n = _stream_words(words[i:], shows)
         if not n:
             return None   # "from the start", "from memory": not a stream we know; the model's turn
@@ -396,8 +377,10 @@ def _bulk_args(verb: str, refs: list[str], kind: str, many: bool, stream: str, l
     return "bulk", args
 
 
-def match(text: str, now: datetime, shows: frozenset[str] = frozenset()) -> tuple[str, dict] | None:
-    """(tool, args) for the phrases clipper knows without a model; None for the rest."""
+def match(text: str, now: datetime, shows: catalog.ShowNames | None = None) -> tuple[str, dict] | None:
+    """(tool, args) for the phrases clipper knows without a model; None for the rest. shows: how
+    the config's shows are named ("from kino 11-14"); none known, only stream ids name a stream."""
+    shows = shows or catalog.ShowNames()
     t = " ".join(text.strip().split())
     low = t.lower().rstrip("?!.")
     m = re.search(r"(?:goes|going|go)\s+out\s+(?:on\s+)?" + DAYS + "$", low) \
@@ -647,8 +630,7 @@ def handle(cfg: dict, text: str) -> dict:
         answer = _answer(chat, text)
         _post(chat, "me", text)
         if not answer:
-            shows = frozenset(w for ws in catalog._show_words(cfg).values() for w in ws)
-            hit = match(text, datetime.now(ZoneInfo(cfg["schedule"]["timezone"])), shows)
+            hit = match(text, datetime.now(ZoneInfo(cfg["schedule"]["timezone"])), catalog.show_names(cfg))
             if hit:
                 run_tool(cfg, chat, *hit)
                 _trim(cfg, chat)

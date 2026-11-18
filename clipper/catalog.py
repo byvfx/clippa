@@ -169,58 +169,79 @@ def match_rows(rows: list[dict], text: str, limit: int = 6) -> list[dict]:
 
 REF_LIKE = re.compile(r"(?:[\w.-]+/)?(?:[a-z]{1,4}\d+[\w.-]*|comp-[\w.-]+)", re.IGNORECASE)
 STREAM_LIKE = re.compile(r"[a-z]+-[\w-]+", re.IGNORECASE)   # kick-131151926, yt-<id>, story-<slug>
+STREAM_ID = r"(?:kick-\d+|yt-[\w-]+|story-[\w-]+)"           # the ids a chat can name a stream by
 
 
 DAY = re.compile(r"(\d{1,2})[-/](\d{1,2})")
 SHOW_STOP = STOP | {"show", "news", "live", "casino", "channel", "podcast", "stream", "streams"}
 
 
-def _show_words(cfg: dict) -> dict[str, set[str]]:
-    """show key -> the words that name it: the key, its channels, its show name's own words."""
-    out = {}
+@dataclass(frozen=True)
+class ShowNames:
+    """How people name each show: naming words (its key, its channels, the words of its name that
+    aren't generic) and the rest of its name, which may follow one ("casino" in "Kino Casino")."""
+    naming: dict[str, frozenset[str]] = field(default_factory=dict)
+    rest: dict[str, frozenset[str]] = field(default_factory=dict)
+
+    def show_of(self, word: str) -> str | None:
+        return next((k for k, ws in self.naming.items() if word in ws), None)
+
+    def end(self, low: list[str], at: int) -> int:
+        """The index after the show's name that starts at low[at] ("kino casino" is two words)."""
+        show, i = self.show_of(low[at]), at + 1
+        while show and i < len(low) and (low[i] in self.naming[show] or low[i] in self.rest.get(show, ())):
+            i += 1
+        return i
+
+
+def show_names(cfg: dict) -> ShowNames:
+    naming, rest = {}, {}
     for key, show in (cfg.get("shows") or {}).items():
         name = ((show.get("overrides") or {}).get("meta") or {}).get("show_name") or ""
-        words = {key.lower(), *(c.lower() for c in show.get("channels") or [])}
-        words |= {w for w in WORD.findall(name.lower()) if len(w) > 2 and w not in SHOW_STOP}
-        out[key] = words
-    return out
+        words = set(WORD.findall(name.lower()))
+        naming[key] = frozenset({key.lower(), *(c.lower() for c in show.get("channels") or []),
+                                 *(w for w in words if len(w) > 2 and w not in SHOW_STOP)})
+        rest[key] = frozenset(words - naming[key])
+    return ShowNames(naming, rest)
 
 
 PREP = ("from", "on", "in", "of")
+REL_DAYS = {"today": 0, "tonight": 0, "yesterday": 1}   # and "last night"
+
+
+def _aware(at: datetime) -> datetime:
+    return at if at.tzinfo else at.replace(tzinfo=UTC)   # an old meta.json without an offset is UTC
 
 
 def stream_named(cfg: dict, text: str, whole: bool = False) -> tuple[str | None, str]:
-    """A stream named the way people say it: a show (its key, channel or a word of its name) with
-    a month-day right after it or after from/on ("kino 11-14", "from 11-14"; a "9/11" elsewhere in
-    a title isn't one), the show alone (its latest stream in review), or yesterday / last night.
-    (stream id, the text without those words); (None, text) when it names none. Raises when it
-    names one that isn't in review, or several: never a quiet fall back to every stream.
-    whole: the text is only a stream's name ("kino 11-14", "last night"), so a day needs no from/on."""
+    """A stream named the way people say it: a show (by a word of its name) with a month-day right
+    after its name ("kino 11-14", "kino casino 11-14"), the show alone (its latest stream in
+    review), or "from 11-14", "from yesterday", "from last night". (stream id, the text without
+    those words); (None, text) when it names none. A show or a from-day that fits no stream in
+    review, or several, raises: never a quiet fall back to every stream. A month-day elsewhere
+    ("anniversary of 9/11") is a title's. whole: the text is only a stream's name ("kino 11-14",
+    "last night"), so a day needs no from."""
     from .config import show_of_channel, stream_channel
 
     words = (text or "").split()
     low = [w.lower().strip(".,;:!?()'\"") for w in words]
-    names = _show_words(cfg)
-    show_at = next((i for i, w in enumerate(low) if any(w in ws for ws in names.values())), None)
-    show = next((k for k, ws in names.items() if low[show_at] in ws), None) if show_at is not None else None
+    names = show_names(cfg)
+    show_at = next((i for i, w in enumerate(low) if names.show_of(w)), None)
+    show = names.show_of(low[show_at]) if show_at is not None else None
+    name_end = names.end(low, show_at) if show_at is not None else -1
     tz = ZoneInfo(cfg["schedule"]["timezone"])
     today = datetime.now(tz).date()
-    used = {show_at} if show is not None else set()
+    used = set(range(show_at, name_end)) if show else set()
     day = None
     for i, w in enumerate(low):
-        m = DAY.fullmatch(w)
-        after = whole or (i > 0 and (i - 1 == show_at or low[i - 1] in PREP))   # not a title's "9/11"
-        if not after:
+        if not (whole or i == name_end or (i > 0 and low[i - 1] == "from")):
             continue
-        if m:
-            day, used = (int(m.group(1)), int(m.group(2))), used | {i}
-            break
-        rel = {"today": 0, "tonight": 0, "yesterday": 1}.get(w)
+        rel = REL_DAYS.get(w)
         if w == "last" and low[i + 1:i + 2] == ["night"]:
             rel, used = 1, used | {i + 1}
-        if rel is not None:
-            d = today - timedelta(days=rel)
-            day, used = (d.month, d.day), used | {i}
+        if (m := DAY.fullmatch(w)) or rel is not None:
+            d = today - timedelta(days=rel or 0)
+            day, used = ((int(m.group(1)), int(m.group(2))) if m else (d.month, d.day)), used | {i}
             break
     if show is None and day is None:
         return None, text
@@ -229,21 +250,48 @@ def stream_named(cfg: dict, text: str, whole: bool = False) -> tuple[str | None,
         if show and show_of_channel(cfg, stream_channel(d)) != show:
             continue
         try:
-            at = datetime.fromisoformat(jsonstate.read(d / "meta.json", {}).get("started_at") or "")
+            at = _aware(datetime.fromisoformat(jsonstate.read(d / "meta.json", {}).get("started_at") or ""))
         except ValueError:
             at = None
         rows.append((at, d.name))
     what = " ".join(x for x in (show or "", f"{day[0]:02d}-{day[1]:02d}" if day else "") if x)
     if day:   # the local day first; the UTC day only when no stream has it locally
-        local = [r for r in rows if r[0] and (r[0].astimezone(tz).month, r[0].astimezone(tz).day) == day]
-        rows = local or [r for r in rows if r[0] and (r[0].month, r[0].day) == day]
+        on = lambda r, zone: r[0] and (r[0].astimezone(zone).month, r[0].astimezone(zone).day) == day
+        rows = [r for r in rows if on(r, tz)] or [r for r in rows if on(r, UTC)]
         if len(rows) > 1:
             fits = ", ".join(f"{sid} ({at.astimezone(tz):%m-%d %H:%M})" for at, sid in sorted(rows))
             raise ClipperError(f"{len(rows)} streams fit {what!r}: {fits}; name it by its id")
     if not rows:
+        before = low[max(0, (show_at or 0) - 2):show_at or 0]
+        if not (whole or day or set(before) & set(PREP)):
+            return None, text   # a show's word in a title ("the kino recap"), its show not in review
         raise ClipperError(f"no stream in review fits {what!r}")
     left = " ".join(w for i, w in enumerate(words) if i not in used)
     return max(rows, key=lambda r: (r[0] or datetime.min.replace(tzinfo=UTC), r[1]))[1], left
+
+
+def stream_span(words: list[str], shows: ShowNames) -> int:
+    """How many of `words` name a stream after from/on/in/of, as stream_named reads it: "from kino
+    casino 11-14", "on the kino one", "from last night", "from kick-1"; 0 for any other word, so
+    "on friday" stays a pin time and "from memory" a note."""
+    low = [w.lower().strip(".,;:!?()'\"") for w in words]
+    if not low or low[0] not in PREP:
+        return 0
+    i = 1 + (low[1:2] == ["the"])
+    if i >= len(low):
+        return 0
+    if re.fullmatch(STREAM_ID, low[i]):   # not any hyphenated word: "from co-host" stays a note
+        return i + 1
+    if low[0] == "from" and low[i] == "last" and low[i + 1:i + 2] == ["night"]:
+        i += 2
+    elif low[0] == "from" and (low[i] in REL_DAYS or DAY.fullmatch(low[i])):
+        i += 1
+    elif shows.show_of(low[i]):
+        i = shows.end(low, i)
+        i += i < len(low) and bool(DAY.fullmatch(low[i]))
+    else:
+        return 0
+    return i + (i < len(low) and low[i] in ("one", "stream", "show"))
 
 
 def find_item(cfg: dict, text: str) -> tuple[actions.Item | None, list[dict]]:
@@ -257,7 +305,7 @@ def find_item(cfg: dict, text: str) -> tuple[actions.Item | None, list[dict]]:
     if not stream:   # "s02 from kino 11-14", "the blade one on kino"
         stream, rest = stream_named(cfg, " ".join(words))
         if stream:
-            words = [w for w in rest.split() if w.lower() not in ("from", "on", "in", "of", "the")]
+            words = [w for w in rest.split() if w.lower() not in (*PREP, "the")]
     ref = next((w for w in words if w != stream and REF_LIKE.fullmatch(w) and ".." not in w), "")
     if ref:
         try:
@@ -569,11 +617,17 @@ NOT_FIT = {"approve": "already decided", "reject": "already decided", "hold": "a
            "release": "that aren't held", "reopen": "still waiting on you"}
 
 
-def _bulk_rows(cfg: dict, args: dict) -> tuple[list[dict], list[tuple[str, list[str]]], str]:
+def _bulk_rows(cfg: dict, args: dict) -> tuple[list[dict], list[tuple[str, list[str]]], str, str]:
     """(rows the ask names, [(a name it couldn't pin down, the streams it is in)], what it asked
-    for in words)."""
+    for in words, the stream id it named or "")."""
     names = names_of(args)
     stream = " ".join(str(args.get("stream") or "").split())
+    if stream and not (cfg["paths"]["streams"] / stream / "review_state.json").exists():
+        named, _ = stream_named(cfg, stream, whole=True)   # "kino 11-14", "last night"; raises if not in review
+        if not named:
+            raise ClipperError(f"I can't tell which stream {stream!r} is: try a show and its "
+                               "month-day, like kino 11-14")
+        stream = named
     if names:
         rows, unclear = [], []
         for name in names:
@@ -583,18 +637,12 @@ def _bulk_rows(cfg: dict, args: dict) -> tuple[list[dict], list[tuple[str, list[
             else:
                 where = sorted({stream_label(cfg, r["stream"]) for r in maybe})
                 unclear.append((name, where))
-        return rows, unclear, "those"
+        return rows, unclear, "those", stream
     kind = str(args.get("kind") or "").strip().lower()   # a model may send "comps" or "Shorts"
     kind = next((k for k, w in KIND_WORD.items() if kind in (k, *(x.lower() for x in w))),
                 {"comp": "compilation", "comps": "compilation"}.get(kind, kind))
     if kind and kind not in KINDS:
         raise ClipperError(f"no kind {kind!r}: one of {', '.join(KINDS)}")
-    if stream and not (cfg["paths"]["streams"] / stream / "review_state.json").exists():
-        named, _ = stream_named(cfg, stream, whole=True)   # "kino 11-14", "kino"; raises if not in review
-        if not named:
-            raise ClipperError(f"I can't tell which stream {stream!r} is: try a show and its "
-                               "month-day, like kino 11-14")
-        stream = named
     rows = _rows(cfg, stream or None)
     if kind:
         rows = [r for r in rows if r["kind"] == kind]
@@ -603,7 +651,7 @@ def _bulk_rows(cfg: dict, args: dict) -> tuple[list[dict], list[tuple[str, list[
         rows = match_rows(rows, query, limit=10_000)
     what = " ".join(x for x in (f"{query!r}" if query else "", KIND_WORD.get(kind, ("", "items"))[1],
                                 f"from {stream}" if stream else "") if x)
-    return rows, [], what
+    return rows, [], what, stream
 
 
 def names_of(args: dict) -> list[str]:
@@ -620,14 +668,11 @@ def _bulk_prepare(cfg: dict, args: dict) -> Plan:
     reason = " ".join(str(args.get("reason") or "").split())
     if verb == "reject" and not reason:
         return Plan("answer", text="Say why: the reason becomes a scoring example.")
-    rows, unclear, what = _bulk_rows(cfg, args)
-    missing = [n for n, where in unclear if not where]
+    rows, unclear, what, where = _bulk_rows(cfg, args)
+    missing = [n for n, places in unclear if not places]
     if missing:
-        given = " ".join(str(args.get("stream") or "").split())
-        named = (given if (cfg["paths"]["streams"] / given / "review_state.json").exists()
-                 else stream_named(cfg, given, whole=True)[0]) if given else None
         return Plan("answer", text=f"I can't find {' or '.join(missing)}"
-                                   + (f" in {stream_label(cfg, named)}" if named else "") + ".")
+                                   + (f" in {stream_label(cfg, where)}" if where else "") + ".")
     if unclear:
         where = "; ".join(f"{n} is in {', '.join(w)}" for n, w in unclear)
         first = unclear[0][1][-1].split()   # "Kino Casino 11-14" -> "kino 11-14"

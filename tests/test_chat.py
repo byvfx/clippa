@@ -524,6 +524,10 @@ def test_the_page_names_no_real_messenger():
         assert not re.search(r"\b(icq|aol|msn|yahoo|trillian|messenger\.com)\b", text.lower()), f.name
 
 
+SHOWS = catalog.ShowNames({"kino": frozenset({"kino", "kinocasino"}), "c404": frozenset({"c404", "404"})},
+                          {"kino": frozenset({"casino"}), "c404": frozenset({"channel", "news"})})
+
+
 @pytest.mark.parametrize("text,want", [
     ("approve all comps", ("bulk", {"verb": "approve", "kind": "compilation"})),
     ("approve comps", ("bulk", {"verb": "approve", "kind": "compilation"})),
@@ -545,6 +549,13 @@ def test_the_page_names_no_real_messenger():
     ("approve s02 from kino 11-14", ("approve", {"item": "s02 from kino 11-14"})),
     ("approve s02 from last night", ("approve", {"item": "s02 from last night"})),
     ("approve s02 from memory", ("approve", {"item": "s02", "note": "from memory"})),   # not a show: a note
+    ("approve s02 from co-host", ("approve", {"item": "s02", "note": "from co-host"})),
+    ("approve s02 from kino casino 11-14", ("approve", {"item": "s02 from kino casino 11-14"})),   # its label
+    ("approve s02 from tonight", ("approve", {"item": "s02 from tonight"})),
+    ("approve s07 and s09 from last night", ("bulk", {"verb": "approve", "items": ["s07", "s09"],
+                                                      "stream": "last night"})),
+    ("reject all clips from kino casino 11-14 boring", ("bulk", {"verb": "reject", "kind": "pick",
+                                                                 "stream": "kino casino 11-14", "reason": "boring"})),
     ("reject s02 from the start too long", ("reject", {"item": "s02", "reason": "from the start too long"})),
     ("pin s01 from kino 11-14 for fri 9am", ("pin", {"item": "s01 from kino 11-14", "when": "2026-11-20 09:00"})),
     ("reject c01 dupe of c02", ("reject", {"item": "c01", "reason": "dupe of c02"})),   # a reason may name one
@@ -557,7 +568,7 @@ def test_the_page_names_no_real_messenger():
     ("whats unslotted", ("unslotted", {})),
 ])
 def test_several_at_once_and_looser_phrases(text, want):
-    assert chat.match(text, MON, frozenset({"kino", "c404"})) == want
+    assert chat.match(text, MON, SHOWS) == want
 
 
 @pytest.mark.parametrize("text", [

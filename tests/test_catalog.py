@@ -396,8 +396,18 @@ def test_stream_named_by_show_and_day(cfg):
                                                               "started_at": "2026-11-11T02:00:00+00:00"}))
     (streams / "kick-5" / "review_state.json").write_text("{}")
     assert catalog.stream_named(cfg, "kino 11-10")[0] == "kick-5"
-    # a date only counts beside the show or after from/on: "the 9/11 one from kino" is kino's latest
+    # a date only counts right after the show's name or after from: "the 9/11 one from kino" is kino's latest
     assert catalog.stream_named(cfg, "the 11-09 one from kino")[1] == "the 11-09 one from"
+    assert catalog.stream_named(cfg, "anniversary of 11-30") == (None, "anniversary of 11-30")   # a title's
+    assert catalog.stream_named(cfg, "s02 kino casino 11-09")[0] == "kick-1"   # its label, read back
+    # a naive started_at (an old meta.json) is UTC, not a TypeError
+    (streams / "kick-6").mkdir()
+    (streams / "kick-6" / "meta.json").write_text(json.dumps({"channel": "kinocasino",
+                                                              "started_at": "2026-11-20T03:00:00"}))
+    (streams / "kick-6" / "review_state.json").write_text("{}")
+    assert catalog.stream_named(cfg, "the kino one")[0] == "kick-6"
+    assert catalog.stream_span("from kino casino 11-14 one too long".split(), catalog.show_names(cfg)) == 5
+    assert catalog.stream_span("on friday 9am".split(), catalog.show_names(cfg)) == 0
     assert catalog.stream_label(cfg, "kick-2") == "Kino Casino 11-14"
 
 
