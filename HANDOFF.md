@@ -327,14 +327,15 @@ messages: GitHub closes the issue on "fix".
   `clippa_intro` (24 fps, 1080p), media in `demo-intro/` on the NAS share (`W:\clipper\demo-intro`), bins
   Plate/Screen/Sound/Reference, timeline `intro_v1` (the elements stacked, beat markers) and `intro_v2_comp`,
   where plate and screen clip are one Fusion clip: the picture pinned into the tube on a fitted path, matted
-  by the plate's own static, the room lit by the picture's mean, then clips through the letters (12-15 s)
-  and plain letters (20 s). A first pass built by script and checked on stills only, not played. The sources are in `mockups/demo-intro/` on the laptop (gitignored): `kit/` (the chosen plate
+  by the plate's own static, the room lit by the picture's mean, a CRT look (soften, scanlines, lifted
+  blacks, the tube's own shading, bloom), and rough 5's push and fade: the plate retimed and pushed so the
+  picture fills the frame at 12.5 s, black up around the letters over the same picture (12-15 s), plain
+  letters at 20 s. Built by script and checked on stills only, not played. The sources are in `mockups/demo-intro/` on the laptop (gitignored): `kit/` (the chosen plate
   `plate_move_720_take2_antenna.mp4`, 15 s 720p 24 fps, its still and the tube's track; the channels as a flat
   4:3 clip, the light they throw, the title matte, sound stems, seven set sounds, times; at 24 and 30 fps),
   `work/` (clips, stills and the scripts that re-make the kit: `kit5.py`), `wall.py`, `measure_plate.py`.
-  Open: the plate runs at its own speed (15 s against the rough's 12.5 s push) and ends with the screen at
-  88% of the frame's height, so the retime and the last 1.15x are still to do; no glass, scanlines or
-  switch-on and switch-off in the comp; the sounds were not listened to; 1080p waits until the 720p cut is right.
+  Open: the last 1.78x of the push is a blow-up of the 720p plate (soft bezel just before the picture fills
+  the frame); no switch-off collapse in the comp; the look's amounts are first guesses for the user to grade; the sounds were not listened to; 1080p waits until the 720p cut is right.
 - **Documentaries (11-13, PR #233, merged and deployed):** `clipper doc
   new|voice|build|master|leak|kit` (wiki Documentaries; `clipper/doc.py`, `doc_resolve.py`), the reusable form
   of the first mini-documentary's one-off Resolve scripts. A piece is `[paths] documentaries/<slug>/` on the
