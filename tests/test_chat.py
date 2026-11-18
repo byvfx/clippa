@@ -529,9 +529,11 @@ def test_the_page_names_no_real_messenger():
     ("approve comps", ("bulk", {"verb": "approve", "kind": "compilation"})),
     ("Approve all the shorts waiting", ("bulk", {"verb": "approve", "kind": "short"})),
     ("hold every segment from kino 11-14", ("bulk", {"verb": "hold", "kind": "segment", "stream": "kino 11-14"})),
+    ("approve all comps from the start", None),   # not a show: the model's turn
     ("release all comps on kick-131151926", ("bulk", {"verb": "release", "kind": "compilation",
                                                       "stream": "kick-131151926"})),
-    ("approve all comps from last night", ("bulk", {"verb": "approve", "kind": "compilation", "stream": "last"})),
+    ("approve all comps from last night", ("bulk", {"verb": "approve", "kind": "compilation",
+                                                    "stream": "last night"})),
     ("approve everything from the kino one", ("bulk", {"verb": "approve", "stream": "kino"})),
     ("reject all clips from c404 too long", ("bulk", {"verb": "reject", "kind": "pick", "stream": "c404",
                                                       "reason": "too long"})),
@@ -540,19 +542,22 @@ def test_the_page_names_no_real_messenger():
     ("approve s07 and s09 from the kino one pls", ("bulk", {"verb": "approve", "items": ["s07", "s09"],
                                                             "stream": "kino"})),
     ("reject c01 and c02 boring", ("bulk", {"verb": "reject", "items": ["c01", "c02"], "reason": "boring"})),
-    ("approve s02 from kino 11-14", ("approve", {"item": "s02 kino 11-14"})),
-    ("pin s01 from kino 11-14 for fri 9am", ("pin", {"item": "s01 kino 11-14", "when": "2026-11-20 09:00"})),
+    ("approve s02 from kino 11-14", ("approve", {"item": "s02 from kino 11-14"})),
+    ("approve s02 from last night", ("approve", {"item": "s02 from last night"})),
+    ("approve s02 from memory", ("approve", {"item": "s02", "note": "from memory"})),   # not a show: a note
+    ("reject s02 from the start too long", ("reject", {"item": "s02", "reason": "from the start too long"})),
+    ("pin s01 from kino 11-14 for fri 9am", ("pin", {"item": "s01 from kino 11-14", "when": "2026-11-20 09:00"})),
     ("reject c01 dupe of c02", ("reject", {"item": "c01", "reason": "dupe of c02"})),   # a reason may name one
     ("pin s01 on friday 9am", ("pin", {"item": "s01", "when": "2026-11-20 09:00"})),   # a day, not a show
     ("approve s02 on fire", ("approve", {"item": "s02", "note": "on fire"})),           # a note, not a show
-    ("approve s02 on the kino one", ("approve", {"item": "s02 kino"})),
+    ("approve s02 on the kino one", ("approve", {"item": "s02 from kino"})),
     ("undo that", ("undo", {})),
     ("undo", ("undo", {})),
     ("whats waiting", ("items", {})),
     ("whats unslotted", ("unslotted", {})),
 ])
 def test_several_at_once_and_looser_phrases(text, want):
-    assert chat.match(text, MON) == want
+    assert chat.match(text, MON, frozenset({"kino", "c404"})) == want
 
 
 @pytest.mark.parametrize("text", [

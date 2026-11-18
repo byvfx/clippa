@@ -272,16 +272,36 @@ STREAM_IN = re.compile(r"(?:^|\s)(?:(?:from|on|in|of)\s+)?(" + STREAM_ID + r")(?
 
 
 REF_WORD = re.compile(r"\b(?:[\w.-]+/)?(?:[a-z]{1,4}\d+[\w.-]*|comp-[\w.-]+)", re.IGNORECASE)
-# "from kino 11-14", "on the kino one": a stream the way people name it, resolved by catalog.find_item
-# only "from <show>", "on the <show> one" or "<on|in|of> <show> 11-14": "on friday", "on fire" stay
-# a note or a pin time
-NOT_SHOW = r"(?!(?:today|tonight|tomorrow|" + "|".join(WEEKDAYS) + "|" + "|".join(d[:3] for d in WEEKDAYS) + r")\b)"
-SHOW_IN = re.compile(r"(?:from\s+(?:the\s+)?" + NOT_SHOW + r"([a-z][\w-]*)(?:\s+(\d{1,2}[-/]\d{1,2}))?(?:\s+(?:one|stream|show))?"
-                     r"|(?:on|in|of)\s+the\s+" + NOT_SHOW + r"([a-z][\w-]*)(?:\s+(\d{1,2}[-/]\d{1,2}))?\s+(?:one|stream|show)"
-                     r"|(?:on|in|of)\s+" + NOT_SHOW + r"([a-z][\w-]*)\s+(\d{1,2}[-/]\d{1,2}))(?=\s|$)\s*(.*)", re.IGNORECASE)
+PREPS = ("from", "on", "in", "of")
+DAY = re.compile(r"\d{1,2}[-/]\d{1,2}")
 
 
-def _verb(t: str, low: str, now: datetime) -> tuple[str, dict] | None:
+def _stream_words(words: list[str], shows: frozenset[str]) -> tuple[str, int] | None:
+    """A stream named after from/on/in/of at the start of `words`: a stream id, a show the config
+    knows ("from kino 11-14", "on the kino one"), "from yesterday" or "from last night". (its
+    words, prefixed "from", for catalog.find_item; how many words it took); None for any other
+    word, so "on friday" stays a pin time and "from memory" a note."""
+    low = [w.lower().rstrip(".!?,") for w in words]
+    if not low or low[0] not in PREPS:
+        return None
+    i = 1 + (low[1:2] == ["the"])
+    if i >= len(low):
+        return None
+    if re.fullmatch(STREAM_ID, low[i], re.IGNORECASE):
+        return words[i].rstrip(".!?,"), i + 1
+    if low[i] == "last" and low[i + 1:i + 2] == ["night"]:
+        name, i = "last night", i + 2
+    elif low[i] in shows or low[i] == "yesterday":
+        name, i = low[i], i + 1
+        if i < len(low) and DAY.fullmatch(low[i]):
+            name, i = f"{name} {low[i]}", i + 1
+    else:
+        return None
+    i += i < len(low) and low[i] in ("one", "stream", "show")
+    return f"from {name}", i
+
+
+def _verb(t: str, low: str, now: datetime, shows: frozenset[str] = frozenset()) -> tuple[str, dict] | None:
     for words in sorted(VERBS, key=len, reverse=True):
         if not low.startswith(words + " "):
             continue
@@ -293,8 +313,8 @@ def _verb(t: str, low: str, now: datetime) -> tuple[str, dict] | None:
         s = None if stream or "/" in m.group(1) else STREAM_IN.search(rest)
         if s:   # "approve s02 from kick-131151926": the stream, not a note
             stream, rest = s.group(1), (rest[:s.start()] + " " + rest[s.end():]).strip()
-        elif not stream and "/" not in m.group(1) and (n := SHOW_IN.match(rest)):
-            stream, rest = " ".join(x for x in n.groups()[:6] if x), n.group(7).strip()   # "from kino 11-14"
+        elif not stream and "/" not in m.group(1) and (n := _stream_words(rest.split(), shows)):
+            stream, rest = n[0], " ".join(rest.split()[n[1]:])   # "from kino 11-14", "from last night"
         if REF_WORD.search(rest) and words not in ("reject", "retake", "changes", "retitle", "cover text",
                                                    "cover words"):
             return None   # "approve s01 and s02 ...": a second name isn't a note; _bulk or the model
@@ -322,10 +342,9 @@ KIND_OF = {"comp": "compilation", "comps": "compilation", "compilation": "compil
            "compilations": "compilation", "segment": "segment", "segments": "segment", "seg": "segment",
            "segs": "segment", "short": "short", "shorts": "short", "clip": "pick", "clips": "pick",
            "pick": "pick", "picks": "pick"}
-DAY = re.compile(r"\d{1,2}[-/]\d{1,2}")
 
 
-def _bulk(t: str) -> tuple[str, dict] | None:
+def _bulk(t: str, shows: frozenset[str] = frozenset()) -> tuple[str, dict] | None:
     """Several items on one card: "approve all comps", "hold the shorts from kino 11-14",
     "approve s07 and s09 from the kino one", "reject c01, c02 too long". None for the rest."""
     first, _, rest = t.partition(" ")
@@ -348,18 +367,22 @@ def _bulk(t: str) -> tuple[str, dict] | None:
     while i < len(low) and low[i] in ("waiting", "pending", "left", "open"):
         i += 1
     stream = ""
-    if i < len(low) and (re.fullmatch(STREAM_ID, low[i], re.IGNORECASE)
-                         or (low[i] in ("from", "on", "in", "of") and i + 1 < len(low))):
-        i += low[i] in ("from", "on", "in", "of")
-        i += i < len(low) - 1 and low[i] == "the"
+    if i < len(low) and re.fullmatch(STREAM_ID, low[i], re.IGNORECASE):
         stream, i = words[i].rstrip(".!?,"), i + 1
-        if i < len(low) and DAY.fullmatch(low[i]):
-            stream, i = f"{stream} {low[i]}", i + 1
-        i += i < len(low) and low[i] in ("one", "stream", "show", "night")   # "from last night"
+    elif i < len(low) and low[i] in PREPS:
+        n = _stream_words(words[i:], shows)
+        if not n:
+            return None   # "from the start", "from memory": not a stream we know; the model's turn
+        stream, i = n[0].removeprefix("from "), i + n[1]
     left = re.sub(r"\b(?:pls|please|plz|thx|thanks|for me|now)\b", "", " ".join(words[i:])).strip(" ,.!")
+    return _bulk_args(verb, refs, kind, every or plural, stream, left)
+
+
+def _bulk_args(verb: str, refs: list[str], kind: str, many: bool, stream: str, left: str) -> tuple[str, dict] | None:
+    """What _bulk read, as the bulk tool's inputs; None when it isn't a bulk ask after all."""
     if len(refs) >= 2:
         args: dict = {"verb": verb, "items": refs}
-    elif not refs and (every or plural) and (kind or stream or every):
+    elif not refs and many:
         args = {"verb": verb, **({"kind": kind} if kind else {})}
     else:
         return None
@@ -373,7 +396,7 @@ def _bulk(t: str) -> tuple[str, dict] | None:
     return "bulk", args
 
 
-def match(text: str, now: datetime) -> tuple[str, dict] | None:
+def match(text: str, now: datetime, shows: frozenset[str] = frozenset()) -> tuple[str, dict] | None:
     """(tool, args) for the phrases clipper knows without a model; None for the rest."""
     t = " ".join(text.strip().split())
     low = t.lower().rstrip("?!.")
@@ -398,7 +421,7 @@ def match(text: str, now: datetime) -> tuple[str, dict] | None:
     m = re.fullmatch(r"(?:story|new story)[: ]+(.{8,})", t, re.IGNORECASE)
     if m:
         return "story", {"brief": m.group(1).strip()}
-    hit = _bulk(t) or _verb(t, low, now)
+    hit = _bulk(t, shows) or _verb(t, low, now, shows)
     if hit:
         return hit
     m = ITEM_REF.fullmatch(t)
@@ -624,7 +647,8 @@ def handle(cfg: dict, text: str) -> dict:
         answer = _answer(chat, text)
         _post(chat, "me", text)
         if not answer:
-            hit = match(text, datetime.now(ZoneInfo(cfg["schedule"]["timezone"])))
+            shows = frozenset(w for ws in catalog._show_words(cfg).values() for w in ws)
+            hit = match(text, datetime.now(ZoneInfo(cfg["schedule"]["timezone"])), shows)
             if hit:
                 run_tool(cfg, chat, *hit)
                 _trim(cfg, chat)

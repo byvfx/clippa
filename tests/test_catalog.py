@@ -374,14 +374,30 @@ def test_stream_named_by_show_and_day(cfg):
         (streams / sid / "meta.json").write_text(json.dumps({"channel": ch, "started_at": at}))
         (streams / sid / "review_state.json").write_text("{}")
     assert catalog.stream_named(cfg, "s02 kino 11-09") == ("kick-1", "s02")   # local (LA) day of 03:00 UTC
-    assert catalog.stream_named(cfg, "s02 kino 11-10") == ("kick-1", "s02")   # its UTC day too
+    assert catalog.stream_named(cfg, "s02 from kino 11-14") == ("kick-2", "s02 from")
     assert catalog.stream_named(cfg, "the kino one") == ("kick-2", "the one")  # the show's latest
     assert catalog.stream_named(cfg, "c404")[0] == "kick-3"
-    assert catalog.stream_named(cfg, "kino 12-25") == (None, "kino 12-25")
+    assert catalog.stream_named(cfg, "s02 from 11-11")[0] == "kick-3"   # one stream that day
     assert catalog.stream_named(cfg, "the blade one") == (None, "the blade one")
     assert catalog.stream_named(cfg, "the 11-11 truther one") == (None, "the 11-11 truther one")   # a title's
-    assert catalog.stream_named(cfg, "s02 from 11-11")[0] == "kick-3"   # one stream that day
     assert catalog.stream_named(cfg, "the last segment") == (None, "the last segment")   # not "last night"
+    # a stream named but not in review, or several fitting: refused, never every stream instead
+    with pytest.raises(ClipperError, match="no stream in review fits 'kino 12-25'"):
+        catalog.stream_named(cfg, "s02 kino 12-25")
+    (streams / "kick-4").mkdir()
+    (streams / "kick-4" / "meta.json").write_text(json.dumps({"channel": "kinocasino",
+                                                              "started_at": "2026-11-15T06:00:00+00:00"}))
+    (streams / "kick-4" / "review_state.json").write_text("{}")
+    with pytest.raises(ClipperError, match="2 streams fit 'kino 11-14'"):
+        catalog.stream_named(cfg, "s02 kino 11-14")
+    # the local day wins over another stream's UTC day: kick-1 is 11-10 in UTC, 11-09 here
+    (streams / "kick-5").mkdir()
+    (streams / "kick-5" / "meta.json").write_text(json.dumps({"channel": "kinocasino",
+                                                              "started_at": "2026-11-11T02:00:00+00:00"}))
+    (streams / "kick-5" / "review_state.json").write_text("{}")
+    assert catalog.stream_named(cfg, "kino 11-10")[0] == "kick-5"
+    # a date only counts beside the show or after from/on: "the 9/11 one from kino" is kino's latest
+    assert catalog.stream_named(cfg, "the 11-09 one from kino")[1] == "the 11-09 one from"
     assert catalog.stream_label(cfg, "kick-2") == "Kino Casino 11-14"
 
 
