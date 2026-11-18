@@ -340,7 +340,7 @@ messages: GitHub closes the issue on "fix".
   `work/` (clips, stills and the scripts that re-make the kit: `kit5.py`), `wall.py`, `measure_plate.py`.
   Open: the last 1.78x of the push is a blow-up of the 720p plate (soft bezel just before the picture fills
   the frame); the look's and the finish's amounts are first guesses for the user to judge; nobody has played it or heard the sound; 1080p waits until the 720p cut is right.
-  Asked for (11-17), not started: a lived-in set (carpet pressed flat in front of the set, cigarette burns, a full ashtray spilling over). It needs a new still and a new move (Runway credits, the user's OK) and then a new track for the comp's path.
+  Asked for (11-17): a lived-in set (carpet pressed flat in front of the set, cigarette burns, a full ashtray spilling over). Two candidate stills are with the user (`mockups/demo-intro/tv/set_lived_in_1_heaped.png`, `_2_worn.png`; `work/lived_in.py` joins a generated carpet under the current still's upper frame). Next: the user's pick and OK for a new move (450 Runway credits a take), then a new track for the comp's path.
 - **Documentaries (11-13, PR #233, merged and deployed):** `clipper doc
   new|voice|build|master|leak|kit` (wiki Documentaries; `clipper/doc.py`, `doc_resolve.py`), the reusable form
   of the first mini-documentary's one-off Resolve scripts. A piece is `[paths] documentaries/<slug>/` on the
