@@ -328,17 +328,19 @@ messages: GitHub closes the issue on "fix".
   Plate/Screen/Sound/Reference, timeline `intro_v1` (the elements stacked, beat markers) and `intro_v2_comp`,
   where plate and screen clip are one Fusion clip: the picture pinned into the tube on a fitted path, matted
   by the plate's own static (keyed, then grown a few pixels onto the tube's dark edge), the room lit by the picture's mean, a CRT look (soften, phosphor stripes and
-  scanlines that grow with the push, a vignette, the tube's own shading, bloom), and rough 5's push and fade: the plate retimed and pushed so the
+  scanlines that grow with the push to about 10 px a cell, a vignette, the tube's own shading, bloom), a finish on everything (`FinalTint`, `FinalTone`,
+  `FinalVignette`, `FinalGrain`: cool shadows, less colour, dark corners, light grain), and rough 5's push and fade: the plate retimed and pushed so the
   picture fills the frame at 12.5 s, black up around the letters over the same picture (12-15 s), the letters
-  filled with static from 19.5 s, folding to a line at 20 s under the plain letters coming up; the
-  two placeholder stems are re-cut to match (`_v2` in the kit, from `work/sound6.py`), not listened to. Picture and letters carry a barrel bulge; from 20.4 to 21.9 s the letters' bulge, soft
+  filled with static from 19.5 s, folding to a line at 20 s under the plain letters coming up. The
+  sound is the seven generated set sounds cut to the same plan (`stem_set_real_24.wav` and the channels alone, `stem_clips_24_v3.wav`, from `work/sound7.py`; `set_sound_cues.txt` says what is where), placed by measurement and never heard. Picture and letters carry a barrel bulge; from 20.4 to 21.9 s the letters' bulge, soft
   edge, scanlines and glow ease to nothing, leaving flat clean text. Built by script and checked on stills
   only, not played. The sources are in `mockups/demo-intro/` on the laptop (gitignored): `kit/` (the chosen plate
   `plate_move_720_take2_antenna.mp4`, 15 s 720p 24 fps, its still and the tube's track; the channels as a flat
   4:3 clip, the light they throw, the title matte, sound stems, seven set sounds, times; at 24 and 30 fps),
   `work/` (clips, stills and the scripts that re-make the kit: `kit5.py`), `wall.py`, `measure_plate.py`.
   Open: the last 1.78x of the push is a blow-up of the 720p plate (soft bezel just before the picture fills
-  the frame); no switch-off collapse in the comp; the look's amounts are first guesses for the user to grade; the sounds were not listened to; 1080p waits until the 720p cut is right.
+  the frame); the look's and the finish's amounts are first guesses for the user to judge; nobody has played it or heard the sound; 1080p waits until the 720p cut is right.
+  Asked for (11-17), not started: a lived-in set (carpet pressed flat in front of the set, cigarette burns, a full ashtray spilling over). It needs a new still and a new move (Runway credits, the user's OK) and then a new track for the comp's path.
 - **Documentaries (11-13, PR #233, merged and deployed):** `clipper doc
   new|voice|build|master|leak|kit` (wiki Documentaries; `clipper/doc.py`, `doc_resolve.py`), the reusable form
   of the first mini-documentary's one-off Resolve scripts. A piece is `[paths] documentaries/<slug>/` on the
