@@ -299,7 +299,12 @@ messages: GitHub closes the issue on "fix".
   (OFL, served `max-age` a month); one line-icon SVG sprite in `warroom.html`, `ic(name)` in core.js, `.ic` is
   `pointer-events: none` so handlers that test `e.target.id` still see the button; skeletons until the first answer;
   `millennium` is the one alternate (also the chat page's default), `retro` and `pager` deleted, and theme.js forgets a
-  kept pick serve no longer lists. Steps 3 and 4 wait on the user's hub deploy. Next plan steps: Ctrl+K and G keys (5),
+  kept pick serve no longer lists. Step 5 is PR #321, merged 11-19 (Grok reviewed it): Ctrl+K / Cmd+K or Search in the
+  top bar opens `js/palette.js` (`<dialog id="palette">`): the pages, items by title/show/kind/name (best 8), the ⋯
+  actions, the tile windows, the other look, the chat, a live show, the queue tabs; on a phone Search… under More. G then
+  R S P M T L F `,` jumps to a page (`GO_KEYS` in palette.js, `goPage` closes an item on top first; a held letter's
+  repeats are swallowed); a test ties GO_KEYS, the palette's names and the ? list to `PAGES`. It also fixed step 4's
+  Stats arrows (chart rules are `svg:not(.ic)`). Steps 3 to 5 wait on the user's hub deploy. Next plan steps:
   Schedule week/timeline (6-7), phone (8). Library/Research/Settings still open the old windows from tiles.
 - **War room heat graph (11-16, user asked "can we see the heat graph of a stream in the war room?"):** PR #294,
   merged 11-16 after Grok's review, **not deployed** (it needs `deploy/hub/deploy.sh` from a checkout of main). 🔥 heat on a stream (Pipeline panel) or in an item's
