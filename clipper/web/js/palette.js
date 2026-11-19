@@ -31,7 +31,7 @@ function palScore(q, text) {
 }
 
 function palEntries() {
-  const pages = PAGES.map(v => ({ label: PAGE_NAME[v], icon: PAGE_ICON[v], hint: `G ${GO_KEY[v].toUpperCase()}`, run: () => goPage(v) }));
+  const pages = PAGES.map(v => ({ label: PAGE_NAME[v], icon: PAGE_ICON[v], hint: GO_KEY[v] ? `G ${GO_KEY[v].toUpperCase()}` : "", run: () => goPage(v) }));
   const tabs = Object.keys(TABS).map((t, k) => ({ label: `${TAB_LABEL[t]} tab`, sub: "Review", icon: "review", hint: String(k + 1),
     run: () => { goPage("queue"); if (document.body.dataset.view !== "queue") return; TAB = t; SEL = null; if (STATE) renderQueue(); } }));
   const click = sel => () => $(sel).click();
@@ -111,11 +111,14 @@ document.addEventListener("keydown", e => {   // anywhere on the page, a box inc
 });
 $("#palette").addEventListener("input", palFill);
 $("#palette").addEventListener("keydown", e => {
+  // none of it reaches the page's keys behind it (A would approve, Esc close the docked item); Esc is the dialog's own
+  e.stopPropagation();
   if (e.target.id !== "palQ") return;
   if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); palMark(PAL.at + (e.key === "ArrowDown" ? 1 : -1), true); }
   else if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); palRun(PAL.at); }
-  if (e.key === "Escape") e.stopPropagation();   // the dialog's own cancel: the page's keys would take it for the item
 });
+// a click in the list keeps the typing in the box
+$("#palette").addEventListener("mousedown", e => { if (e.target.closest(".pal-list, .pal-box") && e.target.id !== "palQ") e.preventDefault(); });
 $("#palette").addEventListener("mousemove", e => { const o = e.target.closest(".pal-o"); if (o && +o.dataset.pal !== PAL.at) palMark(+o.dataset.pal); });
 $("#palette").addEventListener("click", e => {
   const o = e.target.closest(".pal-o");

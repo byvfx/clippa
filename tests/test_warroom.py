@@ -101,6 +101,13 @@ def test_every_page_has_its_tab_and_its_place():
     assert set(re.findall(r'data-go="([a-z]+)"', html)) <= set(pages)
     main = html[html.index("<main>"):html.index("</main>")]
     assert html.count("data-panel=") == main.count("data-panel=") > 0
+    # every page has its G key (palette.js), its name in the palette, and a row in the ? list
+    pal = (warroom.WEB / "js" / "palette.js").read_text(encoding="utf-8")
+    keys = dict(re.findall(r'"?([a-z,])"?: "([a-z]+)"', re.search(r"const GO_KEYS = \{(.*?)\};", pal).group(1)))
+    names = dict(re.findall(r'([a-z]+): "([A-Z][a-z]+)"', re.search(r"const PAGE_NAME = \{(.*?)\};", pal, re.S).group(1)))
+    assert sorted(keys.values()) == sorted(pages) == sorted(names)
+    for k, v in keys.items():
+        assert f'["G {k.upper()}", "{names[v]}"]' in js, (k, v)
 
 
 def test_the_page_has_no_mis_encoded_text():
