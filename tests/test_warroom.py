@@ -568,3 +568,26 @@ def test_heat_window_gives_the_curve_the_windows_and_where_each_item_sits(tmp_pa
     monkeypatch.setattr(warroom.heat.review, "items", lambda d, include, c: (_ for _ in ()).throw(FileNotFoundError()))
     (sdir / "segments.json").write_text("{}", encoding="utf-8")   # a changed folder: read again
     assert warroom.heat_get(cfg, "kick-1")["items"] == []   # nothing cut yet
+
+
+def test_a_stream_says_when_it_ended_and_when_its_items_may_go_out(tmp_path, defaults):
+    """The Schedule's Week and Timeline: a finished stream's end, and kick_first_hours after it;
+    a recording (no duration yet) or a hand-made meta.json has neither, and the page still loads."""
+    from clipper import jsonstate
+
+    cfg = {**defaults, "paths": {**defaults["paths"], "streams": tmp_path}}
+    done = tmp_path / "kick-1"
+    done.mkdir()
+    jsonstate.write(done / "meta.json", {"started_at": "2026-11-18T18:00:00-08:00", "duration_s": 7200})
+    info = warroom.stream_info(cfg, done)
+    assert info["ended_at"] == "2026-11-18T20:00:00-08:00"
+    hours = defaults["schedule"]["kick_first_hours"]
+    assert info["release_at"] == f"2026-11-{18 + (20 + hours) // 24:02d}T{(20 + hours) % 24:02d}:00:00-08:00"
+    live = tmp_path / "kick-2"
+    live.mkdir()
+    jsonstate.write(live / "meta.json", {"started_at": "2026-11-19T18:00:00-08:00"})
+    assert warroom.stream_info(cfg, live)["ended_at"] == warroom.stream_info(cfg, live)["release_at"] == ""
+    odd = tmp_path / "kick-3"
+    odd.mkdir()
+    jsonstate.write(odd / "meta.json", {"started_at": "yesterday", "duration_s": 60})
+    assert warroom.stream_info(cfg, odd)["ended_at"] == ""

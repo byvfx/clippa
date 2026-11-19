@@ -95,11 +95,21 @@ def stream_info(cfg: dict, sdir: Path) -> dict:
         stages[st] = status
     live = jsonstate.read_or(sdir / "live" / "state.json", {})
     running = run.get("status") == "running" and age_s(run.get("heartbeat")) < 15 * 60
+    ended = release = ""
+    if meta.get("started_at") and meta.get("duration_s") is not None:  # a finished recording
+        try:
+            ended = (datetime.fromisoformat(meta["started_at"])
+                     + timedelta(seconds=meta["duration_s"])).isoformat(timespec="seconds")
+            release = schedule.release_window(cfg, sdir, meta)[0].isoformat(timespec="seconds")
+        except (TypeError, ValueError, KeyError) as e:  # a hand-made meta.json: no ends on the page
+            log.warning(f"{sdir.name}: no end time: {type(e).__name__}: {e}")
     return {"id": sdir.name, "show": sc["show"]["key"], "show_name": sc["meta"]["show_name"] or "",
             "channel": meta.get("channel") or live.get("channel", ""),
             "title": meta.get("title") or live.get("title", ""),
             "started_at": meta.get("started_at") or live.get("stream_started_at") or "",
             "duration_s": meta.get("duration_s"),
+            # the Schedule: when it ended, and when its items may first go out (kick_first_hours)
+            "ended_at": ended, "release_at": release,
             "stages": stages, "run_status": "running" if running else run.get("status", ""),
             "run_error": run.get("error", ""), "recording": live.get("status", ""),
             "published": (sdir / "review_state.json").exists(), "faces": (sdir / "faces.json").exists()}
@@ -331,21 +341,23 @@ def overview(cfg: dict) -> dict:
         r = by_ref.get(e["key"], {})
         sd = streams_dir / e["stream"]
         entries.append({**{k: e.get(k) for k in ("key", "stream", "kind", "id", "title", "status",
-                                                    "source", "url", "video_id")},
+                                                    "source", "url", "video_id", "uploaded_at")},
                         "publish_at": when.isoformat(), "show_name": r.get("show_name") or
                         _show_name(cfg, sd),
                         "thumbnail_url": r.get("thumbnail_url", ""),
                         "views": views.get(e.get("video_id") or "")})
     entries.sort(key=lambda e: e["publish_at"])
     sc = cfg["schedule"]
-    # #20: the next 14 days' open slots (drop targets) and the spacing rules the page checks.
+    # #20: the open slots (drop targets) as far ahead as the scheduler plans, at least 14 days
+    # (the Week view pages through them), and the spacing rules the page checks.
     taken = {e["publish_at"][:16] for e in entries}
     free = [{"at": when.isoformat(), "kind": kind}
-            for when, kind in schedule.slots({**sc, "horizon_days": 14}, tz, now.date())
+            for when, kind in schedule.slots({**sc, "horizon_days": max(14, sc["horizon_days"])}, tz, now.date())
             if when > now + timedelta(minutes=30) and when.isoformat()[:16] not in taken]
     hs, hue = all_retakes(cfg), show_hues(cfg)
     return {"generated_at": now.isoformat(), "timezone": sc["timezone"],
-            "free_slots": free, "rules": {"max_per_day": sc["max_per_day"], "min_gap_minutes": sc["min_gap_minutes"]},
+            "free_slots": free, "rules": {"max_per_day": sc["max_per_day"], "min_gap_minutes": sc["min_gap_minutes"],
+                                          "horizon_days": max(14, sc["horizon_days"])},
             "shows": [{"key": k, "name": for_stream_show_name(cfg, k), "channels": s["channels"], "hue": hue[k]}
                       for k, s in shown_shows(cfg).items()],
             "counts": {**counts, "scheduled_7d": sum(

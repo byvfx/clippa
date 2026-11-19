@@ -150,13 +150,13 @@ body[data-view="research"] .page[data-page="research"], body[data-view="settings
   .page[data-page="money"] { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
   .page[data-page="library"], .page[data-page="research"], .page[data-page="settings"] { max-width: 980px; }
 }
-/* Schedule: what is next and the unslotted beside the days (a phone: one under the other) */
-@media (min-width: 1000px) {
-  #vSched { display: grid; grid-template-columns: 400px minmax(0, 1fr); grid-template-rows: auto auto auto 1fr; }
-  #vSched > h2 { grid-column: 1 / -1; }
-  #vSched > .uploads, #vSched > .sched-tools, #vSched > .unslotted { grid-column: 1; border-right: 1px solid var(--line); }
-  #vSched > .sched { grid-column: 2; grid-row: 2 / span 3; }
-  #vSched > .unslotted { max-height: none; align-self: stretch; }
+/* Schedule: Next up across the top, then the Week (or the List) beside the tray (schedule.js) */
+@media (min-width: 1100px) {
+  .page[data-page="schedule"] { grid-template-columns: minmax(0, 1fr) 330px; }
+  .page[data-page="schedule"] > .nextup { grid-column: 1 / -1; }
+  #vTray { position: sticky; top: calc(var(--head-h) + var(--bar-h, 40px) + 10px); max-height: calc(100vh - var(--head-h) - var(--bar-h, 40px) - 24px); display: flex; flex-direction: column; }
+  #vTray > .unslotted { max-height: none; flex: 1 1 auto; min-height: 120px; }
+  #vTray > .uploads { flex: 0 1 auto; overflow: auto; }
 }
 /* the Library, Research and Settings pages: a tile for each window they open */
 .launch { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; padding: 14px; }
@@ -312,16 +312,22 @@ input.search { margin-left: auto; width: 180px; }
 .slot.free { cursor: default; opacity: .55; }
 .slot.free .tt { color: var(--faint); font-style: italic; }
 .slot.free .bar { opacity: .5; }
-.slot.over, .unpin.over, .day h3.over { background: var(--panel2); background: color-mix(in srgb, var(--blue) 20%, var(--panel)); outline: 1px dashed var(--blue); opacity: 1; }
+.slot.over, .unpin.over, .day h3.over, .fslot.over, .wk .wh.over { background: var(--panel2); background: color-mix(in srgb, var(--blue) 20%, var(--panel)); outline: 1px dashed var(--blue); opacity: 1; }
 .sched-tools { display: flex; gap: 8px; align-items: center; padding: 8px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; font-size: 11px; color: var(--faint); }
 .sched-tools label { display: inline-flex; gap: 4px; align-items: center; cursor: pointer; }
 .unpin { border: 1px dashed var(--line); border-radius: 7px; padding: 4px 10px; }
 .unslotted[hidden] { display: none; }
 .unslotted { padding: 6px 14px 10px; border-bottom: 1px solid var(--line); display: grid; gap: 3px; max-height: 220px; overflow: auto; }
-.unslotted .chip { display: grid; grid-template-columns: 6px 1fr auto auto; gap: 8px; align-items: center; font-size: 12px; padding: 3px 6px; border-radius: 6px; cursor: grab; }
+.unslotted .chip { display: grid; grid-template-columns: 4px minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 12px; padding: 4px 6px; border-radius: 6px; cursor: grab; }
 .unslotted .chip:hover { background: var(--panel2); }
-.unslotted .chip .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.unslotted .chip .bar { align-self: stretch; border-radius: 2px; background: var(--clip); }
+.unslotted .chip .bar.short { background: var(--short); } .unslotted .chip .bar.segment { background: var(--segment); } .unslotted .chip .bar.compilation { background: var(--compilation); }
+.unslotted .chip .t { display: grid; gap: 2px; min-width: 0; }
+.unslotted .chip .tt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.unslotted .chip .sub { display: flex; gap: 6px; align-items: center; font-size: 11px; color: var(--faint); min-width: 0; overflow: hidden; }
 .unslotted .chip .why { font-size: 10px; color: var(--amber); }
+.unslotted > .ss { font-size: 11px; color: var(--faint); padding: 2px 0 4px; }
+.unslotted > .lnk { justify-self: start; font-size: 11.5px; margin-top: 6px; }
 .unslotted .chip .nx { background: none; border: 0; padding: 0 4px; color: var(--blue); font: inherit; font-size: 14px; cursor: pointer; }
 /* #54 faces: a stream's groups, the box tool */
 #tool.facesw { width: min(1180px, 97vw); }
@@ -697,4 +703,70 @@ body { --chat-w: min(360px, 100vw); }
   #palette { width: 100vw; max-width: 100vw; max-height: 80vh; margin: 0 0 auto; border-radius: 0 0 var(--win-radius) var(--win-radius); }
   #palQ { font-size: 16px; }   /* 16 px: a phone doesn't zoom into the box */
   .pal-o { padding: 10px; }
+}
+
+/* ---------- the Schedule page (schedule.js) ---------- */
+.panel h2 .seg { display: inline-flex; border: 1px solid color-mix(in srgb, var(--tb-sub) 45%, transparent); border-radius: var(--btn-radius); overflow: hidden; margin-left: 10px; }
+.panel h2 .seg button { border: 0; background: none; padding: 2px 10px; color: var(--tb-sub); font: 500 11.5px var(--sans); letter-spacing: 0; text-transform: none; cursor: pointer; }
+.panel h2 .seg button[aria-pressed="true"] { background: var(--raise); color: var(--text); }
+.wknav { display: inline-flex; align-items: center; gap: 6px; margin-left: 10px; font: 500 11.5px var(--sans); letter-spacing: 0; text-transform: none; color: var(--tb-sub); }
+.wknav[hidden] { display: none; }
+.wknav .btn:disabled { opacity: .35; cursor: default; }
+.panel h2.sub-h { border-top: 1px solid var(--line); }
+.sched-tools .legend { margin-left: auto; display: inline-flex; gap: 12px; flex-wrap: wrap; }
+.sched-tools .legend > span { display: inline-flex; gap: 5px; align-items: center; }
+.lg { width: 14px; height: 10px; border-radius: 2px; display: inline-block; border: 1px solid var(--dim); border-left-width: 3px; }
+.lg.up { background: color-mix(in srgb, var(--dim) 35%, var(--panel2)); }
+.lg.open { border: 1px dashed var(--line2); }
+
+.nextup { display: grid; grid-template-columns: auto repeat(5, minmax(0, 1fr)); gap: 8px; align-items: stretch; min-width: 0; padding: 8px; }
+.nextup .lead { display: grid; align-content: center; gap: 2px; padding: 0 10px 0 2px; font-size: 11.5px; color: var(--faint); }
+.nextup .lead b { font: 600 10.5px var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.nextup > .empty { grid-column: 2 / -1; padding: 12px; text-align: left; }
+.nu { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; padding: 6px; border: 1px solid var(--line); border-radius: var(--card-radius); background: var(--panel); color: var(--text); font: inherit; text-align: left; align-items: center; cursor: pointer; min-width: 0; }
+.nu:hover { border-color: var(--btn-hover); }
+.nu.failed { border-color: var(--red); }
+.nu img, .nu > i { width: 64px; height: 36px; object-fit: cover; border-radius: 3px; background: var(--panel2); display: block; }
+.nu .b { display: grid; gap: 2px; min-width: 0; }
+.nu .w { font: 500 11px var(--mono); color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nu .t { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nu .sub { display: flex; gap: 6px; align-items: center; font-size: 11px; color: var(--faint); min-width: 0; }
+@media (max-width: 1100px) {
+  .nextup { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+  .nextup .lead { grid-column: 1 / -1; display: flex; gap: 10px; align-items: baseline; padding: 0 2px; }
+  .nextup > .empty { grid-column: 1 / -1; }
+}
+
+.wkwrap { overflow: auto; max-height: calc(100vh - var(--head-h) - var(--bar-h, 40px) - 190px); }
+.wkwrap[hidden] { display: none; }
+.wk { display: grid; grid-template-columns: 52px repeat(7, minmax(112px, 1fr)); min-width: 840px; }
+.wk .wh { position: sticky; top: 0; z-index: 2; background: var(--panel2); border-bottom: 1px solid var(--line); border-left: 1px solid var(--line); padding: 6px 8px; display: grid; gap: 1px; font-size: 12px; }
+.wk .wh.corner { border-left: 0; }
+.wk .wh b { font-weight: 600; white-space: nowrap; }
+.wk .wh.today b { color: var(--accent); }
+.wk .wh .c { font: 11px var(--mono); color: var(--faint); }
+.wk .wh .c.full { color: var(--amber); }
+.wk .capbar { height: 3px; background: var(--raise); border-radius: 2px; overflow: hidden; margin-top: 3px; }
+.wk .capbar i { display: block; height: 100%; background: var(--dim); }
+.wk .hr { font: 10.5px var(--mono); color: var(--faint); text-align: right; padding: 3px 8px 0 0; border-top: 1px solid var(--line); white-space: nowrap; }
+.wk .cell { position: relative; border-top: 1px solid var(--line); border-left: 1px solid var(--line); min-height: 40px; padding: 3px; display: grid; gap: 3px; align-content: start; min-width: 0; }
+.wk .cell.today { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.nowline { position: absolute; left: 0; right: 0; height: 0; border-top: 2px solid var(--red); z-index: 1; pointer-events: none; }
+.blk { --sc: var(--dim); --kc: var(--clip); min-width: 0; border-radius: 4px; padding: 3px 6px 3px 7px; font-size: 11.5px; line-height: 1.25; border: 1px solid var(--sc); border-left: 3px solid var(--kc); cursor: pointer; display: grid; color: var(--text); }
+.blk.up { background: color-mix(in srgb, var(--sc) 24%, var(--panel2)); }
+.blk.planned { background: var(--panel); }
+.blk.past { opacity: .55; }
+.blk:hover, .blk:focus-visible { border-color: var(--text); }
+.blk[draggable="true"] { cursor: grab; }
+.blk.s1 { --sc: var(--show-1); } .blk.s2 { --sc: var(--show-2); } .blk.s3 { --sc: var(--show-3); }
+.blk.s4 { --sc: var(--show-4); } .blk.s5 { --sc: var(--show-5); } .blk.s6 { --sc: var(--show-6); }
+.blk.k-short, .fslot.k-short { --kc: var(--short); } .blk.k-segment, .fslot.k-segment { --kc: var(--segment); }
+.blk.k-compilation, .fslot.k-compilation { --kc: var(--compilation); } .fslot.k-clip { --kc: var(--clip); }
+.blk .bm { font: 10.5px var(--mono); color: var(--dim); display: flex; gap: 5px; align-items: center; white-space: nowrap; overflow: hidden; }
+.blk .bm .ic { width: 11px; height: 11px; }
+.blk .bt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fslot { --kc: var(--clip); border: 1px dashed var(--line2); border-left: 3px solid color-mix(in srgb, var(--kc) 45%, transparent); border-radius: 4px; padding: 2px 6px; font: 10.5px var(--mono); color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 700px) {  /* a phone gets the List (schedule.js), and the next three */
+  .panel h2 .seg, .wknav, .sched-tools .legend { display: none; }
+  .nextup .nu:nth-of-type(n+4) { display: none; }
 }

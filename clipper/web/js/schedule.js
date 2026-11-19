@@ -1,0 +1,136 @@
+// War room: the Schedule page. Next up (the next five to go out), then the Week (seven days from
+// today, hours down, a page per week out to the scheduler's horizon) or the day List, beside the
+// tray of approved items with no slot. Dragging onto a slot, a day or "unpin" is panels.js's
+// (#20): it pins through the same action as Kitsu's Publish at. A phone gets the List.
+
+let SVIEW = (() => { try { return localStorage.getItem("warroom.sview") === "list" ? "list" : "week"; } catch { return "week"; } })();
+let WEEK = 0;  // weeks after this one
+const SKIND = { ...KIND, clip: "Clip" };  // schedule.json says clip where an item says pick
+const addDays = (day, n) => { const [y, m, d] = day.split("-").map(Number); return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10); };
+const tzAt = iso => { const p = localPin(iso); return { day: p.slice(0, 10), h: +p.slice(11, 13), m: +p.slice(14, 16) }; };
+const tm = iso => new Date(iso).toLocaleTimeString([], { timeZone: STATE.timezone, hour: "numeric", minute: "2-digit" });
+const dayName = (day, o) => new Date(day + "T12:00:00").toLocaleDateString([], o);
+const hueOf = name => (STATE.shows || []).find(s => s.name === name)?.hue || 0;
+function inTime(iso) {
+  const s = (new Date(iso) - Date.now()) / 1000;
+  if (s <= 0) return ago(iso);
+  return s < 3600 ? `in ${Math.max(1, Math.round(s / 60))} min` : s < 129600 ? `in ${Math.round(s / 3600)} h` : `in ${Math.round(s / 86400)} d`;
+}
+// What an entry is, in words: for a block's tooltip and the Next up cards.
+function entryState(e) {
+  const err = (STATE.uploads?.next || []).find(x => x.key === e.key)?.last_error;
+  if (err) return `the last upload failed: ${err}`;
+  if (e.status !== "uploaded") return `not uploaded yet${e.source === "pinned" ? ", pinned" : e.source === "asap" ? ", as soon as it may" : ""}`;
+  const pub = new Date(e.publish_at) <= Date.now();
+  return `${e.uploaded_at ? `uploaded ${ago(e.uploaded_at)}` : "uploaded"}, ${pub ? "public" : "private until it goes public"}${e.views != null ? ` · ${Number(e.views).toLocaleString()} views` : ""}`;
+}
+
+function renderSchedule() {
+  const week = SVIEW === "week" && !PHONE.matches;
+  $("#schedSub").textContent = `${STATE.counts.scheduled_7d} in 7 days`;
+  for (const b of document.querySelectorAll("[data-sview]")) b.setAttribute("aria-pressed", String(b.dataset.sview === (week ? "week" : "list")));
+  $("#week").hidden = $("#wkNav").hidden = !week;
+  $("#schedule").hidden = week;
+  renderNextUp(); renderTray();
+  const segs = STATE.items.some(i => STATUS.unslotted(i) && i.kind === "segment" && !i.hold);
+  $("#schedTools").innerHTML = `<label title="Show the open slots to drop items on"><input type="checkbox" id="showFree" ${SHOWFREE ? "checked" : ""}> Open slots</label>
+    <span class="unpin" data-unpin>${ic("down")}drop here to unpin</span>
+    ${segs ? `<button class="btn" data-nextkind="segment" title="Pin each approved segment without a slot to the next open segment slot, before it goes stale (a preview first)">${ic("next")}Segments to open slots…</button>` : ""}
+    <span>max ${STATE.rules?.max_per_day ?? "?"}/day · ${STATE.rules?.min_gap_minutes ?? "?"} min apart · drag a block to move it</span>
+    ${week ? `<span class="legend"><span><i class="lg up"></i>uploaded</span><span><i class="lg planned"></i>not uploaded yet</span><span><i class="lg open"></i>open slot</span><span>${ic("pin")}pinned</span></span>` : ""}`;
+  if (week) renderWeek(); else renderDays();
+}
+
+function renderNextUp() {
+  const next = STATE.schedule.filter(e => new Date(e.publish_at) > Date.now()).slice(0, 5), u = STATE.uploads;
+  $("#nextUp").innerHTML = `<div class="lead"><b>Next up</b>${u ? `<span>${u.room} of ${u.max_per_24h} upload room now</span>` : ""}</div>`
+    + (next.length ? next.map(e => { const err = entryState(e).startsWith("the last upload failed");
+      return `<button class="nu${err ? " failed" : ""}" data-open="${esc(e.key)}" title="${esc(`${e.title}\n${entryState(e)}`)}">${e.thumbnail_url ? `<img loading="lazy" src="${esc(e.thumbnail_url)}" alt="">` : "<i></i>"}
+        <span class="b"><span class="w">${esc(dayName(tzAt(e.publish_at).day, { weekday: "short" }))} ${esc(tm(e.publish_at))} · ${esc(inTime(e.publish_at))}${err ? ` · ${ic("warn")}failed` : ""}</span>
+        <span class="t">${esc(bare(e.title, e.show_name))}</span><span class="sub">${showTag("", e.show_name)}<span>${esc(SKIND[e.kind] || e.kind)}</span></span></span></button>`; }).join("")
+    : `<div class="empty">Nothing is planned ahead. Replan fills the open slots.</div>`);
+}
+
+// The tray: what can still go out and has no slot, the number the Schedule tab shows. Stale and
+// over-budget items won't go out unless pinned: one link to them in the queue, not in the tray.
+function renderTray() {
+  const uns = STATE.items.filter(STATUS.unslotted).sort(newest);
+  const gone = STATE.items.filter(i => i.decision === "approved" && !i.scheduled && !i.uploaded && i.dropped).length;
+  $("#traySub").textContent = uns.length || "";
+  $("#unslotted").innerHTML = (uns.length ? `<div class="ss">Drag one onto an open slot, or ${ic("next")} for the next one</div>`
+    + uns.slice(0, 60).map(i => { const k = i.kind === "pick" ? "clip" : i.kind;
+      return `<div class="chip" draggable="true" data-dref="${esc(i.ref)}" data-dkind="${esc(k)}" title="${esc(i.title)}"><span class="bar ${esc(k)}"></span><span class="t"><span class="tt">${esc(bare(i.title, i.show_name))}</span><span class="sub">${showTag(i.show, i.show_name)}<span>${esc(SKIND[k] || k)}</span>${i.hold ? `<span class="why">held</span>` : ""}</span></span>${!i.hold && i.kind !== "compilation" ? `<button class="nx" data-nextslot="${esc(i.ref)}" title="Pin to the next open slot (a preview first)" aria-label="Next open slot">${ic("next")}</button>` : "<span></span>"}</div>`; }).join("")
+    + (uns.length > 60 ? `<div class="ss">and ${uns.length - 60} more</div>` : "")
+    : `<div class="ss">Nothing approved is waiting for a slot.</div>`)
+    + (gone ? `<button class="lnk" data-notout title="Stale or over their stream's budget: the scheduler leaves them out, a pin still sends one">${gone} not going out (stale or over budget)</button>` : "");
+}
+
+function renderWeek() {
+  const today = tzAt(new Date().toISOString()).day, now = tzAt(new Date().toISOString());
+  const last = Math.max(0, Math.ceil((STATE.rules?.horizon_days || 14) / 7) - 1);
+  WEEK = Math.max(0, Math.min(WEEK, last));
+  const days = [...Array(7)].map((_, k) => addDays(today, 7 * WEEK + k)), inWeek = x => days.includes(x.day);
+  const es = STATE.schedule.map(e => ({ e, ...tzAt(e.publish_at) })).filter(inWeek);
+  const fs = SHOWFREE ? (STATE.free_slots || []).map(f => ({ f, ...tzAt(f.at) })).filter(inWeek) : [];
+  const hrs = [...es, ...fs].map(x => x.h).concat(days.includes(now.day) ? [now.h] : []);
+  const h0 = hrs.length ? Math.max(0, Math.min(...hrs) - 1) : 8, h1 = hrs.length ? Math.min(23, Math.max(...hrs) + 1) : 22;
+  const max = STATE.rules?.max_per_day || 0;
+  $("#wkLabel").textContent = `${dayName(days[0], { month: "short", day: "numeric" })} – ${dayName(days[6], { month: "short", day: "numeric" })}`;
+  $("#wkPrev").disabled = WEEK === 0; $("#wkNext").disabled = WEEK === last;
+  const blk = ({ e }) => { const up = e.status === "uploaded", n = hueOf(e.show_name), k = SKIND[e.kind] ? e.kind : "clip";
+    return `<div class="blk ${up ? "up" : "planned"}${new Date(e.publish_at) < Date.now() ? " past" : ""}${n ? ` s${n}` : ""} k-${k}" data-open="${esc(e.key)}" role="button" tabindex="0"
+      title="${esc(`${tm(e.publish_at)} · ${e.show_name} · ${SKIND[e.kind] || e.kind}\n${e.title}\n${entryState(e)}`)}"${up ? "" : ` draggable="true" data-dref="${esc(e.key)}" data-dkind="${esc(e.kind)}" data-dat="${esc(e.publish_at)}"`}>
+      <span class="bm">${esc(tm(e.publish_at))}<span>${esc(SKIND[e.kind] || e.kind)}</span>${e.source === "pinned" ? ic("pin") : ""}${entryState(e).startsWith("the last upload failed") ? ic("warn") : ""}</span>
+      <span class="bt">${esc(bare(e.title, e.show_name))}</span></div>`; };
+  const slot = ({ f }) => `<div class="fslot k-${esc(f.kind)}" data-dslot="${esc(f.at)}" data-dkind="${esc(f.kind)}" title="An open ${esc(SKIND[f.kind] || f.kind)} slot: drop an item here to pin it">${esc(tm(f.at))} ${esc(SKIND[f.kind] || f.kind)}</div>`;
+  let h = `<div class="wk"><div class="wh corner"></div>`;
+  for (const d of days) {
+    const n = es.filter(x => x.day === d).length;
+    h += `<div class="wh${d === today ? " today" : ""}" data-dday="${d}" title="Drop here to pick a time on this day"><b>${esc(dayName(d, { weekday: "short", day: "numeric" }))}${d === today ? " · today" : ""}</b>
+      <span class="c${max && n >= max ? " full" : ""}">${n}${max ? ` of ${max}` : ""}</span>${max ? `<span class="capbar"><i style="width:${Math.min(100, 100 * n / max)}%"></i></span>` : ""}</div>`;
+  }
+  for (let hr = h0; hr <= h1; hr++) {
+    h += `<div class="hr">${esc(new Date(2000, 0, 1, hr).toLocaleTimeString([], { hour: "numeric" }))}</div>`;
+    for (const d of days) {
+      const here = x => x.day === d && x.h === hr;
+      const rows = [...es.filter(here).map(x => ({ m: x.m, html: blk(x) })), ...fs.filter(here).map(x => ({ m: x.m, html: slot(x) }))].sort((a, b) => a.m - b.m);
+      h += `<div class="cell${d === today ? " today" : ""}">${d === now.day && hr === now.h ? `<i class="nowline" style="top:${(now.m / 60 * 100).toFixed(1)}%" title="Now"></i>` : ""}${rows.map(r => r.html).join("")}</div>`;
+    }
+  }
+  $("#week").innerHTML = h + "</div>";
+}
+
+// The List: the days one under the other (the phone's view, and the desktop's other one).
+function renderDays() {
+  const tz = STATE.timezone, days = {};
+  const dayKey = d => new Date(d).toLocaleDateString("en-CA", { timeZone: tz });
+  const today = dayKey(new Date());
+  for (const e of STATE.schedule) (days[dayKey(e.publish_at)] ??= []).push(e);
+  for (let k = 0; k < 14; k++) { const d = new Date(Date.now() + k * 864e5); days[dayKey(d)] ??= []; }
+  const free = {};
+  if (SHOWFREE) for (const f of STATE.free_slots || []) if (new Date(f.at) < Date.now() + 14 * 864e5) (free[dayKey(f.at)] ??= []).push(f);
+  for (const d of Object.keys(free)) days[d] ??= [];
+  $("#schedule").innerHTML = Object.keys(days).sort().map(d => {
+    const label = new Date(d + "T12:00:00").toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+    const rows = [...days[d].map(e => ({ e, at: e.publish_at })), ...(free[d] || []).map(f => ({ f, at: f.at }))]
+      .sort((a, b) => a.at.localeCompare(b.at));
+    return `<div class="day ${d === today ? "today" : d < today ? "past" : ""}"><h3 data-dday="${d}">${d === today ? "Today · " : ""}${label}<span class="n">${days[d].length || ""}</span></h3>
+      ${rows.map(({ e, f }) => f ? `<div class="slot free" data-dslot="${esc(f.at)}" data-dkind="${esc(f.kind)}">
+        <span class="tm">${tm(f.at)}</span>
+        <span class="bar ${esc(f.kind)}"></span><span><div class="tt">open ${esc(f.kind)} slot</div></span></div>`
+      : `<div class="slot" data-open="${esc(e.key)}" role="button" tabindex="0" ${e.status !== "uploaded" ? `draggable="true" data-dref="${esc(e.key)}" data-dkind="${esc(e.kind)}" data-dat="${esc(e.publish_at)}"` : ""}>
+        <span class="tm">${tm(e.publish_at)}</span>
+        <span class="bar ${esc(e.kind)}"></span>
+        <span><div class="tt" title="${esc(e.title)}">${esc(bare(e.title, e.show_name))}</div><div class="ss">${showTag("", e.show_name)} · ${e.kind}${e.status === "uploaded" ? ` · <span class="up">uploaded</span>${e.views != null ? ` · ${Number(e.views).toLocaleString()} views` : ""}${e.url ? ` · <a href="${esc(e.url)}" target="_blank" rel="noopener">YouTube</a>` : ""}` : e.source === "pinned" ? " · pinned" : ""}</div></span></div>`).join("")
+      || `<div class="slot" style="cursor:default"><span></span><span></span><span class="ss">—</span></div>`}</div>`;
+  }).join("");
+}
+
+document.addEventListener("click", e => {
+  const v = e.target.closest?.("[data-sview]");
+  if (v) { SVIEW = v.dataset.sview; try { localStorage.setItem("warroom.sview", SVIEW); } catch { /* private window */ } if (STATE) renderSchedule(); return; }
+  const w = e.target.closest?.("#wkPrev,#wkNext");
+  if (w) { WEEK += w.id === "wkNext" ? 1 : -1; if (STATE) renderSchedule(); return; }
+  if (e.target.closest?.("[data-notout]")) { goPage("queue"); TAB = "approved"; ST = "dropped"; SEL = null; renderQueue(); }
+});
+PHONE.addEventListener("change", () => { if (STATE) renderSchedule(); });
