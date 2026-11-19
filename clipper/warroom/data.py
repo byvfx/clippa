@@ -334,9 +334,15 @@ def overview(cfg: dict) -> dict:
     sched = jsonstate.read_or(cfg["paths"]["schedule"], {}) or {}
     by_ref = {r["ref"]: r for r in rows}
     entries, views = [], views_by_video(cfg)
+    sc = cfg["schedule"]
+    # #20: the open slots (drop targets) go as far ahead as the scheduler plans, at least 14 days
+    # (the Week view pages through them), so the entries must reach at least as far, or a taken
+    # slot past the cutoff would show as open.
+    horizon = max(14, sc["horizon_days"])
+    until = now + timedelta(days=max(21, horizon + 1))
     for e in sched.get("entries", []):
         when = datetime.fromisoformat(e["publish_at"]).astimezone(tz)
-        if when < now - timedelta(days=2) or when > now + timedelta(days=21):
+        if when < now - timedelta(days=2) or when > until:
             continue
         r = by_ref.get(e["key"], {})
         sd = streams_dir / e["stream"]
@@ -347,10 +353,7 @@ def overview(cfg: dict) -> dict:
                         "thumbnail_url": r.get("thumbnail_url", ""),
                         "views": views.get(e.get("video_id") or "")})
     entries.sort(key=lambda e: e["publish_at"])
-    sc = cfg["schedule"]
-    # #20: the open slots (drop targets) as far ahead as the scheduler plans, at least 14 days
-    # (the Week view pages through them), and the spacing rules the page checks.
-    taken, horizon = {e["publish_at"][:16] for e in entries}, max(14, sc["horizon_days"])
+    taken = {e["publish_at"][:16] for e in entries}
     free = [{"at": when.isoformat(), "kind": kind}
             for when, kind in schedule.slots({**sc, "horizon_days": horizon}, tz, now.date())
             if when > now + timedelta(minutes=30) and when.isoformat()[:16] not in taken]

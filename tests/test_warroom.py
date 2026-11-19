@@ -611,3 +611,24 @@ def test_the_schedule_sends_upload_times_and_slots_to_the_horizon(tmp_path, defa
     assert out["rules"]["horizon_days"] == horizon
     last = max(datetime.fromisoformat(f["at"]) for f in out["free_slots"])
     assert last > datetime.fromisoformat(out["generated_at"]) + timedelta(days=horizon - 2)
+
+
+def test_a_taken_slot_past_three_weeks_is_not_offered_again(tmp_path, defaults, monkeypatch):
+    # PR #329 review: entries were cut at 21 days while the open slots went to horizon_days.
+    from datetime import datetime, timedelta
+
+    from clipper import jsonstate
+
+    cfg = {**defaults, "schedule": {**defaults["schedule"], "horizon_days": 28},
+           "paths": {**defaults["paths"], "streams": tmp_path, "schedule": tmp_path / "schedule.json"}}
+    monkeypatch.setattr(warroom.review, "all_rows", lambda c: [])
+    jsonstate.write(cfg["paths"]["schedule"], {"entries": []})
+    out = warroom.overview(cfg)
+    now = datetime.fromisoformat(out["generated_at"])
+    late = next(f for f in out["free_slots"] if datetime.fromisoformat(f["at"]) > now + timedelta(days=24))
+    jsonstate.write(cfg["paths"]["schedule"], {"entries": [
+        {"key": "kick-1/s01", "stream": "kick-1", "kind": late["kind"], "title": "t", "status": "planned",
+         "publish_at": late["at"]}]})
+    out = warroom.overview(cfg)
+    assert [e["key"] for e in out["schedule"]] == ["kick-1/s01"]
+    assert late["at"][:16] not in {f["at"][:16] for f in out["free_slots"]}
