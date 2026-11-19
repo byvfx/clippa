@@ -170,7 +170,7 @@ document.addEventListener("click", e => {
   const b = e.target.closest?.("#moreBtn, #pagesMore");
   if (b) { $("#" + MENUS[b.id]).hidden ? openMenu(b.id) : closeMenus(); return; }
   const lk = e.target.closest?.("[data-look]");
-  if (lk) { ClippaTheme.pick(lk.dataset.look); renderLooks(); return; }
+  if (lk) { ClippaTheme.pick(lk.dataset.look); renderLooks(); }
   if (e.target.closest?.("[data-keys-tile]")) showKeys();
   if (e.target.closest?.("[data-menu-log]")) showLog();
   closeMenus();  // an item was picked (its own handler has run), or a click elsewhere

@@ -185,12 +185,16 @@ function renderWidgets() {
     wu.querySelector(".meter i").className = u.room ? "" : "full";
     wu.title = `Uploads in the last 24 hours: ${u.last_24h} of ${u.max_per_24h}${u.room ? `, ${u.room} more now` : ", at the cap"}. ${c.scheduled_7d} planned in 7 days.`;
   }
-  const st = STATE.streams, rec = st.filter(x => x.recording && x.recording !== "done").length;
-  const run = st.filter(x => x.run_status === "running").length, bad = st.filter(x => x.run_status === "failed").length;
+  // the recorder's states: recording (the show is live), paused (offline, waiting out the grace period),
+  // finalizing (ended, closing the file); Grok on #314: only the first is live
+  const st = STATE.streams, n = f => st.filter(f).length;
+  const live = n(x => x.recording === "recording"), ending = n(x => ["paused", "finalizing"].includes(x.recording));
+  const run = n(x => x.run_status === "running"), bad = n(x => x.run_status === "failed");
   const wp = $("#wPipe");
-  wp.querySelector("b").textContent = [rec && `● ${rec} live`, run && `${run} running`].filter(Boolean).join(" · ") || "idle";
-  wp.dataset.level = bad ? "bad" : rec || run ? "busy" : "";
-  wp.title = `${rec} recording, ${run} processing${bad ? `, ${bad} failed` : ""}. Opens the Pipeline page.`;
+  wp.querySelector("b").textContent = [live && `● ${live} live`, ending && `${ending} ending`, run && `${run} running`,
+    bad && `${bad} failed`].filter(Boolean).join(" · ") || "idle";
+  wp.dataset.level = bad ? "bad" : live || ending || run ? "busy" : "";
+  wp.title = `${live} live, ${ending} paused or finalizing, ${run} processing, ${bad} failed. Opens the Pipeline page.`;
   $("#vnSched").textContent = c.approved_unscheduled || "";
 }
 
