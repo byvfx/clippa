@@ -14,7 +14,7 @@ and Investigations) and **Settings** (the keys, the keyboard shortcuts and the l
 remembers the page. Review counts what waits for you; Schedule counts the approved items with no
 slot. Library, Research and Settings open today's windows from a tile each for now.
 
-The top bar is one row: the live shows, four widgets, **Chat** and **⋯**.
+The top bar is one row: the live shows, four widgets, **Search**, **Chat** and **⋯**.
 
 - **Uploads**: the last 24 hours against `max_per_24h`, as a meter. Opens Schedule.
 - **Spend**: this month's model and Modal spend, the Costs panel's total. Opens Money.
@@ -23,6 +23,20 @@ The top bar is one row: the live shows, four widgets, **Chat** and **⋯**.
   45 s or when a job failed, red past 2 min, when serve or the bot is down or the Kitsu sync
   failed. Hover for what's wrong and how old the numbers are. Opens Pipeline.
 - **⋯** has the actions that change things: Sync Kitsu, Replan, Undo…, the log, the keyboard shortcuts.
+
+## Search and the G keys
+
+<kbd>Ctrl</kbd> <kbd>K</kbd> (<kbd>Cmd</kbd> <kbd>K</kbd> on a Mac), or **Search** in the top bar, opens
+one box that reaches everything: the eight pages, an item by its title, show, kind or name
+(`s07`), the ⋯ actions, the Cast, News, Blinds, Investigations and Keys windows, the other look,
+the Clippa chat, a live show and the queue tabs. Type a few letters, pick with <kbd>↑</kbd>
+<kbd>↓</kbd>, <kbd>Enter</kbd> runs it, <kbd>Esc</kbd> closes it. It shows the best 8 items; the
+queue's own search box finds the rest. On a phone it is **Search…** under **More** in the bottom bar.
+
+<kbd>G</kbd> then a letter jumps to a page from anywhere but a box: <kbd>R</kbd> Review,
+<kbd>S</kbd> Schedule, <kbd>P</kbd> Pipeline, <kbd>M</kbd> Money, <kbd>T</kbd> Stats,
+<kbd>L</kbd> Library, <kbd>F</kbd> Research, <kbd>,</kbd> Settings. An item open on top of the
+page closes first (it asks about unsaved edits). The number keys still switch the queue tabs.
 
 The page used to have a Layout button for dragging panels between columns and saving layouts
 (`[paths] warroom_layouts`); the fixed pages replace it (2026-11-18), and a saved-layouts file
@@ -94,6 +108,8 @@ It works from the keyboard:
 | <kbd>M</kbd> | show or hide the [chat](#the-chat-at-the-side) |
 | <kbd>1</kbd>–<kbd>7</kbd> | the queue tabs (7 is Retakes) |
 | <kbd>/</kbd> | the search box |
+| <kbd>Ctrl</kbd> <kbd>K</kbd> | [search everything](#search-and-the-g-keys) |
+| <kbd>G</kbd> then a letter | [jump to a page](#search-and-the-g-keys) |
 | <kbd>Esc</kbd> | close the item |
 
 <kbd>Tab</kbd> reaches the card titles, schedule slots and live chips too; <kbd>Enter</kbd> or

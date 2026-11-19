@@ -460,6 +460,8 @@ def test_the_look_has_its_fonts_and_one_icon_set():
     # a click on an icon lands on its button: handlers check e.target.id (Undo, Select shown, Log)
     css = (warroom.WEB / "warroom.css").read_text(encoding="utf-8")
     assert "pointer-events: none" in re.search(r"^\.ic \{[^}]*\}", css, re.M).group()
+    # a rule sizing a panel's charts (".stats svg") would size its icons too: it says svg:not(.ic)
+    assert not re.findall(r"[^,{}]*\bsvg\s*[{,]", css), "scope it: svg:not(.ic)"
     # emoji, and the symbols the page drew icons with before the sprite (the arrows but the plain
     # four, technical, shapes, supplemental arrows); a key name's or a sentence's arrow is fine
     emoji = re.compile("[\U0001F300-\U0001FAFF↕-⇿⌀-⏿■-◿☀-➿⟰-⟿⤀-⧿⬀-⯿]")
