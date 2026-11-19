@@ -306,8 +306,14 @@ messages: GitHub closes the issue on "fix".
   actions, the tile windows, the other look, the chat, a live show, the queue tabs; on a phone Search… under More. G then
   R S P M T L F `,` jumps to a page (`GO_KEYS` in palette.js, `goPage` closes an item on top first; a held letter's
   repeats are swallowed); a test ties GO_KEYS, the palette's names and the ? list to `PAGES`. It also fixed step 4's
-  Stats arrows (chart rules are `svg:not(.ic)`). Steps 2 to 4 went live with the 11-19 deploy; step 5 waits on the next one. Next plan steps:
-  Schedule week/timeline (6-7), phone (8). Library/Research/Settings still open the old windows from tiles.
+  Stats arrows (chart rules are `svg:not(.ic)`). Steps 2 to 5 are live (step 5 with the second 11-19 deploy). Step 6 is
+  PR #329, merged 11-19 (Grok reviewed it on the second try; the first gave an empty answer), not deployed: the Schedule
+  page (`js/schedule.js`) is Next up (the next 5, with upload room), the Week (7 days from today, paged to
+  `horizon_days`, a block per entry coloured by show with a kind stripe, dashed open slots, a now line) or the List (the
+  phone always gets it), and the Ready to slot tray (= the Schedule tab count; stale/over-budget is one link to the
+  queue's approved + dropped) with Uploads under it. The overview sends `uploaded_at`, entries and open slots out to
+  max(14, `horizon_days`), and `ended_at`/`release_at` per stream. Drops still go through `act(ref, "pin")`. Next plan
+  steps: the Timeline (7), phone (8). Library/Research/Settings still open the old windows from tiles.
 - **War room heat graph (11-16, user asked "can we see the heat graph of a stream in the war room?"):** PR #294,
   merged 11-16 after Grok's review, deployed 11-19. 🔥 heat on a stream (Pipeline panel) or in an item's
   window: the signals curve, the windows, and each cut item where it sits, coloured by review state, plus the twelve
