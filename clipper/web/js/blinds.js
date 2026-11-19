@@ -17,7 +17,7 @@ async function showBlinds(opts = {}) {
   if (!BS || !d.open || d.dataset.kind !== "blinds") { BS = null; BLINDSWIN++; }  // a fresh opening
   const win = BLINDSWIN, req = ++BLINDSREQ;
   d.dataset.kind = "blinds"; d.classList.remove("cover"); d.classList.add("facesw");
-  if (!BS) d.innerHTML = `<div class="m-head"><b>Blinds</b><button class="x" aria-label="Close" title="Close (Esc)" data-close>×</button></div><div class="tbody">Loading…</div>`;
+  if (!BS) d.innerHTML = `<div class="m-head"><b>Blinds</b><button class="x" aria-label="Close" title="Close (Esc)" data-close>${ic("close")}</button></div><div class="tbody">Loading…</div>`;
   if (!d.open) d.showModal();
   const DEF = { days: 14, view: "waiting", source: "", paste: false, full: new Set() };
   const s = { ...DEF, ...(BS || {}), ...opts };
@@ -84,7 +84,7 @@ function renderBlinds() {
     .map(([v, l]) => `<option value="${esc(v)}"${v === BS.source ? " selected" : ""}>${esc(l)}</option>`).join("");
   const days = [1, 3, 7, 14, 30, 90, 365].map(x => `<option value="${x}"${x == BS.days ? " selected" : ""}>${x} day${x > 1 ? "s" : ""}</option>`).join("");
   const log = job.running || job.error || job.result ? `<div class="nctx blog">${job.running ? "Checking… " : job.error ? `<span style="color:var(--red)">${esc(job.error)}</span> ` : "Last check: "}${job.result ? esc(`${job.result.new} new, ${job.result.read} read, ${job.result.paired} paired`) : ""} <span class="by">${ago(job.at)}</span>${job.log.length ? `<pre>${esc(job.log.slice(-8).join("\n"))}</pre>` : ""}</div>` : "";
-  $("#tool").innerHTML = `<div class="m-head"><b>Blinds</b><span style="color:var(--faint);font-size:12px">${head} · clues by ${esc(data.clues_model)}${data.hidden ? ` · ${data.hidden} hidden by [blinds] hide` : ""}</span><button class="x" aria-label="Close" title="Close (Esc)" data-close>×</button></div>
+  $("#tool").innerHTML = `<div class="m-head"><b>Blinds</b><span style="color:var(--faint);font-size:12px">${head} · clues by ${esc(data.clues_model)}${data.hidden ? ` · ${data.hidden} hidden by [blinds] hide` : ""}</span><button class="x" aria-label="Close" title="Close (Esc)" data-close>${ic("close")}</button></div>
     <div class="news blinds">
       <div class="nbar"><div class="seg">${tabs}</div>
         <select id="blindsDays" aria-label="How far back">${days}</select><select id="blindsSource" aria-label="Source">${srcOpts}</select>

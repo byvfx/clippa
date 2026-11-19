@@ -13,7 +13,7 @@ async function showCast(person) {
   const win = ++CASTWIN;
   person = person ?? CS?.person ?? "";
   d.dataset.kind = "cast"; d.classList.remove("cover"); d.classList.add("facesw");
-  if (!CS || !d.open) d.innerHTML = `<div class="m-head"><b>Cast</b><button class="x" aria-label="Close" title="Close (Esc)" data-close>×</button></div><div class="tbody">Loading…</div>`;
+  if (!CS || !d.open) d.innerHTML = `<div class="m-head"><b>Cast</b><button class="x" aria-label="Close" title="Close (Esc)" data-close>${ic("close")}</button></div><div class="tbody">Loading…</div>`;
   if (!d.open) d.showModal();
   try {
     const data = await api("/api/cast" + (person ? "?person=" + encodeURIComponent(person) : ""));
@@ -47,11 +47,11 @@ function renderCast() {
       <img loading="lazy" src="${esc(ph.url)}" alt="${esc(p.name)} ${esc(ph.label)}">
       <div class="cl"><select data-clabel="${ph.id}">${["", ...data.labels].map(l => `<option${l === ph.label ? " selected" : ""} value="${l}">${l || "label?"}</option>`).join("")}</select>
         <span class="by">${esc(ph.source)}${ph.match != null ? ` ${(+ph.match).toFixed(2)}` : ""} · ${ph.px}px</span></div>
-      ${ph.flag ? `<div class="cf" title="${esc(ph.flag)}">⚠ ${esc(ph.flag)}</div>` : ""}
+      ${ph.flag ? `<div class="cf" title="${esc(ph.flag)}">${ic("warn")}${esc(ph.flag)}</div>` : ""}
       ${ph.page || ph.licence ? `<div class="by">${ph.page?.startsWith("http") ? `<a href="${esc(ph.page)}" target="_blank" rel="noopener">source</a>` : esc(ph.page || "")}${ph.licence ? ` · ${esc(ph.licence)}` : ""}${ph.author ? ` · ${esc(ph.author)}` : ""}</div>` : ""}
       <div class="ca">${ph.status === "new" ? `<button class="btn primary" data-ckeep="${ph.id}">Keep</button>` : `<span class="by">kept</span>`}<button class="btn" data-cdrop="${ph.id}">Drop</button></div></div>`;
   const fresh = p ? p.photos.filter(x => x.status === "new") : [], kept = p ? p.photos.filter(x => x.status === "kept") : [];
-  $("#tool").innerHTML = `<div class="m-head"><b>Cast</b><span style="color:var(--faint);font-size:12px">photos for covers and the weekly · ${min}+ each</span><button class="x" aria-label="Close" title="Close (Esc)" data-close>×</button></div>
+  $("#tool").innerHTML = `<div class="m-head"><b>Cast</b><span style="color:var(--faint);font-size:12px">photos for covers and the weekly · ${min}+ each</span><button class="x" aria-label="Close" title="Close (Esc)" data-close>${ic("close")}</button></div>
     <div class="cast"><div class="cpeople">${who}
         <div class="cnew"><input class="search" id="castNew" placeholder="Someone new"><button class="btn" id="castAdd">Add</button></div></div>
       <div class="cperson">${!p ? `<div class="empty">Pick someone on the left.</div>` : `
@@ -66,7 +66,7 @@ function renderCast() {
           <input class="search" id="castUrl" placeholder="or a photo's web address"><button class="btn" id="castUrlBtn">Add</button>
           <input class="search" id="castStream" placeholder="or a stream id" style="width:150px"><button class="btn" id="castGrab" title="That stream's sharpest faces of ${esc(p.name)} (named in its Faces window)">Grab</button></div>
         ${running}
-        ${fresh.length ? `<div class="f">New: keep the good ones (⚠ = the labeller's doubt)</div><div class="cgrid">${fresh.map(tile).join("")}</div>` : ""}
+        ${fresh.length ? `<div class="f">New: keep the good ones (${ic("warn")} = the labeller's doubt)</div><div class="cgrid">${fresh.map(tile).join("")}</div>` : ""}
         <div class="f">Kept (${kept.length + (p.single ? 1 : 0)})</div>
         <div class="cgrid">${kept.map(tile).join("")}${p.single ? `<div class="ct"><img src="${esc(p.single_url)}" alt=""><div class="by">${esc(p.single)} (a single photo file)</div></div>` : ""}${!kept.length && !p.single ? `<div class="empty">None kept yet.</div>` : ""}</div>`}
       </div></div>`;

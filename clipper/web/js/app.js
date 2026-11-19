@@ -40,7 +40,7 @@ async function playLow(i, full) {  // phones: a 360p copy made by the server (lo
     if (OPEN !== i.ref || !$("#mTap")) return;
     if (r.ready) return play(r.url);
     tap.dataset.wait = "1";
-    tap.querySelector("span").innerHTML = `<b>⏳</b>Making a phone-size copy${r.ahead ? ` (${r.ahead} ahead of it)` : ""}…
+    tap.querySelector("span").innerHTML = `<b>${ic("wait")}</b>Making a phone-size copy${r.ahead ? ` (${r.ahead} ahead of it)` : ""}…
       <span class="alt" data-full style="position:static">Play full quality instead (${r.full_mb} MB)</span>`;
     setTimeout(() => { if (OPEN === i.ref && $("#mTap")) { delete $("#mTap").dataset.wait; playLow(i); } }, 8000);
   } catch (e) { toast(e.message, true); }
@@ -72,7 +72,7 @@ const KEYS = [
 ];
 function showKeys() {
   const k = $("#keys");
-  k.innerHTML = `<div class="m-head"><b>Keyboard shortcuts</b><button class="x" aria-label="Close" title="Close (Esc)" onclick="this.closest('dialog').close()">×</button></div>
+  k.innerHTML = `<div class="m-head"><b>Keyboard shortcuts</b><button class="x" aria-label="Close" title="Close (Esc)" onclick="this.closest('dialog').close()">${ic("close")}</button></div>
     <div class="k-body">${KEYS.map(([h, rows]) => `<h4>${h}</h4>` + rows.map(([a, b]) =>
       `<span>${a.split(" ").map(x => `<kbd>${esc(x)}</kbd>`).join(" ")}</span><span>${esc(b)}</span>`).join("")).join("")}
     <span></span><span style="color:var(--faint);font-size:12px;margin-top:8px">Off while you type in a box (Esc leaves the box).</span></div>`;

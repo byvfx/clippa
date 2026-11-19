@@ -43,10 +43,18 @@ covers the review cards.
 ## Looks
 
 The war room and its chat wear one look, picked on the Settings page (or **Look** in the
-chat's buddy list): `warroom` (the dark default), `retro`, `millennium` and `pager`, the
-same four as the [Clippa messenger](Clippa-messenger#looks). The browser remembers the pick and
-its other tabs follow it, `/chat` included. A look is one file in `clipper/web/themes/`; see
+chat's buddy list): `warroom`, the default, or `millennium`, the alternate, the same two as the
+[Clippa messenger](Clippa-messenger#looks) (`retro` and `pager` were retired on 2026-11-18; a
+browser that had one picked goes back to the default). The browser remembers the pick and its
+other tabs follow it, `/chat` included. A look is one file in `clipper/web/themes/`; see
 [Looks](Clippa-messenger#looks) for what goes in one.
+
+`warroom` looks like a video editor: dark panels edge to edge with flat title bars, one blue
+accent for what is selected, a colour per show, and green, amber and red for status only. The
+interface is set in Inter and the numbers, times and ids in JetBrains Mono, both shipped in
+`clipper/web/fonts/` (SIL Open Font License, the licence files beside them), so the page loads
+nothing from outside. The icons are one line set, drawn in the page itself. While a panel waits
+for its first numbers it shows a grey outline of its rows.
 
 ## Live shows
 
@@ -98,7 +106,7 @@ all), and they combine with the search. The queue is newest stream first; the or
 by score, length or kind instead. The view,
 order included, is in the page's URL, so it can be bookmarked.
 
-Tick items (shift-click for a range, "⇕ Fill the gaps" on a phone, or "Select shown") to approve, reject, hold, release,
+Tick items (shift-click for a range, "Fill the gaps" on a phone, or "Select shown") to approve, reject, hold, release,
 pin, reopen or send the same retake note to all of them, or to find and replace in their
 titles, descriptions, hashtags, tags or playlists: the dry run lists every line that would
 change before anything is written. A selection survives a change of tab or filter, but bulk
@@ -149,7 +157,7 @@ Kitsu.
 
 Who is who on screen (#54), kept in `[paths] faces/known.json` for every show.
 
-- **A stream's groups:** "Faces" in an item's window, or "👤 faces" on a scanned stream in
+- **A stream's groups:** "Faces" in an item's window, or "faces" on a scanned stream in
   the pipeline panel. Each group of faces `clipper faces` found has its contact sheet (first
   row its clearest faces, second a spread over the stream), its name, and whether that came by
   hand or by face (with the match, 0.7+ names a group). Type a name and press Name (this stream
@@ -167,7 +175,7 @@ The command line does the same: `clipper faces <stream> --name F03=Jer --enroll`
 
 ## Heat
 
-**🔥 heat** on a stream in the Pipeline panel, or beside the stream's name in an item's window,
+**heat** on a stream in the Pipeline panel, or beside the stream's name in an item's window,
 opens that stream's heat graph: the curve the [signals stage](Pipeline) makes from chat and
 loudness, over the whole stream. The picker at the top changes the stream.
 
@@ -259,10 +267,10 @@ newest stream first. The ones the scheduler let go are listed too, tagged "over 
 Drag an item or a scheduled slot onto an open slot (or a day) to pin it, or onto "unpin"; the
 page warns before a drop breaks the spacing rules.
 
-Or let clipper pick the slot: ⇥ beside an item (or **⇥ Next open slot** in its window) finds
+Or let clipper pick the slot: the arrow-to-a-line button beside an item (or **Next open slot** in its window) finds
 the first open slot of its kind that the scheduler's rules allow: the slot times, `max_per_day`,
 `min_gap_minutes`, `kick_first_hours` after the stream and `[youtube] min_lead_minutes` from
-now. **⇥ Segments to open slots…** does that for every approved segment without a slot, but
+now. **Segments to open slots…** does that for every approved segment without a slot, but
 only into a slot before its `stale_days` cutoff, as the scheduler would. Both show a preview
 first and pin through Kitsu ("Publish at"), like the Pin button, then replan; Undo takes the
 pins back. A pin counts against its stream's `stream_budget` first, so pinning a segment from a
@@ -314,8 +322,11 @@ on` ([Phone access](Phone-access)).
 
 The page is in `clipper/web/` (`warroom.html` and what it loads). `warroom.css` is structure
 only: every colour and the shape of windows, title bars, buttons and fields comes from the look's
-file in `web/themes/` (`themes/warroom.css` is the one place the default's colours live), loaded
-by `theme.js`, which the chat page shares. `js/chatdock.js` shows and hides the chat frame. The server is the `clipper/warroom/`
+file in `web/themes/` (`themes/warroom.css` is the one place the default's colours live, and
+declares its fonts from `web/fonts/`), loaded by `theme.js`, which the chat page shares. The icons
+are `<symbol>`s in a sprite at the top of `warroom.html`, each with the id `i-` and its name;
+markup points an `<svg class="ic">`'s `<use>` at one and scripts call `ic("name")` (`js/core.js`), and a test
+checks that every name asked for is in the sprite and that no emoji stands in for one. `js/chatdock.js` shows and hides the chat frame. The server is the `clipper/warroom/`
 package. `httpd.py` holds the route tables `GET_API` and `POST_API`, which map each `/api/...` path to
 a function; `data.py` builds the page's data, `review.py` the decisions (through `clipper/actions.py`),
 and each panel has a module of its own.

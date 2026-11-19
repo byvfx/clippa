@@ -437,6 +437,30 @@ def test_the_chat_page_is_its_own(tmp_path, defaults):
     assert "/api/chat" in httpd.GET_API and "/api/chat/send" in httpd.POST_API
 
 
+def test_the_look_has_its_fonts_and_one_icon_set():
+    """The default look's fonts ship in web/fonts/ and serve sends them; every icon the page and
+    its scripts ask for is in the one sprite, and no emoji stands in for one."""
+    from clipper.warroom import httpd
+
+    theme = (warroom.WEB / "themes" / "warroom.css").read_text(encoding="utf-8")
+    fonts = re.findall(r'url\("\.\./fonts/([\w.-]+)"\)', theme)
+    assert len(fonts) == 3
+    for f in fonts:
+        assert (warroom.WEB / "fonts" / f).is_file(), f
+        path, ctype, cache = httpd.static_file(f"/fonts/{f}")
+        assert ctype == "font/woff2" and "max-age" in cache
+    assert httpd.static_file("/fonts/Inter-OFL.txt") is None   # only what the page loads
+    assert httpd.static_file("/fonts/../../warroom/httpd.py") is None
+    page = re.sub(r"<!--.*?-->", "", warroom.PAGE.read_text(encoding="utf-8"), flags=re.S)
+    have = set(re.findall(r'<symbol id="i-([\w-]+)"', page))
+    scripts = " ".join(p.read_text(encoding="utf-8") for p in (warroom.WEB / "js").glob("*.js"))
+    asked = set(re.findall(r'href="#i-([\w-]+)"', page)) | set(re.findall(r'\bic\("([\w-]+)"\)', scripts))
+    asked |= {n for pair in re.findall(r'\bic\([^)]*\?\s*"([\w-]+)"\s*:\s*"([\w-]+)"\)', scripts) for n in pair}
+    assert asked and not asked - have, sorted(asked - have)
+    emoji = re.compile("[\U0001F300-\U0001FAFF☀-➿⬀-⯿]")
+    assert not emoji.search(page + scripts), emoji.findall(page + scripts)
+
+
 def test_heat_buckets_keep_the_hottest_second_and_the_gaps():
     from clipper.warroom import heat
 
