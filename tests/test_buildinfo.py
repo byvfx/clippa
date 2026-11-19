@@ -124,3 +124,12 @@ def test_the_recorder_reports_its_version(tmp_path):
     rec = services.recorder(cfg)
     assert rec["version"] == "0.2.0"
     assert "version 0.2.0," in services.recorder_lines(rec)[0]
+
+
+def test_a_stamp_that_is_not_text_is_no_stamp(tmp_path, monkeypatch):
+    """version() never raises: a corrupt file must not stop a heartbeat or `clipper --version`."""
+    stamp = tmp_path / "_build.txt"
+    stamp.write_bytes(b"\xff\xfe\x00v0.2.0")
+    monkeypatch.setattr(buildinfo, "STAMP", stamp)
+    monkeypatch.setattr(buildinfo, "_from_git", lambda: "")
+    assert buildinfo.version() == __version__

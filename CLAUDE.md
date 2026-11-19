@@ -9,7 +9,7 @@ so edit the pages there, never in the wiki itself. Link pages wiki-style (`[Face
 `[x](War-room#faces)`); `tests/test_wiki.py` checks the links and the sidebar. Messages link a page with
 `wiki.page("Name", "heading")` (`clipper/wiki.py`; the test checks those too). README.md is a
 short pointer and SETUP.md maps its old sections to wiki pages. At the end of a session update HANDOFF.md in place (no diaries there) and add a dated
-entry at the end of the month's log; keep the wiki pages true whenever behaviour changes, in
+entry at the end of the month's log; keep the wiki pages true whenever behaviour changes, and add a bullet to CHANGELOG.md's Unreleased for a change a user would notice (wiki Developing#changelog), in
 the same PR as the change.
 
 ## Shape
@@ -134,7 +134,7 @@ Windows notes above don't apply.
   `required-version`; bump the pin there and in the dev group together. Tests are offline and
   take about 25 s; new pure logic gets a test in `tests/`. CI runs both on every push, on Linux
   and Windows (`.github/workflows/check.yml`), except one that changes only notes no test reads
-  (root `*.md`, `docs/log/`, `docs/archive/`, `reports/`, `studio/` but for its `streamers.json`):
+  (root `*.md` but for `CHANGELOG.md`, `docs/log/`, `docs/archive/`, `reports/`, `studio/` but for its `streamers.json`):
   that PR shows no checks.
   A PR that changes code (`clipper/`, `tests/`, `deploy/`, `.github/`, `pyproject.toml`) gets two
   reviews (user, 2026-11-13; Grok's `review` workflow is gone, too slow): yours first, the

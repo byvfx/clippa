@@ -1,7 +1,9 @@
 """Which copy of clipper this is, for `clipper --version`, `clipper doctor` and the heartbeats.
 
-`__version__` (clipper/__init__.py, equal to pyproject.toml) is the number of the last release.
-A copy made after it says which commit it is, as a PEP 440 local version:
+`__version__` (clipper/__init__.py, equal to pyproject.toml) is the number of the last release,
+bumped by the release PR and made real by the tag: until `v<number>` exists a copy reports the
+release before it, plus commits (tag right after that PR merges, before the deploy that should
+carry the number). A copy says which commit it is, as a PEP 440 local version:
 
     0.2.0               a release (the checkout is exactly at tag v0.2.0)
     0.2.0+3.g570bb87    3 commits after v0.2.0, at 570bb87
@@ -50,7 +52,7 @@ def normalize(raw: str, base: str = __version__) -> str:
 def _stamped() -> str:
     try:
         return STAMP.read_text(encoding="utf-8")
-    except OSError:
+    except (OSError, ValueError):   # a file that isn't text is no stamp (UnicodeDecodeError is a ValueError)
         return ""
 
 
@@ -60,7 +62,7 @@ def _from_git(root: Path | None = None) -> str:
         return ""
     try:
         r = subprocess.run(DESCRIBE, cwd=root, capture_output=True, text=True, timeout=5, check=False)
-    except (OSError, subprocess.SubprocessError):
+    except (OSError, ValueError, subprocess.SubprocessError):
         return ""
     return r.stdout if r.returncode == 0 else ""
 
