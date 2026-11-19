@@ -29,7 +29,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from . import daemon
+from . import buildinfo, daemon
 from .errors import ClipperError
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -59,7 +59,7 @@ def recorder(cfg: dict, now: datetime | None = None) -> dict:
     channels = hb.get("channels") or {}
     live = [slug for slug, state in channels.items() if up and state != "offline"]
     return {"up": up, "age_s": age, "at": at, "channels": channels, "live": live, "path": str(path),
-            "error": error}
+            "error": error, "version": hb.get("version") or ""}
 
 
 def recorder_lines(rec: dict) -> list[str]:
@@ -69,7 +69,8 @@ def recorder_lines(rec: dict) -> list[str]:
         return [f"recorder: no heartbeat at {rec['path']} (not deployed, or the share isn't reachable)"]
     if not rec["up"]:
         return [f"recorder: DOWN, last heartbeat {rec['age_s'] / 60:.0f} min ago ({rec['at']})"]
-    out = [f"recorder: up ({rec['age_s']:.0f} s ago); "
+    out = [f"recorder: up ({'version ' + rec['version'] + ', ' if rec.get('version') else ''}"
+           f"{rec['age_s']:.0f} s ago); "
            + (f"RECORDING {', '.join(rec['live'])}" if rec["live"] else "nothing live")]
     out += [f"  {slug}: {state}" for slug, state in sorted(rec["channels"].items())]
     return out
@@ -170,6 +171,7 @@ def run(cfg: dict, action: str = "status", which: str = "all", force: bool = Fal
             print("\n".join(recorder_lines(recorder(cfg))))
             cuts = nas_cuts(cfg)
             print("NAS cuts: " + ("none running" if not cuts else "\n  " + "\n  ".join(cuts)))
+        print(f"\nthis checkout: {buildinfo.version()}")
         return 0
     if which == "recorder":
         rec = recorder(cfg)

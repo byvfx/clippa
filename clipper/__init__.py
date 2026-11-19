@@ -1,5 +1,7 @@
 """clipper: long Kick streams in, reviewed YouTube videos out. `clipper -h` lists the commands.
 
-The version is also in pyproject.toml; tests/test_cli.py checks the two agree."""
+__version__ is the last release's number, also in pyproject.toml (and uv.lock); tests/test_cli.py
+checks the first two agree. clipper/buildinfo.py adds the commit a copy was made from, which is
+what `clipper --version` prints. A release: Developing#releases."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

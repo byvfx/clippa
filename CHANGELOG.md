@@ -1,13 +1,77 @@
 # Changelog
 
-Notable changes, newest first. The dated diary is `docs/log/<YYYY-MM>.md`; `HANDOFF.md` is the
-current state; the version is `clipper --version` (set in `clipper/__init__.py` and
-`pyproject.toml`, which a test keeps equal). Nothing has been released yet.
+Notable changes, newest first. A change you'd notice gets a bullet here in the PR that makes it (wiki
+Developing#changelog). The dated diary is `docs/log/<YYYY-MM>.md`; `HANDOFF.md` is the current state.
+The version is the last release's number (`clipper/__init__.py` and `pyproject.toml`, which a test
+keeps equal) and, past a release, the commit: `clipper --version` prints `0.2.0` on the tag and
+`0.2.0+3.g570bb87` after it. A release is a git tag `vX.Y.Z`; its GitHub Release shows the lead of
+that version's section (the lines before its first `###`) and a link to this file. The steps are wiki
+Developing#releases.
 
-## Unreleased (0.1.0)
+## Unreleased
+
+## 0.2.0 (2026-11-18)
+
+The first release, as the app stood on 2026-11-18. Clipper takes long streams (Kick, and now Twitch
+and YouTube VODs) through transcription, scoring, cutting, titles and covers to a review in Kitsu,
+Discord and the war room, then schedules and uploads what you approve to YouTube.
+
+- **Review:** pre-flight checks and approval by silence; a redesigned war room (fixed pages, a Review
+  page that docks the open item, a new look); the Clippa messenger (`/chat`), which acts on several items at once;
+  titles that rename videos already on YouTube.
+- **Fetching:** `clipper fetch` takes Twitch and YouTube VODs, with their chat replay.
+- **Scheduling:** segments ranked by a model score, and a stream's heat graph in the war room.
+- **Research and extras:** blind items (`clipper blinds`), documentaries (`clipper doc`, with your own
+  voice takes), b-roll and clip art libraries.
+- **Running it:** a rejected API key holds the stream and sends one DM; `clipper status` and `streams
+  list|prune`, `clipper backup`, command-line polish; and versions: `clipper --version` and the
+  heartbeats say which commit runs, and a release can be checked out on a new machine.
 
 ### 2026-11
 
+- 11-18: versions. `clipper --version` and `clipper doctor` say which copy this is, `0.2.0` on a
+  release and `0.2.0+3.g570bb87` past it (`.dirty` with uncommitted changes), and serve, the bot and
+  the recorder put it in their heartbeats, so `clipper services status` shows what each service
+  runs next to this checkout's. The hub and recorder deploy scripts stamp the image with the
+  checkout's `git describe` (`deploy/stamp.sh`, `clipper/buildinfo.py`). Pushing a `v*` tag
+  makes a GitHub Release with the wheel, the sdist and the section's lead as the notes
+  (`.github/workflows/release.yml`); the wiki's Install page has the steps to check out a release
+  on a new machine, and Developing#changelog says when a change gets a bullet here.
+- 11-18: war room redesign, step 4, the look (#318): a quiet editor palette as the default look
+  (`themes/warroom.css`; Inter and JetBrains Mono bundled in `clipper/web/fonts/`), one line-icon set in
+  place of every emoji and symbol that stood in for an icon, skeleton cards while a panel loads, and
+  an accent focus ring. `warroom` and `millennium` stay as the two looks; `retro` and `pager` are
+  retired (a browser that had picked one goes back to the default), and the chat page's default is
+  `millennium`. Wiki War-room and Clippa-messenger.
+- 11-18: war room redesign, steps 2 and 3 (#314, #316): fixed pages under a page bar and four top-bar
+  widgets replace the movable layout (the layout editor and `/api/layouts` are gone). The Review page
+  docks the open item beside the grid (J and K open and step through items, Esc closes, the edge drags
+  and is remembered); show, kind, status, order and dates sit behind one Filters button with chips for
+  what is on; cards carry the show as a coloured tag; Retakes is a tab of the queue; an empty Waiting
+  tab says "Nothing waiting" with the next upload; Undo moved under ⋯.
+- 11-17: Clippa chat (#299): "approve all comps" acts on several items at once (the `bulk` tool: one
+  card, one undo entry), `undo` takes the last chat change back, streams can be named "kino 11-14", "the
+  kino one" or "from last night", "what's waiting" lists the items, and the one fresh write card takes
+  a typed yes or no. Chat prompt v3.
+- 11-16: the Clippa messenger (#285, #290): `/chat` on serve's page, a retro instant messenger where you
+  tell Clippa what to do. It reads (releases, items, retakes, health, costs) and writes through the same
+  actions as the war room (approve, reject, retake, reopen, hold, pin, retitle, cover text and slot;
+  each lands in the war room's undo list as "(chat)"). Haiku, about $0.0005 a message, ledger `chat`
+  (`clipper/catalog.py`, `clipper/chat.py`, `[chat]`). Docked at the right of the war room (Chat
+  button or M; a Chat tab on a phone), with four looks (`[chat] theme`, `web/themes/`) that dress the
+  whole war room.
+- 11-16: title edits rename videos that are already on YouTube (#291): a new title for an uploaded item
+  renames the video (`youtube.retitle`, the show name and bleeps applied as at upload) from the war
+  room, the bot, Clippa and the CLI; before, only Kitsu's title changed.
+- 11-16: `clipper fetch` takes Twitch (`twitch.tv/videos/<id>`) and YouTube (`watch?v=`, `youtu.be`,
+  `/live/`) URLs as well as Kick, with the chat replay, leaving the same stream files (#293). Ids are
+  `twitch-<id>` and `youtube-<id>`; the channel must be in a show's `channels`; a subscriber-only
+  Twitch VOD reads `secrets/twitch_cookies.txt` (`[paths] twitch_cookies`, which doctor checks). Wiki
+  Fetching-VODs.
+- 11-16: a rejected API key (a provider's 401) no longer looks like an outage (#281): the worker holds
+  the stream and sends one DM for each set of keys, instead of retrying three times an hour apart, and
+  takes the stream again as soon as the keys change; `clipper checkup` lists held streams; deploys
+  check the keys for drift (`deploy/keys.sh`); the war room has a Keys window.
 - 11-16: the war room draws a stream's heat: **🔥 heat** on a stream or in an item's window opens
   the curve from `clipper signals`, the windows picked from it, and each cut segment, Short and clip
   where it sits in the stream, coloured by its review state, with the twelve hottest windows and
@@ -19,6 +83,25 @@ current state; the version is `clipper --version` (set in `clipper/__init__.py` 
   strays from its script is reported on every run. When the last build bought no take, the kit's
   disclosure lines are `[doc] own_voice_disclosures` (none) in place of `[doc] disclosures` (the
   AI-voice line), which is unchanged.
+- 11-15: blind items (#277, #278, #280): `clipper blinds` collects gossip blind items from the feeds
+  you list (`[[blinds.sources]]`: blogger, wordpress or rss; none by default), a Haiku pass reads each
+  one's clues without naming anyone, twins across sources are paired, and you give your guess first
+  (a name from `clipper people`, no idea, or not ours). The war room has a Blinds window; serve checks
+  the sources on a timer (`[blinds] check_minutes`, off by default) and the bot asks in a private
+  `#blinds` channel, as a daily digest or an alert for each, never with a guess of clipper's. Wiki
+  Blind-items.
+- 11-15: approval by silence is firmer (#270, #273): items held only by stale findings are checked
+  again hourly, the approval's Kitsu calls run under a 25 s deadline (`review.kitsu_deadline`), and the
+  Kitsu Checks column is kept current without counting as a person's edit.
+- 11-14: review pre-flight checks and approval by silence (#259, #263, #265): `clipper review publish`
+  looks at an item before it reaches you (`clipper review check`; `[review] checks`): the text against
+  `[checkup] words`, YouTube's limits and the bleep list, a Short's webcam panels through the face
+  detector (the panels marked `cam = true` in the show's layouts), and the cover's face against the
+  person it should show (one vision call, about a cent). A show can let its clean items approve
+  themselves, `[shows.<key>.review] auto_approve = true` (off by default): serve's `auto` job, every 10
+  minutes (`clipper review auto`, `clipper/review_auto.py`), approves an item nobody has acted on whose
+  checks found nothing. On for Kino in this install's config. Wiki Review#pre-flight-checks and
+  Review#approval-by-silence.
 - 11-14: the schedule's budget ranks a stream's segments by their model score, chat heat breaking
   ties, where a score covered the stream (else heat alone, as before); a compilation takes its best
   segment's score; Kitsu's Score column shows a segment's score (#258 C). Turned on for Kino and

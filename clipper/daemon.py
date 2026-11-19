@@ -2,7 +2,8 @@
 log file, one instance per streams folder, and a heartbeat on the streams share.
 
 A heartbeat is <streams>/.<name>/status.json, like the recorder's (clipper/record):
-{"at": <iso>, "host", "pid", "started_at", ...whatever the service adds}. The service writes
+{"at": <iso>, "host", "pid", "started_at", "version" (clipper/buildinfo.py: which commit the
+container runs), ...whatever the service adds}. The service writes
 it every BEAT_S; a reader (`clipper services status`, the war room's Health panel,
 `clipper doctor`) calls it down after HEARTBEAT_S without one, from any machine that sees
 the share. A lock file alone can't say that: it stays behind when a process is killed.
@@ -19,7 +20,7 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-from . import jsonstate
+from . import buildinfo, jsonstate
 from .errors import ClipperError
 
 log = logging.getLogger("clipper.daemon")
@@ -73,7 +74,7 @@ def beat(cfg: dict, name: str, started_at: str, **extra) -> None:
     """Write the heartbeat. Never raises: a share hiccup mustn't stop the service."""
     path = heartbeat_path(cfg, name)
     data = {"at": datetime.now(UTC).isoformat(timespec="seconds"), "host": socket.gethostname(),
-            "pid": os.getpid(), "started_at": started_at, **extra}
+            "pid": os.getpid(), "started_at": started_at, "version": buildinfo.version(), **extra}
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         jsonstate.write(path, data)
@@ -151,7 +152,9 @@ def heartbeat_lines(name: str, hb: dict) -> list[str]:
     if not hb["up"]:
         return [f"{name}: DOWN, last heartbeat {hb['age_s'] / 60:.0f} min ago ({local(hb['at'])}) on {hb['host']}"]
     since = local(hb["data"].get("started_at", ""))
-    out = [f"{name}: up on {hb['host']} (pid {hb['data'].get('pid')}, {hb['age_s']:.0f} s ago, since {since})"]
+    ver = hb["data"].get("version")
+    out = [f"{name}: up on {hb['host']} (" + (f"version {ver}, " if ver else "")
+           + f"pid {hb['data'].get('pid')}, {hb['age_s']:.0f} s ago, since {since})"]
     for job, j in sorted((hb["data"].get("jobs") or {}).items()):
         if j.get("running"):
             out.append(f"  {job}: running since {local(j.get('started', ''), '%H:%M')}")

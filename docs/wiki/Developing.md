@@ -66,13 +66,67 @@ uvx ruff@0.17.3 check clipper tests
 
 Tests are offline and take about 25 s; new pure logic gets a test. CI runs both on every
 push, on Linux and Windows (`.github/workflows/check.yml`), except a push or PR that changes only
-notes no test reads: the root `*.md` files, `LICENSE`, `docs/log/`, `docs/archive/`, `reports/` and
-`studio/`. Such a PR shows no checks at all; that is expected, not a stuck run. A change under
-`docs/wiki/` still runs them, since a test checks the links and the sidebar, and so does one to
-`studio/research_notes/streamers.json`, which a test reads. The ruff rules are the defaults plus
+notes no test reads: the root `*.md` files (not `CHANGELOG.md`), `LICENSE`, `docs/log/`, `docs/archive/`,
+`reports/` and `studio/`. Such a PR shows no checks at all; that is expected, not a stuck run. A change
+under `docs/wiki/` still runs them, since a test checks the links and the sidebar, and so does one to
+`CHANGELOG.md` (`tests/test_changelog.py`) or `studio/research_notes/streamers.json`, which a test reads. The ruff rules are the defaults plus
 the few selected in `pyproject.toml` (`[tool.ruff.lint]`). Try risky changes on a short test stream
 first. Before merging a PR that changes code, wait for the reviews below and handle each
 finding. A PR outside those paths, such as a wiki page or `uv.lock` alone, needs no review.
+
+## Changelog
+
+`CHANGELOG.md` lists the changes someone would notice, newest first: a new command or flag, a
+behaviour that changed, a new setting, something the war room or the bot now does. A PR that makes
+one adds its bullet in that same PR (with the wiki pages it changes), under `## Unreleased` in a
+`### YYYY-MM` block, newest at the top:
+
+```
+- 11-18: what changed, from the user's side, in a sentence or two (#319): the command or setting in
+  backticks, and the wiki page when there is one.
+```
+
+Not for refactors, tests, dependency bumps or notes: a PR that only does those has no bullet. The
+dated diary of a session is `docs/log/<YYYY-MM>.md` and the current state is `HANDOFF.md`; the
+changelog is what a person updating clipper would want to read. When a release is made, Unreleased
+becomes the release's section ([Releases](#releases)). `tests/test_changelog.py` keeps its shape.
+
+## Releases
+
+A release is a git tag `vX.Y.Z` on main. Pushing the tag makes the GitHub Release
+(`.github/workflows/release.yml`): the wheel and sdist, with the **lead** of that version's
+section of `CHANGELOG.md` (its lines before the first `###`: a sentence on what the release is
+and a short list of highlights) as the notes, and a link to the whole file for the detail by date.
+The number is the last release's, in `clipper/__init__.py`,
+`pyproject.toml` and the `clipper` entry of `uv.lock`; a test keeps the first two equal and
+`uv lock --check` the third. Between releases a copy says which commit it is
+(`clipper/buildinfo.py`): `0.2.0` on the tag, `0.2.0+3.g570bb87` three commits past it, `.dirty`
+with uncommitted changes. The NAS containers have no `.git`, so `deploy/hub/deploy.sh` and
+`deploy/record/deploy.sh` write the checkout's `git describe` into the image
+(`deploy/stamp.sh`); serve, the bot and the recorder put the result in their heartbeats and
+`clipper services status` prints it next to this checkout's.
+
+1. In a PR: bump `__version__` and `version`, `uv lock`, rename the changelog's "Unreleased"
+   to "X.Y.Z (date)", open a new empty one above it, and write the new section's lead: what
+   the release is, and a handful of highlights (not the whole list; keep it under 40 lines).
+   `tests/test_changelog.py` fails until the section and its lead are there, and the workflow
+   refuses a tag without them.
+2. After it merges, from a clean checkout of main:
+
+   ```bash
+   git tag -a v0.3.0 -m "clipper 0.3.0" && git push origin v0.3.0
+   ```
+
+   Tag right after the merge, before the deploy that should carry the number: until the tag
+   exists a copy reports the release before it, plus commits. The workflow refuses a tag that
+   disagrees with those files, has no changelog section with a lead, isn't on main, or isn't
+   `vX.Y.Z` (`vX.Y.ZrcN` is published as a pre-release).
+3. `bash deploy/hub/deploy.sh` as usual; the hub then reports the tag's version, or the commit
+   past it.
+
+The release job runs ruff and the tests again on the tagged commit (Linux only) before it builds
+or publishes anything; it deploys nothing. Tags are `vX.Y.Z`, or `v0.3.0rc1` for a pre-release
+(a number PEP 440 accepts, since `pyproject.toml` must say the same).
 
 ## Code review on PRs
 

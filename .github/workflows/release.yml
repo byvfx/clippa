@@ -1,0 +1,59 @@
+# A GitHub Release for each version tag: pushing the tag is the release (wiki Developing#releases).
+#
+#   git tag -a v0.3.0 -m "clipper 0.3.0" && git push origin v0.3.0
+#
+# Checks the tag against the code and the changelog, runs ruff and the tests on the tagged commit
+# (as check.yml does, on Linux only), builds the wheel and sdist, and publishes them with the lead
+# of CHANGELOG.md's section for that version as the notes, and a link to the whole file. It
+# deploys nothing.
+name: release
+
+on:
+  push:
+    tags: ["v[0-9]*"]
+
+permissions:
+  contents: write   # to create the release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # the whole history, to tell whether the tag is on main
+      - uses: astral-sh/setup-uv@v10.3.3
+      - name: The tag, the code and the changelog agree, and the tag is on main
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          # the shapes clipper/buildinfo.py reads: 0.3.0, or a pre-release such as 0.3.0rc1 (PEP 440)
+          printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+)?$' \
+            || { echo "::error::$GITHUB_REF_NAME isn't vX.Y.Z or vX.Y.ZrcN"; exit 1; }
+          case "$version" in *[a-z]*) echo "PRERELEASE=--prerelease" >> "$GITHUB_ENV" ;; esac
+          in_pyproject=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          in_package=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' clipper/__init__.py)
+          [ "$version" = "$in_pyproject" ] || { echo "::error::tag $GITHUB_REF_NAME, but pyproject.toml says $in_pyproject"; exit 1; }
+          [ "$version" = "$in_package" ] || { echo "::error::tag $GITHUB_REF_NAME, but clipper/__init__.py says $in_package"; exit 1; }
+          git merge-base --is-ancestor HEAD origin/main \
+            || { echo "::error::$GITHUB_REF_NAME is not on main: tag a commit that has merged"; exit 1; }
+          # the release notes: the lead of the "## <version> (...)" section, its lines before the first "### "
+          awk -v v="$version" '/^## /{ on = ($2 == v); next } /^### /{ on = 0 } on' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          grep -q '[^[:space:]]' "$RUNNER_TEMP/notes.md" \
+            || { echo "::error::CHANGELOG.md has no '## $version' section, or it has no lead before its first ### heading"; exit 1; }
+          printf '\nEverything that changed, by date: [CHANGELOG.md](https://github.com/%s/blob/%s/CHANGELOG.md)\n' \
+            "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" >> "$RUNNER_TEMP/notes.md"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+      - name: Lint and tests on the tagged commit, as check.yml runs them (the discord extra, no GPU extras)
+        run: |
+          uv sync --locked --extra discord
+          uv run ruff check clipper tests
+          uv run pytest -q
+      - name: Build the wheel and sdist
+        run: uv build
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # shellcheck disable=SC2086  # PRERELEASE is "--prerelease" or empty
+          gh release create "$GITHUB_REF_NAME" dist/* --verify-tag ${PRERELEASE:-} \
+            --title "clipper $VERSION" --notes-file "$RUNNER_TEMP/notes.md"

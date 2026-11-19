@@ -16,7 +16,7 @@ from typing import Any
 
 import requests
 
-from .. import jsonstate, kick
+from .. import buildinfo, jsonstate, kick
 from ..alerts import Alerts
 from .client import Kick
 from .finalize import finalize
@@ -207,6 +207,7 @@ class Watcher:
         hb.mkdir(exist_ok=True)
         jsonstate.write(hb / "status.json", {
             "at": _iso(_now()),
+            "version": buildinfo.version(),
             "channels": {c["slug"]: (self.recs[c["slug"]].st.stream_id + " "
                                      + self.recs[c["slug"]].st.status
                                      if c["slug"] in self.recs else "offline")

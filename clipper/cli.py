@@ -10,7 +10,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import __version__, config, jsonstate
+from . import buildinfo, config, jsonstate
 from .config import stream_dir
 from .errors import KEY_REJECTED, ClipperError, did_you_mean, key_rejected
 
@@ -28,6 +28,18 @@ class Parser(argparse.ArgumentParser):
         hint = (did_you_mean(value, names)
                 or (f"choose from {', '.join(names)}" if len(names) <= 10 else "see --help"))
         raise argparse.ArgumentError(action, f"invalid choice: {value!r}; {hint}")
+
+
+class Version(argparse.Action):
+    """--version: the text is worked out when the flag is given, not when the parser is built:
+    on a checkout it runs `git describe`, which every other command shouldn't wait for."""
+
+    def __init__(self, option_strings, dest=argparse.SUPPRESS, default=argparse.SUPPRESS, help=None):
+        super().__init__(option_strings, dest=dest, default=default, nargs=0, help=help)
+
+    def __call__(self, parser, ns, values, option_string=None):
+        print(f"clipper {buildinfo.version()}")
+        parser.exit()
 
 
 class Items(argparse.Action):
@@ -2289,7 +2301,7 @@ def add_setup(sub) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     ap = Parser(prog="clipper", epilog=command_list(), formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--version", action="version", version=f"clipper {__version__}")
+    ap.add_argument("--version", action=Version, help="show this copy's version and exit")
     ap.add_argument("--config", help="path to clipper.toml (default: $CLIPPER_CONFIG or ./clipper.toml)")
     ap.add_argument("--show", help="use this [shows.<key>] profile (default: the stream's, by Kick channel)")
     sub = ap.add_subparsers(dest="cmd", required=True, metavar="<command>")

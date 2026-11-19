@@ -4,7 +4,8 @@
 #
 # The lists read in order and the last match wins: everything, minus the notes ("!"), plus
 # studio/research_notes/streamers.json again, the one file under studio/ a test reads ([paths]
-# streamers, through tests/test_investigate.py). paths-ignore can't make that exception.
+# streamers, through tests/test_investigate.py), and CHANGELOG.md, the one root note a test reads
+# (tests/test_changelog.py). paths-ignore can't make those exceptions.
 # Never excluded, because a test reads them: docs/wiki/ (tests/test_wiki.py checks the links
 # and the sidebar), docs/big-story.toml and clipper.example.toml (tests/test_config.py), and
 # clipper/prompts/*.md. "*.md" is the repo root only: `*` doesn't cross a `/`.
@@ -16,6 +17,7 @@ on:
     paths:
       - "**"
       - "!*.md"
+      - "CHANGELOG.md"
       - "!LICENSE"
       - "!docs/log/**"
       - "!docs/archive/**"
@@ -26,6 +28,7 @@ on:
     paths:
       - "**"
       - "!*.md"
+      - "CHANGELOG.md"
       - "!LICENSE"
       - "!docs/log/**"
       - "!docs/archive/**"

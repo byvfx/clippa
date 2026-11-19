@@ -75,6 +75,12 @@ on the laptop runs `docker compose` on the NAS over ssh. Logs: `logs/serve.log` 
 logs -f serve'`. Check a container with `ssh nas 'cd clipper-hub && docker compose exec serve
 clipper doctor --role serve'`.
 
+Which code a container runs: `clipper services status` prints each service's version from its
+heartbeat (`0.2.0+3.g570bb87`: the release, three commits past it, at 570bb87; `.dirty` when
+the deploy came from a checkout with uncommitted changes) and this checkout's below it. A
+service that shows a different commit than main's runs older code than the last merged PR
+([Developing](Developing#releases)).
+
 > [!WARNING]
 > Only one serve and one bot may run. A laptop task and a NAS container don't see each
 > other's lock (Windows over SMB vs. the NAS's own disk), so keep the laptop's tasks disabled

@@ -41,6 +41,8 @@ mkdir -p "$TMP/src"
 cp "$ROOT/pyproject.toml" "$ROOT/uv.lock" "$HERE/Dockerfile" "$TMP/src/"
 cp -r "$ROOT/clipper" "$TMP/src/clipper"
 find "$TMP/src" -name __pycache__ -prune -exec rm -rf {} +
+source "$HERE/../stamp.sh"
+stamp_build "$ROOT" "$TMP/src"   # which commit the image is: clipper --version, the heartbeats
 cp "$HERE/compose.yaml" "$HERE/tailscale-serve.json" "$TMP/"
 cp "$ENV_LOCAL" "$TMP/.env"
 

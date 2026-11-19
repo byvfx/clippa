@@ -4,7 +4,7 @@ import tomllib
 import pytest
 from conftest import ROOT
 
-from clipper import __version__, cli, stages
+from clipper import __version__, buildinfo, cli, stages
 from clipper.errors import ClipperError
 
 
@@ -96,11 +96,12 @@ def test_mode_flags_that_dont_combine():
 
 
 def test_version_is_one_number(capsys):
-    """`clipper --version` prints the package version; __init__.py and pyproject.toml agree."""
+    """`clipper --version` prints this copy's version (buildinfo: the release, plus the commit past
+    it); __init__.py and pyproject.toml, the release number, agree."""
     with pytest.raises(SystemExit) as e:
         parse("--version")
     assert e.value.code == 0
-    assert capsys.readouterr().out.strip() == f"clipper {__version__}"
+    assert capsys.readouterr().out.strip() == f"clipper {buildinfo.version()}"
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
     assert project["version"] == __version__
 
