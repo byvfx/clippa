@@ -103,7 +103,7 @@ away (the recorder while a show is live) or off (no fresh heartbeat).
 The page comes in four looks: `retro` (grey bevelled windows on a teal desk), `millennium`
 (beige windows, rounded blue title bars, tooltip-yellow cards), `pager` (green title bars, the
 sender's name on its own line) and `warroom` (the [War room](War-room)'s dark palette). Pick one
-with **Look** under the buddy list (in the war room, also Layout > Look). One pick dresses the
+with **Look** under the buddy list (in the war room, also on the Settings page). One pick dresses the
 war room and the chat together: the browser remembers it and its other tabs follow.
 `[chat] theme` sets the one this page starts with in a browser that never picked one; the war
 room starts as `warroom`. A look picked here before the war room had looks stays this page's

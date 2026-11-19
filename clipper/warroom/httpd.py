@@ -48,7 +48,6 @@ from .review import (
     recent_actions,
     start_retake,
 )
-from .saved_layouts import layouts, save_layout
 from .search import search_transcripts
 from .state import TAILNET, token
 from .tailscale import tailnet_status
@@ -112,7 +111,6 @@ GET_API = {
     "/api/log": lambda cfg, qs: log_tail(cfg, _q(qs, "which"), _q(qs, "lines"), _q(qs, "q"), _q(qs, "bad")),
     "/api/cover": lambda cfg, qs: cover_get(cfg, _q(qs, "ref")),
     "/api/search": lambda cfg, qs: search_transcripts(cfg, _q(qs, "q")),
-    "/api/layouts": lambda cfg, qs: layouts(cfg),
     "/api/faces": lambda cfg, qs: faces_get(cfg, _q(qs, "stream")),
     "/api/heat": lambda cfg, qs: heat_get(cfg, _q(qs, "stream")),
     "/api/cast": lambda cfg, qs: cast_get(cfg, _q(qs, "person")),
@@ -137,7 +135,6 @@ POST_API = {
     "/api/sync": _sync,
     "/api/replan": _replan,
     "/api/retake": lambda cfg, body: {"started": start_retake(cfg)},
-    "/api/layouts": save_layout,
     "/api/faces/name": faces_name,
     "/api/faces/pick": faces_pick,
     "/api/faces/enroll": faces_enroll,

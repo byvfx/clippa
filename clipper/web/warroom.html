@@ -18,64 +18,113 @@
 <script src="theme.js" data-old-key="clippa-chat-theme"></script>
 </head>
 <body>
+<!-- One row: the name, the live shows, four status widgets (each opens its page), the chat and a menu
+     for the actions that change things. The pages sit in the bar under it (a phone: at the bottom). -->
 <header>
   <div class="brand">CLIPPA <b>//</b> WAR ROOM</div>
-  <div class="clock" id="clock"></div>
-  <div class="updated" id="updated" title="How old the numbers on this page are"></div>
   <div class="lives" id="lives"></div>
-  <div class="counters" id="counters"></div>
-  <div class="tools">
-    <button class="btn" id="syncBtn" title="Read decisions and edits from Kitsu now">⟳ Sync Kitsu</button>
-    <button class="btn" id="replanBtn" title="Rerun clipper schedule">Replan</button>
-    <button class="btn" id="castBtn" title="The cast library: photos of each regular for covers and the weekly">Cast</button>
-    <button class="btn" id="newsBtn" title="Headlines about the shows' people (clipper news)">News</button>
-    <button class="btn" id="blindsBtn" title="Gossip blind items: say who you think it is, first (clipper blinds)">Blinds</button>
-    <button class="btn" id="invBtn" title="Leads from an archive subject's own videos (clipper investigate)">Investigations</button>
-    <button class="btn" id="apikeysBtn" title="API keys: where each comes from, and whether its provider still takes it (clipper keys)">Keys</button>
-    <button class="btn" id="chatBtn" aria-controls="chat" title="The Clippa chat at the side: show or hide it (M)">Chat<span class="n" id="chatN"></span></button>
-    <button class="btn" id="layoutBtn" title="Arrange the panels (drag them, save layouts) and pick a look">Layout</button>
-    <button class="btn" id="keysBtn" title="Keyboard shortcuts (?)">?</button>
+  <div class="widgets" id="widgets">
+    <button class="widget" id="wUploads" data-go="schedule" title="Uploads in the last 24 hours, against the cap"><span class="lbl">Uploads</span><span class="meter"><i></i></span><b>–</b></button>
+    <button class="widget" id="wSpend" data-go="money" title="What the models and Modal cost this month"><span class="lbl">Spend</span><b>–</b></button>
+    <button class="widget" id="wPipe" data-go="pipeline" title="Streams being recorded or processed"><span class="lbl">Pipeline</span><b>–</b></button>
+    <button class="widget" id="wHealth" data-go="pipeline" title="How old the numbers on this page are"><span class="dot"></span><b>–</b><span class="lbl" id="updated"></span></button>
+  </div>
+  <button class="btn" id="chatBtn" aria-controls="chat" title="The Clippa chat at the side: show or hide it (M)">Chat<span class="n" id="chatN"></span></button>
+  <button class="btn" id="moreBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="moreMenu" title="Sync Kitsu, replan, the log, keyboard shortcuts">⋯</button>
+  <div class="menu" id="moreMenu" role="menu" hidden>
+    <button class="mi" id="syncBtn" role="menuitem" title="Read decisions and edits from Kitsu now">⟳ Sync Kitsu</button>
+    <button class="mi" id="replanBtn" role="menuitem" title="Rerun clipper schedule">Replan</button>
+    <div class="sep"></div>
+    <button class="mi" data-menu-log role="menuitem">The serve and bot log</button>
+    <button class="mi" id="keysBtn" role="menuitem">Keyboard shortcuts <kbd>?</kbd></button>
+    <button class="mi" data-go="settings" role="menuitem">Look and keys…</button>
   </div>
 </header>
+<nav class="views" id="views" aria-label="Pages">
+  <button data-view="queue"><b>☰</b>Review <span class="n" id="vnQueue"></span></button>
+  <button data-view="schedule"><b>◷</b>Schedule <span class="n warn" id="vnSched" title="Approved, with no slot yet"></span></button>
+  <button data-view="pipeline"><b>⚙</b>Pipeline</button>
+  <button data-view="money" class="wide"><b>$</b>Money</button>
+  <button data-view="stats" class="wide"><b>▥</b>Stats</button>
+  <button data-view="library" class="wide"><b>☺</b>Library</button>
+  <button data-view="research" class="wide"><b>⌕</b>Research</button>
+  <button data-view="settings" class="wide"><b>⚙</b>Settings</button>
+  <button data-view="chat" class="narrow"><b>✉</b>Chat <span class="n" id="vnChat"></span></button>
+  <button class="narrow" id="pagesMore" aria-haspopup="menu" aria-expanded="false" aria-controls="pagesMenu"><b>⋯</b>More</button>
+</nav>
+<div class="menu" id="pagesMenu" role="menu" hidden>
+  <button class="mi" data-go="money" role="menuitem">Money</button>
+  <button class="mi" data-go="stats" role="menuitem">Stats</button>
+  <button class="mi" data-go="library" role="menuitem">Library</button>
+  <button class="mi" data-go="research" role="menuitem">Research</button>
+  <button class="mi" data-go="settings" role="menuitem">Settings</button>
+</div>
 
+<!-- Each page is a group of panels; body[data-view] says which one shows (app.js setView). -->
 <main>
-  <div class="col" id="vPipe">
-    <section class="panel" data-panel="pipeline"><h2>Pipeline <span class="sp" id="pipeSub"></span></h2><div id="streams"></div></section>
+  <div class="page" data-page="queue">
+    <section class="panel" id="vQueue" data-panel="queue">
+      <h2>Review queue <span class="sp" id="queueSub"></span></h2>
+      <div class="queue-bar" id="queueBar"></div>
+      <div class="bulk" id="bulk" hidden></div>
+      <div class="grid" id="grid"></div>
+    </section>
     <section class="panel" data-panel="retakes"><h2>Retakes <span class="sp" id="retakeSub"></span></h2><div class="feed" id="retakes"></div></section>
+  </div>
+
+  <div class="page" data-page="schedule">
+    <section class="panel" id="vSched" data-panel="schedule">
+      <h2>Schedule <span class="sp" id="schedSub"></span></h2>
+      <div class="uploads" id="uploads"></div>
+      <div class="sched-tools" id="schedTools"></div>
+      <div class="unslotted" id="unslotted" hidden></div>
+      <div class="sched" id="schedule"></div>
+    </section>
+  </div>
+
+  <div class="page" data-page="pipeline">
+    <section class="panel" data-panel="pipeline"><h2>Pipeline <span class="sp" id="pipeSub"></span></h2><div id="streams"></div></section>
     <section class="panel" data-panel="health"><h2>Health <button class="btn sm" id="logBtn" title="The serve and bot logs: where errors go">Log</button></h2><div class="health" id="health"></div></section>
-    <section class="panel" data-panel="modal"><h2>Modal <span class="sp" id="cloudSub"></span></h2><div class="cloud" id="cloud"><div class="empty">Asking Modal…</div></div></section>
+  </div>
+
+  <div class="page" data-page="money">
     <section class="panel" data-panel="costs"><h2>Costs <span class="sp" id="costSub"></span></h2><div class="cloud" id="costs"><div class="empty">Adding up…</div></div></section>
+    <section class="panel" data-panel="modal"><h2>Modal <span class="sp" id="cloudSub"></span></h2><div class="cloud" id="cloud"><div class="empty">Asking Modal…</div></div></section>
     <section class="panel" data-panel="usage"><h2>API usage <span class="sp" id="usageSub"></span></h2><div class="cloud" id="usage"><div class="empty">Asking Claude and OpenRouter…</div></div></section>
   </div>
 
-  <section class="panel" id="vQueue" data-panel="queue">
-    <h2>Review queue <span class="sp" id="queueSub"></span></h2>
-    <div class="queue-bar" id="queueBar"></div>
-    <div class="bulk" id="bulk" hidden></div>
-    <div class="grid" id="grid"></div>
-  </section>
+  <div class="page" data-page="stats">
+    <section class="panel" id="vStats" data-panel="stats">
+      <h2>Analytics <span class="sp" id="statsSub"></span>
+        <select id="statsMonth" style="margin-left:auto" title="Month"></select></h2>
+      <div class="stats" id="stats"><div class="empty">Reading analytics.json…</div></div>
+    </section>
+  </div>
 
-  <section class="panel" id="vStats" data-panel="stats">
-    <h2>Analytics <span class="sp" id="statsSub"></span>
-      <select id="statsMonth" style="margin-left:auto" title="Month"></select></h2>
-    <div class="stats" id="stats"><div class="empty">Reading analytics.json…</div></div>
-  </section>
+  <!-- These open today's windows; they move into their pages in a later step. -->
+  <div class="page" data-page="library">
+    <section class="panel"><h2>Library</h2><div class="launch">
+      <button class="tile" id="castBtn"><b>Cast</b><span>Photos of each regular, for covers and the weekly: kept and new, image search, labels.</span></button>
+      <div class="tile off"><b>Faces</b><span>Name a stream's face groups from its row on the <button class="lnk" data-go="pipeline">Pipeline</button> page (👤 faces).</span></div>
+    </div></section>
+  </div>
 
-  <section class="panel" id="vSched" data-panel="schedule">
-    <h2>Schedule <span class="sp" id="schedSub"></span></h2>
-    <div class="uploads" id="uploads"></div>
-    <div class="sched-tools" id="schedTools"></div>
-    <div class="unslotted" id="unslotted" hidden></div>
-    <div class="sched" id="schedule"></div>
-  </section>
+  <div class="page" data-page="research">
+    <section class="panel"><h2>Research</h2><div class="launch">
+      <button class="tile" id="newsBtn"><b>News</b><span>Headlines about the shows' people (clipper news).</span></button>
+      <button class="tile" id="blindsBtn"><b>Blinds</b><span>Gossip blind items: say who you think it is, first (clipper blinds).</span></button>
+      <button class="tile" id="invBtn"><b>Investigations</b><span>Leads from an archive subject's own videos (clipper investigate).</span></button>
+    </div></section>
+  </div>
+
+  <div class="page" data-page="settings">
+    <section class="panel"><h2>Settings</h2><div class="launch">
+      <button class="tile" id="apikeysBtn"><b>Keys</b><span>API keys: where each comes from, and whether its provider still takes it (clipper keys).</span></button>
+      <button class="tile" data-keys-tile><b>Keyboard shortcuts</b><span>Every key the war room answers. <kbd>?</kbd> shows them anywhere.</span></button>
+    </div></section>
+    <section class="panel"><h2>Look</h2><div class="looks" id="looks"><div class="empty">Listing the looks…</div></div></section>
+  </div>
 </main>
-<nav class="views" id="views">
-  <button data-view="queue"><b>☰</b>Review <span class="n" id="vnQueue"></span></button>
-  <button data-view="schedule"><b>◷</b>Schedule</button>
-  <button data-view="pipeline"><b>⚙</b>Pipeline</button>
-  <button data-view="stats"><b>▥</b>Stats</button>
-  <button data-view="chat"><b>✉</b>Chat <span class="n" id="vnChat"></span></button>
-</nav>
 <!-- #158: the Clippa chat is /chat itself in a frame, so the two share one code path and one store -->
 <aside id="chat" aria-label="Clippa chat">
   <div class="c-head"><span>Clippa</span><span class="sp"></span>

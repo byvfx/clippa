@@ -338,8 +338,10 @@ async function refreshCosts() {
   const el = $("#costs");
   let c;
   try { c = await api("/api/costs"); } catch (e) { c = { error: e.message }; }
+  const usd = v => "$" + (+v || 0).toFixed(2), w = $("#wSpend");
+  w.querySelector("b").textContent = c.error ? "?" : usd(c.net_usd);
+  w.title = c.error ? `Costs: ${c.error}` : `${c.month}: ${usd(c.net_usd)} on models and Modal so far. Opens the Money page.`;
   if (c.error) { el.innerHTML = `<div class="bad">${esc(c.error)}</div>`; return; }
-  const usd = v => "$" + (+v || 0).toFixed(2);
   const list = (o, n) => Object.entries(o || {}).slice(0, n).map(([k, v]) => `${esc(k)} ${usd(v)}`).join(", ") || "-";
   const cr = Object.entries(c.credits || {});
   $("#costSub").textContent = c.month;

@@ -18,7 +18,7 @@ the page alone. Only listens on localhost unless [warroom] host is changed, whic
 needs [warroom] token.
 
 One package since 2026-11-08 (audit tier 1): the page's data (data), the decisions (review),
-the panels (covers, faces, cast, search, news, blinds, investigations, heat, keys, saved_layouts), low-res copies
+the panels (covers, faces, cast, search, news, blinds, investigations, heat, keys), low-res copies
 (lowres), the tailscale link and the HTTP server (httpd); `state` holds what they share. Every public name is re-exported here, so
 `warroom.<name>` is the same whichever module defines it."""
 
@@ -129,9 +129,8 @@ from .review import (
     sync_all,
     undo_path,
 )
-from .saved_layouts import LAYOUT_ZONES, layouts, save_layout
 from .search import SRT_CACHE, search_transcripts, srt_text
 from .state import HOOKS, LOCK, SYNC, TAILNET, WHO, token
 from .tailscale import tailnet, tailnet_status, tailscale_exe
 
-__all__ = ["HOOKS", "LOCK", "SYNC", "TAILNET", "WHO", "token", "CACHE", "CACHE_LOCK", "CACHE_MAX_AGE_S", "LIVE_CACHE", "all_rows", "analytics_status", "costs_status", "for_stream_show_name", "health", "kick_live", "last_upload_run", "media_url", "modal_status", "overview", "retakes", "row_json", "shown_shows", "stream_info", "stream_infos", "stream_rows", "upload_status", "usage_status", "views_by_video", "BULK", "COLUMN_OF", "REF", "REPLANS", "ROW_OF", "SLOT_KINDS", "UNDO_MAX", "checked_ref", "do_action", "do_bulk", "do_replace", "do_slot", "do_undo", "recent_actions", "remember", "replace_plan", "slot_plan", "slot_print", "start_retake", "sync_all", "undo_path", "LAYOUT_ZONES", "layouts", "save_layout", "cover_get", "cover_key", "cover_post", "GROUP_KEY", "checked_box", "faces_enroll", "faces_forget", "faces_get", "faces_name", "faces_pick", "stream_path", "CAST_JOB", "CAST_LOCK", "cast_get", "cast_label", "cast_mark", "cast_run", "cast_set", "SRT_CACHE", "search_transcripts", "srt_text", "news_context", "news_dismiss", "news_get", "news_search", "BLINDS_JOB", "BLINDS_LOCK", "blinds_answer", "blinds_check", "blinds_get", "blinds_paste", "investigations_get", "heat_get", "keys_check", "keys_get", "log_tail", "LOWRES", "LOWRES_COND", "lowres_path", "lowres_ready", "lowres_status", "lowres_want", "render_lowres", "tailnet", "tailnet_status", "tailscale_exe", "CODE", "GET_API", "Handler", "LOCAL_HOSTS", "MAX_POST", "PAGE", "POST_API", "STATIC", "WEB", "make_handler", "run", "server", "static_file", "url", "watch_page"]
+__all__ = ["HOOKS", "LOCK", "SYNC", "TAILNET", "WHO", "token", "CACHE", "CACHE_LOCK", "CACHE_MAX_AGE_S", "LIVE_CACHE", "all_rows", "analytics_status", "costs_status", "for_stream_show_name", "health", "kick_live", "last_upload_run", "media_url", "modal_status", "overview", "retakes", "row_json", "shown_shows", "stream_info", "stream_infos", "stream_rows", "upload_status", "usage_status", "views_by_video", "BULK", "COLUMN_OF", "REF", "REPLANS", "ROW_OF", "SLOT_KINDS", "UNDO_MAX", "checked_ref", "do_action", "do_bulk", "do_replace", "do_slot", "do_undo", "recent_actions", "remember", "replace_plan", "slot_plan", "slot_print", "start_retake", "sync_all", "undo_path", "cover_get", "cover_key", "cover_post", "GROUP_KEY", "checked_box", "faces_enroll", "faces_forget", "faces_get", "faces_name", "faces_pick", "stream_path", "CAST_JOB", "CAST_LOCK", "cast_get", "cast_label", "cast_mark", "cast_run", "cast_set", "SRT_CACHE", "search_transcripts", "srt_text", "news_context", "news_dismiss", "news_get", "news_search", "BLINDS_JOB", "BLINDS_LOCK", "blinds_answer", "blinds_check", "blinds_get", "blinds_paste", "investigations_get", "heat_get", "keys_check", "keys_get", "log_tail", "LOWRES", "LOWRES_COND", "lowres_path", "lowres_ready", "lowres_status", "lowres_want", "render_lowres", "tailnet", "tailnet_status", "tailscale_exe", "CODE", "GET_API", "Handler", "LOCAL_HOSTS", "MAX_POST", "PAGE", "POST_API", "STATIC", "WEB", "make_handler", "run", "server", "static_file", "url", "watch_page"]
