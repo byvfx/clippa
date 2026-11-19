@@ -415,7 +415,10 @@ function renderCloud() {
 }
 
 function closeModal(force) { if (!force && !discardOk()) return; OPEN = null; const v = $("#modal video"); if (v) v.pause(); $("#modal").close(); }
-$("#modal").addEventListener("close", () => { OPEN = null; const v = $("#modal video"); if (v) v.pause(); });
+$("#modal").addEventListener("close", () => {
+  if ($("#modal").open) return;  // closed to be opened again the other way (docked / on top): still open
+  OPEN = null; const v = $("#modal video"); if (v) v.pause();
+});
 
 // ---------- #206 the serve and bot logs: what "details in the serve log" points at ----------
 

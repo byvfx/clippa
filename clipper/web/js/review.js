@@ -178,6 +178,16 @@ document.addEventListener("click", e => {
   if (un) { undo(un.dataset.undo); return; }
   if (e.target.closest("[data-close]")) { e.target.closest("dialog").close(); return; }
   if (e.target.id === "undoBtn") { showUndo(); return; }
+  if (e.target.closest("#filterBtn")) {
+    FOPEN = !FOPEN; $("#filters").hidden = !FOPEN; $("#filterBtn").setAttribute("aria-expanded", String(FOPEN)); return;
+  }
+  const uf = e.target.closest("[data-unfilter]");
+  if (uf) {
+    const k = uf.dataset.unfilter, all = k === "all";
+    if (all || k === "show") SHOW = ""; if (all || k === "kind") KINDF = ""; if (all || k === "st") ST = "";
+    if (all || k === "sort") SORT = ""; if (all || k === "from") FROM = ""; if (all || k === "to") TO = "";
+    document.activeElement?.blur(); SEL = null; renderQueue(); return;
+  }
   if (e.target.id === "pickAll") { VISIBLE.forEach(r => PICK.add(r)); renderQueue(); return; }
   if (e.target.closest("a[href]")) return;  // links inside a clickable row (YouTube) just open
   const t = e.target.closest("[data-tab],[data-act],[data-open]");
@@ -191,9 +201,15 @@ document.addEventListener("click", e => {
     else act(ref, a);
     return;
   }
-  if (t.dataset.open) { if (VISIBLE.includes(t.dataset.open)) SEL = t.dataset.open; openModal(t.dataset.open); }
+  if (t.dataset.open) {
+    const r = t.dataset.open;
+    openModal(r);
+    if (OPEN === r && VISIBLE.includes(r) && SEL !== r) { SEL = r; renderQueue(); }  // docked: the grid shows which
+  }
 });
 document.addEventListener("change", e => {
+  // a filter changed: leave the box so the bar redraws with its chip (it doesn't while focus is in it)
+  if (["showSel", "kindSel", "stSel", "sortSel", "fromD", "toD"].includes(e.target.id)) e.target.blur();
   if (e.target.id === "showSel") { SHOW = e.target.value; renderQueue(); }
   if (e.target.id === "kindSel") { KINDF = e.target.value; renderQueue(); }
   if (e.target.id === "stSel") { ST = e.target.value; renderQueue(); }
@@ -231,16 +247,50 @@ $("#replanBtn").onclick = async () => {
   finally { REPLANNING = false; renderBusy(); refresh(); }
 };
 
-// ---------- modal ----------
+// ---------- the item window ----------
+// On the Review page at desk width it docks beside the grid (a non-modal dialog inside the page, so
+// the queue stays in reach: J/K step it along); anywhere else, and on a phone, it opens on top.
+const DOCK = matchMedia("(min-width: 1100px)");
+function dockWanted() { return DOCK.matches && !PHONE.matches && document.body.dataset.view === "queue"; }
+function docked() { const m = $("#modal"); return m.open && m.classList.contains("docked"); }
+function placeModal() {  // open it, or move an open one, the way the page and the width want
+  // on top it must leave the Review page: a dialog inside a hidden page has no box, even as a modal
+  const m = $("#modal"), want = dockWanted(), home = want ? $('.page[data-page="queue"]') : document.body;
+  if (m.open && m.classList.contains("docked") === want && m.parentElement === home) return;
+  if (m.open) m.close();  // the close event comes later, finds it open again and leaves OPEN alone (panels.js)
+  if (m.parentElement !== home) home.append(m);
+  m.classList.toggle("docked", want);
+  if (want) m.show(); else m.showModal();
+}
+DOCK.addEventListener("change", () => { if (OPEN && document.body.dataset.view === "queue") placeModal(); });
+// the docked pane's width: drag its left edge; this browser keeps it
+const PANE_W = /^\d{3,4}px$/;
+if (PANE_W.test(store.get("warroom.paneW") || "")) $('.page[data-page="queue"]').style.setProperty("--pane-w", store.get("warroom.paneW"));
+document.addEventListener("pointerdown", e => {
+  if (!e.target.closest?.("#modal.docked .grip")) return;
+  e.preventDefault();
+  const page = $('.page[data-page="queue"]');
+  const drag = ev => {
+    const w = Math.round(Math.max(380, Math.min(innerWidth - 420, page.getBoundingClientRect().right - ev.clientX)));
+    page.style.setProperty("--pane-w", `${w}px`);
+  };
+  const done = () => {
+    removeEventListener("pointermove", drag); removeEventListener("pointerup", done); removeEventListener("pointercancel", done);
+    const w = page.style.getPropertyValue("--pane-w");
+    if (PANE_W.test(w)) store.set("warroom.paneW", w);
+  };
+  addEventListener("pointermove", drag); addEventListener("pointerup", done); addEventListener("pointercancel", done);
+});
 
-function openModal(ref) {
+function openModal(ref, checked) {  // checked: the caller has already asked about unsaved text
   const i = STATE.items.find(x => x.ref === ref);
   if (!i) { toast("Not published to Kitsu yet"); return; }
+  if (!checked && OPEN && OPEN !== ref && !discardOk()) return;  // docked, a click on another card swaps it
   OPEN = ref;
   const m = $("#modal");
   const hist = STATE.retakes.filter(h => `${h.stream}/${h.key}` === ref);
-  m.innerHTML = `
-    <div class="m-head"><span class="kind ${esc(i.kind)}">${esc(KIND[i.kind] || i.kind)}</span><b>${esc(i.short)}</b><span class="tag">${esc(i.show_name)}</span>
+  m.innerHTML = `<div class="grip" title="Drag to make the pane wider or narrower"></div>
+    <div class="m-head"><span class="kind ${esc(i.kind)}">${esc(KIND[i.kind] || i.kind)}</span><b>${esc(i.short)}</b>${showTag(i.show, i.show_name)}
       <span id="mState" class="state ${esc(i.decision)}" style="position:static"></span>
       <button class="x" aria-label="Close" title="Close (Esc)" onclick="closeModal()">×</button></div>
     <div class="m-body">
@@ -301,7 +351,7 @@ function openModal(ref) {
   showIssues(i.issues || []);
   m.querySelectorAll("[data-check]").forEach(el => el.addEventListener("input", () => checkSoon(ref)));
   if ($("#mTap")) $("#mTap").onclick = e => playLow(i, !!e.target.closest("[data-full]"));
-  if (!m.open) m.showModal();  // J / K swap the item in an open window
+  placeModal();  // J / K swap the item in an open one
   m.querySelector(".m-body").scrollTop = 0;
 }
 function fillModalState(i, fields) {

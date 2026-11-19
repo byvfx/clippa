@@ -6,6 +6,7 @@
   --panel: #c0c0c0; --panel2: #dcdcdc; --line: #808080; --text: #111111; --dim: #3c3c3c; --faint: #5e5e5e;
   --accent: #534ab7; --on-accent: #ffffff; --red: #b4231b; --green: #1a7f52; --blue: #0b3fb0; --amber: #9a5c00; --violet: #8a2f8a;
   --clip: #5a95e6; --short: #e8609f; --segment: #3cbf7a; --compilation: #f0a03c;
+  --show-1: #b07ce8; --show-2: #e8874d; --show-3: #48b5c8; --show-4: #d8c24a; --show-5: #e86a8a; --show-6: #7fb85c;  /* one per show, in [shows] order */
   --sans: Tahoma, Verdana, "Segoe UI", sans-serif;
   --head: #c0c0c0;
   --bar: #c0c0c0;

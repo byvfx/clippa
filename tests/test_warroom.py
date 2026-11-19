@@ -230,6 +230,9 @@ def test_hidden_shows_leave_the_page(tmp_path):
     path.write_text('[warroom]\nhide_shows = ["trish"]\n[shows.kino]\nchannels = ["k"]\n'
                     '[shows.trish]\nchannels = ["t"]\n', encoding="utf-8")
     assert list(warroom.shown_shows(config.load(path))) == ["kino"]
+    # a show's colour is its place in [shows]: hiding kino moves no other show's colour
+    path.write_text(path.read_text(encoding="utf-8").replace('hide_shows = ["trish"]', 'hide_shows = ["kino"]'), encoding="utf-8")
+    assert warroom.show_hues(config.load(path)) == {"kino": 1, "trish": 2}
 
 
 def test_bad_headers_and_queries_are_bad_requests_not_crashes(serve, defaults, tmp_path):

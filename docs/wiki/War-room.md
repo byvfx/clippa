@@ -7,7 +7,7 @@ schedule. Press <kbd>?</kbd> on the page for every keyboard shortcut.
 ## Pages and the top bar
 
 The page bar under the top bar has eight pages, one on screen at a time: **Review** (the queue,
-with Retakes beside it; the page opens here), **Schedule** (the schedule and the upload panel),
+with the item open beside it; the page opens here), **Schedule** (the schedule and the upload panel),
 **Pipeline** (the streams and Health), **Money** (Costs, Modal and API usage), **Stats** (the
 analytics), **Library** (the cast library, and where faces are named), **Research** (News, Blinds
 and Investigations) and **Settings** (the keys, the keyboard shortcuts and the look). The browser
@@ -22,7 +22,7 @@ The top bar is one row: the live shows, four widgets, **Chat** and **⋯**.
 - **The health light**: green when serve and the bot are up and the numbers are fresh, amber past
   45 s or when a job failed, red past 2 min, when serve or the bot is down or the Kitsu sync
   failed. Hover for what's wrong and how old the numbers are. Opens Pipeline.
-- **⋯** has the actions that change things: Sync Kitsu, Replan, the log, the keyboard shortcuts.
+- **⋯** has the actions that change things: Sync Kitsu, Replan, Undo…, the log, the keyboard shortcuts.
 
 The page used to have a Layout button for dragging panels between columns and saving layouts
 (`[paths] warroom_layouts`); the fixed pages replace it (2026-11-18), and a saved-layouts file
@@ -57,6 +57,20 @@ show filter; their streams and items still appear.
 
 ## Review queue
 
+Click a card and the item opens in a pane beside the grid, about 40% of the width; drag the
+pane's left edge to make it wider (the browser remembers). <kbd>J</kbd> / <kbd>K</kbd> move it
+along the queue, opening it if it was closed, and <kbd>Esc</kbd> or ✕ closes it. Below 1100 px,
+on a phone, and from any other page (a schedule slot, say) the item opens on top instead.
+
+Each card shows its show as a small tag in that show's colour, the same colour on every page
+(`--show-1` to `--show-6` in each look, in `[shows]` order; a show not in `[shows]` is grey), and
+the title without its "SHOW NAME |" prefix, which the tag already says (hover for the full title).
+
+The tabs along the top are Waiting, Changes, Approved, Uploaded, Rejected, All and **Retakes**:
+the items with a retake, newest first, each card with its last note, when it ran, what it cost and
+what it did (the Retakes panel before 2026-11-18). When Waiting is empty it says "Nothing
+waiting" and when the next upload goes out.
+
 It works from the keyboard:
 
 | Key | Does |
@@ -70,13 +84,18 @@ It works from the keyboard:
 | <kbd>O</kbd> | pop the video out into its own window |
 | <kbd>B</kbd> | Who's this? (a face on the paused video) |
 | <kbd>M</kbd> | show or hide the [chat](#the-chat-at-the-side) |
+| <kbd>1</kbd>–<kbd>7</kbd> | the queue tabs (7 is Retakes) |
+| <kbd>/</kbd> | the search box |
+| <kbd>Esc</kbd> | close the item |
 
 <kbd>Tab</kbd> reaches the card titles, schedule slots and live chips too; <kbd>Enter</kbd> or
 <kbd>Space</kbd> opens them. The card buttons name their key on hover.
 
 The search box looks through every stream's titles, descriptions, topics and hashtags, and
-what is said in each video (its captions). Status, date and show filters combine with it. The
-queue is newest stream first; the order menu sorts by score, length or kind instead. The view,
+what is said in each video (its captions). Show, kind, status, order and dates sit behind
+**Filters**; each one that is on shows as a chip beside it (× clears it, "Clear all" clears them
+all), and they combine with the search. The queue is newest stream first; the order filter sorts
+by score, length or kind instead. The view,
 order included, is in the page's URL, so it can be bookmarked.
 
 Tick items (shift-click for a range, "⇕ Fill the gaps" on a phone, or "Select shown") to approve, reject, hold, release,
@@ -97,7 +116,7 @@ says so above the title box and asks before it saves, and find and replace's pre
 which items it would rename. Its description and hashtags stay Kitsu-only.
 
 Decisions, hold, pin, title/description/hashtag edits, find and replace and thumbnail words
-can be undone from their toast for 10 s or from "Undo…" (the last 20). Undo goes through
+can be undone from their toast for 10 s or from "Undo…" under **⋯** (the last 20). Undo goes through
 Kitsu too, and an item already on YouTube keeps its live text (change it in Studio), except its
 title: undoing a title change made while it was up renames the video back on YouTube (one made
 before the upload is undone in Kitsu alone). Not on
@@ -106,11 +125,11 @@ status back; the retake still runs).
 
 What costs money says so first. A retake note says what a retake costs (the average of the
 recent ones), a note sent to several items asks before it starts that many, and the Retakes
-panel shows each one's cost and this month's count and total. Cast's Find line says what its
+tab shows each one's cost and this month's count and total. Cast's Find line says what its
 labels can cost.
 
 A button sends once: a double tap is one request, and Sync Kitsu and Replan (under **⋯**) stay greyed out
-until they finish. Closing an item's window, or moving on with J/K, a swipe or Approve, asks
+until they finish. Closing an item, opening another card beside it, or moving on with J/K, a swipe or Approve, asks
 before throwing away a title, description, note or release time you typed but didn't save.
 
 Titles, descriptions, hashtags and cover words are checked as you type ("hosts", unmasked
