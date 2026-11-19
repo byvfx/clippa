@@ -568,3 +568,67 @@ def test_heat_window_gives_the_curve_the_windows_and_where_each_item_sits(tmp_pa
     monkeypatch.setattr(warroom.heat.review, "items", lambda d, include, c: (_ for _ in ()).throw(FileNotFoundError()))
     (sdir / "segments.json").write_text("{}", encoding="utf-8")   # a changed folder: read again
     assert warroom.heat_get(cfg, "kick-1")["items"] == []   # nothing cut yet
+
+
+def test_a_stream_says_when_it_ended_and_when_its_items_may_go_out(tmp_path, defaults):
+    """The Schedule's Week and Timeline: a finished stream's end, and kick_first_hours after it;
+    a recording (no duration yet) or a hand-made meta.json has neither, and the page still loads."""
+    from clipper import jsonstate
+
+    cfg = {**defaults, "paths": {**defaults["paths"], "streams": tmp_path}}
+    done = tmp_path / "kick-1"
+    done.mkdir()
+    jsonstate.write(done / "meta.json", {"started_at": "2026-11-18T18:00:00-08:00", "duration_s": 7200})
+    info = warroom.stream_info(cfg, done)
+    assert info["ended_at"] == "2026-11-18T20:00:00-08:00"
+    hours = defaults["schedule"]["kick_first_hours"]
+    assert info["release_at"] == f"2026-11-{18 + (20 + hours) // 24:02d}T{(20 + hours) % 24:02d}:00:00-08:00"
+    live = tmp_path / "kick-2"
+    live.mkdir()
+    jsonstate.write(live / "meta.json", {"started_at": "2026-11-19T18:00:00-08:00"})
+    assert warroom.stream_info(cfg, live)["ended_at"] == warroom.stream_info(cfg, live)["release_at"] == ""
+    odd = tmp_path / "kick-3"
+    odd.mkdir()
+    jsonstate.write(odd / "meta.json", {"started_at": "yesterday", "duration_s": 60})
+    assert warroom.stream_info(cfg, odd)["ended_at"] == ""
+
+
+def test_the_schedule_sends_upload_times_and_slots_to_the_horizon(tmp_path, defaults, monkeypatch):
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    from clipper import jsonstate
+
+    cfg = {**defaults, "paths": {**defaults["paths"], "streams": tmp_path, "schedule": tmp_path / "schedule.json"}}
+    monkeypatch.setattr(warroom.review, "all_rows", lambda c: [])
+    soon = (datetime.now(ZoneInfo(cfg["schedule"]["timezone"])) + timedelta(days=1)).isoformat(timespec="seconds")
+    jsonstate.write(cfg["paths"]["schedule"], {"entries": [
+        {"key": "kick-1/s01", "stream": "kick-1", "kind": "segment", "title": "t", "status": "uploaded",
+         "publish_at": soon, "uploaded_at": "2026-11-18T10:00:00+00:00"}]})
+    out = warroom.overview(cfg)
+    assert out["schedule"][0]["uploaded_at"] == "2026-11-18T10:00:00+00:00"
+    horizon = max(14, cfg["schedule"]["horizon_days"])
+    assert out["rules"]["horizon_days"] == horizon
+    last = max(datetime.fromisoformat(f["at"]) for f in out["free_slots"])
+    assert last > datetime.fromisoformat(out["generated_at"]) + timedelta(days=horizon - 2)
+
+
+def test_a_taken_slot_past_three_weeks_is_not_offered_again(tmp_path, defaults, monkeypatch):
+    # PR #329 review: entries were cut at 21 days while the open slots went to horizon_days.
+    from datetime import datetime, timedelta
+
+    from clipper import jsonstate
+
+    cfg = {**defaults, "schedule": {**defaults["schedule"], "horizon_days": 28},
+           "paths": {**defaults["paths"], "streams": tmp_path, "schedule": tmp_path / "schedule.json"}}
+    monkeypatch.setattr(warroom.review, "all_rows", lambda c: [])
+    jsonstate.write(cfg["paths"]["schedule"], {"entries": []})
+    out = warroom.overview(cfg)
+    now = datetime.fromisoformat(out["generated_at"])
+    late = next(f for f in out["free_slots"] if datetime.fromisoformat(f["at"]) > now + timedelta(days=24))
+    jsonstate.write(cfg["paths"]["schedule"], {"entries": [
+        {"key": "kick-1/s01", "stream": "kick-1", "kind": late["kind"], "title": "t", "status": "planned",
+         "publish_at": late["at"]}]})
+    out = warroom.overview(cfg)
+    assert [e["key"] for e in out["schedule"]] == ["kick-1/s01"]
+    assert late["at"][:16] not in {f["at"][:16] for f in out["free_slots"]}

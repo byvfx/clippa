@@ -70,7 +70,7 @@ setInterval(tick, 1000);
 // #201: a failed refresh says so once and in the header, not in a toast every 15 s; before the
 // first answer the panels say why they are empty (until then they show the page's own skeletons).
 let DOWN = null;  // {msg} while the overview isn't coming back
-const FIRST = ["#streams", "#health", "#grid", "#schedule", "#uploads"];
+const FIRST = ["#streams", "#health", "#grid", "#week", "#schedule", "#uploads"];
 function waiting(msg) {
   if (STATE || !msg) return;
   for (const s of FIRST) $(s).innerHTML = `<div class="empty">Can't load: ${esc(msg)}.<br>Trying again every 15 s.</div>`;
@@ -403,42 +403,4 @@ function card(i) {
       <button class="btn warn" data-act="changes" data-ref="${esc(i.ref)}" title="A retake note (C)">${ic("edit")}Changes</button>
       <button class="btn bad" data-act="reject" data-ref="${esc(i.ref)}" title="Reject (R)" aria-label="Reject">${ic("close")}</button>
     </div></div>`;
-}
-
-function renderSchedule() {
-  const tz = STATE.timezone, days = {};
-  const dayKey = d => new Date(d).toLocaleDateString("en-CA", { timeZone: tz });
-  const today = dayKey(new Date());
-  for (const e of STATE.schedule) (days[dayKey(e.publish_at)] ??= []).push(e);
-  for (let k = 0; k < 14; k++) { const d = new Date(Date.now() + k * 864e5); days[dayKey(d)] ??= []; }
-  $("#schedSub").textContent = `${STATE.counts.scheduled_7d} in 7 days`;
-  const free = {};
-  if (SHOWFREE) for (const f of STATE.free_slots || []) (free[dayKey(f.at)] ??= []).push(f);
-  // Over budget or stale too (the scheduler won't place those, a pin will), newest stream first.
-  const uns = STATE.items.filter(i => i.decision === "approved" && !i.scheduled && !i.uploaded)
-    .sort(newest);
-  const segs = uns.some(i => i.kind === "segment" && !i.hold);
-  $("#schedTools").innerHTML = `<label title="Show the open slots to drop items on"><input type="checkbox" id="showFree" ${SHOWFREE ? "checked" : ""}> Open slots</label>
-    <span class="unpin" data-unpin>${ic("down")}drop here to unpin</span>
-    ${segs ? `<button class="btn" data-nextkind="segment" title="Pin each approved segment without a slot to the next open segment slot, before it goes stale (a preview first)">${ic("next")}Segments to open slots…</button>` : ""}
-    <span>max ${STATE.rules?.max_per_day ?? "?"}/day · ${STATE.rules?.min_gap_minutes ?? "?"} min apart · drag a slot to move it</span>`;
-  const why = i => i.hold ? `<span class="why">held</span>` : i.dropped ? `<span class="why" title="${esc(i.dropped)}">${i.dropped.startsWith("stale") ? "stale" : "over budget"}</span>` : "<span></span>";
-  $("#unslotted").innerHTML = uns.length ? `<div class="ss" style="color:var(--faint);font-size:11px">Approved, no slot yet (${uns.length}): drag onto an open slot, or ${ic("next")} for the next one</div>`
-    + uns.slice(0, 60).map(i => `<div class="chip" draggable="true" data-dref="${esc(i.ref)}" data-dkind="${esc(i.kind === "pick" ? "clip" : i.kind)}" title="${esc(i.title)}"><span class="bar ${esc(i.kind === "pick" ? "clip" : i.kind)}" style="width:4px;height:16px;border-radius:2px;display:block"></span><span class="t">${esc(bare(i.title, i.show_name))}</span>${why(i)}${!i.hold && i.kind !== "compilation" ? `<button class="nx" data-nextslot="${esc(i.ref)}" title="Pin to the next open slot (a preview first)" aria-label="Next open slot">${ic("next")}</button>` : "<span></span>"}</div>`).join("") : "";
-  $("#unslotted").hidden = !uns.length;
-  for (const d of Object.keys(free)) days[d] ??= [];
-  $("#schedule").innerHTML = Object.keys(days).sort().map(d => {
-    const label = new Date(d + "T12:00:00").toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
-    const rows = [...days[d].map(e => ({ e, at: e.publish_at })), ...(free[d] || []).map(f => ({ f, at: f.at }))]
-      .sort((a, b) => a.at.localeCompare(b.at));
-    return `<div class="day ${d === today ? "today" : d < today ? "past" : ""}"><h3 data-dday="${d}">${d === today ? "Today · " : ""}${label}<span class="n">${days[d].length || ""}</span></h3>
-      ${rows.map(({ e, f }) => f ? `<div class="slot free" data-dslot="${esc(f.at)}" data-dkind="${esc(f.kind)}">
-        <span class="tm">${new Date(f.at).toLocaleTimeString([], { timeZone: tz, hour: "2-digit", minute: "2-digit" })}</span>
-        <span class="bar ${esc(f.kind)}"></span><span><div class="tt">open ${esc(f.kind)} slot</div></span></div>`
-      : `<div class="slot" data-open="${esc(e.key)}" role="button" tabindex="0" ${e.status !== "uploaded" ? `draggable="true" data-dref="${esc(e.key)}" data-dkind="${esc(e.kind)}" data-dat="${esc(e.publish_at)}"` : ""}>
-        <span class="tm">${new Date(e.publish_at).toLocaleTimeString([], { timeZone: tz, hour: "2-digit", minute: "2-digit" })}</span>
-        <span class="bar ${esc(e.kind)}"></span>
-        <span><div class="tt" title="${esc(e.title)}">${esc(bare(e.title, e.show_name))}</div><div class="ss">${showTag("", e.show_name)} · ${e.kind}${e.status === "uploaded" ? ` · <span class="up">uploaded</span>${e.views != null ? ` · ${Number(e.views).toLocaleString()} views` : ""}${e.url ? ` · <a href="${esc(e.url)}" target="_blank" rel="noopener">YouTube</a>` : ""}` : e.source === "pinned" ? " · pinned" : ""}</div></span></div>`).join("")
-      || `<div class="slot" style="cursor:default"><span></span><span></span><span class="ss">—</span></div>`}</div>`;
-  }).join("");
 }

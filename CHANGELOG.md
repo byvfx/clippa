@@ -10,6 +10,11 @@ Developing#releases.
 
 ## Unreleased
 
+- **War room:** Ctrl+K searches pages, actions and items, and G then a letter jumps to a page.
+- **War room:** the Schedule page gets Next up (the next five uploads), a Week view of blocks in each
+  show's colour with open slots to drop onto, and a Ready to slot tray that counts what the Schedule
+  tab counts; stale and over-budget items are one link to the queue. The day list stays, as List.
+
 ## 0.2.0 (2026-11-18)
 
 The first release, as the app stood on 2026-11-18. Clipper takes long streams (Kick, and now Twitch
