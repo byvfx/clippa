@@ -113,6 +113,7 @@ $("#palette").addEventListener("input", palFill);
 $("#palette").addEventListener("keydown", e => {
   // none of it reaches the page's keys behind it (A would approve, Esc close the docked item); Esc is the dialog's own
   e.stopPropagation();
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); $("#palQ").select(); return; }   // not the browser's
   if (e.target.id !== "palQ") return;
   if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); palMark(PAL.at + (e.key === "ArrowDown" ? 1 : -1), true); }
   else if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); palRun(PAL.at); }
