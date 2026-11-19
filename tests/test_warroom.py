@@ -457,7 +457,9 @@ def test_the_look_has_its_fonts_and_one_icon_set():
     asked = set(re.findall(r'href="#i-([\w-]+)"', page)) | set(re.findall(r'\bic\("([\w-]+)"\)', scripts))
     asked |= {n for pair in re.findall(r'\bic\([^)]*\?\s*"([\w-]+)"\s*:\s*"([\w-]+)"\)', scripts) for n in pair}
     assert asked and not asked - have, sorted(asked - have)
-    emoji = re.compile("[\U0001F300-\U0001FAFF☀-➿⬀-⯿]")
+    # emoji, and the symbols the page drew icons with before the sprite (the arrows but the plain
+    # four, technical, shapes, supplemental arrows); a key name's or a sentence's arrow is fine
+    emoji = re.compile("[\U0001F300-\U0001FAFF↕-⇿⌀-⏿■-◿☀-➿⟰-⟿⤀-⧿⬀-⯿]")
     assert not emoji.search(page + scripts), emoji.findall(page + scripts)
 
 

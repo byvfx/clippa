@@ -366,7 +366,7 @@ function fillModalState(i, fields) {
     + (i.decision !== "approved" ? `<button class="btn good" data-act="approve" data-ref="${r}" title="Approve, then the next item (A)">${ic("check")}Approve</button>` : `<button class="btn" data-act="reopen" data-ref="${r}">${ic("reopen")}Reopen</button>`)
     + `<button class="btn warn" data-act="changes" data-ref="${r}" title="Retake note (C)" aria-label="Retake note">${ic("edit")}</button>`
     + `<button class="btn bad" data-act="reject" data-ref="${r}" title="Reject (R)" aria-label="Reject">${ic("close")}</button>`
-    + `<button class="btn" id="bHold" title="${i.hold ? "Release hold" : "Hold"} (H)">${ic(i.hold ? "play" : "pause")}${PHONE.matches ? "" : i.hold ? " Release" : " Hold"}</button>`
+    + `<button class="btn" id="bHold" title="${i.hold ? "Release hold" : "Hold"} (H)">${ic(i.hold ? "play" : "pause")}${PHONE.matches ? "" : i.hold ? "Release" : "Hold"}</button>`
     + (queued ? `<button class="btn nav" data-move="1" title="Next (J, or swipe left)" aria-label="Next">${ic("right")}</button>` : "");
   $("#bHold").onclick = () => act(i.ref, "hold", { on: !i.hold });
   $("#pinHint").textContent = i.scheduled ? `Scheduled ${new Date(i.scheduled).toLocaleString()}${i.publish_at ? " (pinned)" : ""}` : i.decision === "approved" ? "Approved, waiting for a free slot" : "Gets a slot once approved";

@@ -31,6 +31,8 @@ const ClippaTheme = (() => {
     document.dispatchEvent(new Event("clippa-theme"));
   }
   link.addEventListener("load", painted);
+  // a look whose file is gone (a pick of a retired look): wear the page's own at once, not a bare page
+  link.addEventListener("error", () => { if (HOME && current() !== HOME) use(HOME); });
 
   function use(name) {
     if (!NAME.test(name || "")) return;
@@ -56,6 +58,8 @@ const ClippaTheme = (() => {
   // When the page knows which looks serve has: a pick that is gone, or no pick, wears the default.
   function settle(list, dflt = HOME) {
     if (outerLook()) return;   // docked: the outer page settles it and tells this one
+    const kept = read(KEY);   // a kept pick of a look serve no longer has (a retired one): forget it
+    if (kept && !list.includes(kept)) { picked = false; try { localStorage.removeItem(KEY); } catch { /* storage off */ } }
     if (picked && list.includes(current())) return;
     const name = list.includes(dflt) ? dflt : list[0];
     use(name);

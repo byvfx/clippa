@@ -70,7 +70,7 @@ setInterval(tick, 1000);
 // #201: a failed refresh says so once and in the header, not in a toast every 15 s; before the
 // first answer the panels say why they are empty (until then they show the page's own skeletons).
 let DOWN = null;  // {msg} while the overview isn't coming back
-const FIRST = ["#streams", "#health", "#grid", "#schedule"];
+const FIRST = ["#streams", "#health", "#grid", "#schedule", "#uploads"];
 function waiting(msg) {
   if (STATE || !msg) return;
   for (const s of FIRST) $(s).innerHTML = `<div class="empty">Can't load: ${esc(msg)}.<br>Trying again every 15 s.</div>`;
@@ -144,7 +144,7 @@ function watch(ch, where) {
   d.innerHTML = `<div class="d-head"><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--red)"></span><b>${esc(name)}</b><span style="color:var(--faint)">${esc(ch)}</span>
     <span class="sp"></span><button class="btn" id="dSize" title="Bigger / smaller" aria-label="Bigger or smaller">${ic("expand")}</button>
     <button class="btn" id="dPop" title="Open on kick.com in a new window instead" aria-label="Open on kick.com">${ic("external")}</button>
-    <button class="btn" id="dClose" title="Close the player">${ic("close")}</button></div>
+    <button class="btn" id="dClose" title="Close the player" aria-label="Close the player">${ic("close")}</button></div>
     <iframe src="https://player.kick.com/${encodeURIComponent(ch)}?autoplay=true" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>`;
   d.classList.toggle("big", !!store.get("warroom.dock.big"));
   $("#dSize").onclick = () => { d.classList.toggle("big"); store.set("warroom.dock.big", d.classList.contains("big") ? "1" : null); };
