@@ -9,7 +9,7 @@ async function showApiKeys() {
   const d = $("#tool");
   const win = ++AKWIN;
   d.dataset.kind = "apikeys"; d.classList.remove("cover"); d.classList.add("facesw");
-  d.innerHTML = `<div class="m-head"><b>Keys</b><button class="x" aria-label="Close" title="Close (Esc)" data-close>×</button></div><div class="tbody">Loading…</div>`;
+  d.innerHTML = `<div class="m-head"><b>Keys</b><button class="x" aria-label="Close" title="Close (Esc)" data-close>${ic("close")}</button></div><div class="tbody">Loading…</div>`;
   if (!d.open) d.showModal();
   try {
     const data = await api("/api/keys");
@@ -29,7 +29,7 @@ function renderApiKeys() {
     const l = r.last;
     if (!l) return `<span class="by">${r.checkable ? "not checked yet" : "no check"}</span>`;
     const cls = l.ok === true ? "ok" : l.ok === false ? "bad" : "mid";
-    return `<span class="${cls}">${l.ok === true ? "✓" : l.ok === false ? "✗" : "?"} ${esc(l.note)}</span> <span class="by">${ago(l.at)}</span>`;
+    return `<span class="${cls}">${l.ok === true ? ic("check") : l.ok === false ? ic("close") : "?"}${esc(l.note)}</span> <span class="by">${ago(l.at)}</span>`;
   };
   const row = r => `<tr class="${r.set ? "" : "off"}">
       <td><b>${esc(r.name)}</b><div class="by">${esc(r.what)}</div><code class="akenv-sm">${esc(r.env)}${r.set ? " · " + esc(r.source.startsWith("$") ? "env" : r.source) : ""}</code></td>
@@ -39,7 +39,7 @@ function renderApiKeys() {
       <td>${r.set && r.checkable ? `<button class="btn" data-akcheck="${esc(r.name)}"${busy ? " disabled" : ""}>Check</button>` : ""}</td>
     </tr>`;
   const held = data.held.map(h => `<div class="nst"><div class="nh"><b>${esc(h.stream)}</b><span class="by">held since ${ago(h.since)}</span></div><div class="by">${esc(h.error)}</div></div>`).join("");
-  $("#tool").innerHTML = `<div class="m-head"><b>Keys</b><span style="color:var(--faint);font-size:12px">as the war room's server on ${esc(data.host)} sees them (on the hub: serve's, the bot's and the worker's) · values never leave it</span><button class="x" aria-label="Close" title="Close (Esc)" data-close>×</button></div>
+  $("#tool").innerHTML = `<div class="m-head"><b>Keys</b><span style="color:var(--faint);font-size:12px">as the war room's server on ${esc(data.host)} sees them (on the hub: serve's, the bot's and the worker's) · values never leave it</span><button class="x" aria-label="Close" title="Close (Esc)" data-close>${ic("close")}</button></div>
     <div class="news apikeys">
       ${data.held.length ? `<div class="f" style="color:var(--red)">Held for a rejected key: the worker retries these by itself once the key changes</div>${held}` : ""}
       <div class="nbar"><button class="btn primary" id="akAll"${busy ? " disabled" : ""}>Check all</button><span class="by">one free request a provider; Brave, Pixabay, DVIDS and sync.so aren't asked</span></div>

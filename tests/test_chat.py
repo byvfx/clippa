@@ -470,7 +470,7 @@ def theme_variables() -> set[str]:
 def test_every_theme_defines_every_variable():
     want = theme_variables()
     assert {"desk", "win", "tb", "btn", "panel2", "accent", "field", "sel"} <= want   # both pages' vocabulary
-    assert {"millennium", "pager", "retro", "warroom"} <= set(routes.themes())   # a new look is just a file
+    assert set(routes.themes()) == {"millennium", "warroom"}   # a new look is just a file; retro and pager retired 2026-11-18
     for name in routes.themes():
         have = set(_defined((WEB / "themes" / f"{name}.css").read_text(encoding="utf-8")))
         assert not want - have, (name, sorted(want - have))
@@ -490,7 +490,7 @@ def test_the_warroom_theme_is_the_one_source():
     literal = set(re.findall(r"#[0-9a-fA-F]{3,8}\b", room)) | set(re.findall(r"\brgba?\([^)]*\)", room))
     assert literal <= THEME_FREE, sorted(literal - THEME_FREE)
     palette = _defined((WEB / "themes" / "warroom.css").read_text(encoding="utf-8"))
-    assert (palette["bg"], palette["panel"], palette["accent"]) == ("#0b0d10", "#12161b", "#ffd400")   # the war room as it was
+    assert (palette["bg"], palette["panel"], palette["accent"]) == ("#111215", "#18191d", "#5b93f0")   # the editor look (2026-11-18)
 
 
 def test_both_pages_wear_a_look_through_theme_js():
@@ -507,9 +507,9 @@ def test_both_pages_wear_a_look_through_theme_js():
 
 
 def test_the_default_theme_comes_from_config(cfg):
-    assert routes.chat_themes(cfg)["default"] == "retro"
-    cfg["chat"]["theme"] = "pager"
-    assert routes.chat_themes(cfg)["default"] == "pager"
+    assert routes.chat_themes(cfg)["default"] == "millennium"
+    cfg["chat"]["theme"] = "warroom"
+    assert routes.chat_themes(cfg)["default"] == "warroom"
     cfg["chat"]["theme"] = "no-such-look"
     assert routes.chat_themes(cfg)["default"] == routes.themes()[0]
 

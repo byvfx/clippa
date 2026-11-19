@@ -109,7 +109,7 @@ async function showHeat(stream, focus) {
   const list = (STATE?.streams || []).filter(s => s.stages.signals === "done" || s.id === stream);
   if (!list.some(s => s.id === stream)) list.unshift({ id: stream, show_name: "", started_at: "", title: stream });
   const opts = list.map(s => `<option value="${esc(s.id)}"${s.id === stream ? " selected" : ""}>${esc([s.show_name || s.channel, s.started_at.slice(0, 10), s.title].filter(Boolean).join(" · ").slice(0, 90))}</option>`).join("");
-  d.innerHTML = `<div class="m-head"><b>Heat</b><select id="heatStream" title="The stream">${opts}</select><button class="x" aria-label="Close" title="Close (Esc)" data-close>×</button></div><div class="tbody heat">Loading…</div>`;
+  d.innerHTML = `<div class="m-head"><b>Heat</b><select id="heatStream" title="The stream">${opts}</select><button class="x" aria-label="Close" title="Close (Esc)" data-close>${ic("close")}</button></div><div class="tbody heat">Loading…</div>`;
   if (!d.open) d.showModal();
   HEAT = { focus: focus || "", data: null, geo: null };
   try {

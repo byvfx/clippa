@@ -2,6 +2,8 @@
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+// One of the page's line icons (the sprite at the top of warroom.html), drawn in the text's colour.
+const ic = name => `<svg class="ic" aria-hidden="true"><use href="#i-${name}"/></svg>`;
 const KIND = { pick: "Clip", short: "Short", segment: "Segment", compilation: "Comp" };
 const DEC = { pending: "waiting", changes_requested: "changes", approved: "approved", rejected: "rejected" };
 let STATE = null, TAB = "waiting", SHOW = "", KINDF = "", Q = "", BUSY = new Set(), OPEN = null;
@@ -66,14 +68,14 @@ function tick() {
 setInterval(tick, 1000);
 
 // #201: a failed refresh says so once and in the header, not in a toast every 15 s; before the
-// first answer the panels say why they are empty.
+// first answer the panels say why they are empty (until then they show the page's own skeletons).
 let DOWN = null;  // {msg} while the overview isn't coming back
-const FIRST = ["#streams", "#health", "#grid", "#schedule"];
+const FIRST = ["#streams", "#health", "#grid", "#schedule", "#uploads"];
 function waiting(msg) {
-  if (STATE) return;
-  for (const s of FIRST) $(s).innerHTML = `<div class="empty">${msg ? `Can't load: ${esc(msg)}.<br>Trying again every 15 s.` : "Loading…"}</div>`;
+  if (STATE || !msg) return;
+  for (const s of FIRST) $(s).innerHTML = `<div class="empty">Can't load: ${esc(msg)}.<br>Trying again every 15 s.</div>`;
 }
-waiting();
+let DRAWN = false;  // render() has filled the panels once
 let MUTATED = 0;  // bumped when an action's answer changes STATE.items here
 let REFRESHING = 0;  // overviews asked for and not answered yet
 // The timer's refresh waits for one still on its way: a slow serve (a cold cache over the NAS
@@ -123,7 +125,7 @@ function renderLive() {
     const tip = l.live ? `${l.title || ""}\nlive ${since(l.since)} · ${rec ? "recording " + rec.id : "NOT recording"}` : `${l.channel}: offline, click for the channel`;
     // #206: the chip's label is a real button (keyboard, screen readers); its menu sits beside it
     return `<span class="live ${l.live ? "on" : ""}" data-live="${n}" title="${esc(tip)}"><button class="chipb" type="button"><span class="dot"></span>${esc(l.show_name)}${l.live
-      ? ` · LIVE${l.viewers != null ? " · " + l.viewers.toLocaleString() : ""}${l.since ? " · " + since(l.since) : ""} <span class="rec ${rec ? "" : "off"}">${rec ? "● REC" : "○ no rec"}</span>` : ""}</button>${LIVEMENU === n ? liveMenu(l, rec) : ""}</span>`;
+      ? ` · LIVE${l.viewers != null ? " · " + l.viewers.toLocaleString() : ""}${l.since ? " · " + since(l.since) : ""} <span class="rec ${rec ? "" : "off"}">${rec ? `<i class="recdot"></i>REC` : "no rec"}</span>` : ""}</button>${LIVEMENU === n ? liveMenu(l, rec) : ""}</span>`;
   }).join("");
   if (ticked && $("#liveRemember")) $("#liveRemember").checked = true;
   if (had != null) $(`#lives .live[data-live="${had}"] ${LIVEMENU === +had ? inMenu : ".chipb"}`)?.focus();
@@ -131,8 +133,8 @@ function renderLive() {
 function liveMenu(l, rec) {
   return `<div class="livemenu" data-menu>
     <div class="info">${esc(l.channel)} · ${rec ? `recording ${esc(rec.id)} (${esc(rec.recording)})` : "the NAS isn't recording it"}</div>
-    <button class="btn" data-watch="here" data-ch="${esc(l.channel)}">▶ Watch here</button>
-    <button class="btn" data-watch="window" data-ch="${esc(l.channel)}">↗ Open in a new window</button>
+    <button class="btn" data-watch="here" data-ch="${esc(l.channel)}">${ic("play")}Watch here</button>
+    <button class="btn" data-watch="window" data-ch="${esc(l.channel)}">${ic("external")}Open in a new window</button>
     <label><input type="checkbox" id="liveRemember"> Always do this (shift-click a chip to ask again)</label></div>`;
 }
 function watch(ch, where) {
@@ -140,9 +142,9 @@ function watch(ch, where) {
   if (where === "window") { window.open(`https://kick.com/${encodeURIComponent(ch)}`, `kick-${ch}`); return; }
   const d = $("#dock"); d.hidden = false;
   d.innerHTML = `<div class="d-head"><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--red)"></span><b>${esc(name)}</b><span style="color:var(--faint)">${esc(ch)}</span>
-    <span class="sp"></span><button class="btn" id="dSize" title="Bigger / smaller">⤢</button>
-    <button class="btn" id="dPop" title="Open on kick.com in a new window instead">↗</button>
-    <button class="btn" id="dClose" title="Close the player">×</button></div>
+    <span class="sp"></span><button class="btn" id="dSize" title="Bigger / smaller" aria-label="Bigger or smaller">${ic("expand")}</button>
+    <button class="btn" id="dPop" title="Open on kick.com in a new window instead" aria-label="Open on kick.com">${ic("external")}</button>
+    <button class="btn" id="dClose" title="Close the player" aria-label="Close the player">${ic("close")}</button></div>
     <iframe src="https://player.kick.com/${encodeURIComponent(ch)}?autoplay=true" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>`;
   d.classList.toggle("big", !!store.get("warroom.dock.big"));
   $("#dSize").onclick = () => { d.classList.toggle("big"); store.set("warroom.dock.big", d.classList.contains("big") ? "1" : null); };
@@ -169,7 +171,7 @@ function liveClick(e, t) {
 function render() {
   const s = STATE, c = s.counts;
   renderWidgets();
-  const first = !$("#schedule").children.length;
+  const first = !DRAWN; DRAWN = true;
   renderStreams(); renderHealth(); renderQueue(); renderUploads(); renderSchedule(); renderLive(); tick();
   if (first && document.body.dataset.view === "schedule") setView("schedule");  // opened on it: go to today
   if (OPEN) { const r = s.items.find(i => i.ref === OPEN); if (r && !$("#modal").contains(document.activeElement)) fillModalState(r); }
@@ -191,7 +193,7 @@ function renderWidgets() {
   const live = n(x => x.recording === "recording"), ending = n(x => ["paused", "finalizing"].includes(x.recording));
   const run = n(x => x.run_status === "running"), bad = n(x => x.run_status === "failed");
   const wp = $("#wPipe");
-  wp.querySelector("b").textContent = [live && `● ${live} live`, ending && `${ending} ending`, run && `${run} running`,
+  wp.querySelector("b").textContent = [live && `${live} live`, ending && `${ending} ending`, run && `${run} running`,
     bad && `${bad} failed`].filter(Boolean).join(" · ") || "idle";
   wp.dataset.level = bad ? "bad" : live || ending || run ? "busy" : "";
   wp.title = `${live} live, ${ending} paused or finalizing, ${run} processing, ${bad} failed. Opens the Pipeline page.`;
@@ -203,14 +205,14 @@ function renderStreams() {
   $("#pipeSub").textContent = st.filter(x => x.run_status === "running").length ? "running" : "";
   $("#streams").innerHTML = st.slice(0, 10).map(x => {
     const done = STATE.stages.filter(g => x.stages[g] === "done").length;
-    const status = x.recording && x.recording !== "done" ? `● ${x.recording}` : x.run_status === "running" ? "running"
+    const status = x.recording && x.recording !== "done" ? x.recording : x.run_status === "running" ? "running"
       : x.run_status === "failed" ? "failed" : done === STATE.stages.length ? "done" : x.published ? "in review" : `${done}/${STATE.stages.length}`;
     return `<div class="stream" title="${esc(x.run_error)}">
-      <div class="top"><span class="tag">${esc(x.show_name || x.channel)}</span><b style="font-size:12px">${esc(x.started_at.slice(0, 10))}</b>
-        <span style="margin-left:auto;font-size:11px;color:${x.run_status === "failed" ? "var(--red)" : x.run_status === "running" ? "var(--accent)" : "var(--faint)"}">${esc(status)}</span></div>
+      <div class="top">${showTag(x.show, x.show_name || x.channel)}<b style="font-size:12px">${esc(x.started_at.slice(0, 10))}</b>
+        <span style="margin-left:auto;font-size:11px;color:${x.run_status === "failed" ? "var(--red)" : x.run_status === "running" ? "var(--accent)" : "var(--faint)"}">${x.recording && x.recording !== "done" ? `<i class="recdot"></i>` : ""}${esc(status)}</span></div>
       <div class="t">${esc(x.title)}</div>
       <div class="stages" role="img" aria-label="${esc(STATE.stages.map(g => `${g} ${x.stages[g] || "not yet"}`).join(", "))}">${STATE.stages.map(g => `<div class="stage ${esc(x.stages[g] || "")}" title="${g}: ${x.stages[g] || "not yet"}"></div>`).join("")}</div>
-      <div class="meta"><span>${esc(x.id)}</span>${x.faces ? `<button class="lnk" data-faces="${esc(x.id)}" title="Name this stream's face groups">👤 faces</button>` : ""}${x.stages.signals === "done" ? `<button class="lnk" data-heat="${esc(x.id)}" title="Where this stream ran hot, and what was cut from it">🔥 heat</button>` : ""}<span>${x.duration_s ? (x.duration_s / 3600).toFixed(1) + " h" : ""}</span></div></div>`;
+      <div class="meta"><span>${esc(x.id)}</span>${x.faces ? `<button class="lnk" data-faces="${esc(x.id)}" title="Name this stream's face groups">${ic("face")}faces</button>` : ""}${x.stages.signals === "done" ? `<button class="lnk" data-heat="${esc(x.id)}" title="Where this stream ran hot, and what was cut from it">${ic("heat")}heat</button>` : ""}<span>${x.duration_s ? (x.duration_s / 3600).toFixed(1) + " h" : ""}</span></div></div>`;
   }).join("") || `<div class="empty">No streams yet</div>`;
 }
 
@@ -218,8 +220,8 @@ function renderStreams() {
 let RETAKEN = new Map();  // ref -> its newest retake (STATE.retakes comes newest first)
 function retaken() { RETAKEN = new Map(); for (const h of STATE.retakes || []) { const r = `${h.stream}/${h.key}`; if (!RETAKEN.has(r)) RETAKEN.set(r, h); } }
 function retakeResult(h) {
-  return `<div class="r-${esc(h.result)}">${h.result === "applied" ? "✓ " + esc(h.summary || (h.applied || []).join("; "))
-    : h.result === "unsupported" ? "⚠ " + esc(h.unsupported || "not applied") : h.result === "error" ? "✕ " + esc(h.error) : esc(h.result)}</div>`;
+  return `<div class="r-${esc(h.result)}">${h.result === "applied" ? ic("check") + esc(h.summary || (h.applied || []).join("; "))
+    : h.result === "unsupported" ? ic("warn") + esc(h.unsupported || "not applied") : h.result === "error" ? ic("close") + esc(h.error) : esc(h.result)}</div>`;
 }
 function retakeSub() {  // #203: what retakes cost
   const rc = STATE.retake_cost || {};
@@ -345,9 +347,9 @@ function renderQueue() {
     const chips = filterChips();
     bar.innerHTML = `<span class="tabs">${Object.keys(TABS).map(t => `<button class="tab ${TAB === t ? "on" : ""}" data-tab="${t}">${TAB_LABEL[t]}<span class="n">${base.filter(TABS[t]).length}</span></button>`).join("")}</span>`
     + `<span class="sep"></span><button class="btn ${chips.length ? "on" : ""}" id="filterBtn" aria-expanded="${FOPEN}" aria-controls="filters">Filters${chips.length ? ` <b>${chips.length}</b>` : ""}</button>
-       ${chips.map(([, k, label]) => `<button class="fchip" data-unfilter="${k}" title="Clear this filter">${esc(label)} ×</button>`).join("")}
+       ${chips.map(([, k, label]) => `<button class="fchip" data-unfilter="${k}" title="Clear this filter">${esc(label)}${ic("close")}</button>`).join("")}
        <input class="search" id="q" aria-label="Search the queue" placeholder="Search titles, descriptions, transcripts… ( / )" value="${esc(Q)}">
-       <button class="btn" id="pickAll" title="Select every item shown, for a bulk action">☑ Select shown</button>
+       <button class="btn" id="pickAll" title="Select every item shown, for a bulk action">${ic("selectall")}Select shown</button>
        <div class="filters" id="filters" ${FOPEN ? "" : "hidden"}><select id="showSel"><option value="">All shows</option>${shows.map(s => `<option value="${s.key}" ${SHOW === s.key ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select>
        <select id="kindSel"><option value="">All kinds</option>${Object.entries(KIND).map(([k, v]) => `<option value="${k}" ${KINDF === k ? "selected" : ""}>${v}s</option>`).join("")}</select>
        <select id="stSel"><option value="">Any status</option>${Object.keys(STATUS).map(k => `<option value="${k}" ${ST === k ? "selected" : ""}>${STATUS_LABEL[k]}</option>`).join("")}</select>
@@ -380,26 +382,26 @@ function card(i) {
   const vertical = i.kind === "short";
   const media = i.thumbnail_url ? `<img loading="lazy" src="${i.thumbnail_url}" alt="">`
     : i.video_url ? `<video muted preload="${PHONE.matches ? "none" : "metadata"}" src="${i.video_url}#t=3"></video>` : "";
-  const sched = i.scheduled ? `⏱ ${new Date(i.scheduled).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}` : i.publish_at ? `📌 ${esc(i.publish_at)}` : "";
+  const sched = i.scheduled ? `${ic("clock")}${new Date(i.scheduled).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}` : i.publish_at ? `${ic("pin")}${esc(i.publish_at)}` : "";
   const hit = THQ === Q && THITS[i.ref] && !textOf(i).includes(Q.toLowerCase().split(/\s+/)[0]) ? THITS[i.ref] : "";
   return `<div class="card ${BUSY.has(i.ref) ? "busy" : ""} ${SEL === i.ref ? "sel" : ""} ${PICK.has(i.ref) ? "picked" : ""}" data-ref="${esc(i.ref)}">
     <div class="thumb ${vertical ? "vertical" : ""}" data-open="${esc(i.ref)}">${media}
       <span class="kind ${esc(i.kind)}">${esc(KIND[i.kind] || i.kind)}</span>
       <span class="state ${esc(i.decision)}">${esc(DEC[i.decision] || i.decision)}${i.hold ? " · held" : ""}</span>
-      <span class="dur">${mmss(i.duration_s)}</span>${i.video_url ? `<button class="pop" data-pop="${esc(i.ref)}" title="Open the video in its own window">⧉</button>` : ""}</div>
+      <span class="dur">${mmss(i.duration_s)}</span>${i.video_url ? `<button class="pop" data-pop="${esc(i.ref)}" title="Open the video in its own window" aria-label="Pop out">${ic("popout")}</button>` : ""}</div>
     <div class="body">
       <div class="title" data-open="${esc(i.ref)}" role="button" tabindex="0" title="${esc(i.title)}">${esc(bare(i.title, i.show_name))}</div>
-      <div class="sub">${showTag(i.show, i.show_name)}<span>${esc(i.date)}</span><span>${esc(i.short.split("/")[1])}</span>${i.score ? `<span>★ ${esc(i.score)}</span>` : ""}${sched ? `<span>${sched}</span>` : ""}${i.issues?.length ? `<span class="issues" title="${esc(i.issues.map(x => x.msg).join("\n"))}">⚠ ${i.issues.length}</span>` : ""}</div>
+      <div class="sub">${showTag(i.show, i.show_name)}<span>${esc(i.date)}</span><span>${esc(i.short.split("/")[1])}</span>${i.score ? `<span class="score" title="Score">${esc(i.score)}</span>` : ""}${sched ? `<span>${sched}</span>` : ""}${i.issues?.length ? `<span class="issues" title="${esc(i.issues.map(x => x.msg).join("\n"))}">${ic("warn")}${i.issues.length}</span>` : ""}</div>
       ${i.hook ? `<div class="hook">${esc(i.hook)}</div>` : ""}
-      ${hit ? `<div class="hit" title="Said in the video">🗨 ${esc(hit)}</div>` : ""}
-      ${i.decision === "changes_requested" && i.comment ? `<div class="note">✎ ${esc(i.comment)}</div>` : ""}
+      ${hit ? `<div class="hit" title="Said in the video">${ic("said")}${esc(hit)}</div>` : ""}
+      ${i.decision === "changes_requested" && i.comment ? `<div class="note">${ic("edit")}${esc(i.comment)}</div>` : ""}
       ${TAB === "retakes" && RETAKEN.has(i.ref) ? (h => `<div class="ev"><div class="w">${esc(ago(h.at))}${h.cost_usd != null ? " · " + usd(h.cost_usd) : ""}</div><q>${esc(h.comment)}</q>${retakeResult(h)}</div>`)(RETAKEN.get(i.ref)) : ""}
     </div>
     <div class="acts">
       <label class="pickl" title="Select (shift-click: a range)"><input type="checkbox" aria-label="Select" data-pick="${esc(i.ref)}" ${PICK.has(i.ref) ? "checked" : ""}></label>
-      ${i.decision !== "approved" ? `<button class="btn good" data-act="approve" data-ref="${esc(i.ref)}" title="Approve (A)">✓ Approve</button>` : `<button class="btn" data-act="reopen" data-ref="${esc(i.ref)}" title="Reopen (U)">↺ Reopen</button>`}
-      <button class="btn warn" data-act="changes" data-ref="${esc(i.ref)}" title="A retake note (C)">✎ Changes</button>
-      <button class="btn bad" data-act="reject" data-ref="${esc(i.ref)}" title="Reject (R)" aria-label="Reject">✕</button>
+      ${i.decision !== "approved" ? `<button class="btn good" data-act="approve" data-ref="${esc(i.ref)}" title="Approve (A)">${ic("check")}Approve</button>` : `<button class="btn" data-act="reopen" data-ref="${esc(i.ref)}" title="Reopen (U)">${ic("reopen")}Reopen</button>`}
+      <button class="btn warn" data-act="changes" data-ref="${esc(i.ref)}" title="A retake note (C)">${ic("edit")}Changes</button>
+      <button class="btn bad" data-act="reject" data-ref="${esc(i.ref)}" title="Reject (R)" aria-label="Reject">${ic("close")}</button>
     </div></div>`;
 }
 
@@ -417,12 +419,12 @@ function renderSchedule() {
     .sort(newest);
   const segs = uns.some(i => i.kind === "segment" && !i.hold);
   $("#schedTools").innerHTML = `<label title="Show the open slots to drop items on"><input type="checkbox" id="showFree" ${SHOWFREE ? "checked" : ""}> Open slots</label>
-    <span class="unpin" data-unpin>⇣ drop here to unpin</span>
-    ${segs ? `<button class="btn" data-nextkind="segment" title="Pin each approved segment without a slot to the next open segment slot, before it goes stale (a preview first)">⇥ Segments to open slots…</button>` : ""}
+    <span class="unpin" data-unpin>${ic("down")}drop here to unpin</span>
+    ${segs ? `<button class="btn" data-nextkind="segment" title="Pin each approved segment without a slot to the next open segment slot, before it goes stale (a preview first)">${ic("next")}Segments to open slots…</button>` : ""}
     <span>max ${STATE.rules?.max_per_day ?? "?"}/day · ${STATE.rules?.min_gap_minutes ?? "?"} min apart · drag a slot to move it</span>`;
   const why = i => i.hold ? `<span class="why">held</span>` : i.dropped ? `<span class="why" title="${esc(i.dropped)}">${i.dropped.startsWith("stale") ? "stale" : "over budget"}</span>` : "<span></span>";
-  $("#unslotted").innerHTML = uns.length ? `<div class="ss" style="color:var(--faint);font-size:11px">Approved, no slot yet (${uns.length}): drag onto an open slot, or ⇥ for the next one</div>`
-    + uns.slice(0, 60).map(i => `<div class="chip" draggable="true" data-dref="${esc(i.ref)}" data-dkind="${esc(i.kind === "pick" ? "clip" : i.kind)}" title="${esc(i.title)}"><span class="bar ${esc(i.kind === "pick" ? "clip" : i.kind)}" style="width:4px;height:16px;border-radius:2px;display:block"></span><span class="t">${esc(bare(i.title, i.show_name))}</span>${why(i)}${!i.hold && i.kind !== "compilation" ? `<button class="nx" data-nextslot="${esc(i.ref)}" title="Pin to the next open slot (a preview first)">⇥</button>` : "<span></span>"}</div>`).join("") : "";
+  $("#unslotted").innerHTML = uns.length ? `<div class="ss" style="color:var(--faint);font-size:11px">Approved, no slot yet (${uns.length}): drag onto an open slot, or ${ic("next")} for the next one</div>`
+    + uns.slice(0, 60).map(i => `<div class="chip" draggable="true" data-dref="${esc(i.ref)}" data-dkind="${esc(i.kind === "pick" ? "clip" : i.kind)}" title="${esc(i.title)}"><span class="bar ${esc(i.kind === "pick" ? "clip" : i.kind)}" style="width:4px;height:16px;border-radius:2px;display:block"></span><span class="t">${esc(bare(i.title, i.show_name))}</span>${why(i)}${!i.hold && i.kind !== "compilation" ? `<button class="nx" data-nextslot="${esc(i.ref)}" title="Pin to the next open slot (a preview first)" aria-label="Next open slot">${ic("next")}</button>` : "<span></span>"}</div>`).join("") : "";
   $("#unslotted").hidden = !uns.length;
   for (const d of Object.keys(free)) days[d] ??= [];
   $("#schedule").innerHTML = Object.keys(days).sort().map(d => {
