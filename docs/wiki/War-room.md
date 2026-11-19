@@ -257,6 +257,10 @@ to `""` (console only) says to use `docker compose logs` instead.
 
 ## Layouts
 
+By default the pipeline and Modal sit on the left, the review queue with Retakes, Health and API
+usage under it in the middle, and the schedule with Costs on the right, so the three columns come
+out about as tall as each other. Layout > Default puts the panels back there.
+
 On a desktop the panels can be moved: Layout > Arrange panels, then drag a panel by its title
 into the top, left, middle, right or bottom zone, or into the hidden tray. Without a mouse,
 focus a panel's title: ↑/↓ move it within its zone, ←/→ to the next zone, H hides it. Each

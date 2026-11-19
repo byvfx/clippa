@@ -4,13 +4,13 @@ version = "0.1.0"
 description = "Stream clipping pipeline: ingest, transcribe, score, render, review, publish"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "yt-dlp[default,deno]>=2026.11.4.232659.dev0",  # deno: YouTube needs a JS runtime (clipper preshow)
+    "yt-dlp[default,deno]>=2026.11.14.232655.dev0",  # deno: YouTube needs a JS runtime (clipper preshow)
     "numpy>=2.0",
     "scipy>=1.13",
     "pyarrow>=26.0.1",
-    "anthropic>=2.7.0",
+    "anthropic>=2.8.0",
     "gazu>=1.3",
-    "google-api-python-client>=2.150",
+    "google-api-python-client>=2.202.0",
     "google-auth-oauthlib>=1.2",
     "requests>=2.32",
     "websockets>=17.4",   # live chat (clipper record)
@@ -32,7 +32,7 @@ mac = [
 ]
 # Transcribe on a Modal cloud GPU ([transcribe] backend = "modal", issue #11).
 modal = [
-    "modal>=1.6.3",
+    "modal>=1.6.4",
 ]
 # Who is on screen, by face (`clipper faces`, #54): OpenCV runs two small ONNX models on the CPU.
 faces = [

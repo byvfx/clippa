@@ -102,6 +102,16 @@ def test_the_page_loads_every_script_app_last():
     assert "<script>" not in html and "<style>" not in html
 
 
+def test_default_layout_places_every_panel_once():
+    """A panel missing from DEFAULT_LAYOUT (or misspelt there) falls back to the middle zone,
+    under the review queue, without anything failing."""
+    html = warroom.PAGE.read_text(encoding="utf-8")
+    js = (warroom.WEB / "js" / "app.js").read_text(encoding="utf-8")
+    zones = re.search(r"const DEFAULT_LAYOUT = \{ zones: \{(.*?)\}, widths", js, re.DOTALL).group(1)
+    placed = re.findall(r'"([a-z]+)"', zones)
+    assert sorted(placed) == sorted(re.findall(r'data-panel="([a-z]+)"', html))
+
+
 def test_the_page_has_no_mis_encoded_text():
     """UTF-8 read as cp1252 and saved again: a middle dot became "Â·" in the Health panel (#206)."""
     broken = re.compile("[ÂÃ][\x80-\xbf]|â[€œš]")

@@ -23,7 +23,9 @@ Project memory (`~/.claude/projects/C--clipper/memory/`, MEMORY.md first) holds 
   to `<footer` into the site page, which keeps its own head, nav and footer links. The README's hero
   (`docs/readme/hero-*.png`, #237) is a screenshot of its header; the figures (347 videos, 799 tests) are dated
   11-13 and go stale: the 11-11 log entry has the re-render recipe. The page has no show names; its documentary
-  case study names no subject, channel or title, and should stay that way.
+  case study names no subject, channel or title, and should stay that way. The wiki's `Overview` page
+  (11-18) is a Markdown copy of it (the wiki strips CSS and scripts), with the hero screenshots in
+  `docs/wiki/images/`: when the page's content changes, carry the text over to `Overview.md` too.
 - Interactive demo (HTML, numbers as of 2026-10-27): https://claude.ai/artifact/ASL1grYiajRAELyoqTGitN
 - Keys are Windows **User** env vars (ANTHROPIC_API_KEY, KITSU_TOKEN, ...); agent shells must load them:
   `export KITSU_TOKEN="$(powershell.exe -NoProfile -Command "[Environment]::GetEnvironmentVariable('KITSU_TOKEN','User')" | tr -d '\r')"`
