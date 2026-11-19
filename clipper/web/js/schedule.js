@@ -138,7 +138,7 @@ function renderTimeline() {
   const quiet = x => x.r > x.b ? `<i class="quiet" style="${W(x.b, x.r)}" title="${esc(`${x.s.show_name}: nothing from this stream goes out until ${when(x.r)} (Kick first)`)}"></i>` : "";
   let h = `<div class="tl"><div class="ln ax"></div><div class="lt ax">${mid.map((t, k) => t >= t0 && t < t1 - 6 * 36e5 ? `<span class="${days[k] === today ? "today" : ""}" style="left:${X(t)}">${esc(dayName(days[k], { weekday: "short", day: "numeric" }))}</span>` : "").join("")}<span class="nowl" style="left:${X(now)}">now</span></div>`;
   h += lane("<b>Recordings</b>", `${streams.length} in view`, streams.map(x => quiet(x)
-    + (x.b > t0 ? `<span class="sbar${x.n ? ` s${x.n}` : ""}${x.live ? " live" : ""}${x.norec ? " norec" : ""}" style="${W(Math.max(t0, x.a), x.b)}" title="${esc(`${x.s.show_name} · ${x.s.title}\n${when(x.a)} – ${x.norec ? "live now, not recorded" : x.live ? "still recording" : when(x.b)}${x.r ? `\nits items may go out from ${when(x.r)}` : ""}`)}">${esc(x.s.show_name)}</span>` : "")).join(""));
+    + (x.b > t0 ? `<span class="sbar${x.n ? ` s${x.n}` : ""}${x.live && x.s.recording !== "finalizing" ? " live" : ""}${x.norec ? " norec" : ""}" style="${W(Math.max(t0, x.a), x.b)}" title="${esc(`${x.s.show_name} · ${x.s.title}\n${when(x.a)} – ${x.norec ? "live now, not recorded" : x.live ? ({ paused: "paused (the show went offline)", finalizing: "ended, the file is closing" }[x.s.recording] || "still recording") : when(x.b)}${x.r ? `\nits items may go out from ${when(x.r)}` : ""}`)}">${esc(x.s.show_name)}</span>` : "")).join(""));
   const es = STATE.schedule.map(e => ({ e, t: Date.parse(e.publish_at) })).filter(x => x.t >= t0 && x.t <= t1);
   const tick = ({ e, t }) => { const up = e.status === "uploaded", n = hueOf(e.show_name), k = SKIND[e.kind] ? e.kind : "clip";
     const failed = entryState(e).startsWith("the last upload failed");
@@ -157,7 +157,7 @@ function renderTimeline() {
     ups.map(t => `<i class="ut" style="left:${X(t)}" title="uploaded ${esc(when(t))}"></i>`).join("")
     + (frees > now && frees < t1 ? `<i class="free-at" style="left:${X(frees)}" title="${esc(`room for another upload from ${when(frees)}`)}"></i>` : ""), " ups");
   if (SHOWFREE) {
-    const fs = (STATE.free_slots || []).filter(f => Date.parse(f.at) <= t1);
+    const fs = (STATE.free_slots || []).filter(f => Date.parse(f.at) >= t0 && Date.parse(f.at) <= t1);
     h += lane("<b>Open slots</b>", `${fs.length} in view`, fs.map(f => `<i class="ft k-${esc(f.kind)}" style="left:${X(Date.parse(f.at))}" data-dslot="${esc(f.at)}" data-dkind="${esc(f.kind)}" title="${esc(`An open ${SKIND[f.kind] || f.kind} slot, ${when(Date.parse(f.at))}: drop an item here to pin it`)}"></i>`).join(""), " slots");
   }
   $("#tl").innerHTML = h + "</div>";
