@@ -89,6 +89,7 @@ function dayPin(ref, kind, day) {  // a day, not a slot: ask the time
   if (!hm) return;
   if (!/^\d{1,2}:\d{2}$/.test(hm.trim())) return toast("Use HH:MM", true);
   const [h, m] = hm.trim().split(":").map(Number);
+  if (h > 23 || m > 59) return toast("Use HH:MM", true);
   const guess = new Date(`${day}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00`);
   const text = `${day} ${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
   const warn = ruleWarnings(guess.toISOString(), kind, ref);
@@ -124,7 +125,13 @@ document.addEventListener("click", e => {
   arm(null);
   if (t.dataset.dslot) dropPin(ref, t.dataset.dslot, t.dataset.dkind, kind); else dayPin(ref, kind, t.dataset.dday);
 });
-document.addEventListener("keydown", e => { if (e.key === "Escape" && ARMED) { arm(null); e.stopPropagation(); } }, true);
+// Esc puts it down only when nothing else has it: an open window, a menu or a field keeps its own Esc
+// (a visible one: the Review page's docked item stays open while another page is shown)
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape" || !ARMED || [...document.querySelectorAll("dialog[open], .menu:not([hidden])")].some(x => x.checkVisibility())) return;
+  if (e.target.matches?.("input, textarea, select, [contenteditable]")) return;
+  arm(null); e.stopPropagation();
+}, true);
 
 // Next open slot: the server picks it by the scheduler's rules; a preview, then the pins. Apply
 // sends the preview's print: if the plan has moved since, the new one is shown instead.
