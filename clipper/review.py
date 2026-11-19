@@ -788,7 +788,7 @@ def kitsu_deadline(seconds: float) -> Iterator[None]:
     def request(*args, **kw):
         if threading.get_ident() != mine:
             return send(*args, **kw)
-        left = end - time.monotonic()
+        left = min(seconds, end - time.monotonic())   # (t0 + s) - t0 can round a hair over s
         if left <= 0:
             raise TimeoutError(f"Kitsu took over {seconds:.0f} s")
         asked = kw.get("timeout")
