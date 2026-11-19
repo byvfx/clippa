@@ -129,7 +129,7 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   `serve` (war room on 127.0.0.1:8765, on the tailnet as https://clipper.taile415cd.ts.net/; heartbeat
   `streams/.serve/status.json`), `bot` (`streams/.bot/status.json`) and `worker` (cuts with QSV on the iGPU).
   Code changes go out with `bash deploy/hub/deploy.sh` from a main checkout; `clipper services status|restart ...`
-  runs docker compose there (`[serve] hub`). Last deploy 2026-11-16 00:05: main as of #281 (Keys window, held streams). **The config and
+  runs docker compose there (`[serve] hub`). Last deploy 2026-11-19 00:19: main as of #319, v0.2.0 (serve, bot and worker report `0.2.0`; the recorder is older). **The config and
   all state are on the NAS:** `//192.168.0.155/docker/clipper` (`/data`) holds `clipper.toml` (the one copy;
   `CLIPPER_CONFIG` on the laptop points at it), `schedule.json`, secrets/, backups/, logs/, faces/, voices/,
   news/, weekly/, archive/, layouts/, people.json, fonts/. The laptop's old copies: `backups/laptop-state-2026-11-05/`.
@@ -192,19 +192,21 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   Moving a stage (e.g. Pass A to DeepSeek V4 Pro) is a config change whenever the user wants it.
 
 ## Waiting on the user
-- **Release v0.2.0** (11-18, branch `release/version-stamp`: version stamp, the 0.2.0 bump, `release.yml`; wiki
-  Developing#releases): after it merges, from a clean main: `git tag -a v0.2.0 -m "clipper 0.2.0" && git push origin v0.2.0`
-  makes the GitHub Release (wheel, sdist; the lead of the changelog's 0.2.0 section as the notes, and a link to the file). Then the next `bash deploy/hub/deploy.sh` (the
-  recorder's when no show is live) stamps the services: `clipper services status` shows each one's version next to this
-  checkout's. A new machine: wiki Install#a-release-on-a-new-machine.
-- **Deploy #299** (Clippa chat: several items on one card, undo, streams by show and day; merged 11-18 after Grok's
-  review): the hub runs the old chat until `bash deploy/hub/deploy.sh`. Then send a few real messages ("approve all
+- **Push the v0.2.0 tag** (PR #319 merged 11-19 as 958a33d: version stamp, the 0.2.0 bump, `release.yml`, the changelog
+  backfill and its lead; wiki Developing#releases and #changelog). The hub was deployed from it 11-19 00:19 and
+  `clipper services status` shows each service's version. The tag exists **locally only** (annotated, on 958a33d; the
+  auto-mode classifier blocked the push from a session): `git push origin v0.2.0` makes the GitHub Release (wheel,
+  sdist, the changelog lead as the notes and a link to the file). It is the first run of `release.yml`; if it fails,
+  fix it by a PR and move the tag (`git push --delete origin v0.2.0`, retag, push). The recorder isn't redeployed:
+  its next `bash deploy/record/deploy.sh` (no show live) puts its version in its heartbeat. A new machine: wiki
+  Install#a-release-on-a-new-machine (needs the tag pushed).
+- **Clippa chat after #299** (deployed 11-19 with everything on main): send a few real messages ("approve all
   comps", "approve s02 from kino 11-14", "undo that", "whats waiting"): chat prompt v3 has only been tried against a
   scripted stand-in for Haiku, not the model itself (about $0.0005 a message).
 - A cloud environment named "clipper" (11-18) holds an OpenRouter key so cloud sessions can run Grok reviews; it
   was made for a Haiku test that cloud sessions can't do (Anthropic keys can't be saved there). Keep or delete it.
-- **Deploy #293** (`clipper fetch` of Twitch and YouTube VODs, merged 11-16 at the user's word, no Copilot review): the
-  hub containers run the old code until `bash deploy/hub/deploy.sh`. Still untested: a subscriber-only Twitch
+- **#293** (`clipper fetch` of Twitch and YouTube VODs, merged 11-16 at the user's word, no Copilot review; deployed
+  11-19). Still untested: a subscriber-only Twitch
   VOD (the cookies in `secrets/twitch_cookies.txt` are the user's personal account `gadnuck`, a tier 1 sub of
   `nmnader`, whose last stream was 4 April so no VODs are left), a full YouTube video download, and `clipper run`
   on a `twitch-` or `youtube-` stream. A show claims one by listing the channel (`vanillamace`, `donflurgundy`) in `channels`.
@@ -279,7 +281,7 @@ room, one pick for both (`theme.js`; `themes/warroom.css` is the default and the
 Renaming a video that's up (user, 11-16: Clippa "really need[s] to be the point of control"): PR #291 (merged and deployed 11-17): `youtube.retitle`
 behind `actions.edit_meta`, so every title edit of a video that's up (war room, bot, chat, CLI, undo) renames it on
 YouTube; chat prompt v2; YouTube's other edits (description, cover, privacy) still Kitsu-only / Studio. PR #299 (merged
-11-18, not deployed) after "approve all comps" came back as a list: the `bulk` tool (several items on one card, one
+11-18, deployed 11-19) after "approve all comps" came back as a list: the `bulk` tool (several items on one card, one
 undo entry), `undo`, streams named "kino 11-14" / "the kino one" / "from last night" (`catalog.stream_named`,
 `stream_span`, `ShowNames`), "what's waiting" listing items, a typed yes/no for the one fresh write card, prompt v3.
 Next, a week of phone use; #300 (access levels and a local Jev-like classifier in front of the model, a lab first);
@@ -304,10 +306,10 @@ messages: GitHub closes the issue on "fix".
   actions, the tile windows, the other look, the chat, a live show, the queue tabs; on a phone Search… under More. G then
   R S P M T L F `,` jumps to a page (`GO_KEYS` in palette.js, `goPage` closes an item on top first; a held letter's
   repeats are swallowed); a test ties GO_KEYS, the palette's names and the ? list to `PAGES`. It also fixed step 4's
-  Stats arrows (chart rules are `svg:not(.ic)`). Steps 3 to 5 wait on the user's hub deploy. Next plan steps:
+  Stats arrows (chart rules are `svg:not(.ic)`). Steps 2 to 4 went live with the 11-19 deploy; step 5 waits on the next one. Next plan steps:
   Schedule week/timeline (6-7), phone (8). Library/Research/Settings still open the old windows from tiles.
 - **War room heat graph (11-16, user asked "can we see the heat graph of a stream in the war room?"):** PR #294,
-  merged 11-16 after Grok's review, **not deployed** (it needs `deploy/hub/deploy.sh` from a checkout of main). 🔥 heat on a stream (Pipeline panel) or in an item's
+  merged 11-16 after Grok's review, deployed 11-19. 🔥 heat on a stream (Pipeline panel) or in an item's
   window: the signals curve, the windows, and each cut item where it sits, coloured by review state, plus the twelve
   hottest windows and what was cut from each (`/api/heat`, `clipper/warroom/heat.py`, `web/js/heat.js`, wiki
   War-room#heat). It is also the demo video's "how it finds moments" shot. Not yet seen on the live page or on a real phone.
@@ -342,7 +344,7 @@ messages: GitHub closes the issue on "fix".
   The script (ten takes, not locked) and the capture checklist are one private page:
   https://claude.ai/artifact/W48qW95ZPYkA7AE16F4TEX (ticks kept with the page; its Install day tab is the
   install checklist with each step tied to a tutorial chapter). The "how it finds moments" shot is the war
-  room's heat graph (above; merged, wants the hub deploy). Build the piece with `clipper doc`; PR #289
+  room's heat graph (above; merged, deployed 11-19). Build the piece with `clipper doc`; PR #289
   (merged 11-16 after Grok's review, no deploy needed: `doc` runs on the laptop, pull main there) lets
   `doc voice` take a recording per take from the piece's `vo/read/`. Not tried on a real spoken take or in
   Resolve: the demo is the first. Tutorial (user, 11-16): recorded during the desktop clean install (#46/#78),
