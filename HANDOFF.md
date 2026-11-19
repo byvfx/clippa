@@ -312,8 +312,13 @@ messages: GitHub closes the issue on "fix".
   `horizon_days`, a block per entry coloured by show with a kind stripe, dashed open slots, a now line) or the List (the
   phone always gets it), and the Ready to slot tray (= the Schedule tab count; stale/over-budget is one link to the
   queue's approved + dropped) with Uploads under it. The overview sends `uploaded_at`, entries and open slots out to
-  max(14, `horizon_days`), and `ended_at`/`release_at` per stream. Drops still go through `act(ref, "pin")`. Next plan
-  steps: the Timeline (7), phone (8). Library/Research/Settings still open the old windows from tiles.
+  max(14, `horizon_days`), and `ended_at`/`release_at` per stream. Drops still go through `act(ref, "pin")`. Step 6
+  deployed 11-19. Step 7 is PR #331, merged 11-19 (Grok reviewed it), not deployed: the Schedule's Timeline
+  (`renderTimeline` in schedule.js), 2 days back to 7 ahead, a lane per show plus Recordings (a bar per stream, the
+  Kick-first stretch hatched after it and in the show's lane, a dashed bar for a show live on Kick but not recorded,
+  from `/api/live`), Uploads (the last 2 days against `max_per_24h`, the 24 h band across every lane) and Open slots
+  (drop targets). `kickMs()` in core.js parses Kick's zone-less UTC times. Next plan step: phone (8).
+  Library/Research/Settings still open the old windows from tiles.
 - **War room heat graph (11-16, user asked "can we see the heat graph of a stream in the war room?"):** PR #294,
   merged 11-16 after Grok's review, deployed 11-19. 🔥 heat on a stream (Pipeline panel) or in an item's
   window: the signals curve, the windows, and each cut item where it sits, coloured by review state, plus the twelve
