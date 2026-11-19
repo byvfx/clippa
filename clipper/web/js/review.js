@@ -253,11 +253,13 @@ $("#replanBtn").onclick = async () => {
 const DOCK = matchMedia("(min-width: 1100px)");
 function dockWanted() { return DOCK.matches && !PHONE.matches && document.body.dataset.view === "queue"; }
 function docked() { const m = $("#modal"); return m.open && m.classList.contains("docked"); }
+let SWAPS = 0;  // closes placeModal makes to reopen the item the other way: the close handler (panels.js) skips them
 function placeModal() {  // open it, or move an open one, the way the page and the width want
   // on top it must leave the Review page: a dialog inside a hidden page has no box, even as a modal
   const m = $("#modal"), want = dockWanted(), home = want ? $('.page[data-page="queue"]') : document.body;
   if (m.open && m.classList.contains("docked") === want && m.parentElement === home) return;
-  if (m.open) m.close();  // the close event comes later, finds it open again and leaves OPEN alone (panels.js)
+  // its close event, sync or queued depending on the browser, must leave OPEN alone (panels.js)
+  if (m.open) { SWAPS++; m.close(); }
   if (m.parentElement !== home) home.append(m);
   m.classList.toggle("docked", want);
   if (want) m.show(); else m.showModal();
@@ -286,6 +288,8 @@ function openModal(ref, checked) {  // checked: the caller has already asked abo
   const i = STATE.items.find(x => x.ref === ref);
   if (!i) { toast("Not published to Kitsu yet"); return; }
   if (!checked && OPEN && OPEN !== ref && !discardOk()) return;  // docked, a click on another card swaps it
+  // already open (its card clicked again, docked): keep what was typed, only move it if the page wants
+  if (OPEN === ref && $("#modal").open) { placeModal(); return; }
   OPEN = ref;
   const m = $("#modal");
   const hist = STATE.retakes.filter(h => `${h.stream}/${h.key}` === ref);
