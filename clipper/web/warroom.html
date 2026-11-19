@@ -122,10 +122,11 @@
     <section class="panel nextup" id="nextUp" aria-label="Next up"><div class="skel" role="status" aria-label="Loading"><i></i><i></i></div></section>
     <section class="panel" id="vSched" data-panel="schedule">
       <h2>Schedule <span class="sp" id="schedSub"></span>
-        <span class="seg" role="group" aria-label="View"><button data-sview="week" aria-pressed="true">Week</button><button data-sview="list" aria-pressed="false">List</button></span>
+        <span class="seg" role="group" aria-label="View"><button data-sview="week" aria-pressed="true">Week</button><button data-sview="timeline" aria-pressed="false">Timeline</button><button data-sview="list" aria-pressed="false">List</button></span>
         <span class="wknav" id="wkNav"><button class="btn sm" id="wkPrev" aria-label="Earlier week" title="Earlier week"><svg class="ic" aria-hidden="true"><use href="#i-left"/></svg></button><span id="wkLabel"></span><button class="btn sm" id="wkNext" aria-label="Later week" title="Later week"><svg class="ic" aria-hidden="true"><use href="#i-right"/></svg></button></span></h2>
       <div class="sched-tools" id="schedTools"></div>
       <div class="wkwrap" id="week"><div class="skel" role="status" aria-label="Loading"><i></i><i></i><i></i></div></div>
+      <div class="tlwrap" id="tl" hidden></div>
       <div class="sched" id="schedule" hidden></div>
     </section>
     <aside class="panel" id="vTray" data-panel="tray">

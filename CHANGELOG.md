@@ -14,6 +14,8 @@ Developing#releases.
 - **War room:** the Schedule page gets Next up (the next five uploads), a Week view of blocks in each
   show's colour with open slots to drop onto, and a Ready to slot tray that counts what the Schedule
   tab counts; stale and over-budget items are one link to the queue. The day list stays, as List.
+- **War room:** the Schedule's Timeline view: a lane per show over nine days, the recordings with
+  the Kick-first wait after each, the uploads against the 24 h cap, and the open slots.
 
 ## 0.2.0 (2026-11-18)
 

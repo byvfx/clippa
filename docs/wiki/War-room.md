@@ -7,7 +7,7 @@ schedule. Press <kbd>?</kbd> on the page for every keyboard shortcut.
 ## Pages and the top bar
 
 The page bar under the top bar has eight pages, one on screen at a time: **Review** (the queue,
-with the item open beside it; the page opens here), **Schedule** (Next up, the Week and the tray of items with no slot),
+with the item open beside it; the page opens here), **Schedule** (Next up, the Week or the Timeline, and the tray of items with no slot),
 **Pipeline** (the streams and Health), **Money** (Costs, Modal and API usage), **Stats** (the
 analytics), **Library** (the cast library, and where faces are named), **Research** (News, Blinds
 and Investigations) and **Settings** (the keys, the keyboard shortcuts and the look). The browser
@@ -285,6 +285,17 @@ has passed, with a pin when it is pinned. Each day's head shows its count agains
 red line marks now, and the open slots are dashed. Hover a block for the whole title and its
 state; click it to open the item. **List** shows the days one under the other instead, as before
 (a phone always gets the List and the next three).
+
+**Timeline** answers why a show got nothing this week and how close the upload cap is. It runs
+from two days ago to seven ahead, a lane per show with a mark for each item at its time (the same
+fills and outlines as the Week; Shorts are the short marks). The top lane is the recordings: a bar
+in the show's colour for each, to now while it is still live (dashed when the show is live but not
+being recorded), then a hatched stretch until `kick_first_hours` after it ended, when nothing of
+it may go out; the same stretch shows in that show's lane. A lane with nothing planned ahead says
+"nothing ahead" in amber. The **Uploads** lane marks each upload of the last two days and says how
+many of `[youtube] max_per_24h` the last 24 hours used, the shaded band across every lane; a
+dotted green line marks when the cap next has room, if it is full. **Open slots** are the small
+dashed marks along the bottom; drop an item on one to pin it, as on the Week.
 
 **Ready to slot**, beside it, lists the approved items with no slot that can still go out, newest
 stream first: the same number as on the Schedule tab. The ones the scheduler let go (over

@@ -1,9 +1,11 @@
 // War room: the Schedule page. Next up (the next five to go out), then the Week (seven days from
-// today, hours down, a page per week out to the scheduler's horizon) or the day List, beside the
-// tray of approved items with no slot. Dragging onto a slot, a day or "unpin" is panels.js's
-// (#20): it pins through the same action as Kitsu's Publish at. A phone gets the List.
+// today, hours down, a page per week out to the scheduler's horizon), the Timeline (2 days back to
+// 7 ahead, a lane per show) or the day List, beside the tray of approved items with no slot.
+// Dragging onto a slot, a day or "unpin" is panels.js's (#20): it pins through the same action as
+// Kitsu's Publish at. A phone gets the List.
 
-let SVIEW = (() => { try { return localStorage.getItem("warroom.sview") === "list" ? "list" : "week"; } catch { return "week"; } })();
+const SVIEWS = ["week", "timeline", "list"];
+let SVIEW = (() => { try { const v = localStorage.getItem("warroom.sview"); return SVIEWS.includes(v) ? v : "week"; } catch { return "week"; } })();
 let WEEK = 0;  // weeks after this one
 const SKIND = { ...KIND, clip: "Clip" };  // schedule.json says clip where an item says pick
 const addDays = (day, n) => { const [y, m, d] = day.split("-").map(Number); return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10); };
@@ -26,19 +28,21 @@ function entryState(e) {
 }
 
 function renderSchedule() {
-  const week = SVIEW === "week" && !PHONE.matches;
+  const view = PHONE.matches ? "list" : SVIEW, week = view === "week";
   $("#schedSub").textContent = `${STATE.counts.scheduled_7d} in 7 days`;
-  for (const b of document.querySelectorAll("[data-sview]")) b.setAttribute("aria-pressed", String(b.dataset.sview === (week ? "week" : "list")));
+  for (const b of document.querySelectorAll("[data-sview]")) b.setAttribute("aria-pressed", String(b.dataset.sview === view));
   $("#week").hidden = $("#wkNav").hidden = !week;
-  $("#schedule").hidden = week;
+  $("#tl").hidden = view !== "timeline";
+  $("#schedule").hidden = view !== "list";
   renderNextUp(); renderTray();
   const segs = STATE.items.some(i => STATUS.unslotted(i) && i.kind === "segment" && !i.hold);
   $("#schedTools").innerHTML = `<label title="Show the open slots to drop items on"><input type="checkbox" id="showFree" ${SHOWFREE ? "checked" : ""}> Open slots</label>
     <span class="unpin" data-unpin>${ic("down")}drop here to unpin</span>
     ${segs ? `<button class="btn" data-nextkind="segment" title="Pin each approved segment without a slot to the next open segment slot, before it goes stale (a preview first)">${ic("next")}Segments to open slots…</button>` : ""}
     <span>max ${STATE.rules?.max_per_day ?? "?"}/day · ${STATE.rules?.min_gap_minutes ?? "?"} min apart · drag a block to move it</span>
-    ${week ? `<span class="legend"><span><i class="lg up"></i>uploaded</span><span><i class="lg planned"></i>not uploaded yet</span><span><i class="lg open"></i>open slot</span><span>${ic("pin")}pinned</span></span>` : ""}`;
-  if (week) renderWeek(); else renderDays();
+    ${week ? `<span class="legend"><span><i class="lg up"></i>uploaded</span><span><i class="lg planned"></i>not uploaded yet</span><span><i class="lg open"></i>open slot</span><span>${ic("pin")}pinned</span></span>`
+    : view === "timeline" ? `<span class="legend"><span><i class="lg up"></i>uploaded</span><span><i class="lg planned"></i>not uploaded yet</span><span><i class="lg quiet"></i>nothing goes out (Kick first)</span><span><i class="lg band"></i>the last 24 h</span></span>` : ""}`;
+  if (week) renderWeek(); else if (view === "timeline") renderTimeline(); else renderDays();
 }
 
 function renderNextUp() {
@@ -98,6 +102,65 @@ function renderWeek() {
     }
   }
   $("#week").innerHTML = h + "</div>";
+}
+
+// 00:00 on a day in the schedule's zone, as epoch ms (a DST change at 2 am doesn't move midnight).
+function tzMidnight(day) {
+  const g = Date.parse(day + "T00:00:00Z");
+  return 2 * g - Date.parse(localPin(new Date(g).toISOString()).replace(" ", "T") + ":00Z");
+}
+
+// The Timeline: why a show got nothing and how close the cap is. A lane of recordings on top (the
+// hatched stretch after each is kick_first_hours, when none of its items may go out), a lane per
+// show with a tick per entry, the uploads of the last two days, and the open slots; the shaded
+// band is the rolling 24 h that max_per_24h counts.
+function renderTimeline() {
+  const now = Date.now(), today = tzAt(new Date(now).toISOString()).day;
+  const days = [...Array(10)].map((_, k) => addDays(today, k - 2)), mid = days.map(tzMidnight);
+  const t0 = now - 2 * 864e5, t1 = now + 7 * 864e5;
+  const X = t => `${(Math.max(0, Math.min(1, (t - t0) / (t1 - t0))) * 100).toFixed(3)}%`;
+  const W = (a, b) => `left:${X(a)};width:calc(${X(b)} - ${X(a)})`;
+  const u = STATE.uploads || {}, shows = STATE.shows || [], hueK = key => shows.find(x => x.key === key)?.hue || 0;
+  const when = t => `${dayName(tzAt(new Date(t).toISOString()).day, { weekday: "short" })} ${tm(new Date(t).toISOString())}`;
+  // what every lane shares: the day lines, the 24 h band and now
+  const under = mid.map((t, k) => t > t0 && t < t1 ? `<i class="gl${days[k] === today ? " today" : ""}" style="left:${X(t)}"></i>` : "").join("")
+    + `<i class="cap" style="${W(now - 864e5, now)}"></i>`;
+  const over = `<i class="tnow" style="left:${X(now)}"></i>`;
+  const lane = (label, sub, body, cls = "") => `<div class="ln${cls}">${label}<span class="lsub">${sub}</span></div><div class="lt${cls}">${under}${body}${over}</div>`;
+  const streams = (STATE.streams || []).map(s => {
+    const a = Date.parse(s.started_at), live = !s.ended_at && ["recording", "paused", "finalizing"].includes(s.recording);
+    const b = s.ended_at ? Date.parse(s.ended_at) : live ? now : NaN, r = s.release_at ? Date.parse(s.release_at) : NaN;
+    return { s, a, b, r, live, n: hueK(s.show) };
+  }).filter(x => x.a < t1 && Math.max(x.b || 0, x.r || 0) > t0);
+  for (const l of LIVE)  // live now with no recording on the page (a show that isn't recorded): from /api/live
+    if (l.live && l.since && !streams.some(x => x.live && x.s.show === l.show))
+      streams.push({ s: { show: l.show, show_name: l.show_name, title: l.title || "" }, a: kickMs(l.since), b: now, r: NaN, live: true, norec: !recording(l), n: hueK(l.show) });
+  const quiet = x => x.r > x.b ? `<i class="quiet" style="${W(x.b, x.r)}" title="${esc(`${x.s.show_name}: nothing from this stream goes out until ${when(x.r)} (Kick first)`)}"></i>` : "";
+  let h = `<div class="tl"><div class="ln ax"></div><div class="lt ax">${mid.map((t, k) => t >= t0 && t < t1 - 6 * 36e5 ? `<span class="${days[k] === today ? "today" : ""}" style="left:${X(t)}">${esc(dayName(days[k], { weekday: "short", day: "numeric" }))}</span>` : "").join("")}<span class="nowl" style="left:${X(now)}">now</span></div>`;
+  h += lane("<b>Recordings</b>", `${streams.length} in view`, streams.map(x => quiet(x)
+    + (x.b > t0 ? `<span class="sbar${x.n ? ` s${x.n}` : ""}${x.live && x.s.recording !== "finalizing" ? " live" : ""}${x.norec ? " norec" : ""}" style="${W(Math.max(t0, x.a), x.b)}" title="${esc(`${x.s.show_name} · ${x.s.title}\n${when(x.a)} – ${x.norec ? "live now, not recorded" : x.live ? ({ paused: "paused (the show went offline)", finalizing: "ended, the file is closing" }[x.s.recording] || "still recording") : when(x.b)}${x.r ? `\nits items may go out from ${when(x.r)}` : ""}`)}">${esc(x.s.show_name)}</span>` : "")).join(""));
+  const es = STATE.schedule.map(e => ({ e, t: Date.parse(e.publish_at) })).filter(x => x.t >= t0 && x.t <= t1);
+  const tick = ({ e, t }) => { const up = e.status === "uploaded", n = hueOf(e.show_name), k = SKIND[e.kind] ? e.kind : "clip";
+    const failed = entryState(e).startsWith("the last upload failed");
+    return `<i class="tk ${up ? "up" : "planned"}${t < now ? " past" : ""}${failed ? " failed" : ""}${n ? ` s${n}` : ""} k-${k}" style="left:${X(t)}" data-open="${esc(e.key)}" role="button" tabindex="0"
+      title="${esc(`${when(t)} · ${e.show_name} · ${SKIND[e.kind] || e.kind}\n${e.title}\n${entryState(e)}`)}"${up ? "" : ` draggable="true" data-dref="${esc(e.key)}" data-dkind="${esc(e.kind)}" data-dat="${esc(e.publish_at)}"`}></i>`; };
+  const named = new Set(shows.map(x => x.name));
+  for (const sh of [...shows, ...(es.some(x => !named.has(x.e.show_name)) ? [{ name: "", hue: 0 }] : [])]) {
+    const mine = es.filter(x => sh.name ? x.e.show_name === sh.name : !named.has(x.e.show_name)), ahead = mine.filter(x => x.t > now).length;
+    h += lane(`<b class="show${sh.hue ? ` s${sh.hue}` : ""}">${esc(sh.name || "Other")}</b>`,
+      ahead ? `${ahead} ahead` : `<span class="none" title="Nothing of this show is planned in the next 7 days: see its recordings' Kick-first stretch above, and the queue's approved and dropped">nothing ahead</span>`,
+      streams.filter(x => sh.key && x.s.show === sh.key).map(quiet).join("") + mine.map(tick).join(""));
+  }
+  const ups = STATE.schedule.filter(e => e.uploaded_at && Date.parse(e.uploaded_at) >= t0).map(e => Date.parse(e.uploaded_at));
+  const frees = u.frees_at ? Date.parse(u.frees_at) : NaN;
+  h += lane("<b>Uploads</b>", u.max_per_24h ? `<span${u.room ? "" : ` class="none"`}>${u.last_24h} of ${u.max_per_24h} in 24 h</span>` : "",
+    ups.map(t => `<i class="ut" style="left:${X(t)}" title="uploaded ${esc(when(t))}"></i>`).join("")
+    + (frees > now && frees < t1 ? `<i class="free-at" style="left:${X(frees)}" title="${esc(`room for another upload from ${when(frees)}`)}"></i>` : ""), " ups");
+  if (SHOWFREE) {
+    const fs = (STATE.free_slots || []).filter(f => Date.parse(f.at) >= t0 && Date.parse(f.at) <= t1);
+    h += lane("<b>Open slots</b>", `${fs.length} in view`, fs.map(f => `<i class="ft k-${esc(f.kind)}" style="left:${X(Date.parse(f.at))}" data-dslot="${esc(f.at)}" data-dkind="${esc(f.kind)}" title="${esc(`An open ${SKIND[f.kind] || f.kind} slot, ${when(Date.parse(f.at))}: drop an item here to pin it`)}"></i>`).join(""), " slots");
+  }
+  $("#tl").innerHTML = h + "</div>";
 }
 
 // The List: the days one under the other (the phone's view, and the desktop's other one).
