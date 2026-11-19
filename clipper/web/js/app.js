@@ -62,6 +62,8 @@ $("#modal").addEventListener("touchend", e => {
 // ---------- keyboard ----------
 
 const KEYS = [
+  ["Pages", [["Ctrl K", "go to a page, find an item, run an action (Cmd K on a Mac)"], ["G R", "Review"], ["G S", "Schedule"],
+             ["G P", "Pipeline"], ["G M", "Money"], ["G T", "Stats"], ["G L", "Library"], ["G F", "Research"], ["G ,", "Settings"]]],
   ["Queue", [["J K", "next / previous item (in the item window too)"], ["Enter", "open the item"], ["Esc", "close the window, or clear the selection"]]],
   ["Decide", [["A", "approve (in the item window: then the next item)"], ["R", "reject, asks why"], ["C", "retake note"],
               ["H", "hold / release"], ["P", "pin a release time"], ["U", "reopen an approved item"]]],
@@ -116,8 +118,9 @@ document.addEventListener("keydown", e => {
     e.preventDefault(); e.stopImmediatePropagation(); t.click();
   }
 }, true);
+let GOING = 0, GONE = null;  // when G was pressed, waiting for a page's letter; the letter that jumped
 document.addEventListener("keydown", e => {
-  if (e.ctrlKey || e.metaKey || e.altKey || !STATE) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
   const tg = e.target;
   if (tg.matches?.("input, textarea, select, [contenteditable]")) { if (e.key === "Escape" && OPEN) { e.preventDefault(); tg.blur(); } return; }
   if ($("#keys").open) { if (e.key === "?") $("#keys").close(); return; }
@@ -130,6 +133,14 @@ document.addEventListener("keydown", e => {
   const grid = docked() && !$("#modal").contains(tg) && !!tg.closest?.("button, a, [role=button], [tabindex]");
   const free = !OPEN || docked();  // the grid's own keys: nothing on top of it
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key, video = OPEN && q && !grid ? $("#modal video") : null;
+  // G then a page's letter (palette.js GO_KEYS) jumps to it; the letter does nothing else then
+  if (e.repeat && k === GONE) { take(); return; }   // the jump's letter still held: its repeats aren't R, P, M or L
+  if (!e.repeat) GONE = null;
+  const go = GOING && !e.repeat && Date.now() - GOING < 1500 ? GO_KEYS[k] : null;
+  if (k !== "g" && e.key !== "Shift") GOING = 0;
+  if (go) { take(); GONE = k; goPage(go); return; }
+  if (k === "g") { take(); GOING = Date.now(); return; }   // a held G stays armed
+  if (!STATE) return;  // the rest act on the overview
   if (k === "?") { take(); showKeys(); }
   else if ((k === "j" || k === "k") && q) { take(); move(k === "j" ? 1 : -1); }
   else if (k === "Enter" && free && q && SEL && SEL !== OPEN && !tg.closest?.("button, a")) { take(); openModal(SEL); }

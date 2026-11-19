@@ -101,6 +101,13 @@ def test_every_page_has_its_tab_and_its_place():
     assert set(re.findall(r'data-go="([a-z]+)"', html)) <= set(pages)
     main = html[html.index("<main>"):html.index("</main>")]
     assert html.count("data-panel=") == main.count("data-panel=") > 0
+    # every page has its G key (palette.js), its name in the palette, and a row in the ? list
+    pal = (warroom.WEB / "js" / "palette.js").read_text(encoding="utf-8")
+    keys = dict(re.findall(r'"?([a-z,])"?: "([a-z]+)"', re.search(r"const GO_KEYS = \{(.*?)\};", pal).group(1)))
+    names = dict(re.findall(r'([a-z]+): "([A-Z][a-z]+)"', re.search(r"const PAGE_NAME = \{(.*?)\};", pal, re.S).group(1)))
+    assert sorted(keys.values()) == sorted(pages) == sorted(names)
+    for k, v in keys.items():
+        assert f'["G {k.upper()}", "{names[v]}"]' in js, (k, v)
 
 
 def test_the_page_has_no_mis_encoded_text():
@@ -460,6 +467,8 @@ def test_the_look_has_its_fonts_and_one_icon_set():
     # a click on an icon lands on its button: handlers check e.target.id (Undo, Select shown, Log)
     css = (warroom.WEB / "warroom.css").read_text(encoding="utf-8")
     assert "pointer-events: none" in re.search(r"^\.ic \{[^}]*\}", css, re.M).group()
+    # a rule sizing a panel's charts (".stats svg") would size its icons too: it says svg:not(.ic)
+    assert not re.findall(r"[^,{}]*\bsvg\s*[{,]", css), "scope it: svg:not(.ic)"
     # emoji, and the symbols the page drew icons with before the sprite (the arrows but the plain
     # four, technical, shapes, supplemental arrows); a key name's or a sentence's arrow is fine
     emoji = re.compile("[\U0001F300-\U0001FAFF↕-⇿⌀-⏿■-◿☀-➿⟰-⟿⤀-⧿⬀-⯿]")

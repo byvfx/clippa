@@ -71,6 +71,7 @@
     <button class="widget" id="wPipe" data-go="pipeline" title="Streams being recorded or processed"><span class="lbl">Pipeline</span><b>–</b></button>
     <button class="widget" id="wHealth" data-go="pipeline" title="How old the numbers on this page are"><span class="dot"></span><b>–</b><span class="lbl" id="updated"></span></button>
   </div>
+  <button class="btn" id="palBtn" aria-label="Search" aria-haspopup="dialog" aria-controls="palette" title="Go to a page, find an item, run an action"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg><span class="pl">Search</span><kbd>Ctrl K</kbd></button>
   <button class="btn" id="chatBtn" aria-controls="chat" title="The Clippa chat at the side: show or hide it (M)"><svg class="ic" aria-hidden="true"><use href="#i-chat"/></svg>Chat<span class="n" id="chatN"></span></button>
   <button class="btn" id="moreBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="moreMenu" title="Sync Kitsu, replan, the log, keyboard shortcuts" aria-label="More"><svg class="ic" aria-hidden="true"><use href="#i-more"/></svg></button>
   <div class="menu" id="moreMenu" role="menu" hidden>
@@ -96,6 +97,7 @@
   <button class="narrow" id="pagesMore" aria-haspopup="menu" aria-expanded="false" aria-controls="pagesMenu"><svg class="ic" aria-hidden="true"><use href="#i-more"/></svg>More</button>
 </nav>
 <div class="menu" id="pagesMenu" role="menu" hidden>
+  <button class="mi" data-palette role="menuitem">Search…</button>
   <button class="mi" data-go="money" role="menuitem">Money</button>
   <button class="mi" data-go="stats" role="menuitem">Stats</button>
   <button class="mi" data-go="library" role="menuitem">Library</button>
@@ -179,6 +181,7 @@
 
 <dialog id="keys"></dialog>
 <dialog id="tool"></dialog>
+<dialog id="palette" aria-label="Go to a page, find an item, run an action"></dialog>
 <div id="dock" hidden></div>
 <div id="announce" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 <!-- Classic scripts in this order share one global scope; app.js starts the page. -->
@@ -193,6 +196,7 @@
 <script src="js/heat.js"></script>
 <script src="js/apikeys.js"></script>
 <script src="js/chatdock.js"></script>
+<script src="js/palette.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
