@@ -160,7 +160,11 @@ function showReplace() {
 
 function ask(label, required) { const t = prompt(label); if (t === null) return null; if (required && !t.trim()) { toast("That needs some text.", true); return null; } return t.trim(); }
 
+// On a phone the filters are a sheet from the bottom: Done, or a tap outside it, puts it away
+// (that tap does only that, so it can't approve a card under the dimmed page).
+function filtersOpen(on) { FOPEN = on; $("#filters").hidden = !on; $("#filterBtn").setAttribute("aria-expanded", String(on)); }
 document.addEventListener("click", e => {
+  if (FOPEN && PHONE.matches && document.body.dataset.view === "queue" && !e.target.closest("#filters, #filterBtn, #views")) { filtersOpen(false); e.preventDefault(); e.stopImmediatePropagation(); return; }
   const lv = e.target.closest("[data-live]");
   if (lv) { liveClick(e, lv); return; }
   if (LIVEMENU !== null) { LIVEMENU = null; renderLive(); }
@@ -178,9 +182,8 @@ document.addEventListener("click", e => {
   if (un) { undo(un.dataset.undo); return; }
   if (e.target.closest("[data-close]")) { e.target.closest("dialog").close(); return; }
   if (e.target.id === "undoBtn") { showUndo(); return; }
-  if (e.target.closest("#filterBtn")) {
-    FOPEN = !FOPEN; $("#filters").hidden = !FOPEN; $("#filterBtn").setAttribute("aria-expanded", String(FOPEN)); return;
-  }
+  if (e.target.closest("#filterBtn")) { filtersOpen(!FOPEN); return; }
+  if (e.target.closest("#filterDone")) { filtersOpen(false); $("#filterBtn").focus(); return; }
   const uf = e.target.closest("[data-unfilter]");
   if (uf) {
     const k = uf.dataset.unfilter, all = k === "all";

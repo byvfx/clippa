@@ -352,12 +352,12 @@ function renderQueue() {
        ${chips.map(([, k, label]) => `<button class="fchip" data-unfilter="${k}" title="Clear this filter">${esc(label)}${ic("close")}</button>`).join("")}
        <input class="search" id="q" aria-label="Search the queue" placeholder="Search titles, descriptions, transcripts… ( / )" value="${esc(Q)}">
        <button class="btn" id="pickAll" title="Select every item shown, for a bulk action">${ic("selectall")}Select shown</button>
-       <div class="filters" id="filters" ${FOPEN ? "" : "hidden"}><select id="showSel"><option value="">All shows</option>${shows.map(s => `<option value="${s.key}" ${SHOW === s.key ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select>
+       <div class="filters" id="filters" ${FOPEN ? "" : "hidden"}><div class="fhead"><b>Filters</b><button class="btn" id="filterDone">Done</button></div><select id="showSel" aria-label="Show"><option value="">All shows</option>${shows.map(s => `<option value="${s.key}" ${SHOW === s.key ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select>
        <select id="kindSel"><option value="">All kinds</option>${Object.entries(KIND).map(([k, v]) => `<option value="${k}" ${KINDF === k ? "selected" : ""}>${v}s</option>`).join("")}</select>
        <select id="stSel"><option value="">Any status</option>${Object.keys(STATUS).map(k => `<option value="${k}" ${ST === k ? "selected" : ""}>${STATUS_LABEL[k]}</option>`).join("")}</select>
        <select id="sortSel" aria-label="Sort the queue" title="Order">${Object.entries(SORTS).map(([k, [l]]) => `<option value="${k}" ${SORT === k ? "selected" : ""}>${l}</option>`).join("")}</select>
-       <input type="date" class="date" id="fromD" value="${esc(FROM)}" title="Streams from this day">
-       <input type="date" class="date" id="toD" value="${esc(TO)}" title="...to this day">
+       <label class="dl">From <input type="date" class="date" id="fromD" value="${esc(FROM)}" title="Streams from this day"></label>
+       <label class="dl">To <input type="date" class="date" id="toD" value="${esc(TO)}" title="...to this day"></label>
        ${chips.length ? `<button class="btn" data-unfilter="all">Clear all</button>` : ""}</div>`;
   }
   const byRetake = (a, b) => (RETAKEN.get(b.ref)?.at || "").localeCompare(RETAKEN.get(a.ref)?.at || "");

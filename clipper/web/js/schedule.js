@@ -28,6 +28,8 @@ function entryState(e) {
 }
 
 function renderSchedule() {
+  // an item picked up to pin that got a slot meanwhile (a replan, the bot) is put down (panels.js)
+  if (ARMED && !STATE.items.some(i => i.ref === ARMED.ref && STATUS.unslotted(i))) arm(null, false);
   const view = PHONE.matches ? "list" : SVIEW, week = view === "week";
   $("#schedSub").textContent = `${STATE.counts.scheduled_7d} in 7 days`;
   for (const b of document.querySelectorAll("[data-sview]")) b.setAttribute("aria-pressed", String(b.dataset.sview === view));
@@ -39,7 +41,7 @@ function renderSchedule() {
   $("#schedTools").innerHTML = `<label title="Show the open slots to drop items on"><input type="checkbox" id="showFree" ${SHOWFREE ? "checked" : ""}> Open slots</label>
     <span class="unpin" data-unpin>${ic("down")}drop here to unpin</span>
     ${segs ? `<button class="btn" data-nextkind="segment" title="Pin each approved segment without a slot to the next open segment slot, before it goes stale (a preview first)">${ic("next")}Segments to open slots…</button>` : ""}
-    <span>max ${STATE.rules?.max_per_day ?? "?"}/day · ${STATE.rules?.min_gap_minutes ?? "?"} min apart · drag a block to move it</span>
+    <span>max ${STATE.rules?.max_per_day ?? "?"}/day · ${STATE.rules?.min_gap_minutes ?? "?"} min apart · ${PHONE.matches ? "tap one in Ready to slot, then a slot" : "drag a block to move it"}</span>
     ${week ? `<span class="legend"><span><i class="lg up"></i>uploaded</span><span><i class="lg planned"></i>not uploaded yet</span><span><i class="lg open"></i>open slot</span><span>${ic("pin")}pinned</span></span>`
     : view === "timeline" ? `<span class="legend"><span><i class="lg up"></i>uploaded</span><span><i class="lg planned"></i>not uploaded yet</span><span><i class="lg quiet"></i>nothing goes out (Kick first)</span><span><i class="lg band"></i>the last 24 h</span></span>` : ""}`;
   if (week) renderWeek(); else if (view === "timeline") renderTimeline(); else renderDays();
@@ -61,9 +63,9 @@ function renderTray() {
   const uns = STATE.items.filter(STATUS.unslotted).sort(newest);
   const gone = STATE.items.filter(i => i.decision === "approved" && !i.scheduled && !i.uploaded && i.dropped).length;
   $("#traySub").textContent = uns.length || "";
-  $("#unslotted").innerHTML = (uns.length ? `<div class="ss">Drag one onto an open slot, or ${ic("next")} for the next one</div>`
+  $("#unslotted").innerHTML = (uns.length ? `<div class="ss">Drag one onto an open slot, or tap it and then the slot; ${ic("next")} for the next one</div>`
     + uns.slice(0, 60).map(i => { const k = i.kind === "pick" ? "clip" : i.kind;
-      return `<div class="chip" draggable="true" data-dref="${esc(i.ref)}" data-dkind="${esc(k)}" title="${esc(i.title)}"><span class="bar ${esc(k)}"></span><span class="t"><span class="tt">${esc(bare(i.title, i.show_name))}</span><span class="sub">${showTag(i.show, i.show_name)}<span>${esc(SKIND[k] || k)}</span>${i.hold ? `<span class="why">held</span>` : ""}</span></span>${!i.hold && i.kind !== "compilation" ? `<button class="nx" data-nextslot="${esc(i.ref)}" title="Pin to the next open slot (a preview first)" aria-label="Next open slot">${ic("next")}</button>` : "<span></span>"}</div>`; }).join("")
+      return `<div class="chip${ARMED?.ref === i.ref ? " armed" : ""}" draggable="true" data-dref="${esc(i.ref)}" data-dkind="${esc(k)}" title="${esc(i.title)}"><span class="bar ${esc(k)}"></span><span class="t"><span class="tt">${esc(bare(i.title, i.show_name))}</span><span class="sub">${showTag(i.show, i.show_name)}<span>${esc(SKIND[k] || k)}</span>${i.hold ? `<span class="why">held</span>` : ""}</span></span>${!i.hold && i.kind !== "compilation" ? `<button class="nx" data-nextslot="${esc(i.ref)}" title="Pin to the next open slot (a preview first)" aria-label="Next open slot">${ic("next")}</button>` : "<span></span>"}</div>`; }).join("")
     + (uns.length > 60 ? `<div class="ss">and ${uns.length - 60} more</div>` : "")
     : `<div class="ss">Nothing approved is waiting for a slot.</div>`)
     + (gone ? `<button class="lnk" data-notout title="Stale or over their stream's budget: the scheduler leaves them out, a pin still sends one">${gone} not going out (stale or over budget)</button>` : "");
@@ -75,7 +77,7 @@ function renderWeek() {
   WEEK = Math.max(0, Math.min(WEEK, last));
   const days = [...Array(7)].map((_, k) => addDays(today, 7 * WEEK + k)), inWeek = x => days.includes(x.day);
   const es = STATE.schedule.map(e => ({ e, ...tzAt(e.publish_at) })).filter(inWeek);
-  const fs = SHOWFREE ? (STATE.free_slots || []).map(f => ({ f, ...tzAt(f.at) })).filter(inWeek) : [];
+  const fs = freeShown() ? (STATE.free_slots || []).map(f => ({ f, ...tzAt(f.at) })).filter(inWeek) : [];
   const hrs = [...es, ...fs].map(x => x.h).concat(days.includes(now.day) ? [now.h] : []);
   const h0 = hrs.length ? Math.max(0, Math.min(...hrs) - 1) : 8, h1 = hrs.length ? Math.min(23, Math.max(...hrs) + 1) : 22;
   const max = STATE.rules?.max_per_day || 0;
@@ -156,27 +158,34 @@ function renderTimeline() {
   h += lane("<b>Uploads</b>", u.max_per_24h ? `<span${u.room ? "" : ` class="none"`}>${u.last_24h} of ${u.max_per_24h} in 24 h</span>` : "",
     ups.map(t => `<i class="ut" style="left:${X(t)}" title="uploaded ${esc(when(t))}"></i>`).join("")
     + (frees > now && frees < t1 ? `<i class="free-at" style="left:${X(frees)}" title="${esc(`room for another upload from ${when(frees)}`)}"></i>` : ""), " ups");
-  if (SHOWFREE) {
+  if (freeShown()) {
     const fs = (STATE.free_slots || []).filter(f => Date.parse(f.at) >= t0 && Date.parse(f.at) <= t1);
     h += lane("<b>Open slots</b>", `${fs.length} in view`, fs.map(f => `<i class="ft k-${esc(f.kind)}" style="left:${X(Date.parse(f.at))}" data-dslot="${esc(f.at)}" data-dkind="${esc(f.kind)}" title="${esc(`An open ${SKIND[f.kind] || f.kind} slot, ${when(Date.parse(f.at))}: drop an item here to pin it`)}"></i>`).join(""), " slots");
   }
   $("#tl").innerHTML = h + "</div>";
 }
 
-// The List: the days one under the other (the phone's view, and the desktop's other one).
+// The List: the days one under the other (the phone's view, and the desktop's other one). On a
+// phone it is an agenda: what is still to come, the earlier ones folded into one row, no empty
+// days, and the open slots only while an item is picked up to pin (panels.js freeShown).
+let EARLIER = false;  // the agenda's folded rows, shown
 function renderDays() {
-  const tz = STATE.timezone, days = {};
+  const tz = STATE.timezone, days = {}, agenda = PHONE.matches, now = Date.now();
   const dayKey = d => new Date(d).toLocaleDateString("en-CA", { timeZone: tz });
   const today = dayKey(new Date());
   for (const e of STATE.schedule) (days[dayKey(e.publish_at)] ??= []).push(e);
-  for (let k = 0; k < 14; k++) { const d = new Date(Date.now() + k * 864e5); days[dayKey(d)] ??= []; }
+  for (let k = 0; k < 14; k++) { const d = new Date(now + k * 864e5); days[dayKey(d)] ??= []; }
   const free = {};
-  if (SHOWFREE) for (const f of STATE.free_slots || []) if (new Date(f.at) < Date.now() + 14 * 864e5) (free[dayKey(f.at)] ??= []).push(f);
+  if (freeShown()) for (const f of STATE.free_slots || []) if (new Date(f.at) < now + 14 * 864e5) (free[dayKey(f.at)] ??= []).push(f);
   for (const d of Object.keys(free)) days[d] ??= [];
-  $("#schedule").innerHTML = Object.keys(days).sort().map(d => {
+  const gone = (d, e) => d < today || (d === today && Date.parse(e.publish_at) <= now);
+  const fold = agenda && !EARLIER, folded = agenda ? Object.entries(days).reduce((n, [d, es]) => n + es.filter(e => gone(d, e)).length, 0) : 0;
+  $("#schedule").innerHTML = (folded ? `<button class="earlier" data-earlier aria-expanded="${EARLIER}">${ic(EARLIER ? "up" : "down")}${EARLIER ? "Hide the earlier ones" : `${folded} earlier (uploaded or due)`}</button>` : "")
+    + Object.keys(days).sort().filter(d => !fold || d >= today).map(d => {
     const label = new Date(d + "T12:00:00").toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
-    const rows = [...days[d].map(e => ({ e, at: e.publish_at })), ...(free[d] || []).map(f => ({ f, at: f.at }))]
+    const rows = [...days[d].filter(e => !fold || !gone(d, e)).map(e => ({ e, at: e.publish_at })), ...(free[d] || []).map(f => ({ f, at: f.at }))]
       .sort((a, b) => a.at.localeCompare(b.at));
+    if (agenda && !rows.length && d !== today) return "";
     return `<div class="day ${d === today ? "today" : d < today ? "past" : ""}"><h3 data-dday="${d}">${d === today ? "Today · " : ""}${label}<span class="n">${days[d].length || ""}</span></h3>
       ${rows.map(({ e, f }) => f ? `<div class="slot free" data-dslot="${esc(f.at)}" data-dkind="${esc(f.kind)}">
         <span class="tm">${tm(f.at)}</span>
@@ -190,6 +199,7 @@ function renderDays() {
 }
 
 document.addEventListener("click", e => {
+  if (e.target.closest?.("[data-earlier]")) { EARLIER = !EARLIER; if (STATE) renderSchedule(); return; }
   const v = e.target.closest?.("[data-sview]");
   if (v) { SVIEW = v.dataset.sview; try { localStorage.setItem("warroom.sview", SVIEW); } catch { /* private window */ } if (STATE) renderSchedule(); return; }
   const w = e.target.closest?.("#wkPrev,#wkNext");

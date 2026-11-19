@@ -284,7 +284,7 @@ filled once it is uploaded (private until it goes public), outlined until then, 
 has passed, with a pin when it is pinned. Each day's head shows its count against `max_per_day`, a
 red line marks now, and the open slots are dashed. Hover a block for the whole title and its
 state; click it to open the item. **List** shows the days one under the other instead, as before
-(a phone always gets the List and the next three).
+(a phone always gets the List and the next three; see [On a phone](War-room#on-a-phone)).
 
 **Timeline** answers why a show got nothing this week and how close the upload cap is. It runs
 from two days ago to seven ahead, a lane per show with a mark for each item at its time (the same
@@ -303,6 +303,9 @@ their stream's budget or stale, see [Staying current](Scheduling-and-uploads#sta
 are one link under it, "N not going out", which opens them in the queue; a pin there (Pin or
 Next open slot in the item) sends one anyway. Drag an item or a block onto an open slot (or a
 day's head) to pin it, or onto "unpin"; the page warns before a drop breaks the spacing rules.
+Or tap an item in Ready to slot, then an open slot or a day's head: a bar at the bottom says
+which item you picked up (the open slots show while you do, even when they are hidden), and
+**Cancel**, <kbd>Esc</kbd>, another page or a second tap on the item puts it down.
 
 Or let clipper pick the slot: the arrow-to-a-line button beside an item (or **Next open slot** in its window) finds
 the first open slot of its kind that the scheduler's rules allow: the slot times, `max_per_day`,
@@ -349,11 +352,19 @@ The Money page has the first three, the Stats page the analytics.
 ## On a phone
 
 The page bar moves to the bottom: Review, Schedule, Pipeline, Chat and More, which lists the other
-pages. The top bar keeps the Uploads widget, the health light and **⋯**.
-Items open full screen with the decisions at the bottom and swipe to the next one, and videos
+pages. The top bar keeps the Uploads widget, the health light and **⋯** (Sync Kitsu and Replan
+are in there, never the first thing to tap). The Review queue is one column, the first card on
+the first screen; **Filters** opens as a sheet from the bottom (**Done**, or a tap above it, puts
+it away). Items open full screen with the decisions at the bottom and swipe to the next one, and videos
 play from a 360p copy (`lowres/` beside each preview, about a quarter of the data). It can be
 added to the home screen. Away from home it goes through Tailscale: `clipper warroom --tailnet
 on` ([Phone access](Phone-access)).
+
+The Schedule is an agenda: Next up, then what is still to come by day. What already went out or
+was due folds into one row at the top (tap it for the last two days), days with nothing are
+left out, and the open slots show only while you pin: tap an item in Ready to slot, then a slot
+or a day (nothing is dragged on a phone). Pipeline, Money and Stats are one column of the same
+panels, and the windows (Cast, News, Blinds, Investigations, Keys, the log) open full screen.
 
 ## For developers
 

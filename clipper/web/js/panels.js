@@ -82,16 +82,49 @@ document.addEventListener("drop", async e => {
   t.classList.remove("over");
   if (t.dataset.unpin !== undefined) return act(ref, "pin", { text: "" });
   if (t.dataset.dslot) return dropPin(ref, t.dataset.dslot, t.dataset.dkind, kind);
-  const hm = prompt(`Time on ${t.dataset.dday} (HH:MM, ${STATE.timezone})`, "12:00");
+  dayPin(ref, kind, t.dataset.dday);
+});
+function dayPin(ref, kind, day) {  // a day, not a slot: ask the time
+  const hm = prompt(`Time on ${day} (HH:MM, ${STATE.timezone})`, "12:00");
   if (!hm) return;
   if (!/^\d{1,2}:\d{2}$/.test(hm.trim())) return toast("Use HH:MM", true);
   const [h, m] = hm.trim().split(":").map(Number);
-  const guess = new Date(`${t.dataset.dday}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00`);
-  const text = `${t.dataset.dday} ${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  const guess = new Date(`${day}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00`);
+  const text = `${day} ${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
   const warn = ruleWarnings(guess.toISOString(), kind, ref);
   if (warn.length && !confirm(`Pin for ${text}?\n\n` + warn.map(x => "• " + x).join("\n"))) return;
   act(ref, "pin", { text });
+}
+
+// Tap to pin (a phone can't drag): a tap on an item in Ready to slot picks it up, the open slots
+// light up, and a tap on one (or on a day) pins it there, through the same dropPin as a drop.
+// Esc, Cancel, another page or a second tap on the same item puts it down.
+let ARMED = null;  // { ref, kind, title }
+// picked up: the open slots show even when hidden (a phone's agenda shows them only then)
+const freeShown = () => !!ARMED || (SHOWFREE && !PHONE.matches);
+function arm(a, draw = true) {
+  ARMED = a;
+  document.body.classList.toggle("arming", !!a);
+  $("#armBar").hidden = !a;
+  if (a) $("#armBar").innerHTML = `<span>${ic("pin")}Pin <b>${esc(a.title)}</b>: tap an open slot or a day</span><button class="btn" id="armCancel">Cancel</button>`;
+  if (draw && STATE) renderSchedule();
+  if (a && PHONE.matches) $(".day.today")?.scrollIntoView({ block: "start" });
+}
+document.addEventListener("click", e => {
+  if (e.target.closest?.("#armCancel")) return arm(null);
+  const chip = e.target.closest?.("#unslotted [data-dref]");
+  if (chip && !e.target.closest("[data-nextslot]")) {
+    const ref = chip.dataset.dref;
+    return arm(ARMED?.ref === ref ? null : { ref, kind: chip.dataset.dkind, title: chip.querySelector(".tt")?.textContent || ref });
+  }
+  const t = e.target.closest?.("[data-dslot],[data-dday]");
+  if (!t) return;
+  if (!ARMED) { if (t.dataset.dslot) toast("Tap an item in Ready to slot first, then the slot"); return; }
+  const { ref, kind } = ARMED;
+  arm(null);
+  if (t.dataset.dslot) dropPin(ref, t.dataset.dslot, t.dataset.dkind, kind); else dayPin(ref, kind, t.dataset.dday);
 });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && ARMED) { arm(null); e.stopPropagation(); } }, true);
 
 // Next open slot: the server picks it by the scheduler's rules; a preview, then the pins. Apply
 // sends the preview's print: if the plan has moved since, the new one is shown instead.
