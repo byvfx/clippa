@@ -283,12 +283,15 @@ Udder Truth #58/#59/#60, P&L #50 (revenue once monetized). Write "#77 L6" rather
 messages: GitHub closes the issue on "fix".
 - **War room redesign (11-18, user: make it "feel more like you want to use it", every function kept):** a designer
   review and three rounds of questions (memory `warroom-redesign`), plan doc https://claude.ai/artifact/2Ny9Ad8bfWpjhyvtpx87eW
-  (8 steps), mockup https://claude.ai/artifact/H8uGqKzPmXJcXnAAUcNK4Z (look signed off "looks good"). Step 2 on branch
-  `warroom/pages`: a one-row top bar (live shows, Uploads / Spend / Pipeline / health-light widgets, Chat, ⋯ with Sync,
-  Replan, log, keys), a page bar under it with all eight pages (Review, Schedule, Pipeline, Money, Stats, Library,
-  Research, Settings; a phone keeps the bottom bar with More), pages built from today's panels, the drag-and-drop layout
-  editor and `/api/layouts` / `[paths] warroom_layouts` removed. Library/Research/Settings open today's windows from
-  tiles (inline later). Next steps from the plan: the new look (step 1), Review side pane, Ctrl+K, Schedule week/timeline.
+  (8 steps), mockup https://claude.ai/artifact/H8uGqKzPmXJcXnAAUcNK4Z (look signed off "looks good"). Step 2 (pages and
+  the top bar, layout editor and `/api/layouts` removed) is PR #314, merged and deployed 11-18. Step 3, the Review page,
+  is PR #316 (branch `warroom/review-pane`): the item docks beside the grid (`#modal` shown non-modal inside the Review
+  page; moved to `<body>` when it opens on top, since a dialog in a hidden page has no box), J/K open and move it, Esc
+  closes, drag its edge (`warroom.paneW`); Filters button with chips; show tags coloured by the overview's `hue`
+  (`warroom.show_hues`, place in `[shows]`) and `--show-1..6` in each look; Retakes is queue tab 7 (panel gone); "Nothing
+  waiting" with the next upload; Undo under ⋯. Waiting on Copilot's review, then the user's deploy. Next plan steps: the
+  new look (4), Ctrl+K and G keys (5), Schedule week/timeline (6-7), phone (8). Library/Research/Settings still open the
+  old windows from tiles.
 - **War room heat graph (11-16, user asked "can we see the heat graph of a stream in the war room?"):** PR #294,
   merged 11-16 after Grok's review, **not deployed** (it needs `deploy/hub/deploy.sh` from a checkout of main). 🔥 heat on a stream (Pipeline panel) or in an item's
   window: the signals curve, the windows, and each cut item where it sits, coloured by review state, plus the twelve
