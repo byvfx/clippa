@@ -164,8 +164,8 @@ document.addEventListener("click", e => {
   const lv = e.target.closest("[data-live]");
   if (lv) { liveClick(e, lv); return; }
   if (LIVEMENU !== null) { LIVEMENU = null; renderLive(); }
-  const v = e.target.closest("#views button, [data-move]");  // not body[data-view]
-  if (v?.dataset.view) { setView(v.dataset.view); return; }
+  const v = e.target.closest("#views button[data-view], [data-go], [data-move]");  // not body[data-view]
+  if (v?.dataset.view || v?.dataset.go) { setView(v.dataset.view || v.dataset.go); return; }
   if (v?.dataset.move) { move(+v.dataset.move); return; }
   const pop = e.target.closest("[data-pop]");
   if (pop) { popOut(pop.dataset.pop); return; }

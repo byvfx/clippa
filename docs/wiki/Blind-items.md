@@ -172,7 +172,7 @@ warning (at most once per `[notify] cooldown_hours`).
 
 ## The war room
 
-**Blinds** in the [war room](War-room)'s header opens the window.
+**Blinds** on the [war room](War-room#pages-and-the-top-bar)'s Research page opens the window.
 
 - **Tabs:** Waiting on you (the default), Answered, No idea, Not ours, Reveals, Unread and All,
   each with its count. Next to them are how far back to look (1 to 365 days, 14 by default) and

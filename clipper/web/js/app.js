@@ -1,15 +1,27 @@
-// War room: phone view, keyboard, layouts, then start: runs last, once everything above is defined.
+// War room: pages, keyboard, menus, the look, then start: runs last, once everything above is defined.
 
-// ---------- phone ----------
-
+// ---------- pages ----------
+// One page at a time (body[data-view]; warroom.css shows its .page). The page bar sits under the
+// header on a desktop and at the bottom on a phone, where Chat is a page too and More lists the rest.
+const PAGES = ["queue", "schedule", "pipeline", "money", "stats", "library", "research", "settings"];
+const MORE_PAGES = ["money", "stats", "library", "research", "settings"];  // behind More on a phone
 function setView(v) {
+  if (!PAGES.includes(v) && !(v === "chat" && PHONE.matches)) v = "queue";  // an old or unknown name
   document.body.dataset.view = v; store.set("warroom.view", v);
-  document.querySelectorAll("#views button").forEach(b => b.classList.toggle("on", b.dataset.view === v));
+  document.querySelectorAll("#views button[data-view]").forEach(b => {
+    b.classList.toggle("on", b.dataset.view === v);
+    if (b.dataset.view === v) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+  });
+  $("#pagesMore").classList.toggle("on", MORE_PAGES.includes(v));
   chatSync();  // the Chat view shows the chat (chatdock.js)
   const today = v === "schedule" && PHONE.matches && $(".day.today");
   today ? today.scrollIntoView({ block: "start" }) : scrollTo(0, 0);
 }
 setView(store.get("warroom.view") || "queue");
+for (const k of ["warroom.layout", "warroom.layoutName"]) store.set(k, null);  // the layout editor's, retired 2026-11-18
+PHONE.addEventListener("change", () => { if (!PHONE.matches && document.body.dataset.view === "chat") setView("queue"); });
+// the page bar sticks under the header, however tall the header wraps
+new ResizeObserver(() => document.body.style.setProperty("--head-h", `${$("header").offsetHeight}px`)).observe($("header"));
 
 async function playLow(i, full) {  // phones: a 360p copy made by the server (lowres/ beside the preview)
   const tap = $("#mTap");
@@ -109,11 +121,13 @@ document.addEventListener("keydown", e => {
   if ($("#tool").open) return;
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key, video = OPEN ? $("#modal video") : null;
   const take = () => e.preventDefault();
+  // the queue's keys act on what is on screen: the Review page, or an item's window from any page
+  const q = !!OPEN || (document.body.dataset.view === "queue" && !tg.closest?.(".menu"));
   if (k === "?") { take(); showKeys(); }
-  else if (k === "j" || k === "k") { take(); move(k === "j" ? 1 : -1); }
-  else if (k === "Enter" && !OPEN && SEL && !tg.closest?.("button, a")) { take(); openModal(SEL); }
+  else if ((k === "j" || k === "k") && q) { take(); move(k === "j" ? 1 : -1); }
+  else if (k === "Enter" && !OPEN && q && SEL && !tg.closest?.("button, a")) { take(); openModal(SEL); }
   else if (k === "Escape" && !OPEN) { if (LIVEMENU !== null) { LIVEMENU = null; renderLive(); } else if (SEL) { SEL = null; renderQueue(); } }
-  else if ("arhcpu".includes(k) && k.length === 1 && (OPEN || SEL)) { take(); keyAct(k, OPEN || SEL); }
+  else if ("arhcpu".includes(k) && k.length === 1 && q && (OPEN || SEL)) { take(); keyAct(k, OPEN || SEL); }
   else if (k === " " && video && tg !== video) { take(); video.paused ? video.play() : video.pause(); }
   else if ((k === "ArrowLeft" || k === "ArrowRight") && video && tg !== video) { take(); video.currentTime += k === "ArrowRight" ? 5 : -5; }
   else if (k === "f" && video) {
@@ -121,11 +135,11 @@ document.addEventListener("keydown", e => {
     if (document.pictureInPictureElement) document.exitPictureInPicture();
     else if (video.requestPictureInPicture) video.requestPictureInPicture().catch(err => toast(err.message, true));
   }
-  else if (k === "o" && (OPEN || SEL)) { take(); popOut(OPEN || SEL); }
+  else if (k === "o" && q && (OPEN || SEL)) { take(); popOut(OPEN || SEL); }
   else if (k === "m") { take(); toggleChat(); }
   else if (k === "b" && video) { take(); pickFace(OPEN); }
-  else if (/^[1-6]$/.test(k) && !OPEN) { take(); TAB = Object.keys(TABS)[+k - 1]; SEL = null; renderQueue(); }
-  else if (k === "/" && !OPEN) { take(); $("#q").focus(); }
+  else if (/^[1-6]$/.test(k) && !OPEN && q) { take(); TAB = Object.keys(TABS)[+k - 1]; SEL = null; renderQueue(); }
+  else if (k === "/" && !OPEN && q) { take(); $("#q").focus(); }
   else if (k === "l") {
     const on = LIVE.filter(l => l.live);
     if (!on.length) return toast("Nothing is live right now.");
@@ -135,202 +149,59 @@ document.addEventListener("keydown", e => {
   }
 });
 
-// ---------- layouts: drag panels between zones, save named layouts ----------
-// A layout is {zones: {zone: [panel, ...]}, widths: {left: px, right: px}}. The one in use is
-// kept by this browser; named ones are saved in clipper (/api/layouts, every machine sees them).
-const ZONES = ["top", "left", "middle", "right", "bottom", "hidden"];
-// The columns are balanced by height: the review queue is short when little waits, so Retakes, Health and
-// API usage sit under it, Modal (tall) goes under the pipeline and Costs under the schedule.
-const DEFAULT_LAYOUT = { zones: { left: ["pipeline", "modal"], middle: ["queue", "retakes", "health", "usage"],
-  right: ["schedule", "costs"], bottom: ["stats"] }, widths: { left: 300, right: 340 } };
-const WIDTHS = [260, 300, 340, 420, 520, 640];  // side column widths, px
-const DESKTOP = matchMedia("(min-width: 701px)");
-const HOME = [...document.querySelectorAll("[data-panel]")].map(p => [p, p.parentNode]);  // the page as written (phones)
-const PANEL = new Map(HOME.map(([p]) => [p.dataset.panel, p]));  // by name; saved names are never used as selectors
-let LAYOUT = currentLayout(), LAYOUT_NAME = store.get("warroom.layoutName") || "", SAVED = {}, EDITING = false;
-let PDRAG = null;
-const MARK = Object.assign(document.createElement("div"), { className: "drop-mark" });
-
-function currentLayout() {
-  try { const l = JSON.parse(store.get("warroom.layout")); if (l && l.zones) return l; } catch { /* none yet */ }
-  return structuredClone(DEFAULT_LAYOUT);
+// ---------- menus: the header's ⋯ and, on a phone, the page bar's More ----------
+const MENUS = { moreBtn: "moreMenu", pagesMore: "pagesMenu" };
+function closeMenus() {
+  for (const [b, m] of Object.entries(MENUS)) { $("#" + m).hidden = true; $("#" + b).setAttribute("aria-expanded", "false"); }
 }
-function zoneEl(z) {
-  let el = $(`main > .zone[data-zone="${z}"]`);
-  if (!el) {
-    el = Object.assign(document.createElement("div"), { className: "zone" });
-    el.dataset.zone = z;
-    const side = z === "left" || z === "right";
-    el.innerHTML = `<div class="zone-h">${z === "hidden" ? "hidden: drag a panel here to hide it" : z}${side
-      ? ` <select data-width="${z}" title="Column width">${WIDTHS.map(px => `<option value="${px}">${px} px</option>`).join("")}</select>` : ""}</div>`;
-    $("main").append(el);
-  }
-  return el;
+function openMenu(b) {
+  const m = $("#" + MENUS[b]), r = $("#" + b).getBoundingClientRect();
+  closeMenus();
+  m.hidden = false; $("#" + b).setAttribute("aria-expanded", "true");
+  // under the ⋯ button; above the More button (the phone's bar is at the bottom)
+  m.style.right = `${Math.max(8, innerWidth - r.right)}px`;
+  if (r.top > innerHeight / 2) { m.style.top = "auto"; m.style.bottom = `${innerHeight - r.top + 6}px`; }
+  else { m.style.bottom = "auto"; m.style.top = `${r.bottom + 6}px`; }
+  m.querySelector("button:not(:disabled)")?.focus();
 }
-function panels(el) { return [...el.querySelectorAll(":scope > section[data-panel]")]; }
-function applyLayout() {
-  const main = $("main");
-  if (!DESKTOP.matches) {  // phones: the page as written, one view at a time
-    for (const [p, parent] of HOME) parent.append(p);
-    main.querySelectorAll(":scope > .zone").forEach(z => z.remove());
-    document.body.classList.remove("layout", "editing");
+addEventListener("resize", closeMenus);  // placed once, by the button: a menu doesn't follow it
+addEventListener("scroll", closeMenus, { passive: true });
+document.addEventListener("click", e => {
+  const b = e.target.closest?.("#moreBtn, #pagesMore");
+  if (b) { $("#" + MENUS[b.id]).hidden ? openMenu(b.id) : closeMenus(); return; }
+  const lk = e.target.closest?.("[data-look]");
+  if (lk) { ClippaTheme.pick(lk.dataset.look); renderLooks(); }
+  if (e.target.closest?.("[data-keys-tile]")) showKeys();
+  if (e.target.closest?.("[data-menu-log]")) showLog();
+  closeMenus();  // an item was picked (its own handler has run), or a click elsewhere
+});
+document.addEventListener("keydown", e => {
+  const m = e.target.closest?.(".menu");
+  if (!m) {
+    if (e.key === "Escape" && document.querySelector(".menu:not([hidden])")) { e.preventDefault(); e.stopImmediatePropagation(); closeMenus(); }
     return;
   }
-  const placed = new Set();
-  for (const z of ZONES) {
-    const el = zoneEl(z);
-    for (const name of LAYOUT.zones[z] || []) {
-      const p = PANEL.get(name);
-      if (p && !placed.has(p)) { el.append(p); placed.add(p); }
-    }
+  const items = [...m.querySelectorAll("button:not(:disabled)")], at = items.indexOf(e.target);
+  if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); closeMenus(); $("#" + Object.keys(MENUS).find(k => MENUS[k] === m.id)).focus(); }
+  else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault(); e.stopImmediatePropagation();
+    items[(at + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length]?.focus();
   }
-  for (const [p] of HOME) {  // a panel the layout doesn't know (new since it was saved): its default place
-    if (placed.has(p)) continue;
-    const z = ZONES.find(z => (DEFAULT_LAYOUT.zones[z] || []).includes(p.dataset.panel)) || "middle";
-    zoneEl(z).append(p);
-  }
-  const used = z => EDITING || panels(zoneEl(z)).length > 0;
-  let cols = ["left", "middle", "right"].filter(used);
-  if (!cols.length) cols = ["middle"];
-  const w = { ...DEFAULT_LAYOUT.widths, ...(LAYOUT.widths || {}) };
-  const size = cols.map(z => z === "middle" || !cols.includes("middle") && z === cols.at(-1) ? "minmax(0, 1fr)" : `${w[z]}px`);
-  const rows = [["top"], [], ["bottom"], ["hidden"]].map((r, i) => i === 1 ? cols : cols.map(() => r[0]))
-    .filter((r, i) => i === 1 || (i === 3 ? EDITING : used(r[0])));
-  main.style.setProperty("--cols", size.join(" "));
-  main.style.setProperty("--areas", rows.map(r => `"${r.join(" ")}"`).join(" "));
-  for (const z of ZONES) {
-    const el = zoneEl(z);
-    el.style.display = (z === "hidden" ? EDITING : used(z)) && (rows.flat().includes(z)) ? "" : "none";
-    const sel = el.querySelector("select[data-width]");
-    if (sel) sel.value = String(w[z]);
-  }
-  for (const [p] of HOME) {
-    const h = p.querySelector(":scope > h2");
-    h.draggable = EDITING;
-    if (EDITING) { h.tabIndex = 0; h.title = "Drag, or ↑/↓ move, ←/→ zone, H hide"; }
-    else { h.removeAttribute("tabindex"); h.removeAttribute("title"); }
-  }
-  document.body.classList.add("layout");
-  document.body.classList.toggle("editing", EDITING);
-}
-function readLayout() {
-  const zones = {};
-  for (const z of ZONES) zones[z] = panels(zoneEl(z)).map(p => p.dataset.panel);
-  return { zones, widths: { ...DEFAULT_LAYOUT.widths, ...(LAYOUT.widths || {}) } };
-}
-function keepLayout() { store.set("warroom.layout", JSON.stringify(LAYOUT)); store.set("warroom.layoutName", LAYOUT_NAME || null); }
-function sameLayout(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
-function useLayout(lay, name) { LAYOUT = structuredClone(lay); LAYOUT_NAME = name; keepLayout(); applyLayout(); }
-
-document.addEventListener("dragstart", e => {
-  const h = EDITING && e.target.closest?.("section[data-panel] > h2");
-  if (!h) return;
-  PDRAG = h.parentNode;
-  PDRAG.classList.add("dragging");
-  e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", PDRAG.dataset.panel);
-});
-document.addEventListener("dragover", e => {
-  const zone = PDRAG && e.target.closest?.("main > .zone");
-  if (!zone) return;
-  e.preventDefault();
-  const row = zone.dataset.zone === "hidden";
-  const before = panels(zone).filter(p => p !== PDRAG).find(p => {
-    const r = p.getBoundingClientRect();
-    return row ? e.clientY < r.bottom && e.clientX < r.left + r.width / 2 : e.clientY < r.top + r.height / 2;
-  });
-  if (before) zone.insertBefore(MARK, before); else zone.append(MARK);
-});
-document.addEventListener("drop", e => {
-  if (!PDRAG || !MARK.parentNode) return;
-  e.preventDefault();
-  MARK.parentNode.insertBefore(PDRAG, MARK);
-  MARK.remove();
-  LAYOUT = readLayout(); keepLayout(); applyLayout();
-});
-document.addEventListener("dragend", () => { PDRAG?.classList.remove("dragging"); PDRAG = null; MARK.remove(); });
-document.addEventListener("change", e => {
-  const side = e.target.dataset?.width;
-  if (!side) return;
-  LAYOUT.widths = { ...DEFAULT_LAYOUT.widths, ...(LAYOUT.widths || {}), [side]: +e.target.value };
-  keepLayout(); applyLayout();
-});
-
-function closeLayoutMenu() { $("#layoutMenu")?.remove(); }
-async function openLayoutMenu() {
-  try { SAVED = (await api("/api/layouts")).layouts || {}; } catch (e) { toast("Saved layouts: " + e.message, true); }
-  if (!LOOKS.length) await loadLooks();  // serve wasn't answering when the page opened
-  closeLayoutMenu();
-  const changed = LAYOUT_NAME && SAVED[LAYOUT_NAME] && !sameLayout(SAVED[LAYOUT_NAME], LAYOUT);
-  const m = Object.assign(document.createElement("div"), { className: "layout-menu", id: "layoutMenu" });
-  m.innerHTML = `<button data-lay="edit">${EDITING ? "Done arranging" : "Arrange panels…"}<span>drag titles</span></button>
-    ${changed ? `<button data-lay="save">Save “${esc(LAYOUT_NAME)}”</button>` : ""}
-    <button data-lay="saveas">Save as…</button>
-    <div class="sep"></div><div class="lbl">SAVED LAYOUTS</div>
-    ${Object.keys(SAVED).sort().map(n => `<div class="row"><button data-lay="use" data-name="${esc(n)}" class="${n === LAYOUT_NAME ? "on" : ""}">${esc(n)}${n === LAYOUT_NAME && changed ? " (changed)" : ""}</button><button class="del" data-lay="del" data-name="${esc(n)}" title="Delete">×</button></div>`).join("")
-      || `<div class="lbl" style="font-weight:400;letter-spacing:0">none yet</div>`}
-    <div class="sep"></div><button data-lay="default">Default layout</button>
-    <div class="sep"></div><div class="lbl">LOOK</div>
-    ${LOOKS.map(n => `<button data-lay="look" data-name="${esc(n)}" class="${n === ClippaTheme.current() ? "on" : ""}">${esc(n)}</button>`).join("")
-      || `<div class="lbl" style="font-weight:400;letter-spacing:0">can't list them</div>`}`;
-  document.body.append(m);
-  const r = $("#layoutBtn").getBoundingClientRect();
-  m.style.top = `${r.bottom + 6}px`; m.style.right = `${innerWidth - r.right}px`;
-}
-async function saveLayoutAs(name) {
-  try {
-    SAVED = (await api("/api/layouts", { name, layout: LAYOUT })).layouts;
-    LAYOUT_NAME = name; keepLayout(); toast(`Layout “${name}” saved`);
-  } catch (e) { toast(e.message, true); }
-}
-$("#layoutBtn").onclick = e => { e.stopPropagation(); $("#layoutMenu") ? closeLayoutMenu() : openLayoutMenu(); };
-document.addEventListener("click", async e => {
-  const b = e.target.closest?.("#layoutMenu [data-lay]");
-  if (!b) { if (!e.target.closest?.("#layoutMenu")) closeLayoutMenu(); return; }
-  const what = b.dataset.lay, name = b.dataset.name;
-  closeLayoutMenu();
-  if (what === "edit") { EDITING = !EDITING; applyLayout(); if (EDITING) toast("Drag a panel by its title. Layout → Done when finished."); }
-  else if (what === "save") saveLayoutAs(LAYOUT_NAME);
-  else if (what === "saveas") { const n = prompt("Save this layout as", LAYOUT_NAME || "My layout"); if (n && n.trim()) saveLayoutAs(n.trim()); }
-  else if (what === "use") useLayout(SAVED[name], name);
-  else if (what === "default") useLayout(DEFAULT_LAYOUT, "");
-  else if (what === "look") ClippaTheme.pick(name);
-  else if (what === "del" && confirm(`Delete the layout “${name}”?`)) {
-    try { SAVED = (await api("/api/layouts", { name, delete: true })).layouts; if (name === LAYOUT_NAME) { LAYOUT_NAME = ""; keepLayout(); } toast(`Deleted “${name}”`); }
-    catch (err) { toast(err.message, true); }
-  }
-});
-// Keyboard arranging (no mouse): on a focused panel title, ↑/↓ move it within its zone,
-// ←/→ to the previous/next zone, H to the hidden tray. Caught before the queue's own keys.
-document.addEventListener("keydown", e => {
-  if (!EDITING) return;
-  if (e.key === "Escape") { EDITING = false; applyLayout(); return; }
-  // the title itself: a control inside it (Health's Log, Analytics' month) keeps its own keys
-  const h = e.target.matches?.("section[data-panel] > h2") ? e.target : null;
-  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-  if (!h || !["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "h"].includes(k)) return;
-  e.preventDefault(); e.stopImmediatePropagation();
-  const p = h.parentNode, zone = p.parentNode, z = ZONES.indexOf(zone.dataset.zone);
-  if (k === "ArrowUp" && p.previousElementSibling?.matches("section")) zone.insertBefore(p, p.previousElementSibling);
-  else if (k === "ArrowDown" && p.nextElementSibling) p.nextElementSibling.after(p);
-  else if (k === "ArrowLeft" || k === "ArrowRight") {
-    const to = ZONES[Math.min(ZONES.length - 1, Math.max(0, z + (k === "ArrowLeft" ? -1 : 1)))];
-    zoneEl(to).append(p);
-  } else if (k === "h") zoneEl("hidden").append(p);
-  LAYOUT = readLayout(); keepLayout(); applyLayout();
-  h.focus();
-  toast(`${p.dataset.panel} → ${p.parentNode.dataset.zone}`);
 }, true);
-DESKTOP.addEventListener("change", applyLayout);
 
 // ---------- the look: a file in web/themes/ (theme.js); the war room and its chat wear one pick ----------
+// Picked on the Settings page (#looks).
 let LOOKS = [];
+function renderLooks() {
+  $("#looks").innerHTML = LOOKS.map(n => `<button class="look ${n === ClippaTheme.current() ? "on" : ""}" data-look="${esc(n)}">${esc(n)}</button>`).join("")
+    || `<div class="empty">Can't list them: serve isn't answering.</div>`;
+}
 async function loadLooks() {
   try { LOOKS = (await api("/api/chat/themes")).themes; ClippaTheme.settle(LOOKS); }   // the default here: <html data-theme>
   catch (e) { /* serve unreachable: the look stays */ }
+  renderLooks();
 }
 loadLooks();
-addEventListener("resize", () => { if (DESKTOP.matches !== document.body.classList.contains("layout")) applyLayout(); });
-applyLayout();
 
 // Everything that polls the server: [refresh, every ms]. Each runs now, then whenever it falls due.
 const POLL = [[pollRefresh, 15000], [refreshLive, 60000], [refreshCloud, 60000], [refreshCosts, 300000],

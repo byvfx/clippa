@@ -281,6 +281,14 @@ Next, a week of phone use; #300 (access levels and a local Jev-like classifier i
 then a small `clipper mcp`; #13 may fold into it), Modal ideas #53, #56,
 Udder Truth #58/#59/#60, P&L #50 (revenue once monetized). Write "#77 L6" rather than "fix #77" in commit
 messages: GitHub closes the issue on "fix".
+- **War room redesign (11-18, user: make it "feel more like you want to use it", every function kept):** a designer
+  review and three rounds of questions (memory `warroom-redesign`), plan doc https://claude.ai/artifact/2Ny9Ad8bfWpjhyvtpx87eW
+  (8 steps), mockup https://claude.ai/artifact/H8uGqKzPmXJcXnAAUcNK4Z (look signed off "looks good"). Step 2 on branch
+  `warroom/pages`: a one-row top bar (live shows, Uploads / Spend / Pipeline / health-light widgets, Chat, ⋯ with Sync,
+  Replan, log, keys), a page bar under it with all eight pages (Review, Schedule, Pipeline, Money, Stats, Library,
+  Research, Settings; a phone keeps the bottom bar with More), pages built from today's panels, the drag-and-drop layout
+  editor and `/api/layouts` / `[paths] warroom_layouts` removed. Library/Research/Settings open today's windows from
+  tiles (inline later). Next steps from the plan: the new look (step 1), Review side pane, Ctrl+K, Schedule week/timeline.
 - **War room heat graph (11-16, user asked "can we see the heat graph of a stream in the war room?"):** PR #294,
   merged 11-16 after Grok's review, **not deployed** (it needs `deploy/hub/deploy.sh` from a checkout of main). 🔥 heat on a stream (Pipeline panel) or in an item's
   window: the signals curve, the windows, and each cut item where it sits, coloured by review state, plus the twelve

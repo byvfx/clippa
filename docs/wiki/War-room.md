@@ -4,6 +4,30 @@ with the background jobs (`http://localhost:8765`, `[warroom] port`); `clipper w
 shows what is live, where each stream is in the pipeline, the review queue and the upload
 schedule. Press <kbd>?</kbd> on the page for every keyboard shortcut.
 
+## Pages and the top bar
+
+The page bar under the top bar has eight pages, one on screen at a time: **Review** (the queue,
+with Retakes beside it; the page opens here), **Schedule** (the schedule and the upload panel),
+**Pipeline** (the streams and Health), **Money** (Costs, Modal and API usage), **Stats** (the
+analytics), **Library** (the cast library, and where faces are named), **Research** (News, Blinds
+and Investigations) and **Settings** (the keys, the keyboard shortcuts and the look). The browser
+remembers the page. Review counts what waits for you; Schedule counts the approved items with no
+slot. Library, Research and Settings open today's windows from a tile each for now.
+
+The top bar is one row: the live shows, four widgets, **Chat** and **⋯**.
+
+- **Uploads**: the last 24 hours against `max_per_24h`, as a meter. Opens Schedule.
+- **Spend**: this month's model and Modal spend, the Costs panel's total. Opens Money.
+- **Pipeline**: how many streams are recording (● live) or running, or idle. Opens Pipeline.
+- **The health light**: green when serve and the bot are up and the numbers are fresh, amber past
+  45 s or when a job failed, red past 2 min, when serve or the bot is down or the Kitsu sync
+  failed. Hover for what's wrong and how old the numbers are. Opens Pipeline.
+- **⋯** has the actions that change things: Sync Kitsu, Replan, the log, the keyboard shortcuts.
+
+The page used to have a Layout button for dragging panels between columns and saving layouts
+(`[paths] warroom_layouts`); the fixed pages replace it (2026-11-18), and a saved-layouts file
+left on the share is no longer read.
+
 ## The chat at the side
 
 The [Clippa messenger](Clippa-messenger) sits at the right of the page: tell Clippa what to do
@@ -18,8 +42,8 @@ covers the review cards.
 
 ## Looks
 
-The war room and its chat wear one look, picked under Layout > Look (on a phone, **Look** in
-the chat's buddy list): `warroom` (the dark default), `retro`, `millennium` and `pager`, the
+The war room and its chat wear one look, picked on the Settings page (or **Look** in the
+chat's buddy list): `warroom` (the dark default), `retro`, `millennium` and `pager`, the
 same four as the [Clippa messenger](Clippa-messenger#looks). The browser remembers the pick and
 its other tabs follow it, `/chat` included. A look is one file in `clipper/web/themes/`; see
 [Looks](Clippa-messenger#looks) for what goes in one.
@@ -61,11 +85,11 @@ titles, descriptions, hashtags, tags or playlists: the dry run lists every line 
 change before anything is written. A selection survives a change of tab or filter, but bulk
 actions only touch what is on screen: the bar says how many picks are left out.
 
-"Updated N s ago" in the header is the age of the page's numbers: amber past 45 s, red past
-2 min. When a refresh fails it says "serve isn't answering" there (hover for why), with one
+The health light in the top bar shows the age of the page's numbers (amber past 45 s, red past
+2 min). When a refresh fails it says Offline there (hover for why), with one
 toast when it starts and one when serve is back; before the first answer the panels say
 Loading… or why they are empty. A tab in the background stops polling and catches up when
-you come back. A page whose sign-in has gone says so and asks for the `?key=` link again.
+you come back. A page whose sign-in has gone says Signed out there and asks for the `?key=` link again.
 
 A new title for an item that's already on YouTube renames the video there too
 ([Scheduling and uploads](Scheduling-and-uploads#renaming-a-video-thats-up)): the item window
@@ -85,7 +109,7 @@ recent ones), a note sent to several items asks before it starts that many, and 
 panel shows each one's cost and this month's count and total. Cast's Find line says what its
 labels can cost.
 
-A button sends once: a double tap is one request, and Sync Kitsu and Replan stay greyed out
+A button sends once: a double tap is one request, and Sync Kitsu and Replan (under **⋯**) stay greyed out
 until they finish. Closing an item's window, or moving on with J/K, a swipe or Approve, asks
 before throwing away a title, description, note or release time you typed but didn't save.
 
@@ -145,7 +169,7 @@ Nothing here costs anything or changes anything.
 
 ## News
 
-Headlines about the shows' people (`clipper news`, #110). **News** in the header opens it.
+Headlines about the shows' people (`clipper news`, #110). **News** on the Research page opens it.
 
 - **Stories** from the last 1, 3, 7 or 30 days, newest first: the headline the judge wrote, strong
   or maybe, who and which show, why it matters, and the outlets' links. "posted" means the bot
@@ -159,14 +183,14 @@ Headlines about the shows' people (`clipper news`, #110). **News** in the header
 
 ## Blinds
 
-Gossip blind items with their clues read (`clipper blinds`, #111). **Blinds** in the header opens
-it: each blind's text, its typed clues, the claim, and a box for your guess, which you give before
+Gossip blind items with their clues read (`clipper blinds`, #111). **Blinds** on the Research page
+opens it: each blind's text, its typed clues, the claim, and a box for your guess, which you give before
 clipper looks into anything. The whole of it is on [Blind items](Blind-items#the-war-room).
 
 ## Keys
 
 The API keys serve itself has, which on the hub are the ones serve, the bot and the worker use.
-**Keys** in the header opens it. Each key shows its env var, where it was found (`$ANTHROPIC_API_KEY`,
+**Keys** on the Settings page opens it. Each key shows its env var, where it was found (`$ANTHROPIC_API_KEY`,
 or its file in `secrets/`), what uses it, and the last answer from its provider: ✓ works,
 ✗ rejected, or ? (no answer about the key, or not reachable). **Check** asks one provider again,
 and **Check all** asks every one that's set. Each check is one free request (a model list or a
@@ -181,7 +205,7 @@ No key's value ever reaches the page. To change one, edit `deploy/hub/env.local`
 ## Cast
 
 The cast library (#41): a few head-and-shoulders photos of each regular in `[thumbnail]
-photos/<Person>/`, for covers and the weekly. **Cast** in the header opens it.
+photos/<Person>/`, for covers and the weekly. **Cast** on the Library page opens it.
 
 - **The list** is everyone with photos or an enrolled face, with how many are kept and new;
   "!" marks fewer than `[cast] min_photos`. "Someone new" adds a person.
@@ -209,7 +233,8 @@ The command line: `clipper cast list|grab|find|add|keep|drop|label|set|auto` ([C
 
 ## Schedule and uploads
 
-The schedule shows the open slots of the next two weeks and the approved items with no slot,
+The Schedule page shows the open slots of the next two weeks (on a wide screen the days sit on
+the right, the upload panel and the items with no slot on the left) and the approved items with no slot,
 newest stream first. The ones the scheduler let go are listed too, tagged "over budget" or
 "stale" (see [Staying current](Scheduling-and-uploads#staying-current)): a pin sends one anyway.
 Drag an item or a scheduled slot onto an open slot (or a day) to pin it, or onto "unpin"; the
@@ -226,12 +251,12 @@ stream whose budget is full bumps that stream's weakest automatic one: the previ
 The bulk button leaves those streams out, since a pin there would only swap one for another.
 Raise `stream_budget` to send more of a stream.
 
-Above it, the upload panel shows uploads in the last 24 h against the cap, the last automatic
+The upload panel shows uploads in the last 24 h against the cap, the last automatic
 run and its errors, and what goes next. Uploaded slots show views and a YouTube link.
 
 ## The log
 
-**Log** on the Health panel shows the end of the serve or bot log (`[paths] serve_log`,
+**Log** on the Health panel (or **⋯** > the log) shows the end of the serve or bot log (`[paths] serve_log`,
 `bot_log`), with a word filter and an "errors and warnings" switch. An error toast that says
 "details in the serve log" has a Log button that opens it filtered to errors. Values of secret
 environment variables and the page's key are blanked before the lines leave serve. A log set
@@ -239,37 +264,28 @@ to `""` (console only) says to use `docker compose logs` instead.
 
 ## Modal, costs and analytics
 
-- **Modal** (under Health): the month's Modal bill, the spend rate, GPUs up, transcriptions
+The Money page has the first three, the Stats page the analytics.
+
+- **Modal**: the month's Modal bill, the spend rate, GPUs up, transcriptions
   running and failed, and each archive's progress. `clipper modal` prints the same.
-- **Costs** (below it): the month added up. Every model call (logged as it is made, with its
+- **Costs**: the month added up (the Spend widget shows its total). Every model call (logged as it is made, with its
   stage and stream), Modal runs, and `[costs] monthly` fixed costs, by stage and show.
   `clipper costs` prints the same; revenue joins it once the channel is monetized.
-- **API usage** (below Costs): the month by the Claude API's and OpenRouter's own count,
+- **API usage**: the month by the Claude API's and OpenRouter's own count,
   today, by model, OpenRouter's week, limit and balance, each next to what our log recorded.
   Claude's needs an Admin API key ([Costs](Costs#the-providers-own-numbers));
   `clipper costs --providers` prints the same.
-- **Analytics** (full width, under the queue): a month of YouTube. Views, watch time and
+- **Analytics**: a month of YouTube. Views, watch time and
   subscribers against the month before, views per day, where views came from (Shorts feed,
   search, ...), and the first-7-day numbers of that month's uploads by show, kind, weekday and
   hour, with the best and weakest. `clipper analytics --report` writes the same as
   `reports/analytics/<month>.md` plus a .csv of every upload, and ends with
   [what predicts views](Scheduling-and-uploads#what-predicts-views), which the panel leaves out.
 
-## Layouts
-
-By default the pipeline and Modal sit on the left, the review queue with Retakes, Health and API
-usage under it in the middle, and the schedule with Costs on the right, so the three columns come
-out about as tall as each other. Layout > Default puts the panels back there.
-
-On a desktop the panels can be moved: Layout > Arrange panels, then drag a panel by its title
-into the top, left, middle, right or bottom zone, or into the hidden tray. Without a mouse,
-focus a panel's title: ↑/↓ move it within its zone, ←/→ to the next zone, H hides it. Each
-side column has a width. The browser keeps the arrangement; Layout > Save as names it in
-`[paths] warroom_layouts`, where every machine can pick it.
-
 ## On a phone
 
-It switches to one view at a time (Review, Schedule, Pipeline, Stats and Chat tabs at the bottom).
+The page bar moves to the bottom: Review, Schedule, Pipeline, Chat and More, which lists the other
+pages. The top bar keeps the Uploads widget, the health light and **⋯**.
 Items open full screen with the decisions at the bottom and swipe to the next one, and videos
 play from a 360p copy (`lowres/` beside each preview, about a quarter of the data). It can be
 added to the home screen. Away from home it goes through Tailscale: `clipper warroom --tailnet

@@ -64,22 +64,6 @@ def test_a_refused_post_still_gets_its_answer(serve, monkeypatch):
     assert status(port, "/api/nope", "localhost", method="POST") == 413
 
 
-def test_saved_layouts(tmp_path):
-    cfg = {"paths": {"warroom_layouts": tmp_path / "logs" / "layouts.json"}}
-    assert warroom.layouts(cfg) == {"layouts": {}}
-    lay = {"zones": {"top": ["schedule"], "left": ["pipeline"], "middle": ["queue"]}, "widths": {"left": 300}}
-    assert warroom.save_layout(cfg, {"name": "Mine", "layout": lay})["layouts"]["Mine"] == lay
-    assert warroom.layouts(cfg)["layouts"]["Mine"] == lay
-    for bad in ({"zones": {"sideways": []}}, {"zones": {"top": "schedule"}}, {"zones": {"top": ['"]']}},
-                {"zones": {"top": []}, "widths": {"left": 5000}}, {"zones": {"top": []}, "widths": [300]},
-                ["top"]):   # widths and the layout itself must be dicts (Copilot on #176)
-        with pytest.raises(ClipperError, match="not a layout"):
-            warroom.save_layout(cfg, {"name": "Bad", "layout": bad})
-    with pytest.raises(ClipperError, match="name"):
-        warroom.save_layout(cfg, {"name": " ", "layout": lay})
-    assert warroom.save_layout(cfg, {"name": "Mine", "delete": True}) == {"layouts": {}}
-
-
 def test_page_code_is_served_without_the_key(serve):
     """The stylesheet and scripts hold no secrets; they're fetched fresh so a restart's
     page never runs old code. Nothing outside web/ and no other file type is served."""
@@ -102,14 +86,21 @@ def test_the_page_loads_every_script_app_last():
     assert "<script>" not in html and "<style>" not in html
 
 
-def test_default_layout_places_every_panel_once():
-    """A panel missing from DEFAULT_LAYOUT (or misspelt there) falls back to the middle zone,
-    under the review queue, without anything failing."""
+def test_every_page_has_its_tab_and_its_place():
+    """The page bar, app.js's PAGES and the page groups name the same eight pages, each once, and
+    the CSS shows each one; every panel sits in a page, and every data-go names one."""
     html = warroom.PAGE.read_text(encoding="utf-8")
     js = (warroom.WEB / "js" / "app.js").read_text(encoding="utf-8")
-    zones = re.search(r"const DEFAULT_LAYOUT = \{ zones: \{(.*?)\}, widths", js, re.DOTALL).group(1)
-    placed = re.findall(r'"([a-z]+)"', zones)
-    assert sorted(placed) == sorted(re.findall(r'data-panel="([a-z]+)"', html))
+    css = (warroom.WEB / "warroom.css").read_text(encoding="utf-8")
+    pages = re.findall(r'"([a-z]+)"', re.search(r"const PAGES = \[(.*?)\]", js).group(1))
+    assert len(pages) == len(set(pages)) == 8 and pages[0] == "queue"
+    assert re.findall(r'<div class="page" data-page="([a-z]+)">', html) == pages
+    assert [v for v in re.findall(r'data-view="([a-z]+)"', html) if v != "chat"] == pages
+    for v in pages:
+        assert f'body[data-view="{v}"] .page[data-page="{v}"]' in css
+    assert set(re.findall(r'data-go="([a-z]+)"', html)) <= set(pages)
+    main = html[html.index("<main>"):html.index("</main>")]
+    assert html.count("data-panel=") == main.count("data-panel=") > 0
 
 
 def test_the_page_has_no_mis_encoded_text():

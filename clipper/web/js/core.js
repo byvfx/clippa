@@ -40,15 +40,28 @@ async function api(path, body) {
   return j;
 }
 
+// The health light in the header: serve, the bot, the Kitsu sync and how old the numbers are.
+function healthLight(age) {
+  const h = STATE?.health, svc = h?.services || {}, why = [];
+  for (const k of ["serve", "bot"]) if (svc[k] && svc[k].level !== "ok") why.push(`${svc[k].label}: ${svc[k].text}`);
+  if (h?.sync?.error) why.push("Kitsu sync: " + h.sync.error);
+  const down = why.length > 0;  // a service or the sync: red; a failed job: amber
+  const failed = Object.entries(svc.serve?.last || {}).filter(([, j]) => j.exit).map(([k, j]) => `${k} exit ${j.exit}`);
+  if (failed.length) why.push("failed: " + failed.join(", "));
+  const level = DOWN || age > 120 || down ? "bad" : age === null || age > 45 || failed.length ? "mid" : "ok";
+  return { level, why };
+}
 function tick() {
-  const tz = STATE?.timezone || undefined;
-  $("#clock").textContent = new Date().toLocaleString([], { timeZone: tz, weekday: "short", hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  // #201: the clock ticks whatever the last poll did; this says how old the numbers are
-  const age = STATE ? Math.max(0, (Date.now() - new Date(STATE.generated_at)) / 1000) : null, u = $("#updated");
+  // #201: the light says how old the numbers are, whatever the last poll did
+  const age = STATE ? Math.max(0, (Date.now() - new Date(STATE.generated_at)) / 1000) : null, w = $("#wHealth");
   const was = age === null ? "" : age < 90 ? `${Math.round(age)} s ago` : ago(STATE.generated_at);
-  u.textContent = DOWN ? `${DOWN.signedOut ? "signed out: open the ?key= link again" : "serve isn't answering"}${was ? " · data from " + was : ""}` : age === null ? "no data yet" : `updated ${was}`;
-  u.title = DOWN ? `${DOWN.msg}\nTrying again every 15 s.` : "How old the numbers on this page are";
-  u.className = "updated " + (DOWN || age > 120 ? "bad" : age === null || age > 45 ? "mid" : "");
+  const { level, why } = healthLight(age);
+  w.dataset.level = level;
+  w.querySelector("b").textContent = DOWN ? (DOWN.signedOut ? "Signed out" : "Offline") : level === "ok" ? "OK" : age === null ? "…" : "Check";
+  $("#updated").textContent = age === null ? "" : age < 90 ? `${Math.round(age)} s` : was.replace(" ago", "");
+  const title = [DOWN ? (DOWN.signedOut ? "Signed out: open the war room's ?key= link again." : `serve isn't answering: ${DOWN.msg}\nTrying again every 15 s.`) : "",
+    ...why, age === null ? "No data yet" : `Updated ${ago(STATE.generated_at)}`, "Opens the Pipeline page (Health)"].filter(Boolean).join("\n");
+  if (w.title !== title) w.title = title;  // not every second while it is hovered: the age in it is to the minute
 }
 setInterval(tick, 1000);
 
@@ -155,15 +168,34 @@ function liveClick(e, t) {
 
 function render() {
   const s = STATE, c = s.counts;
-  $("#counters").innerHTML = [
-    ["Waiting", c.pending, c.pending ? "hot" : ""], ["Changes", c.changes || 0, c.changes ? "warn" : ""],
-    ["Approved", c.approved || 0, ""], ["Unslotted", c.approved_unscheduled, c.approved_unscheduled ? "warn" : ""],
-    ["Next 7 d", c.scheduled_7d, ""], ["Uploaded", c.uploaded, ""],
-  ].map(([l, n, k]) => `<div class="counter ${k}"><b>${n}</b><span>${l}</span></div>`).join("");
+  renderWidgets();
   const first = !$("#schedule").children.length;
   renderStreams(); renderRetakes(); renderHealth(); renderQueue(); renderUploads(); renderSchedule(); renderLive(); tick();
   if (first && document.body.dataset.view === "schedule") setView("schedule");  // opened on it: go to today
   if (OPEN) { const r = s.items.find(i => i.ref === OPEN); if (r && !$("#modal").contains(document.activeElement)) fillModalState(r); }
+}
+
+// The header's widgets (each opens its page). Spend is filled by refreshCosts (panels.js).
+function renderWidgets() {
+  const u = STATE.uploads, c = STATE.counts, wu = $("#wUploads");
+  if (u) {
+    const pct = u.max_per_24h ? Math.min(100, 100 * u.last_24h / u.max_per_24h) : 0;
+    wu.querySelector("b").textContent = `${u.last_24h}/${u.max_per_24h}`;
+    Object.assign(wu.querySelector(".meter i").style, { width: `${pct}%` });
+    wu.querySelector(".meter i").className = u.room ? "" : "full";
+    wu.title = `Uploads in the last 24 hours: ${u.last_24h} of ${u.max_per_24h}${u.room ? `, ${u.room} more now` : ", at the cap"}. ${c.scheduled_7d} planned in 7 days.`;
+  }
+  // the recorder's states: recording (the show is live), paused (offline, waiting out the grace period),
+  // finalizing (ended, closing the file); Grok on #314: only the first is live
+  const st = STATE.streams, n = f => st.filter(f).length;
+  const live = n(x => x.recording === "recording"), ending = n(x => ["paused", "finalizing"].includes(x.recording));
+  const run = n(x => x.run_status === "running"), bad = n(x => x.run_status === "failed");
+  const wp = $("#wPipe");
+  wp.querySelector("b").textContent = [live && `● ${live} live`, ending && `${ending} ending`, run && `${run} running`,
+    bad && `${bad} failed`].filter(Boolean).join(" · ") || "idle";
+  wp.dataset.level = bad ? "bad" : live || ending || run ? "busy" : "";
+  wp.title = `${live} live, ${ending} paused or finalizing, ${run} processing, ${bad} failed. Opens the Pipeline page.`;
+  $("#vnSched").textContent = c.approved_unscheduled || "";
 }
 
 function renderStreams() {
