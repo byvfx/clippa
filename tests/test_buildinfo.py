@@ -1,8 +1,13 @@
 """clipper/buildinfo.py: the version a copy reports (`clipper --version`, doctor, heartbeats)."""
 import json
+import re
+import shlex
+import shutil
+import subprocess
 from datetime import UTC, datetime
 
 import pytest
+from conftest import ROOT
 
 from clipper import __version__, buildinfo, daemon, services
 
@@ -21,6 +26,7 @@ def fresh():
     ("v0.2.0-3-g570bb87", "0.2.0+3.g570bb87"),            # three commits past it
     ("v0.2.0-3-g570bb87-dirty", "0.2.0+3.g570bb87.dirty"),
     ("v1.10", "1.10"),
+    ("v0.3.0rc1-2-gabc1234", "0.3.0rc1+2.gabc1234"),      # a PEP 440 pre-release tag
     ("570bb87", "9.9.9+g570bb87"),                        # no release tag in reach: the base + the commit
     ("570bb87-dirty", "9.9.9+g570bb87.dirty"),
     ("", ""), ("fatal: not a git repository", ""), ("v0.2.0-x-gzz", ""),
@@ -55,10 +61,36 @@ def test_a_garbled_stamp_falls_through_to_git(tmp_path, monkeypatch):
     assert buildinfo.version() == "0.2.0"
 
 
-def test_a_checkout_says_something_that_starts_with_a_number(tmp_path, monkeypatch):
-    """Whatever git says here (a tag, a commit, nothing), the answer is a version, not text."""
-    monkeypatch.setattr(buildinfo, "STAMP", tmp_path / "missing.txt")
-    assert buildinfo.version()[0].isdigit()
+def git(repo, *args):
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false",
+                    *args], cwd=repo, check=True, capture_output=True)
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
+def test_a_checkout_is_read_from_git(tmp_path):
+    """The dev machine's path: no stamp, `git describe` of the folder the package is in."""
+    assert buildinfo._from_git(tmp_path) == ""            # no .git: nothing to ask
+    git(tmp_path, "init", "-q")
+    (tmp_path / "f.txt").write_text("one", encoding="utf-8")
+    git(tmp_path, "add", "f.txt")
+    git(tmp_path, "commit", "-q", "-m", "first")
+    assert re.fullmatch(r"[0-9a-f]+", buildinfo._from_git(tmp_path).strip())           # no tag yet: a commit
+    git(tmp_path, "tag", "-a", "v0.2.0", "-m", "release")
+    assert buildinfo.normalize(buildinfo._from_git(tmp_path)) == "0.2.0"
+    (tmp_path / "f.txt").write_text("two", encoding="utf-8")
+    git(tmp_path, "commit", "-q", "-am", "second")
+    assert re.fullmatch(r"0\.2\.0\+1\.g[0-9a-f]+", buildinfo.normalize(buildinfo._from_git(tmp_path)))
+    (tmp_path / "f.txt").write_text("three", encoding="utf-8")
+    assert buildinfo.normalize(buildinfo._from_git(tmp_path)).endswith(".dirty")
+    git(tmp_path, "tag", "-a", "other", "-m", "not a release")                          # --match skips it
+    assert buildinfo.normalize(buildinfo._from_git(tmp_path)).startswith("0.2.0+1.g")
+
+
+def test_the_deploy_stamp_asks_git_the_same_question():
+    """deploy/stamp.sh writes the file buildinfo reads: one `git describe`, spelled twice."""
+    sh = (ROOT / "deploy" / "stamp.sh").read_text(encoding="utf-8")
+    asked = "describe " + " ".join(shlex.quote(a) for a in buildinfo.DESCRIBE[2:])
+    assert asked in sh, f"deploy/stamp.sh must run `git {asked}`, as buildinfo.DESCRIBE does"
 
 
 def test_the_heartbeat_carries_the_version(tmp_path, monkeypatch):

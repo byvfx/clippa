@@ -18,18 +18,19 @@ Check out a tagged release, not main's tip: each is on the
 
 ```powershell
 git clone https://github.com/byvfx/clipper.git C:\clipper
-git -C C:\clipper checkout (git -C C:\clipper describe --tags --abbrev=0)
+git -C C:\clipper checkout (git -C C:\clipper describe --tags --abbrev=0 --match 'v[0-9]*')
 powershell -ExecutionPolicy Bypass -File C:\clipper\deploy\bootstrap.ps1
 ```
 
 ```bash
 git clone https://github.com/byvfx/clipper.git ~/clipper && cd ~/clipper
-git checkout "$(git describe --tags --abbrev=0)"
+git checkout "$(git describe --tags --abbrev=0 --match 'v[0-9]*')"
 bash deploy/bootstrap.sh
 ```
 
-`describe` names the newest release; to pin one instead, `git checkout v0.2.0`. `clipper
---version` says what the machine has (`0.2.0` on a release). The bootstrap carries on from
+`describe` names the newest release; to pin one instead, `git checkout v0.2.0`. If it prints
+`No names found`, nothing has been tagged yet: stay on main. `clipper --version` says what the
+machine has (`0.2.0` on a release, `0.2.0+3.g570bb87` past one). The bootstrap carries on from
 [the walkthrough below](#the-walkthrough-clipper-setup-78).
 
 To move a machine to a newer release: stop what runs from the folder (the bot, a worker task),

@@ -100,7 +100,9 @@ with uncommitted changes. The NAS containers have no `.git`, so `deploy/hub/depl
 3. `bash deploy/hub/deploy.sh` as usual; the hub then reports the tag's version, or the commit
    past it.
 
-The release job doesn't run the tests: they ran on the commit when it merged to main.
+The release job runs ruff and the tests again on the tagged commit (Linux only) before it builds
+or publishes anything; it deploys nothing. Tags are `vX.Y.Z`, or `v0.3.0rc1` for a pre-release
+(a number PEP 440 accepts, since `pyproject.toml` must say the same).
 
 ## Code review on PRs
 

@@ -171,8 +171,7 @@ def run(cfg: dict, action: str = "status", which: str = "all", force: bool = Fal
             print("\n".join(recorder_lines(recorder(cfg))))
             cuts = nas_cuts(cfg)
             print("NAS cuts: " + ("none running" if not cuts else "\n  " + "\n  ".join(cuts)))
-        print(f"\nthis checkout: {buildinfo.version()}   (a service above on another version runs "
-              "other code than this)")
+        print(f"\nthis checkout: {buildinfo.version()}")
         return 0
     if which == "recorder":
         rec = recorder(cfg)

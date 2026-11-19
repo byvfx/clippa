@@ -2,9 +2,9 @@
 #
 #   git tag -a v0.3.0 -m "clipper 0.3.0" && git push origin v0.3.0
 #
-# Checks the tag against the code and the changelog, builds the wheel and sdist, and publishes
-# them with CHANGELOG.md's section for that version as the notes. It deploys nothing and doesn't
-# run the tests (check.yml ran them on the commit when it merged to main).
+# Checks the tag against the code and the changelog, runs ruff and the tests on the tagged commit
+# (as check.yml does, on Linux only), builds the wheel and sdist, and publishes them with
+# CHANGELOG.md's section for that version as the notes. It deploys nothing.
 name: release
 
 on:
@@ -35,6 +35,11 @@ jobs:
           awk -v v="$version" '/^## /{ on = ($2 == v); next } on' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
           [ -s "$RUNNER_TEMP/notes.md" ] || { echo "::error::CHANGELOG.md has no '## $version' section"; exit 1; }
           echo "VERSION=$version" >> "$GITHUB_ENV"
+      - name: Lint and tests on the tagged commit (as check.yml: base dependencies, the discord extra)
+        run: |
+          uv sync --locked --extra discord
+          uv run ruff check clipper tests
+          uv run pytest -q
       - name: Build the wheel and sdist
         run: uv build
       - name: Publish the release

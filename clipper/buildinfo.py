@@ -27,7 +27,8 @@ from . import __version__
 DESCRIBE = ["git", "describe", "--tags", "--always", "--dirty", "--match", "v[0-9]*"]
 STAMP = Path(__file__).with_name("_build.txt")
 
-_TAG = re.compile(r"v(?P<tag>\d+(?:\.\d+)*)(?:-(?P<n>\d+)-g(?P<sha>[0-9a-f]+))?(?P<dirty>-dirty)?")
+# a tag is a PEP 440 number after the v: 0.2.0, or a pre-release such as 0.3.0rc1
+_TAG = re.compile(r"v(?P<tag>\d[\w.]*?)(?:-(?P<n>\d+)-g(?P<sha>[0-9a-f]+))?(?P<dirty>-dirty)?")
 _SHA = re.compile(r"(?P<sha>[0-9a-f]{4,40})(?P<dirty>-dirty)?")
 
 
@@ -53,8 +54,8 @@ def _stamped() -> str:
         return ""
 
 
-def _from_git() -> str:
-    root = Path(__file__).resolve().parent.parent
+def _from_git(root: Path | None = None) -> str:
+    root = root or Path(__file__).resolve().parent.parent
     if not (root / ".git").exists():   # a file, not a folder, in a worktree
         return ""
     try:
