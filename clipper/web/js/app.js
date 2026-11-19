@@ -10,7 +10,7 @@ function setView(v) {
   document.body.dataset.view = v; store.set("warroom.view", v);
   document.querySelectorAll("#views button[data-view]").forEach(b => {
     b.classList.toggle("on", b.dataset.view === v);
-    b.toggleAttribute("aria-current", b.dataset.view === v);
+    if (b.dataset.view === v) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
   });
   $("#pagesMore").classList.toggle("on", MORE_PAGES.includes(v));
   chatSync();  // the Chat view shows the chat (chatdock.js)
@@ -18,6 +18,7 @@ function setView(v) {
   today ? today.scrollIntoView({ block: "start" }) : scrollTo(0, 0);
 }
 setView(store.get("warroom.view") || "queue");
+for (const k of ["warroom.layout", "warroom.layoutName"]) store.set(k, null);  // the layout editor's, retired 2026-11-18
 PHONE.addEventListener("change", () => { if (!PHONE.matches && document.body.dataset.view === "chat") setView("queue"); });
 // the page bar sticks under the header, however tall the header wraps
 new ResizeObserver(() => document.body.style.setProperty("--head-h", `${$("header").offsetHeight}px`)).observe($("header"));
@@ -120,11 +121,13 @@ document.addEventListener("keydown", e => {
   if ($("#tool").open) return;
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key, video = OPEN ? $("#modal video") : null;
   const take = () => e.preventDefault();
+  // the queue's keys act on what is on screen: the Review page, or an item's window from any page
+  const q = !!OPEN || (document.body.dataset.view === "queue" && !tg.closest?.(".menu"));
   if (k === "?") { take(); showKeys(); }
-  else if (k === "j" || k === "k") { take(); move(k === "j" ? 1 : -1); }
-  else if (k === "Enter" && !OPEN && SEL && !tg.closest?.("button, a")) { take(); openModal(SEL); }
+  else if ((k === "j" || k === "k") && q) { take(); move(k === "j" ? 1 : -1); }
+  else if (k === "Enter" && !OPEN && q && SEL && !tg.closest?.("button, a")) { take(); openModal(SEL); }
   else if (k === "Escape" && !OPEN) { if (LIVEMENU !== null) { LIVEMENU = null; renderLive(); } else if (SEL) { SEL = null; renderQueue(); } }
-  else if ("arhcpu".includes(k) && k.length === 1 && (OPEN || SEL)) { take(); keyAct(k, OPEN || SEL); }
+  else if ("arhcpu".includes(k) && k.length === 1 && q && (OPEN || SEL)) { take(); keyAct(k, OPEN || SEL); }
   else if (k === " " && video && tg !== video) { take(); video.paused ? video.play() : video.pause(); }
   else if ((k === "ArrowLeft" || k === "ArrowRight") && video && tg !== video) { take(); video.currentTime += k === "ArrowRight" ? 5 : -5; }
   else if (k === "f" && video) {
@@ -132,11 +135,11 @@ document.addEventListener("keydown", e => {
     if (document.pictureInPictureElement) document.exitPictureInPicture();
     else if (video.requestPictureInPicture) video.requestPictureInPicture().catch(err => toast(err.message, true));
   }
-  else if (k === "o" && (OPEN || SEL)) { take(); popOut(OPEN || SEL); }
+  else if (k === "o" && q && (OPEN || SEL)) { take(); popOut(OPEN || SEL); }
   else if (k === "m") { take(); toggleChat(); }
   else if (k === "b" && video) { take(); pickFace(OPEN); }
-  else if (/^[1-6]$/.test(k) && !OPEN) { take(); TAB = Object.keys(TABS)[+k - 1]; SEL = null; renderQueue(); }
-  else if (k === "/" && !OPEN) { take(); $("#q").focus(); }
+  else if (/^[1-6]$/.test(k) && !OPEN && q) { take(); TAB = Object.keys(TABS)[+k - 1]; SEL = null; renderQueue(); }
+  else if (k === "/" && !OPEN && q) { take(); $("#q").focus(); }
   else if (k === "l") {
     const on = LIVE.filter(l => l.live);
     if (!on.length) return toast("Nothing is live right now.");
@@ -161,6 +164,8 @@ function openMenu(b) {
   else { m.style.bottom = "auto"; m.style.top = `${r.bottom + 6}px`; }
   m.querySelector("button:not(:disabled)")?.focus();
 }
+addEventListener("resize", closeMenus);  // placed once, by the button: a menu doesn't follow it
+addEventListener("scroll", closeMenus, { passive: true });
 document.addEventListener("click", e => {
   const b = e.target.closest?.("#moreBtn, #pagesMore");
   if (b) { $("#" + MENUS[b.id]).hidden ? openMenu(b.id) : closeMenus(); return; }

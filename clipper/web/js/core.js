@@ -45,9 +45,10 @@ function healthLight(age) {
   const h = STATE?.health, svc = h?.services || {}, why = [];
   for (const k of ["serve", "bot"]) if (svc[k] && svc[k].level !== "ok") why.push(`${svc[k].label}: ${svc[k].text}`);
   if (h?.sync?.error) why.push("Kitsu sync: " + h.sync.error);
+  const down = why.length > 0;  // a service or the sync: red; a failed job: amber
   const failed = Object.entries(svc.serve?.last || {}).filter(([, j]) => j.exit).map(([k, j]) => `${k} exit ${j.exit}`);
   if (failed.length) why.push("failed: " + failed.join(", "));
-  const level = DOWN || age > 120 || why.some(w => !w.startsWith("failed")) ? "bad" : age === null || age > 45 || failed.length ? "mid" : "ok";
+  const level = DOWN || age > 120 || down ? "bad" : age === null || age > 45 || failed.length ? "mid" : "ok";
   return { level, why };
 }
 function tick() {
@@ -58,8 +59,9 @@ function tick() {
   w.dataset.level = level;
   w.querySelector("b").textContent = DOWN ? (DOWN.signedOut ? "Signed out" : "Offline") : level === "ok" ? "OK" : age === null ? "…" : "Check";
   $("#updated").textContent = age === null ? "" : age < 90 ? `${Math.round(age)} s` : was.replace(" ago", "");
-  w.title = [DOWN ? (DOWN.signedOut ? "Signed out: open the war room's ?key= link again." : `serve isn't answering: ${DOWN.msg}\nTrying again every 15 s.`) : "",
-    ...why, age === null ? "No data yet" : `Updated ${was}`, "Opens the Pipeline page (Health)"].filter(Boolean).join("\n");
+  const title = [DOWN ? (DOWN.signedOut ? "Signed out: open the war room's ?key= link again." : `serve isn't answering: ${DOWN.msg}\nTrying again every 15 s.`) : "",
+    ...why, age === null ? "No data yet" : `Updated ${ago(STATE.generated_at)}`, "Opens the Pipeline page (Health)"].filter(Boolean).join("\n");
+  if (w.title !== title) w.title = title;  // not every second while it is hovered: the age in it is to the minute
 }
 setInterval(tick, 1000);
 
