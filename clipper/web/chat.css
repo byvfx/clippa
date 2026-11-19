@@ -1,7 +1,7 @@
 /* The Clippa messenger (#158): the page's structure. Layout only; every colour, font, border,
    radius and shadow is a custom property that a theme in web/themes/ defines (the look is the
    theme's, so a new look is a new file there; tests/test_chat.py checks each defines them all).
-   A theme may add rules of its own for what a variable can't say (pager's name-on-its-own-line). */
+   A theme may add rules of its own for what a variable can't say (millennium's row of text-style marks). */
 
 * { box-sizing: border-box; }
 html, body { height: 100%; }

@@ -37,7 +37,7 @@ async function showUndo() {
   const d = $("#tool"); d.dataset.kind = "undo";
   let list = [];
   try { list = (await api("/api/undo")).actions; } catch (e) { return toast(e.message, true); }
-  d.innerHTML = `<div class="m-head"><b>Recent war room actions</b><span class="sp" style="color:var(--faint);font-size:12px">the last 20, newest first</span><button class="x" aria-label="Close" title="Close (Esc)" data-close>×</button></div>
+  d.innerHTML = `<div class="m-head"><b>Recent war room actions</b><span class="sp" style="color:var(--faint);font-size:12px">the last 20, newest first</span><button class="x" aria-label="Close" title="Close (Esc)" data-close>${ic("close")}</button></div>
     <div class="tbody"><div class="undo-list">${list.map(a => `<span class="f">${esc(ago(a.at))}</span>
       <span class="${a.undone ? "gone" : ""}">${esc(a.label)}${a.uploaded ? ` <span style="color:var(--amber)" title="An upload can't be undone: change it in YouTube Studio">· ${a.uploaded} on YouTube</span>` : ""}</span>
       ${a.undone ? `<span class="f">undone</span>` : `<button class="btn" data-undo="${esc(a.id)}">Undo</button>`}`).join("")
@@ -56,13 +56,13 @@ function renderBulk() {
   if (!n) return;
   const gap = gaps().length;
   b.innerHTML = `<b>${n} selected</b>${off ? `<span style="color:var(--amber)" title="Picked under another tab or filter. Bulk actions leave them out until they're on screen again.">+ ${off} not shown, left out</span>` : ""}
-    <button class="btn good" data-bulk="approve">✓ Approve</button>
+    <button class="btn good" data-bulk="approve">${ic("check")}Approve</button>
     <button class="btn" data-bulk="hold">Hold</button><button class="btn" data-bulk="release">Release</button>
-    <button class="btn" data-bulk="pin" title="Publish at for all of them">📌 Pin…</button>
-    <button class="btn warn" data-bulk="changes">✎ Same retake note…</button>
-    <button class="btn bad" data-bulk="reject">✕ Reject…</button>
-    <button class="btn" data-bulk="reopen">↺ Reopen</button>
-    ${gap ? `<button class="btn" data-bulk="fill" title="Also select the ${gap} between the first and last selected (shift-click does this with a mouse)">⇕ Fill the gaps</button>` : ""}
+    <button class="btn" data-bulk="pin" title="Publish at for all of them">${ic("pin")}Pin…</button>
+    <button class="btn warn" data-bulk="changes">${ic("edit")}Same retake note…</button>
+    <button class="btn bad" data-bulk="reject">${ic("close")}Reject…</button>
+    <button class="btn" data-bulk="reopen">${ic("reopen")}Reopen</button>
+    ${gap ? `<button class="btn" data-bulk="fill" title="Also select the ${gap} between the first and last selected (shift-click does this with a mouse)">${ic("gaps")}Fill the gaps</button>` : ""}
     <button class="btn" data-bulk="replace">Find and replace…</button>
     <button class="btn" data-bulk="clear">Clear</button>`;
 }
@@ -121,7 +121,7 @@ function repBody(dry) {
 function showReplace() {
   REP_REFS = picked();  // fixed while the window is open: a refresh can't change what Apply touches
   const d = $("#tool"), n = REP_REFS.length; d.dataset.kind = "replace";
-  d.innerHTML = `<div class="m-head"><b>Find and replace</b><span style="color:var(--faint);font-size:12px">in ${n} selected item${n > 1 ? "s" : ""}, through Kitsu</span><button class="x" aria-label="Close" title="Close (Esc)" data-close>×</button></div>
+  d.innerHTML = `<div class="m-head"><b>Find and replace</b><span style="color:var(--faint);font-size:12px">in ${n} selected item${n > 1 ? "s" : ""}, through Kitsu</span><button class="x" aria-label="Close" title="Close (Esc)" data-close>${ic("close")}</button></div>
     <div class="tbody">
       <input class="search" id="rFind" placeholder="Find">
       <input class="search" id="rRepl" placeholder="Replace with (empty deletes it)">
@@ -223,8 +223,8 @@ document.addEventListener("input", e => { if (e.target.id === "q") { Q = e.targe
 let SYNCING = false, REPLANNING = false;
 function renderBusy() {
   const s = SYNCING || !!STATE?.health?.sync?.running;
-  $("#syncBtn").disabled = s; $("#syncBtn").textContent = s ? "⟳ Syncing…" : "⟳ Sync Kitsu";
-  $("#replanBtn").disabled = REPLANNING; $("#replanBtn").textContent = REPLANNING ? "Replanning…" : "Replan";
+  $("#syncBtn").disabled = s; $("#syncBtn").innerHTML = ic("sync") + (s ? "Syncing…" : "Sync Kitsu");
+  $("#replanBtn").disabled = REPLANNING; $("#replanBtn").innerHTML = ic("schedule") + (REPLANNING ? "Replanning…" : "Replan");
 }
 $("#syncBtn").onclick = async () => {
   if (SYNCING) return;
@@ -296,25 +296,25 @@ function openModal(ref, checked) {  // checked: the caller has already asked abo
   m.innerHTML = `<div class="grip" title="Drag to make the pane wider or narrower"></div>
     <div class="m-head"><span class="kind ${esc(i.kind)}">${esc(KIND[i.kind] || i.kind)}</span><b>${esc(i.short)}</b>${showTag(i.show, i.show_name)}
       <span id="mState" class="state ${esc(i.decision)}" style="position:static"></span>
-      <button class="x" aria-label="Close" title="Close (Esc)" onclick="closeModal()">×</button></div>
+      <button class="x" aria-label="Close" title="Close (Esc)" onclick="closeModal()">${ic("close")}</button></div>
     <div class="m-body">
       <div class="player">
         ${!i.video_url ? `<div class="empty">No preview file</div>` : PHONE.matches
-          ? `<button class="tap ${i.kind === "short" ? "vertical" : ""}" id="mTap">${i.thumbnail_url ? `<img src="${i.thumbnail_url}" alt="">` : ""}<span><b>▶</b>Play (phone size)</span></button>`
+          ? `<button class="tap ${i.kind === "short" ? "vertical" : ""}" id="mTap">${i.thumbnail_url ? `<img src="${i.thumbnail_url}" alt="">` : ""}<span><b>${ic("play")}</b>Play (phone size)</span></button>`
           : `<video controls preload="metadata" src="${i.video_url}"></video>`}
-        ${i.video_url && !PHONE.matches ? `<div class="row" style="margin-top:6px"><button class="btn" data-pop="${esc(i.ref)}" title="Open the video in its own window (O)">⧉ Pop out</button>
-          <button class="btn" data-facepick="${esc(i.ref)}" title="Draw a box round a face on the paused frame: who it is, and keep it (B)">👤 Who's this?</button>
+        ${i.video_url && !PHONE.matches ? `<div class="row" style="margin-top:6px"><button class="btn" data-pop="${esc(i.ref)}" title="Open the video in its own window (O)">${ic("popout")}Pop out</button>
+          <button class="btn" data-facepick="${esc(i.ref)}" title="Draw a box round a face on the paused frame: who it is, and keep it (B)">${ic("face")}Who's this?</button>
           <button class="btn" data-faces="${esc(i.stream)}" title="Name this stream's face groups">Faces</button></div>` : ""}
         ${i.thumbnail_url ? `<img src="${i.thumbnail_url}" alt="thumbnail">` : ""}
-        ${i.thumbnail_url && i.kind !== "short" ? `<div class="row" style="margin-top:6px"><button class="btn" data-cover="${esc(i.ref)}" title="Frame, face box, photos and words; re-renders without model calls">🖼 Edit cover</button></div>` : ""}
+        ${i.thumbnail_url && i.kind !== "short" ? `<div class="row" style="margin-top:6px"><button class="btn" data-cover="${esc(i.ref)}" title="Frame, face box, photos and words; re-renders without model calls">${ic("image")}Edit cover</button></div>` : ""}
         <div class="kv">
           <b>Length</b><span>${mmss(i.duration_s)}</span>
-          <b>Stream</b><span>${esc(i.stream)} · ${esc(i.date)} · <button class="lnk" data-heat="${esc(i.stream)}" data-heatfocus="${esc(i.ref)}" title="Where this sits in the stream, and how hot it ran">🔥 heat</button></span>
+          <b>Stream</b><span>${esc(i.stream)} · ${esc(i.date)} · <button class="lnk" data-heat="${esc(i.stream)}" data-heatfocus="${esc(i.ref)}" title="Where this sits in the stream, and how hot it ran">${ic("heat")}heat</button></span>
           ${i.score ? `<b>Score</b><span>${esc(i.score)} · ${esc(i.category)} · ${esc(i.found_by)}</span>` : ""}
           <b>Revision</b><span>${esc(i.revision)} ${i.synced_at ? "· synced " + ago(i.synced_at) : ""}</span>
           <b>Links</b><span><a href="${esc(i.kitsu_url)}" target="_blank">Kitsu</a>${i.youtube_url ? ` · <a href="${esc(i.youtube_url)}" target="_blank">YouTube</a>` : ""}</span>
           ${i.auto ? `<b>Auto</b><span>${esc(i.auto)}</span>` : ""}
-          ${i.checks?.length ? `<b>Checks</b><span class="warn-line">${i.checks.map(c => "⚠ " + esc(c)).join("<br>")}</span>` : ""}
+          ${i.checks?.length ? `<b>Checks</b><span class="warn-line">${i.checks.map(c => ic("warn") + esc(c)).join("<br>")}</span>` : ""}
         </div>
         ${hist.length ? `<div class="form"><label>Retakes</label>${hist.map(h => `<div class="ev" style="padding:6px 0"><div class="w">${esc(ago(h.at))}</div><q>${esc(h.comment)}</q><div class="r-${esc(h.result)}">${esc(h.summary || h.unsupported || h.error)}</div></div>`).join("")}</div>` : ""}
       </div>
@@ -322,7 +322,7 @@ function openModal(ref, checked) {  // checked: the caller has already asked abo
         <div class="row" id="mActs"></div>
         <label for="fChanges">Ask for changes (Clippa does the retake${STATE.retake_cost?.auto && STATE.retake_cost.avg_usd != null ? `, about ${usd(STATE.retake_cost.avg_usd)}` : ""})</label>
         <textarea id="fChanges" placeholder="e.g. start 5 s earlier · the thumbnail shows the back of his head · use the cams layout"></textarea>
-        <div class="row"><button class="btn warn" id="bChanges">✎ Send retake note</button><button class="btn bad" id="bReject">✕ Reject with this as the reason</button></div>
+        <div class="row"><button class="btn warn" id="bChanges">${ic("edit")}Send retake note</button><button class="btn bad" id="bReject">${ic("close")}Reject with this as the reason</button></div>
         <label for="fTitle">YouTube title${i.uploaded ? ` <span style="color:var(--amber)">· on YouTube: saving a new one renames the video there too</span>` : ""}</label><input id="fTitle" maxlength="100" data-check="title"><div class="warn-line" id="w_title"></div>
         <label for="fDesc">Description</label><textarea id="fDesc" style="min-height:120px" data-check="description"></textarea><div class="warn-line" id="w_description"></div>
         <label for="fTags">Hashtags</label><input id="fTags" data-check="hashtags"><div class="warn-line" id="w_hashtags"></div>
@@ -330,7 +330,7 @@ function openModal(ref, checked) {  // checked: the caller has already asked abo
         ${i.kind !== "short" ? `<label for="fThumb">Thumbnail words</label><input id="fThumb" maxlength="40" data-check="thumb_text"><div class="warn-line" id="w_thumb_text"></div><div class="row"><button class="btn" id="bThumb">Re-render thumbnail</button></div>` : ""}
         <label for="fPin">Pin release time</label><input id="fPin" type="datetime-local">
         <div class="hint" id="pinHint"></div>
-        <div class="row"><button class="btn" id="bPin">Pin</button><button class="btn" id="bUnpin">Unpin</button>${i.kind !== "compilation" ? `<button class="btn" data-nextslot="${esc(ref)}" title="Pin to the next open slot its kind may take (a preview first)">⇥ Next open slot</button>` : ""}</div>
+        <div class="row"><button class="btn" id="bPin">Pin</button><button class="btn" id="bUnpin">Unpin</button>${i.kind !== "compilation" ? `<button class="btn" data-nextslot="${esc(ref)}" title="Pin to the next open slot its kind may take (a preview first)">${ic("next")}Next open slot</button>` : ""}</div>
       </div>
     </div>`;
   fillModalState(i, true);
@@ -362,12 +362,12 @@ function fillModalState(i, fields) {
   if (!i || !$("#mActs")) return;
   $("#mState").className = `state ${i.decision}`; $("#mState").textContent = (DEC[i.decision] || i.decision) + (i.hold ? " · held" : "");
   const r = esc(i.ref), queued = VISIBLE.includes(i.ref);
-  $("#mActs").innerHTML = (queued ? `<button class="btn nav" data-move="-1" title="Previous (K, or swipe right)">‹</button>` : "")
-    + (i.decision !== "approved" ? `<button class="btn good" data-act="approve" data-ref="${r}" title="Approve, then the next item (A)">✓ Approve</button>` : `<button class="btn" data-act="reopen" data-ref="${r}">↺ Reopen</button>`)
-    + `<button class="btn warn" data-act="changes" data-ref="${r}" title="Retake note (C)">✎</button>`
-    + `<button class="btn bad" data-act="reject" data-ref="${r}" title="Reject (R)">✕</button>`
-    + `<button class="btn" id="bHold" title="${i.hold ? "Release hold" : "Hold"} (H)">${i.hold ? "▶" : "⏸"}${PHONE.matches ? "" : i.hold ? " Release" : " Hold"}</button>`
-    + (queued ? `<button class="btn nav" data-move="1" title="Next (J, or swipe left)">›</button>` : "");
+  $("#mActs").innerHTML = (queued ? `<button class="btn nav" data-move="-1" title="Previous (K, or swipe right)" aria-label="Previous">${ic("left")}</button>` : "")
+    + (i.decision !== "approved" ? `<button class="btn good" data-act="approve" data-ref="${r}" title="Approve, then the next item (A)">${ic("check")}Approve</button>` : `<button class="btn" data-act="reopen" data-ref="${r}">${ic("reopen")}Reopen</button>`)
+    + `<button class="btn warn" data-act="changes" data-ref="${r}" title="Retake note (C)" aria-label="Retake note">${ic("edit")}</button>`
+    + `<button class="btn bad" data-act="reject" data-ref="${r}" title="Reject (R)" aria-label="Reject">${ic("close")}</button>`
+    + `<button class="btn" id="bHold" title="${i.hold ? "Release hold" : "Hold"} (H)">${ic(i.hold ? "play" : "pause")}${PHONE.matches ? "" : i.hold ? "Release" : "Hold"}</button>`
+    + (queued ? `<button class="btn nav" data-move="1" title="Next (J, or swipe left)" aria-label="Next">${ic("right")}</button>` : "");
   $("#bHold").onclick = () => act(i.ref, "hold", { on: !i.hold });
   $("#pinHint").textContent = i.scheduled ? `Scheduled ${new Date(i.scheduled).toLocaleString()}${i.publish_at ? " (pinned)" : ""}` : i.decision === "approved" ? "Approved, waiting for a free slot" : "Gets a slot once approved";
   if (fields) {
@@ -408,7 +408,7 @@ addEventListener("beforeunload", e => { if (unsaved().length) e.preventDefault()
 let CHECK_T = null;
 function showIssues(issues) {
   document.querySelectorAll("#modal .warn-line").forEach(w => { w.textContent = ""; });
-  for (const x of issues) { const w = $(`#w_${x.field}`); if (w) w.textContent += (w.textContent ? " · " : "⚠ ") + x.msg; }
+  for (const x of issues) { const w = $(`#w_${x.field}`); if (w) w.textContent += (w.textContent ? " · " : "") + x.msg; }
 }
 function checkSoon(ref) {  // same rules as the server, as you type
   clearTimeout(CHECK_T);

@@ -7,7 +7,7 @@ let FACEWIN = 0;  // which faces window is open: an answer for an older one is d
 const faceWin = (win, kind) => win === FACEWIN && $("#tool").open && $("#tool").dataset.kind === kind;
 const knownList = known => `<datalist id="fcKnown">${Object.keys(known || {}).map(n => `<option value="${esc(n)}">`).join("")}</datalist>`;
 const knownChips = known => Object.entries(known || {}).map(([n, k]) =>
-  `<span class="fk">${esc(n)} <i>${k}</i><button data-fcforget="${esc(n)}" title="Forget ${esc(n)}'s face (every sample)">×</button></span>`).join("")
+  `<span class="fk">${esc(n)} <i>${k}</i><button data-fcforget="${esc(n)}" title="Forget ${esc(n)}'s face (every sample)">${ic("close")}</button></span>`).join("")
   || `<span style="color:var(--faint)">nobody yet</span>`;
 
 // ---------- a stream's groups ----------
@@ -17,7 +17,7 @@ async function showFaces(stream) {
   const win = ++FACEWIN, filter = FC?.stream === stream ? FC.filter : "all";
   FP = null; FC = null;
   d.dataset.kind = "faces"; d.classList.remove("cover"); d.classList.add("facesw");
-  d.innerHTML = `<div class="m-head"><b>Faces</b><span style="color:var(--faint);font-size:12px">${esc(stream)}</span><button class="x" aria-label="Close" title="Close (Esc)" data-close>×</button></div><div class="tbody">Loading…</div>`;
+  d.innerHTML = `<div class="m-head"><b>Faces</b><span style="color:var(--faint);font-size:12px">${esc(stream)}</span><button class="x" aria-label="Close" title="Close (Esc)" data-close>${ic("close")}</button></div><div class="tbody">Loading…</div>`;
   if (!d.open) d.showModal();
   let data;
   try { data = await api("/api/faces?stream=" + encodeURIComponent(stream)); }
@@ -33,7 +33,7 @@ function groupWho(g) {
 function renderFaces() {
   const { data, filter } = FC, d = $("#tool");
   const shown = data.groups.filter(g => filter === "all" || (filter === "named") === !!g.name);
-  d.innerHTML = `<div class="m-head"><b>Faces</b><span style="color:var(--faint);font-size:12px">${esc(data.stream)}${data.scanned ? ` · ${data.faces} faces in ${data.frames} keyframes` : ""}</span><button class="x" aria-label="Close" title="Close (Esc)" data-close>×</button></div>
+  d.innerHTML = `<div class="m-head"><b>Faces</b><span style="color:var(--faint);font-size:12px">${esc(data.stream)}${data.scanned ? ` · ${data.faces} faces in ${data.frames} keyframes` : ""}</span><button class="x" aria-label="Close" title="Close (Esc)" data-close>${ic("close")}</button></div>
     <div class="tbody">
       <div class="fknown"><span class="f">Known faces (every show)</span>${knownChips(data.known)}</div>
       ${!data.scanned ? `<div class="empty">Not scanned yet: <code>clipper faces ${esc(data.stream)}</code> (about 8 min on a quiet NAS). The box tool in an item window works without it.</div>` : `
@@ -45,7 +45,7 @@ function renderFaces() {
           ${g.sheet_url ? `<img loading="lazy" src="${esc(g.sheet_url)}" alt="${esc(g.key)} faces">` : `<div class="f">no sheet</div>`}
           <div class="fa"><input class="search" list="fcKnown" data-fcname="${esc(g.key)}" placeholder="Who is this?" value="${esc(g.name || "")}">
             <button class="btn" data-fcset="${esc(g.key)}">Name</button><button class="btn primary" data-fcset="${esc(g.key)}" data-enroll="1">Name + enroll</button>
-            ${g.by === "face" ? `<button class="btn" data-fcset="${esc(g.key)}" data-same="1" title="Keep ${esc(g.name)} as a hand name">✓ Right</button>` : ""}
+            ${g.by === "face" ? `<button class="btn" data-fcset="${esc(g.key)}" data-same="1" title="Keep ${esc(g.name)} as a hand name">${ic("check")}Right</button>` : ""}
             ${g.name ? `<button class="btn" data-fcclear="${esc(g.key)}">Clear</button>` : ""}</div></div>`).join("") || `<div class="empty">None here.</div>`}</div>
       ${data.more ? `<div class="f" style="color:var(--faint);font-size:12px">… and ${data.more} smaller groups without a sheet.</div>` : ""}`}
     </div>${knownList(data.known)}`;
@@ -94,7 +94,7 @@ function pickFace(ref) {
 }
 function renderPick() {
   const { box: b, found: f } = FP;
-  $("#tool").innerHTML = `<div class="m-head"><b>Who's this?</b><span style="color:var(--faint);font-size:12px">${esc(FP.ref)} · ${mmss(FP.t)}</span><button class="x" aria-label="Close" title="Close (Esc)" data-close>×</button></div>
+  $("#tool").innerHTML = `<div class="m-head"><b>Who's this?</b><span style="color:var(--faint);font-size:12px">${esc(FP.ref)} · ${mmss(FP.t)}</span><button class="x" aria-label="Close" title="Close (Esc)" data-close>${ic("close")}</button></div>
     <div class="cv"><div>
       <div class="boxwrap fpwrap" id="fpWrap"><img src="${FP.frame}" alt="" draggable="false">${b ? `<div class="box" style="left:${b.x * 100}%;top:${b.y * 100}%;width:${b.width * 100}%;height:${b.height * 100}%"></div>` : ""}</div>
       <div class="f" style="font-size:11px;color:var(--faint);margin-top:6px">Drag a box round one face, forehead to chin. Clippa finds it in the full-size frame.</div>

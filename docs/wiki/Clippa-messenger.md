@@ -100,9 +100,9 @@ away (the recorder while a show is live) or off (no fresh heartbeat).
 
 ## Looks
 
-The page comes in four looks: `retro` (grey bevelled windows on a teal desk), `millennium`
-(beige windows, rounded blue title bars, tooltip-yellow cards), `pager` (green title bars, the
-sender's name on its own line) and `warroom` (the [War room](War-room)'s dark palette). Pick one
+The page comes in two looks: `millennium` (beige windows, rounded blue title bars,
+tooltip-yellow cards), its default, and `warroom` (the [War room](War-room#looks)'s dark editor
+look). `retro` and `pager` were retired on 2026-11-18. Pick one
 with **Look** under the buddy list (in the war room, also on the Settings page). One pick dresses the
 war room and the chat together: the browser remembers it and its other tabs follow.
 `[chat] theme` sets the one this page starts with in a browser that never picked one; the war

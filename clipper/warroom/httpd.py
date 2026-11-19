@@ -63,18 +63,24 @@ STATIC = {"/manifest.webmanifest": "application/manifest+json", "/icon.svg": "im
           "/icon-192.png": "image/png", "/icon-512.png": "image/png"}  # no secrets: no key needed
 
 CODE = {".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8"}
+FONTS = {".woff2": "font/woff2"}   # web/fonts/: they never change under one name, so a browser keeps them
 
 MAX_POST = 1 << 20  # bytes; decisions, bulk edits, covers and layouts are far smaller
 
 def static_file(path: str) -> tuple[Path, str, str] | None:
     """The page's own files, with their type and caching: no secrets, so no key (the phone's
     home-screen install fetches the icons without the cookie). Its stylesheet and scripts
-    are fetched fresh each load, so a restarted bot's page never runs the old code."""
+    are fetched fresh each load, so a restarted bot's page never runs the old code; its fonts
+    are kept for a month."""
     if path in STATIC:
         return WEB / path.lstrip("/"), STATIC[path], "max-age=86400"
     f = (WEB / path.lstrip("/")).resolve()
-    if f.suffix in CODE and WEB.resolve() in f.parents and f.is_file():
+    if WEB.resolve() not in f.parents or not f.is_file():
+        return None
+    if f.suffix in CODE:
         return f, CODE[f.suffix], "no-cache"
+    if f.suffix in FONTS:
+        return f, FONTS[f.suffix], "max-age=2592000"
     return None
 
 def watch_page(qs: dict) -> bytes:

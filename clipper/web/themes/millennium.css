@@ -3,8 +3,8 @@
    An era look, light on purpose; on a dark system only the desk dims. */
 :root {
   /* the war room (warroom.css): beige windows, rounded blue title bars */
-  --panel: #ece9d8; --panel2: #ffffff; --line: #aca899; --text: #000000; --dim: #3d3d3d; --faint: #5a5a5a;
-  --accent: #2457c8; --on-accent: #ffffff; --red: #c42b1c; --green: #2b7a32; --blue: #0046d5; --amber: #a35f00; --violet: #6a3fc4;
+  --panel: #ece9d8; --panel2: #ffffff; --raise: #dfdccb; --line: #aca899; --line2: #8f8b7c; --text: #000000; --dim: #3d3d3d; --faint: #5a5a5a;
+  --accent: #2457c8; --on-accent: #ffffff; --accent-bg: #dbe5fb; --red: #c42b1c; --green: #2b7a32; --blue: #0046d5; --amber: #a35f00; --violet: #6a3fc4;
   --clip: #5a95e6; --short: #e8609f; --segment: #3cbf7a; --compilation: #f0a03c;
   --show-1: #b07ce8; --show-2: #e8874d; --show-3: #48b5c8; --show-4: #d8c24a; --show-5: #e86a8a; --show-6: #7fb85c;  /* one per show, in [shows] order */
   --sans: Tahoma, Arial, Helvetica, sans-serif;
@@ -12,11 +12,13 @@
   --bar: #ece9d8;
   --panel-pad: 0 3px 3px;
   --tb-pad: 4px 8px;
+  --tb-h: 0;                 /* a title as tall as its text */
   --tb-line: none;
   --tb-sub: #dfe8ff;
   --tb-tool-ink: #000000;
   --dlg-radius: 6px 6px 0 0;
   --pill: 10px;
+  --tab-line: var(--line);   /* a queue tab's border */
   --field: #ffffff;
   --field-border: 1px solid #7f9db9;
   --sel: #316ac5;

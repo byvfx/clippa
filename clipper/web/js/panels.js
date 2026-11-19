@@ -98,7 +98,7 @@ let SLOTWIN = 0;  // which preview window is open: an answer for an older (or cl
 async function nextSlot(body, what) {
   const d = $("#tool"), win = ++SLOTWIN; d.dataset.kind = "slot"; d.classList.remove("cover", "facesw");
   const live = () => win === SLOTWIN && d.open && d.dataset.kind === "slot";
-  d.innerHTML = `<div class="m-head"><b>Next open slot</b><span class="sp" style="color:var(--faint);font-size:12px">${esc(what)}</span><button class="x" aria-label="Close" title="Close (Esc)" data-close>×</button></div>
+  d.innerHTML = `<div class="m-head"><b>Next open slot</b><span class="sp" style="color:var(--faint);font-size:12px">${esc(what)}</span><button class="x" aria-label="Close" title="Close (Esc)" data-close>${ic("close")}</button></div>
     <div class="tbody"><div class="rep-list" id="slList"><span class="f">Finding slots…</span></div>
       <div><button class="btn primary" id="slApply" disabled>Pin</button></div></div>`;
   if (!d.open) d.showModal();
@@ -149,7 +149,7 @@ let CV = null;  // {ref, info, changes, box: "face" | "inset_face"}
 async function showCover(ref) {
   const d = $("#tool");
   d.dataset.kind = "cover"; d.classList.add("cover");
-  d.innerHTML = `<div class="m-head"><b>Cover</b><span style="color:var(--faint);font-size:12px">${esc(ref)}</span><button class="x" aria-label="Close" title="Close (Esc)" data-close>×</button></div><div class="tbody">Loading the frames…</div>`;
+  d.innerHTML = `<div class="m-head"><b>Cover</b><span style="color:var(--faint);font-size:12px">${esc(ref)}</span><button class="x" aria-label="Close" title="Close (Esc)" data-close>${ic("close")}</button></div><div class="tbody">Loading the frames…</div>`;
   if (!d.open) d.showModal();
   let info;
   try { info = await api("/api/cover?ref=" + encodeURIComponent(ref)); } catch (e) { d.querySelector(".tbody").innerHTML = `<span style="color:var(--red)">${esc(e.message)}</span>`; return; }
@@ -169,7 +169,7 @@ function renderCover() {
     const opt = (val, text) => `<option value="${esc(val)}" ${val === v ? "selected" : ""}>${esc(text)}</option>`;
     return `<select id="${id}">${opt("", "(none: use the frame)")}${info.photos.map(p => opt(p, p) + (info.photo_labels?.[p] || []).map(l => opt(p + "|" + l, `${p} · ${l}`)).join("")).join("")}</select>`;
   };
-  $("#tool").innerHTML = `<div class="m-head"><b>Cover</b><span style="color:var(--faint);font-size:12px">${esc(CV.ref)} · ${esc(info.style)}</span><button class="x" aria-label="Close" title="Close (Esc)" data-close>×</button></div>
+  $("#tool").innerHTML = `<div class="m-head"><b>Cover</b><span style="color:var(--faint);font-size:12px">${esc(CV.ref)} · ${esc(info.style)}</span><button class="x" aria-label="Close" title="Close (Esc)" data-close>${ic("close")}</button></div>
     <div class="cv"><div>
       <img class="shot" id="cvShot" src="${esc(CV.preview || info.cover_url)}" alt="cover">
       <div class="f" style="font-size:11px;color:var(--faint);margin-top:6px">${CV.preview ? "Preview (not saved)" : "Current cover"} · click a frame to use it${enq ? "; shift-click for the inset" : ""}</div>
@@ -267,7 +267,7 @@ function renderStats(a) {
   if (!sel.options.length) sel.innerHTML = monthsBack(4).map(m => `<option>${m}</option>`).join("");
   sel.value = a.month;
   $("#statsSub").textContent = a.fetched_at ? "YouTube data as of " + ago(a.fetched_at) : "";
-  const delta = (x, y) => y > 0 ? `<span class="d ${x >= y ? "up" : "down"}">${x >= y ? "▲" : "▼"} ${Math.abs(Math.round((x - y) / y * 100))}% vs ${esc(a.prev_month)}</span>` : `<span class="d">${esc(a.prev_month)}: no data</span>`;
+  const delta = (x, y) => y > 0 ? `<span class="d ${x >= y ? "up" : "down"}">${ic(x >= y ? "up" : "down")}${Math.abs(Math.round((x - y) / y * 100))}% vs ${esc(a.prev_month)}</span>` : `<span class="d">${esc(a.prev_month)}: no data</span>`;
   const tile = (label, value, d) => `<div class="tile"><span>${label}</span><b>${value}</b>${d}</div>`;
   const kinds = Object.entries(a.uploads_by_kind).map(([k, v]) => `${v} ${kindName(k)}${v > 1 ? "s" : ""}`).join(" · ");
   const tiles = tile("Views", n(t.views), delta(t.views, p.views))
@@ -370,7 +370,7 @@ async function refreshUsage() {
       <div class="row"><span class="big">${usd(p.month_usd)}</span><span>this month · ${usd(p.today_usd)} today · ${ours(p)}</span></div>
       ${extra(p)}${models ? `<div>${models}</div>` : ""}
       ${p.stale ? `<div class="f bad" title="${esc(p.stale)}">last good answer; the provider didn't reply</div>` : ""}
-      ${p.link ? `<div><a href="${esc(p.link)}" target="_blank" rel="noopener">Open ${title} ↗</a></div>` : ""}`;
+      ${p.link ? `<div><a href="${esc(p.link)}" target="_blank" rel="noopener">Open ${title} ${ic("external")}</a></div>` : ""}`;
   };
   const cl = u.claude || {}, or = u.openrouter || {};
   $("#usageSub").textContent = u.month;
@@ -411,7 +411,7 @@ function renderCloud() {
     ${m.archives.map(a => `<div class="sub">Archive · ${esc(a.subject)}</div>
       <div class="row"><span class="meter"><i style="width:${a.items ? 100 * a.done / a.items : 0}%"></i></span><span>${a.done.toLocaleString()} / ${a.items.toLocaleString()}</span></div>
       <div>${Math.round(a.hours_done).toLocaleString()} / ${Math.round(a.hours_total).toLocaleString()} h${a.errors ? ` · <span class="bad">${a.errors} errors</span>` : ""}${a.items_per_hour ? ` · ${a.items_per_hour}/h, ETA ${a.eta_h} h` : a.left ? ` · ${a.left} left, not running` : " · done"} · ~${usd(a.est_usd)}</div>`).join("")}
-    ${m.links?.[m.app] ? `<div><a href="${esc(m.links[m.app])}" target="_blank" rel="noopener">Open ${esc(m.app)} on modal.com ↗</a></div>` : ""}`;
+    ${m.links?.[m.app] ? `<div><a href="${esc(m.links[m.app])}" target="_blank" rel="noopener">Open ${esc(m.app)} on modal.com ${ic("external")}</a></div>` : ""}`;
 }
 
 function closeModal(force) { if (!force && !discardOk()) return; OPEN = null; SWAPS = 0; const v = $("#modal video"); if (v) v.pause(); $("#modal").close(); }
@@ -441,11 +441,11 @@ async function showLog(opts) {
   d.innerHTML = `<div class="m-head"><b>Log</b>
       <select id="logWhich" aria-label="Which log">${r.logs.map(k => `<option value="${esc(k)}" ${k === r.which ? "selected" : ""}>${esc(k)}</option>`).join("")}</select>
       <span style="color:var(--faint);font-size:12px">${esc(r.name || "")}${r.name ? ` · ${r.lines.length ? `the last ${r.lines.length} line${r.lines.length === 1 ? "" : "s"}${LOGQ.q || LOGQ.bad ? " that match" : ""}` : "nothing matches"}${size}` : ""}</span>
-      <button class="x" aria-label="Close" title="Close (Esc)" data-close>×</button></div>
+      <button class="x" aria-label="Close" title="Close (Esc)" data-close>${ic("close")}</button></div>
     <div class="tbody"><div class="logbar">
       <input class="search" id="logQ" aria-label="Filter the log" placeholder="Words on the line (Enter)" value="${esc(LOGQ.q)}">
       <label><input type="checkbox" id="logBad" ${LOGQ.bad ? "checked" : ""}> Errors and warnings</label>
-      <button class="btn" id="logRefresh">↻ Refresh</button></div>
+      <button class="btn" id="logRefresh">${ic("sync")}Refresh</button></div>
       ${r.note ? `<div class="note">${esc(r.note)}</div>` : ""}
       <pre class="logview" id="logPre">${r.lines.map(x => `<span class="${cls(x)}">${esc(x)}</span>`).join("\n") || (r.note ? "" : "Nothing matches.")}</pre></div>`;
   if (!d.open) d.showModal();
