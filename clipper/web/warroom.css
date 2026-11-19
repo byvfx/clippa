@@ -8,9 +8,10 @@ html, body { margin: 0; height: 100%; background: var(--desk); background-image:
   color: var(--text); font: 13px/1.45 var(--sans); -webkit-font-smoothing: antialiased; }
 html { scrollbar-color: var(--line2) transparent; }
 button { font: inherit; color: inherit; cursor: pointer; }
-/* the icon set (the sprite in warroom.html; core.js ic()): line icons in the text's colour */
+/* the icon set (the sprite in warroom.html; core.js ic()): line icons in the text's colour; a click
+   on one lands on its button, so a handler that checks e.target.id still sees the button */
 .sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
-.ic { width: 1.15em; height: 1.15em; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round;
+.ic { width: 1.15em; height: 1.15em; flex: none; fill: none; pointer-events: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round;
   stroke-linejoin: round; vertical-align: -.2em; }
 .recdot { display: inline-block; width: 7px; height: 7px; margin-right: 5px; border-radius: 50%; background: var(--red); vertical-align: .05em; }
 /* loading: a quiet skeleton where the panel's rows will be (warroom.html), replaced by the first answer */
