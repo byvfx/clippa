@@ -7,7 +7,7 @@ schedule. Press <kbd>?</kbd> on the page for every keyboard shortcut.
 ## Pages and the top bar
 
 The page bar under the top bar has eight pages, one on screen at a time: **Review** (the queue,
-with the item open beside it; the page opens here), **Schedule** (the schedule and the upload panel),
+with the item open beside it; the page opens here), **Schedule** (Next up, the Week and the tray of items with no slot),
 **Pipeline** (the streams and Health), **Money** (Costs, Modal and API usage), **Stats** (the
 analytics), **Library** (the cast library, and where faces are named), **Research** (News, Blinds
 and Investigations) and **Settings** (the keys, the keyboard shortcuts and the look). The browser
@@ -276,12 +276,22 @@ The command line: `clipper cast list|grab|find|add|keep|drop|label|set|auto` ([C
 
 ## Schedule and uploads
 
-The Schedule page shows the open slots of the next two weeks (on a wide screen the days sit on
-the right, the upload panel and the items with no slot on the left) and the approved items with no slot,
-newest stream first. The ones the scheduler let go are listed too, tagged "over budget" or
-"stale" (see [Staying current](Scheduling-and-uploads#staying-current)): a pin sends one anyway.
-Drag an item or a scheduled slot onto an open slot (or a day) to pin it, or onto "unpin"; the
-page warns before a drop breaks the spacing rules.
+The Schedule page answers "what goes out next". **Next up** across the top shows the next five
+uploads with their covers and how long until each (a red edge: its last upload failed). Under it,
+**Week** shows seven days from today, hours down; the arrows page a week at a time out to the
+scheduler's `horizon_days`. Each clip is a block in its show's colour with a stripe for its kind:
+filled once it is uploaded (private until it goes public), outlined until then, faded once its time
+has passed, with a pin when it is pinned. Each day's head shows its count against `max_per_day`, a
+red line marks now, and the open slots are dashed. Hover a block for the whole title and its
+state; click it to open the item. **List** shows the days one under the other instead, as before
+(a phone always gets the List and the next three).
+
+**Ready to slot**, beside it, lists the approved items with no slot that can still go out, newest
+stream first: the same number as on the Schedule tab. The ones the scheduler let go (over
+their stream's budget or stale, see [Staying current](Scheduling-and-uploads#staying-current))
+are one link under it, "N not going out", which opens them in the queue; a pin there (Pin or
+Next open slot in the item) sends one anyway. Drag an item or a block onto an open slot (or a
+day's head) to pin it, or onto "unpin"; the page warns before a drop breaks the spacing rules.
 
 Or let clipper pick the slot: the arrow-to-a-line button beside an item (or **Next open slot** in its window) finds
 the first open slot of its kind that the scheduler's rules allow: the slot times, `max_per_day`,
@@ -294,7 +304,7 @@ stream whose budget is full bumps that stream's weakest automatic one: the previ
 The bulk button leaves those streams out, since a pin there would only swap one for another.
 Raise `stream_budget` to send more of a stream.
 
-The upload panel shows uploads in the last 24 h against the cap, the last automatic
+The Uploads panel under the tray shows uploads in the last 24 h against the cap, the last automatic
 run and its errors, and what goes next. Uploaded slots show views and a YouTube link.
 
 ## The log

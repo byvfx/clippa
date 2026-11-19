@@ -591,3 +591,23 @@ def test_a_stream_says_when_it_ended_and_when_its_items_may_go_out(tmp_path, def
     odd.mkdir()
     jsonstate.write(odd / "meta.json", {"started_at": "yesterday", "duration_s": 60})
     assert warroom.stream_info(cfg, odd)["ended_at"] == ""
+
+
+def test_the_schedule_sends_upload_times_and_slots_to_the_horizon(tmp_path, defaults, monkeypatch):
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    from clipper import jsonstate
+
+    cfg = {**defaults, "paths": {**defaults["paths"], "streams": tmp_path, "schedule": tmp_path / "schedule.json"}}
+    monkeypatch.setattr(warroom.review, "all_rows", lambda c: [])
+    soon = (datetime.now(ZoneInfo(cfg["schedule"]["timezone"])) + timedelta(days=1)).isoformat(timespec="seconds")
+    jsonstate.write(cfg["paths"]["schedule"], {"entries": [
+        {"key": "kick-1/s01", "stream": "kick-1", "kind": "segment", "title": "t", "status": "uploaded",
+         "publish_at": soon, "uploaded_at": "2026-11-18T10:00:00+00:00"}]})
+    out = warroom.overview(cfg)
+    assert out["schedule"][0]["uploaded_at"] == "2026-11-18T10:00:00+00:00"
+    horizon = max(14, cfg["schedule"]["horizon_days"])
+    assert out["rules"]["horizon_days"] == horizon
+    last = max(datetime.fromisoformat(f["at"]) for f in out["free_slots"])
+    assert last > datetime.fromisoformat(out["generated_at"]) + timedelta(days=horizon - 2)

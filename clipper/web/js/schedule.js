@@ -131,6 +131,10 @@ document.addEventListener("click", e => {
   if (v) { SVIEW = v.dataset.sview; try { localStorage.setItem("warroom.sview", SVIEW); } catch { /* private window */ } if (STATE) renderSchedule(); return; }
   const w = e.target.closest?.("#wkPrev,#wkNext");
   if (w) { WEEK += w.id === "wkNext" ? 1 : -1; if (STATE) renderSchedule(); return; }
-  if (e.target.closest?.("[data-notout]")) { goPage("queue"); TAB = "approved"; ST = "dropped"; SEL = null; renderQueue(); }
+  if (e.target.closest?.("[data-notout]")) {
+    goPage("queue");
+    if (document.body.dataset.view !== "queue") return;  // an item window that wouldn't close
+    TAB = "approved"; ST = "dropped"; SEL = null; renderQueue();
+  }
 });
 PHONE.addEventListener("change", () => { if (STATE) renderSchedule(); });

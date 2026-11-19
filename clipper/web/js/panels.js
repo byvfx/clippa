@@ -37,10 +37,11 @@ function renderUploads() {
 
 let SHOWFREE = (() => { try { return localStorage.getItem("warroom.free") !== "0"; } catch { return true; } })();
 let DRAG = null;
+const PIN_FMT = {};  // one formatter per zone: the Week view asks for hundreds a render
 function localPin(iso) {  // "2026-10-29T14:00:00-07:00" -> "2026-10-29 14:00" in the schedule's zone
   const d = new Date(iso), tz = STATE.timezone;
-  const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
-    .formatToParts(d).map(x => [x.type, x.value]));
+  const f = PIN_FMT[tz] ??= new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  const p = Object.fromEntries(f.formatToParts(d).map(x => [x.type, x.value]));
   return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}`;
 }
 function ruleWarnings(at, kind, ref) {

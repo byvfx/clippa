@@ -350,14 +350,14 @@ def overview(cfg: dict) -> dict:
     sc = cfg["schedule"]
     # #20: the open slots (drop targets) as far ahead as the scheduler plans, at least 14 days
     # (the Week view pages through them), and the spacing rules the page checks.
-    taken = {e["publish_at"][:16] for e in entries}
+    taken, horizon = {e["publish_at"][:16] for e in entries}, max(14, sc["horizon_days"])
     free = [{"at": when.isoformat(), "kind": kind}
-            for when, kind in schedule.slots({**sc, "horizon_days": max(14, sc["horizon_days"])}, tz, now.date())
+            for when, kind in schedule.slots({**sc, "horizon_days": horizon}, tz, now.date())
             if when > now + timedelta(minutes=30) and when.isoformat()[:16] not in taken]
     hs, hue = all_retakes(cfg), show_hues(cfg)
     return {"generated_at": now.isoformat(), "timezone": sc["timezone"],
             "free_slots": free, "rules": {"max_per_day": sc["max_per_day"], "min_gap_minutes": sc["min_gap_minutes"],
-                                          "horizon_days": max(14, sc["horizon_days"])},
+                                          "horizon_days": horizon},
             "shows": [{"key": k, "name": for_stream_show_name(cfg, k), "channels": s["channels"], "hue": hue[k]}
                       for k, s in shown_shows(cfg).items()],
             "counts": {**counts, "scheduled_7d": sum(
