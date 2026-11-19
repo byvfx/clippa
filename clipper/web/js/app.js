@@ -20,8 +20,11 @@ function setView(v) {
 setView(store.get("warroom.view") || "queue");
 for (const k of ["warroom.layout", "warroom.layoutName"]) store.set(k, null);  // the layout editor's, retired 2026-11-18
 PHONE.addEventListener("change", () => { if (!PHONE.matches && document.body.dataset.view === "chat") setView("queue"); });
-// the page bar sticks under the header, however tall the header wraps
-new ResizeObserver(() => document.body.style.setProperty("--head-h", `${$("header").offsetHeight}px`)).observe($("header"));
+// the page bar sticks under the header, however tall the header wraps, and the docked pane under both
+new ResizeObserver(() => {
+  document.body.style.setProperty("--head-h", `${$("header").offsetHeight}px`);
+  document.body.style.setProperty("--bar-h", `${$("#views").offsetHeight}px`);
+}).observe($("header"));
 
 async function playLow(i, full) {  // phones: a 360p copy made by the server (lowres/ beside the preview)
   const tap = $("#mTap");
@@ -64,7 +67,7 @@ const KEYS = [
               ["H", "hold / release"], ["P", "pin a release time"], ["U", "reopen an approved item"]]],
   ["Video (item window)", [["Space", "play / pause"], ["← →", "back / forward 5 s"], ["F", "picture in picture"], ["O", "open the video in its own window"],
                            ["B", "box a face on the paused frame: who it is"]]],
-  ["Other", [["1 2 3 4 5 6", "queue tabs"], ["/", "search"], ["L", "watch the live show"], ["M", "show / hide the Clippa chat (Esc in its box comes back)"],
+  ["Other", [["1 2 3 4 5 6 7", "queue tabs (7: Retakes)"], ["/", "search"], ["L", "watch the live show"], ["M", "show / hide the Clippa chat (Esc in its box comes back)"],
              ["?", "this list"]]],
 ];
 function showKeys() {
@@ -85,8 +88,8 @@ function move(d) {
   if (OPEN && to !== OPEN && !discardOk()) return;
   SEL = to;
   renderQueue();
-  if (OPEN) { if (SEL !== OPEN) openModal(SEL); return; }
-  $(".card.sel")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  if (OPEN || dockWanted()) { if (SEL !== OPEN) openModal(SEL, true); }  // docked, J/K opens the pane too
+  if (!OPEN || docked()) $(".card.sel")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 function keyAct(key, ref) {
   const i = STATE.items.find(x => x.ref === ref);
@@ -96,7 +99,7 @@ function keyAct(key, ref) {
     if (OPEN && !discardOk()) return;  // approving moves on to the next item
     const at = VISIBLE.indexOf(ref), next = VISIBLE[at + 1] || VISIBLE[at - 1];
     act(ref, "approve");
-    if (OPEN) { if (next && next !== ref) { SEL = next; openModal(next); } else closeModal(true); }
+    if (OPEN) { if (next && next !== ref) { SEL = next; openModal(next, true); } else closeModal(true); }
   } else if (key === "u") { if (i.decision === "approved") act(ref, "reopen"); else toast("Only approved items reopen."); }
   else if (key === "r") { const n = ask(`Reject ${i.short}? Say why (kept as a scoring example):`, true); if (n) act(ref, "reject", { text: n }); }
   else if (key === "c") {
@@ -119,13 +122,19 @@ document.addEventListener("keydown", e => {
   if (tg.matches?.("input, textarea, select, [contenteditable]")) { if (e.key === "Escape" && OPEN) { e.preventDefault(); tg.blur(); } return; }
   if ($("#keys").open) { if (e.key === "?") $("#keys").close(); return; }
   if ($("#tool").open) return;
-  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key, video = OPEN ? $("#modal video") : null;
   const take = () => e.preventDefault();
-  // the queue's keys act on what is on screen: the Review page, or an item's window from any page
-  const q = !!OPEN || (document.body.dataset.view === "queue" && !tg.closest?.(".menu"));
+  // the queue's keys act on what is on screen: the Review page (with its docked pane), or an item's window
+  // on top of any page; a pane left docked on the Review page doesn't answer from another page
+  const q = $("#modal").matches(":modal") || (document.body.dataset.view === "queue" && !tg.closest?.(".menu"));
+  // with the pane docked the grid stays usable: a focused button there keeps Space and the arrows
+  const grid = docked() && !$("#modal").contains(tg) && !!tg.closest?.("button, a, [role=button], [tabindex]");
+  const free = !OPEN || docked();  // the grid's own keys: nothing on top of it
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key, video = OPEN && q && !grid ? $("#modal video") : null;
   if (k === "?") { take(); showKeys(); }
   else if ((k === "j" || k === "k") && q) { take(); move(k === "j" ? 1 : -1); }
-  else if (k === "Enter" && !OPEN && q && SEL && !tg.closest?.("button, a")) { take(); openModal(SEL); }
+  else if (k === "Enter" && free && q && SEL && SEL !== OPEN && !tg.closest?.("button, a")) { take(); openModal(SEL); }
+  else if (k === "Escape" && free && LIVEMENU !== null) { take(); LIVEMENU = null; renderLive(); }
+  else if (k === "Escape" && OPEN && q && docked()) { take(); closeModal(); }  // on top, the dialog's own cancel
   else if (k === "Escape" && !OPEN) { if (LIVEMENU !== null) { LIVEMENU = null; renderLive(); } else if (SEL) { SEL = null; renderQueue(); } }
   else if ("arhcpu".includes(k) && k.length === 1 && q && (OPEN || SEL)) { take(); keyAct(k, OPEN || SEL); }
   else if (k === " " && video && tg !== video) { take(); video.paused ? video.play() : video.pause(); }
@@ -138,8 +147,8 @@ document.addEventListener("keydown", e => {
   else if (k === "o" && q && (OPEN || SEL)) { take(); popOut(OPEN || SEL); }
   else if (k === "m") { take(); toggleChat(); }
   else if (k === "b" && video) { take(); pickFace(OPEN); }
-  else if (/^[1-6]$/.test(k) && !OPEN && q) { take(); TAB = Object.keys(TABS)[+k - 1]; SEL = null; renderQueue(); }
-  else if (k === "/" && !OPEN && q) { take(); $("#q").focus(); }
+  else if (/^[1-7]$/.test(k) && free && q) { take(); TAB = Object.keys(TABS)[+k - 1]; SEL = null; renderQueue(); }
+  else if (k === "/" && free && q) { take(); $("#q").focus(); }
   else if (k === "l") {
     const on = LIVE.filter(l => l.live);
     if (!on.length) return toast("Nothing is live right now.");

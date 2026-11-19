@@ -108,7 +108,22 @@ body[data-view="pipeline"] .page[data-page="pipeline"], body[data-view="money"] 
 body[data-view="stats"] .page[data-page="stats"], body[data-view="library"] .page[data-page="library"],
 body[data-view="research"] .page[data-page="research"], body[data-view="settings"] .page[data-page="settings"] { display: grid; }
 @media (min-width: 1251px) {
-  .page[data-page="queue"], .page[data-page="pipeline"] { grid-template-columns: minmax(0, 1fr) 340px; }
+  .page[data-page="pipeline"] { grid-template-columns: minmax(0, 1fr) 340px; }
+}
+/* The Review page: the queue, and beside it the clip docked (review.js openModal; drag its left edge) */
+#modal .grip { display: none; }
+@media (min-width: 1100px) {
+  /* a width dragged on a bigger screen still leaves the grid room on this one */
+  .page[data-page="queue"]:has(> #modal[open]) { grid-template-columns: minmax(0, 1fr) min(var(--pane-w, clamp(440px, 40vw, 900px)), calc(100vw - 460px)); }
+  #modal.docked[open] { position: sticky; top: calc(var(--head-h) + var(--bar-h, 40px) + 14px); inset: auto; z-index: 1; margin: 0;
+    width: auto; max-width: none; height: calc(100vh - var(--head-h) - var(--bar-h, 40px) - 28px); max-height: none;
+    display: flex; flex-direction: column; overflow: hidden; color: inherit; }
+  #modal.docked .m-head { flex: none; }
+  #modal.docked .m-body { display: block; flex: 1; min-height: 0; max-height: none; }
+  #modal.docked .m-body > .form { margin-top: 12px; }
+  #modal.docked .player video { max-height: 48vh; }
+  #modal.docked .grip { display: block; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; z-index: 2; cursor: col-resize; }
+  #modal.docked .grip:hover { background: var(--accent); }
 }
 @media (min-width: 701px) {
   .page[data-page="money"] { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
@@ -458,6 +473,20 @@ dialog::backdrop { background: #000b; }
 .cloud .sub { font: 700 10px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--faint); margin-top: 3px; }
 .cloud a { color: var(--blue); }
 .queue-bar .tabs { display: contents; }
+/* the show as a coloured tag (a look's --show-N); the filters behind one button, what is on as chips */
+.show { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text); white-space: nowrap; }
+.show::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--sc, var(--faint)); flex: none; }
+.show.s1 { --sc: var(--show-1); } .show.s2 { --sc: var(--show-2); } .show.s3 { --sc: var(--show-3); }
+.show.s4 { --sc: var(--show-4); } .show.s5 { --sc: var(--show-5); } .show.s6 { --sc: var(--show-6); }
+#filterBtn.on { border-color: var(--accent); }
+#filterBtn b { color: var(--accent); font-family: var(--mono); }
+.fchip { padding: 3px 9px; border-radius: var(--pill); border: 1px solid var(--line); background: var(--panel2); color: var(--text); font-size: 12px; }
+.fchip:hover { border-color: var(--btn-hover); }
+.queue-bar .filters { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; padding-top: 4px; }
+.queue-bar .filters[hidden] { display: none; }
+.empty.caught { display: grid; gap: 6px; justify-items: center; }
+.empty.caught b { color: var(--text); font-size: 15px; }
+.card .ev { padding: 6px 0 0; border: 0; }
 
 /* phones (#25): one view at a time, bottom tabs, a full-screen item with the decisions at the thumb */
 @media (max-width: 700px) {
@@ -469,9 +498,9 @@ dialog::backdrop { background: #000b; }
   .widget { height: 36px; padding: 0 8px; }
   .widget .meter { width: 28px; }
   #updated { display: none; }
-  .brand { letter-spacing: .08em; }
+  .brand { letter-spacing: .04em; }  /* brand, uploads, health and ⋯ on one row at 375 px */
   #moreBtn { padding: 8px 12px; }
-  .lives { order: 3; width: 100%; overflow-x: auto; }
+  .lives { order: 3; width: 100%; flex-wrap: nowrap; overflow-x: auto; }
   .live { padding: 6px 10px; white-space: nowrap; }
   .livemenu .btn { padding: 12px; }
   main { display: block; padding: 10px 0 calc(74px + env(safe-area-inset-bottom)); }
@@ -494,7 +523,7 @@ dialog::backdrop { background: #000b; }
   dialog#modal { overflow-x: hidden; }
   #modal .m-head { padding-top: max(10px, env(safe-area-inset-top)); gap: 8px; }
   #modal .m-head b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #modal .m-head .tag { display: none; }
+  #modal .m-head .tag, #modal .m-head .show { display: none; }
   #modal .m-head .x { font-size: 30px; padding: 0 6px; }
   #modal .m-body { display: block; padding: 0 0 calc(84px + env(safe-area-inset-bottom)); max-height: calc(100dvh - 54px); }
   #modal .player { padding: 0 0 4px; }

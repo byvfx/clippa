@@ -11,6 +11,7 @@
   --dim: #8b95a3; --faint: #7a8494; --accent: #ffd400; --on-accent: #111; --red: #ff3b4e; --green: #2fd17c;
   --blue: #4da3ff; --amber: #ffad33; --violet: #a88bff;
   --clip: #4da3ff; --short: #ff6fae; --segment: #2fd17c; --compilation: #ffad33;
+  --show-1: #b07ce8; --show-2: #e8874d; --show-3: #48b5c8; --show-4: #d8c24a; --show-5: #e86a8a; --show-6: #7fb85c;  /* one per show, in [shows] order */
   --mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
   --sans: "Segoe UI", system-ui, -apple-system, sans-serif;
 

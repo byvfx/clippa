@@ -414,8 +414,12 @@ function renderCloud() {
     ${m.links?.[m.app] ? `<div><a href="${esc(m.links[m.app])}" target="_blank" rel="noopener">Open ${esc(m.app)} on modal.com ↗</a></div>` : ""}`;
 }
 
-function closeModal(force) { if (!force && !discardOk()) return; OPEN = null; const v = $("#modal video"); if (v) v.pause(); $("#modal").close(); }
-$("#modal").addEventListener("close", () => { OPEN = null; const v = $("#modal video"); if (v) v.pause(); });
+function closeModal(force) { if (!force && !discardOk()) return; OPEN = null; SWAPS = 0; const v = $("#modal video"); if (v) v.pause(); $("#modal").close(); }
+$("#modal").addEventListener("close", () => {
+  if (SWAPS) { SWAPS--; return; }  // placeModal's own close, to reopen it the other way
+  if ($("#modal").open) return;  // closed and opened again before this event came: still open
+  OPEN = null; const v = $("#modal video"); if (v) v.pause();
+});
 
 // ---------- #206 the serve and bot logs: what "details in the serve log" points at ----------
 

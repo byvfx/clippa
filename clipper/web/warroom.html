@@ -34,6 +34,7 @@
   <div class="menu" id="moreMenu" role="menu" hidden>
     <button class="mi" id="syncBtn" role="menuitem" title="Read decisions and edits from Kitsu now">⟳ Sync Kitsu</button>
     <button class="mi" id="replanBtn" role="menuitem" title="Rerun clipper schedule">Replan</button>
+    <button class="mi" id="undoBtn" role="menuitem" title="The last 20 war room actions, to undo">↶ Undo…</button>
     <div class="sep"></div>
     <button class="mi" data-menu-log role="menuitem">The serve and bot log</button>
     <button class="mi" id="keysBtn" role="menuitem">Keyboard shortcuts <kbd>?</kbd></button>
@@ -69,7 +70,8 @@
       <div class="bulk" id="bulk" hidden></div>
       <div class="grid" id="grid"></div>
     </section>
-    <section class="panel" data-panel="retakes"><h2>Retakes <span class="sp" id="retakeSub"></span></h2><div class="feed" id="retakes"></div></section>
+    <!-- the item window: docked here beside the grid on a wide screen (review.js openModal), a window on top elsewhere -->
+    <dialog id="modal" aria-label="The clip"></dialog>
   </div>
 
   <div class="page" data-page="schedule">
@@ -133,7 +135,6 @@
   <iframe id="chatFrame" src="/chat?dock" title="Clippa chat"></iframe>
 </aside>
 
-<dialog id="modal"></dialog>
 <dialog id="keys"></dialog>
 <dialog id="tool"></dialog>
 <div id="dock" hidden></div>

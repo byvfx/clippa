@@ -110,6 +110,12 @@ def shown_shows(cfg: dict) -> dict:
     hide = set(root["warroom"]["hide_shows"])
     return {k: s for k, s in root["shows"].items() if k not in hide}
 
+
+def show_hues(cfg: dict) -> dict:
+    """Each show's colour on the page, 1 to 6 (a look's --show-1 to --show-6), by its place in
+    [shows]: hiding a show with [warroom] hide_shows moves no other show's colour."""
+    return {k: n % 6 + 1 for n, k in enumerate(base(cfg)["shows"])}
+
 def kick_live(cfg: dict) -> list[dict]:
     """Each show's channels' live status from Kick, cached for a minute."""
     import requests
@@ -337,10 +343,10 @@ def overview(cfg: dict) -> dict:
     free = [{"at": when.isoformat(), "kind": kind}
             for when, kind in schedule.slots({**sc, "horizon_days": 14}, tz, now.date())
             if when > now + timedelta(minutes=30) and when.isoformat()[:16] not in taken]
-    hs = all_retakes(cfg)
+    hs, hue = all_retakes(cfg), show_hues(cfg)
     return {"generated_at": now.isoformat(), "timezone": sc["timezone"],
             "free_slots": free, "rules": {"max_per_day": sc["max_per_day"], "min_gap_minutes": sc["min_gap_minutes"]},
-            "shows": [{"key": k, "name": for_stream_show_name(cfg, k), "channels": s["channels"]}
+            "shows": [{"key": k, "name": for_stream_show_name(cfg, k), "channels": s["channels"], "hue": hue[k]}
                       for k, s in shown_shows(cfg).items()],
             "counts": {**counts, "scheduled_7d": sum(
                 1 for e in entries if now <= datetime.fromisoformat(e["publish_at"]) <= now + timedelta(days=7)),
