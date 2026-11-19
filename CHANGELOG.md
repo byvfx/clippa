@@ -17,7 +17,7 @@ and YouTube VODs) through transcription, scoring, cutting, titles and covers to 
 Discord and the war room, then schedules and uploads what you approve to YouTube.
 
 - **Review:** pre-flight checks and approval by silence; a redesigned war room (fixed pages, a Review
-  page that docks the open item); the Clippa messenger (`/chat`), which acts on several items at once;
+  page that docks the open item, a new look); the Clippa messenger (`/chat`), which acts on several items at once;
   titles that rename videos already on YouTube.
 - **Fetching:** `clipper fetch` takes Twitch and YouTube VODs, with their chat replay.
 - **Scheduling:** segments ranked by a model score, and a stream's heat graph in the war room.
@@ -37,6 +37,12 @@ Discord and the war room, then schedules and uploads what you approve to YouTube
   makes a GitHub Release with the wheel, the sdist and the section's lead as the notes
   (`.github/workflows/release.yml`); the wiki's Install page has the steps to check out a release
   on a new machine, and Developing#changelog says when a change gets a bullet here.
+- 11-18: war room redesign, step 4, the look (#318): a quiet editor palette as the default look
+  (`themes/warroom.css`; Inter and JetBrains Mono bundled in `clipper/web/fonts/`), one line-icon set in
+  place of every emoji and symbol that stood in for an icon, skeleton cards while a panel loads, and
+  an accent focus ring. `warroom` and `millennium` stay as the two looks; `retro` and `pager` are
+  retired (a browser that had picked one goes back to the default), and the chat page's default is
+  `millennium`. Wiki War-room and Clippa-messenger.
 - 11-18: war room redesign, steps 2 and 3 (#314, #316): fixed pages under a page bar and four top-bar
   widgets replace the movable layout (the layout editor and `/api/layouts` are gone). The Review page
   docks the open item beside the grid (J and K open and step through items, Esc closes, the edge drags
