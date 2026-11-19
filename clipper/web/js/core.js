@@ -102,9 +102,11 @@ async function refresh() {
 let LIVE = [], LIVEMENU = null;
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* private window */ } } };
-function since(iso) {  // Kick gives "2026-10-23 01:02:03" in UTC
+// Kick gives "2026-10-23 01:02:03" in UTC, with no zone: as epoch ms
+const kickMs = iso => +new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : iso.replace(" ", "T") + "Z");
+function since(iso) {
   if (!iso) return "";
-  const t = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : iso.replace(" ", "T") + "Z");
+  const t = kickMs(iso);
   const m = Math.max(0, Math.round((Date.now() - t) / 60000));
   return isNaN(m) ? "" : m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")}`;
 }

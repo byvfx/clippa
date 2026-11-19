@@ -766,6 +766,47 @@ body { --chat-w: min(360px, 100vw); }
 .blk .bm .ic { width: 11px; height: 11px; }
 .blk .bt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fslot { --kc: var(--clip); border: 1px dashed var(--line2); border-left: 3px solid color-mix(in srgb, var(--kc) 45%, transparent); border-radius: 4px; padding: 2px 6px; font: 10.5px var(--mono); color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* the Timeline (schedule.js renderTimeline): a label column, then a track per lane; positions are % of 9 days */
+.lg.quiet { border: 1px solid var(--line2); background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--text) 14%, transparent) 0 3px, transparent 3px 6px); }
+.lg.band { border: 1px dashed color-mix(in srgb, var(--amber) 60%, transparent); background: color-mix(in srgb, var(--amber) 12%, transparent); }
+.tlwrap { overflow: auto; max-height: calc(100vh - var(--head-h) - var(--bar-h, 40px) - 190px); }
+.tlwrap[hidden] { display: none; }
+.tl { display: grid; grid-template-columns: 144px minmax(0, 1fr); min-width: 900px; padding: 0 12px 10px 0; }
+.tl .ln { display: grid; align-content: center; gap: 1px; padding: 0 10px 0 12px; border-bottom: 1px solid var(--line); min-width: 0; }
+.tl .ln b { font-weight: 600; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl .ln b.show { background: none; padding: 0; color: var(--text); }
+.tl .lsub { font: 10.5px var(--mono); color: var(--faint); white-space: nowrap; }
+.tl .lsub .none { color: var(--amber); }
+.tl .lt { position: relative; height: 46px; border-bottom: 1px solid var(--line); overflow: hidden; }
+.tl .lt.ups, .tl .lt.slots { height: 30px; }
+.tl .ax { height: 26px; position: sticky; top: 0; z-index: 3; background: var(--panel); }
+.tl .lt.ax { overflow: visible; }
+.tl .lt.ax span { position: absolute; top: 6px; font: 10.5px var(--mono); color: var(--faint); white-space: nowrap; padding-left: 4px; }
+.tl .lt.ax span.today { color: var(--accent); }
+.tl .lt.ax .nowl { color: var(--red); transform: translateX(-50%); padding: 0; top: 7px; font-weight: 500; }
+.tl .gl { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--line); }
+.tl .gl.today { border-left-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.tl .cap { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--amber) 8%, transparent); border-left: 1px dashed color-mix(in srgb, var(--amber) 55%, transparent); pointer-events: none; }
+.tl .tnow { position: absolute; top: 0; bottom: 0; border-left: 2px solid var(--red); z-index: 2; pointer-events: none; }
+.tl .quiet { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--text) 7%, transparent) 0 6px, transparent 6px 12px); }
+.tl .sbar { --sc: var(--dim); position: absolute; top: 11px; height: 24px; border-radius: 4px; border: 1px solid var(--sc); background: color-mix(in srgb, var(--sc) 28%, var(--panel2)); font-size: 11px; line-height: 22px; padding: 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); min-width: 6px; box-sizing: border-box; }
+.tl .sbar.live { border-right: 3px solid var(--red); }
+.tl .sbar.norec { border-style: dashed; background: color-mix(in srgb, var(--sc) 10%, var(--panel2)); }
+.tl .tk { --sc: var(--dim); position: absolute; top: 9px; width: 8px; height: 28px; margin-left: -4px; border-radius: 3px; background: var(--sc); border: 1.5px solid var(--sc); box-sizing: border-box; cursor: pointer; z-index: 1; }
+.tl .tk.planned { background: var(--panel); }
+.tl .tk.k-short { top: 15px; height: 16px; }
+.tl .tk.past { opacity: .5; }
+.tl .tk.failed { border-color: var(--red); box-shadow: 0 0 0 1px var(--red); }
+.tl .tk:hover, .tl .tk:focus-visible { border-color: var(--text); z-index: 2; }
+.tl .tk[draggable="true"] { cursor: grab; }
+.tl .tk.s1, .tl .sbar.s1, .tl .show.s1 { --sc: var(--show-1); } .tl .tk.s2, .tl .sbar.s2, .tl .show.s2 { --sc: var(--show-2); }
+.tl .tk.s3, .tl .sbar.s3, .tl .show.s3 { --sc: var(--show-3); } .tl .tk.s4, .tl .sbar.s4, .tl .show.s4 { --sc: var(--show-4); }
+.tl .tk.s5, .tl .sbar.s5, .tl .show.s5 { --sc: var(--show-5); } .tl .tk.s6, .tl .sbar.s6, .tl .show.s6 { --sc: var(--show-6); }
+.tl .ut { position: absolute; top: 8px; width: 2px; height: 14px; margin-left: -1px; background: var(--dim); border-radius: 1px; }
+.tl .free-at { position: absolute; top: 4px; bottom: 4px; border-left: 2px dotted var(--green); }
+.tl .ft { --kc: var(--clip); position: absolute; top: 7px; width: 10px; height: 16px; margin-left: -5px; border: 1px dashed var(--line2); border-left: 2px solid color-mix(in srgb, var(--kc) 55%, transparent); border-radius: 2px; box-sizing: border-box; }
+.tl .ft.k-short { --kc: var(--short); } .tl .ft.k-segment { --kc: var(--segment); } .tl .ft.k-compilation { --kc: var(--compilation); }
+.tl .ft.over { border-color: var(--accent); background: var(--accent-bg); }
 @media (max-width: 700px) {  /* a phone gets the List (schedule.js), and the next three */
   .panel h2 .seg, .wknav, .sched-tools .legend { display: none; }
   .nextup .nu:nth-of-type(n+4) { display: none; }
