@@ -2,6 +2,8 @@
 .venv/
 __pycache__/
 .ruff_cache/
+# written into the staged copy by deploy/stamp.sh (the image has no .git), never the checkout
+clipper/_build.txt
 
 # data: streams live on the NAS share or a local folder, never in git
 streams/

@@ -10,7 +10,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import __version__, config, jsonstate
+from . import buildinfo, config, jsonstate
 from .config import stream_dir
 from .errors import KEY_REJECTED, ClipperError, did_you_mean, key_rejected
 
@@ -2289,7 +2289,7 @@ def add_setup(sub) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     ap = Parser(prog="clipper", epilog=command_list(), formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--version", action="version", version=f"clipper {__version__}")
+    ap.add_argument("--version", action="version", version=f"clipper {buildinfo.version()}")
     ap.add_argument("--config", help="path to clipper.toml (default: $CLIPPER_CONFIG or ./clipper.toml)")
     ap.add_argument("--show", help="use this [shows.<key>] profile (default: the stream's, by Kick channel)")
     sub = ap.add_subparsers(dest="cmd", required=True, metavar="<command>")

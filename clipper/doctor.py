@@ -26,7 +26,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import jsonstate, prompts, wiki
+from . import buildinfo, jsonstate, prompts, wiki
 from .config import base, for_show
 from .errors import ClipperError
 
@@ -97,6 +97,11 @@ def check_python() -> None:
             warn("python", f"the venv's path is {len(sys.prefix)} characters and Windows long paths are off",
                  "some packages (anthropic) fail to load past 260 characters: move clipper to a short "
                  "folder such as C:\\clipper, or turn long paths on")
+
+
+def check_version() -> None:
+    """Which copy this is (clipper/buildinfo.py): the release, and the commit past it."""
+    ok("version", f"clipper {buildinfo.version()}")
 
 
 def check_command() -> None:
@@ -1402,6 +1407,7 @@ def check_role_settings(cfg: dict, role: str) -> None:
 def main(cfg: dict, offline: bool = False, role: str = "all") -> int:
     RESULTS.clear()
     check_python()
+    check_version()
     check_command()
     check_config(cfg, role)
     check_role_settings(cfg, role)

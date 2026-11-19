@@ -10,10 +10,38 @@ Per platform: [Windows](Install-Windows) (GPU worker, serve, bot), [macOS](Insta
 [Character pieces](Character-pieces) (narration voice), [X posts](X-posts),
 [News watcher](News-watcher).
 
+## A release on a new machine
+
+Check out a tagged release, not main's tip: each is on the
+[Releases](https://github.com/byvfx/clipper/releases) page with what changed. You need git
+(`winget install Git.Git` on a Windows machine without it), then:
+
+```powershell
+git clone https://github.com/byvfx/clipper.git C:\clipper
+git -C C:\clipper checkout (git -C C:\clipper describe --tags --abbrev=0)
+powershell -ExecutionPolicy Bypass -File C:\clipper\deploy\bootstrap.ps1
+```
+
+```bash
+git clone https://github.com/byvfx/clipper.git ~/clipper && cd ~/clipper
+git checkout "$(git describe --tags --abbrev=0)"
+bash deploy/bootstrap.sh
+```
+
+`describe` names the newest release; to pin one instead, `git checkout v0.2.0`. `clipper
+--version` says what the machine has (`0.2.0` on a release). The bootstrap carries on from
+[the walkthrough below](#the-walkthrough-clipper-setup-78).
+
+To move a machine to a newer release: stop what runs from the folder (the bot, a worker task),
+`git fetch --tags`, `git checkout <tag>`, then `uv sync` with the extras its roles need, the
+list `clipper setup --sync-args` prints (the bootstrap leaves an existing `.venv` as it is).
+The NAS containers aren't updated this way: they get the code with `bash deploy/hub/deploy.sh`,
+which stamps the image with the commit, and `clipper services status` shows each one's version.
+
 ## The walkthrough: `clipper setup` (#78)
 
-Get the code onto the machine (clone it, or copy the folder without `streams/`, `.venv/`,
-`logs/`) into a short path, then from that folder:
+Get the code onto the machine into a short path ([a release](#a-release-on-a-new-machine), a
+clone, or a copy of the folder without `streams/`, `.venv/`, `logs/`), then from that folder:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File deploy\bootstrap.ps1     # Windows

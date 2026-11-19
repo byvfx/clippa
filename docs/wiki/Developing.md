@@ -74,6 +74,34 @@ the few selected in `pyproject.toml` (`[tool.ruff.lint]`). Try risky changes on 
 first. Before merging a PR that changes code, wait for the reviews below and handle each
 finding. A PR outside those paths, such as a wiki page or `uv.lock` alone, needs no review.
 
+## Releases
+
+A release is a git tag `vX.Y.Z` on main. Pushing the tag makes the GitHub Release
+(`.github/workflows/release.yml`): the wheel and sdist, with that version's section of
+`CHANGELOG.md` as the notes. The number is the last release's, in `clipper/__init__.py`,
+`pyproject.toml` and the `clipper` entry of `uv.lock`; a test keeps the first two equal and
+`uv lock --check` the third. Between releases a copy says which commit it is
+(`clipper/buildinfo.py`): `0.2.0` on the tag, `0.2.0+3.g570bb87` three commits past it, `.dirty`
+with uncommitted changes. The NAS containers have no `.git`, so `deploy/hub/deploy.sh` and
+`deploy/record/deploy.sh` write the checkout's `git describe` into the image
+(`deploy/stamp.sh`); serve, the bot and the recorder put the result in their heartbeats and
+`clipper services status` prints it next to this checkout's.
+
+1. In a PR: bump `__version__` and `version`, `uv lock`, rename the changelog's "Unreleased"
+   to "X.Y.Z (date)" and open a new empty one above it.
+2. After it merges, from a clean checkout of main:
+
+   ```bash
+   git tag -a v0.3.0 -m "clipper 0.3.0" && git push origin v0.3.0
+   ```
+
+   The workflow refuses a tag that disagrees with those files, has no changelog section, or
+   isn't on main.
+3. `bash deploy/hub/deploy.sh` as usual; the hub then reports the tag's version, or the commit
+   past it.
+
+The release job doesn't run the tests: they ran on the commit when it merged to main.
+
 ## Code review on PRs
 
 A PR that changes code (`clipper/`, `tests/`, `deploy/`, `.github/`, `pyproject.toml`) gets two

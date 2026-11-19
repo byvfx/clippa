@@ -1,12 +1,27 @@
 # Changelog
 
 Notable changes, newest first. The dated diary is `docs/log/<YYYY-MM>.md`; `HANDOFF.md` is the
-current state; the version is `clipper --version` (set in `clipper/__init__.py` and
-`pyproject.toml`, which a test keeps equal). Nothing has been released yet.
+current state. The version is the last release's number (`clipper/__init__.py` and `pyproject.toml`,
+which a test keeps equal) and, past a release, the commit: `clipper --version` prints `0.2.0` on
+the tag and `0.2.0+3.g570bb87` after it. A release is a git tag `vX.Y.Z` whose GitHub Release takes
+its notes from that version's section here; the steps are wiki Developing#releases.
 
-## Unreleased (0.1.0)
+## Unreleased
+
+## 0.2.0 (2026-11-18)
+
+The first release: everything below, which had piled up as "Unreleased 0.1.0" since October.
 
 ### 2026-11
+
+- 11-18: versions. `clipper --version` and `clipper doctor` say which copy this is, `0.2.0` on a
+  release and `0.2.0+3.g570bb87` past it (`.dirty` with uncommitted changes), and serve, the bot and
+  the recorder put it in their heartbeats, so `clipper services status` shows what each service
+  runs next to this checkout's. The hub and recorder deploy scripts stamp the image with the
+  checkout's `git describe` (`deploy/stamp.sh`, `clipper/buildinfo.py`). Pushing a `v*` tag
+  makes a GitHub Release with the wheel, the sdist and this section as the notes
+  (`.github/workflows/release.yml`); the wiki's Install page has the steps to check out a release
+  on a new machine.
 
 - 11-16: the war room draws a stream's heat: **🔥 heat** on a stream or in an item's window opens
   the curve from `clipper signals`, the windows picked from it, and each cut segment, Short and clip

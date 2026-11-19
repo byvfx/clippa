@@ -192,6 +192,11 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   Moving a stage (e.g. Pass A to DeepSeek V4 Pro) is a config change whenever the user wants it.
 
 ## Waiting on the user
+- **Release v0.2.0** (11-18, branch `release/version-stamp`: version stamp, the 0.2.0 bump, `release.yml`; wiki
+  Developing#releases): after it merges, from a clean main: `git tag -a v0.2.0 -m "clipper 0.2.0" && git push origin v0.2.0`
+  makes the GitHub Release (wheel, sdist, the changelog section). Then the next `bash deploy/hub/deploy.sh` (the
+  recorder's when no show is live) stamps the services: `clipper services status` shows each one's version next to this
+  checkout's. A new machine: wiki Install#a-release-on-a-new-machine.
 - **Deploy #299** (Clippa chat: several items on one card, undo, streams by show and day; merged 11-18 after Grok's
   review): the hub runs the old chat until `bash deploy/hub/deploy.sh`. Then send a few real messages ("approve all
   comps", "approve s02 from kino 11-14", "undo that", "whats waiting"): chat prompt v3 has only been tried against a
