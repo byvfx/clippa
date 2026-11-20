@@ -10,6 +10,11 @@ Developing#releases.
 
 ## Unreleased
 
+- `clipper checkup --fix` (serve runs it hourly) repairs what it can without asking: a run that
+  failed on a rate limit or a dropped connection gets one more attempt, and temp files a killed
+  write left are deleted. Each repair stays would-fix (reported, nothing changed) until you list it in
+  `[checkup] fix`, and stops after two tries at the same problem. Every checkup now says what was fixed
+  and what needs you.
 - War room: each Review card says in one line why the item was picked (the open item shows it in full
   under Why), beside its score.
 - `clipper analytics` rides out Google's passing errors: each call retries a 500 or a rate limit

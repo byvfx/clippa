@@ -9,6 +9,7 @@ when it finds anything.
 clipper checkup                  # every check
 clipper checkup --only streams   # one check (repeatable)
 clipper checkup --json           # the report as JSON, for a script or Claude
+clipper checkup --fix            # make the repairs [checkup] fix allows (serve does, hourly)
 ```
 
 ## What it checks
@@ -25,6 +26,7 @@ clipper checkup --json           # the report as JSON, for a script or Claude
 | schedule | nothing at all releases in the next `gap_hours` | `gap_hours` (24; 0 = off) |
 | lint | a title, description or thumbnail text about to go out has one of `words` in it, is over YouTube's limit, or has no description. It checks what `clipper upload` would send (Kitsu's columns, then the draft) | `words` |
 | auto | an item that [approved itself](Review#approval-by-silence) in the last 14 days and that a person then rejected, reopened, held or sent back for changes | `[review] auto_min_*`, `auto_grace_minutes` |
+| housekeeping | temp files (`<file>.<pid>.<thread>.tmp`) a killed write left beside a state file, a day old or more | - |
 
 The settings are `[checkup]` in the config; a show's table or a stream's own `config.toml` can
 override them for its streams and items. A check that crashes is reported as a finding of
@@ -35,12 +37,48 @@ keys in `streams/.checkup/state.json`, so the next run can mark which findings a
 which it saw before ("since 11-08 08:30"). Only the scheduled run uses `--mark`. A run by hand
 doesn't, so it never hides anything from the next scheduled run.
 
+## Repairs
+
+Some findings have a fixed repair, from a short list, with no model call (`clipper/repairs.py`,
+#287). Every checkup says, under such a finding, what its repair did or would do (`fix: would:
+one more attempt ...`), and the first line counts them: `3 findings; fixed 1, would fix 1, need
+you 1`. "Will fix" is a repair that is on and either waiting for its time or due on serve's next
+run (a checkup without `--fix`, like the nightly one, changes nothing).
+
+| Repair | For | What it does |
+|---|---|---|
+| `retry` | a run that failed with no retries left, when its error is a passing one: a rate limit, a dropped connection, a remote server's 5xx (`passing`, whole words) | `retry_after_hours` (3) after the run failed, gives back one attempt in `run.json`; the worker runs it again on its next pass. Never while a worker holds the stream, nor for a run held on a rejected key |
+| `tmp` | the housekeeping finding | deletes those temp files |
+
+serve runs `clipper checkup --fix` every `fix_minutes` (60), over the checks that have repairs
+(streams and housekeeping). Only the kinds listed in `fix` act; the
+others are **would-fix**: what they would have done goes in the ledger
+(`streams/.checkup/repairs.json`), once a day per finding, and nothing else changes. `fix` is
+empty to start, so the first week only reports. Read it with the nightly reports, then turn the
+repairs on one at a time in clipper.toml, for example `[checkup] fix = ["tmp"]`. A name that isn't a
+repair stops `--fix` with an error.
+
+Every repair is safe to repeat and capped: at most `max_repairs` (2) tries per finding key in 7
+days, counted in the ledger, a failed try included. After that the finding says "tried 2 times in
+7 days: it needs you" and stays for you. `--fix` exits 1 only when a repair failed (serve DMs
+that); a finding alone is the nightly report's business. No repair ever uploads or publishes,
+makes a Kitsu decision, touches the recorder or source footage, edits the config or viewer-facing
+text, or restarts anything. No repair calls a model itself, but a run given one more attempt
+reruns its failed stage, which calls models or Modal as it always does (score, segments,
+transcription): at most twice a week per stream.
+
+Checked and left out, because a service already does them: a late release (serve's upload job
+replans every hour), a stale run lock (the worker takes it over), a stream queued while nothing
+runs (the worker polls every `poll_s`; when it doesn't, the fix is its container, which nothing
+here reaches).
+
 ## The nightly report
 
 The [claude container](Claude-on-the-NAS) runs the checkup every morning at `CHECKUP_AT`
 (`deploy/claude/env.local`, e.g. `08:30`, after quiet hours; empty = off) and DMs you once:
 
-- **Nothing found:** a one-line "Checkup 11-09: all good.", with no model call.
+- **Nothing found:** a one-line "Checkup 11-09: all good.", with no model call, plus what the
+  repairs did or would have done in the last 24 hours, when they did anything.
 - **Findings:** a headless `claude -p` run (prompt: `deploy/claude/checkup.md`) reads the
   report, the stage logs, `logs/` and recent commits, and sends one DM with each problem, its
   likely cause and the next step. It runs on the Claude subscription, not the API key.
@@ -63,6 +101,6 @@ that has the kind (deployed after 2026-11-09).
 The DM is kind `checkup` in `[notify] kinds`, and `clipper alert send` is how any script queues
 one: `clipper alert send --kind checkup "text"`, or `-` to read stdin.
 
-Planned (#185 is closed; HANDOFF.md tracks the rest): more checks (repeated errors in `logs/`, cookies and tokens about to expire,
-Kitsu approvals that never reached the schedule), hourly runs once the nightly reports prove
-right, and then PRs for clear code fixes.
+Planned (#287): more checks (yt-dlp out of date or failing, cookies and tokens about to expire,
+repeated errors in `logs/`, Kitsu approvals that never reached the schedule), and then PRs for
+clear code fixes from the nightly run.

@@ -13,8 +13,14 @@ misses its upload, a title that breaks the house rules. This looks for those:
                at all in the next gap_hours
     lint       what is about to go out: [checkup] words in a title, description or
                thumbnail text, no description, a title or description over YouTube's limit
+    auto       an item that approved itself (#259) and that a person then undid
+    housekeeping  temp files a killed write left behind
 
-No model, no network, nothing written unless --mark. Each finding has a stable key; --mark
+--fix (#287, clipper/repairs.py) repairs what it can from a short allowlist and logs it; a run
+without it still says, per finding, what a repair would do. No model, no network; nothing
+written unless --mark or --fix.
+
+Each finding has a stable key; --mark
 keeps the keys in <streams>/.checkup/state.json, so the next run can say which are new (the
 claude container's nightly run uses it, deploy/claude/checkup.sh). Exit 1 when it finds anything.
 """
@@ -26,7 +32,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import daemon, jsonstate, services, worker
+from . import daemon, jsonstate, repairs, services, worker
 from .config import for_stream
 from .errors import ClipperError
 
@@ -234,9 +240,21 @@ def check_auto(cfg: dict, now: datetime) -> list[dict]:
     return out
 
 
+def check_housekeeping(cfg: dict, now: datetime) -> list[dict]:
+    """Temp files a killed write left beside a state file (repairs.leftover_tmp)."""
+    left = repairs.leftover_tmp(cfg, now.timestamp())
+    if not left:
+        return []
+    oldest = datetime.fromtimestamp(min(left.values()), UTC)
+    return [finding("tmp:leftover", "housekeeping", WARN,
+                    f"{len(left)} temp file{'s' if len(left) != 1 else ''} left by killed writes "
+                    f"(oldest {oldest:%m-%d}, e.g. {next(iter(left)).name})",
+                    look="safe to delete; `clipper checkup --fix` does with [checkup] fix = [\"tmp\"]")]
+
+
 CHECKS: dict[str, Callable[[dict, datetime], list[dict]]] = {
     "services": check_services, "streams": check_streams, "schedule": check_schedule, "lint": check_lint,
-    "auto": check_auto}
+    "auto": check_auto, "housekeeping": check_housekeeping}
 
 
 # ---------- running them ----------
@@ -246,9 +264,10 @@ def _state_path(cfg: dict) -> Path:
 
 
 def run(cfg: dict, only: list[str] | None = None, mark: bool = False,
-        now: datetime | None = None) -> dict:
-    """{at, checks, findings}; each finding also says when it was first seen and whether it is
-    new since the last --mark. A check that crashes is a finding too, so the rest still run."""
+        now: datetime | None = None, fix: bool = False) -> dict:
+    """{at, checks, findings, repairs}; each finding also says when it was first seen, whether it
+    is new since the last --mark, and what a repair did or would do (repairs.apply; fix: act).
+    repairs: the ledger's last 24 h. A check that crashes is a finding too, so the rest still run."""
     now = now or datetime.now(UTC)
     names = only or list(CHECKS)
     found = []
@@ -262,6 +281,7 @@ def run(cfg: dict, only: list[str] | None = None, mark: bool = False,
     for f in found:
         f["new"] = f["key"] not in seen
         f["first_seen"] = seen.get(f["key"], {}).get("first_seen", at)
+    repairs.apply(cfg, found, now, fix=fix)
     if mark:
         # Only what is still wrong is kept, so a problem that clears and comes back is new
         # again; a run of some checks (--only) leaves the others' findings as they were.
@@ -270,17 +290,30 @@ def run(cfg: dict, only: list[str] | None = None, mark: bool = False,
         path.parent.mkdir(parents=True, exist_ok=True)
         jsonstate.write(path, {"at": at, "seen": {
             **kept, **{f["key"]: {"first_seen": f["first_seen"], "check": f["check"]} for f in found}}}, indent=1)
-    return {"at": at, "checks": names, "findings": found}
+    return {"at": at, "checks": names, "findings": found, "repairs": repairs.recent(cfg, now)}
+
+
+def repair_lines(entries: list[dict], tz: ZoneInfo, hours: int = 24) -> list[str]:
+    """The ledger's recent entries: each repair made, then how many would-fixes were logged."""
+    if not entries:
+        return []
+    did = [e for e in entries if e.get("did")]
+    n = {"fixed": sum(1 for e in did if e.get("ok")), "failed": sum(1 for e in did if not e.get("ok")),
+         "would have fixed": len(entries) - len(did)}
+    head = [f"repairs in the last {hours} h: " + ", ".join(f"{k} {v}" for k, v in n.items() if v)]
+    return head + [f"  {datetime.fromisoformat(e['at']).astimezone(tz):%m-%d %H:%M} {e['kind']} {e['key']}: "
+                   f"{'' if e.get('ok') else 'FAILED '}{e['text']}" for e in did]
 
 
 def lines(report: dict, tz: ZoneInfo) -> list[str]:
     fs = report["findings"]
     at = datetime.fromisoformat(report["at"]).astimezone(tz)
+    tail = repair_lines(report.get("repairs", []), tz)
     if not fs:
-        return [f"checkup {at:%m-%d %H:%M}: all good ({', '.join(report['checks'])})"]
+        return [f"checkup {at:%m-%d %H:%M}: all good ({', '.join(report['checks'])})", *tail]
     new = sum(f["new"] for f in fs)
     out = [f"checkup {at:%m-%d %H:%M}: {len(fs)} finding{'s' if len(fs) != 1 else ''}"
-           + (f" ({new} new)" if new != len(fs) else "")]
+           + (f" ({new} new)" if new != len(fs) else "") + f"; {repairs.summary(fs)}"]
     for f in sorted(fs, key=lambda f: (f["level"] != BAD, list(CHECKS).index(f["check"])
                                        if f["check"] in CHECKS else 99)):
         tag = "BAD " if f["level"] == BAD else "warn"
@@ -288,4 +321,6 @@ def lines(report: dict, tz: ZoneInfo) -> list[str]:
         out.append(f"  {tag} {f['check']:<9} {f['text']}{since}")
         if f["look"]:
             out.append(f"       look: {f['look']}")
-    return out
+        if r := f.get("repair"):
+            out.append(f"       fix:  {r['state']}: {r['text']}")
+    return out + tail

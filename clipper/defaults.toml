@@ -698,6 +698,25 @@ queue_hours = 3              # a finished recording waiting this long while noth
 late_hours = 1               # a release not uploaded this close to its slot (or past it)
 gap_hours = 24               # no release at all this far ahead; 0 = no check
 words = ["hosts", "co-host", "co-hosts"]   # never in a title, description or thumbnail text
+# Self-maintenance (#287, `clipper checkup --fix`, clipper/repairs.py): fixed repairs for some
+# findings, no model. serve runs it every fix_minutes; only the kinds in `fix` act, the others
+# are logged as would-fix (<streams>/.checkup/repairs.json), so turn one on after a week of
+# reports. The kinds: "retry" (a run out of retries on a passing error: one attempt back; the
+# rerun of its failed stage may call models, as any run does) and "tmp" (delete temp files a
+# killed write left). Never an upload, a Kitsu decision, the recorder, footage, the config,
+# viewer-facing text or a restart; no repair calls a model itself.
+fix = []                     # e.g. ["tmp", "retry"]; [] = would-fix only
+fix_minutes = 60             # serve's checkup job; 0 = off
+max_repairs = 2              # tries per finding key in 7 days; then it waits for you
+retry_after_hours = 3        # "retry": this long after the run failed
+# "retry" only when the run's error has one of these (whole words, any case): a rate limit, a
+# dropped connection, a remote server's 5xx. Anything else is for a person to read.
+passing = ["Too Many Requests", "RateLimitError", "rate limit", "rate limited", "Error code: 429",
+           "Error code: 529", "OverloadedError", "overloaded_error", "Server Error",
+           "Service Unavailable", "Bad Gateway", "Gateway Timeout", "Gateway Time-out", "timed out",
+           "TimeoutError", "ReadTimeout", "ConnectTimeout", "FunctionTimeoutError", "ConnectionError",
+           "Connection reset", "Connection aborted", "RemoteDisconnected",
+           "Temporary failure in name resolution"]
 
 [audit]
 # `clipper audit`: the weekly digest (no model) and the monthly deep audit that reads the saved
