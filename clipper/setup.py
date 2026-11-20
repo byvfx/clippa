@@ -676,7 +676,8 @@ def ensure_env_key(cfg: dict, ask: Ask, name: str, what: str, where: str, check:
             continue
         if not value:
             say(f"skipped {name}; `clipper doctor` fails until it is set ({required})" if required
-                else f"skipped {name}; `clipper setup --step keys` asks again")
+                else f"skipped {name}")
+            say("`clipper setup --step keys` asks again")
             return
         os.environ[name] = value
         good, msg = check_key(name, cfg) if check else (True, "set")
@@ -719,7 +720,8 @@ def step_keys(cfg: dict, st: dict, ask: Ask) -> None:  # noqa: C901
             return kitsu_host_error(v, bool(need_kitsu and ask.interactive))
         host = ask.text("kitsu", "Kitsu address (review happens there)", "", url_ok).rstrip("/")
         if not host and need_kitsu:
-            say(f"skipped the Kitsu address; `clipper doctor` fails until [review] host is set ({need_kitsu})")
+            say(f"skipped the Kitsu address; `clipper doctor` fails until [review] host is set ({need_kitsu}); "
+                "`clipper setup --step keys` asks again")
         if host:
             host = host if host.endswith("/api") else host + "/api"
             toml_set(base(cfg)["_file"], "review", "host", host)
@@ -833,7 +835,11 @@ def main(cfg_path: str | None, step: str | None = None, answers: str | None = No
         cfg = config.load(cfg_path)
         if s == "check":
             return step_check(cfg, st, ask, offline)
-        {"mode": step_mode, "roles": step_roles, "machine": step_machine, "keys": step_keys}[s](cfg, st, ask)
+        try:
+            {"mode": step_mode, "roles": step_roles, "machine": step_machine, "keys": step_keys}[s](cfg, st, ask)
+        except KeyboardInterrupt:
+            print(f"\nStopped; `clipper setup` carries on from {s}.")
+            return 130
         cfg = config.load(cfg_path)
         bad = [r for r in checks_for(cfg, st, s) if r[0] == "FAIL"]
         if bad:
