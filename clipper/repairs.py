@@ -30,8 +30,9 @@ import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from . import jsonstate
 from .config import for_stream
@@ -92,6 +93,14 @@ def _give_back(cfg: dict, d: Path) -> str:
     return f"{d.name}: one attempt back; the worker runs it on its next pass"
 
 
+def _mtime(path: Path) -> datetime | None:
+    """When run.json was last written: the failure's time when it has no `updated`."""
+    try:
+        return datetime.fromtimestamp(path.stat().st_mtime, UTC)
+    except OSError:
+        return None
+
+
 def plan_retry(cfg: dict, f: dict, now: datetime) -> Plan | None:
     d = cfg["paths"]["streams"] / f["stream"]
     run = jsonstate.read_or(d / "run.json", {})
@@ -99,10 +108,11 @@ def plan_retry(cfg: dict, f: dict, now: datetime) -> Plan | None:
     cause = passing_cause(ck["passing"], run.get("error", ""))
     if not cause:
         return None   # not a passing error: a person reads the log
-    failed = _when(run.get("updated")) or now
+    failed = _when(run.get("updated")) or _mtime(d / "run.json") or now
     after = failed + timedelta(hours=ck["retry_after_hours"])
     if now < after:
-        return Plan("retry", False, f"one more attempt after {after.astimezone():%m-%d %H:%M} "
+        tz = ZoneInfo(cfg["schedule"]["timezone"])
+        return Plan("retry", False, f"one more attempt after {after.astimezone(tz):%m-%d %H:%M} "
                                     f"(the error says {cause!r})")
     return Plan("retry", True, f"one more attempt (the error says {cause!r})", lambda: _give_back(cfg, d))
 
@@ -138,14 +148,16 @@ def leftover_tmp(cfg: dict, now_s: float | None = None) -> dict[Path, float]:
 
 def _delete(paths: list[Path]) -> str:
     _scanned.clear()
-    gone = 0
+    errors = []
     for p in paths:
         try:
             p.unlink(missing_ok=True)
-            gone += 1
-        except OSError:
-            continue
-    return f"deleted {gone} of {len(paths)} leftover temp files"
+        except OSError as e:
+            errors.append(f"{p.name}: {e.strerror or e}")
+    if errors:   # a failed try: it counts toward the cap, and serve DMs it
+        raise ClipperError(f"deleted {len(paths) - len(errors)} of {len(paths)} leftover temp files; "
+                           f"{len(errors)} couldn't be: {errors[0]}")
+    return f"deleted {len(paths)} leftover temp files"
 
 
 def plan_tmp(cfg: dict, f: dict, now: datetime) -> Plan | None:
@@ -205,7 +217,7 @@ def apply(cfg: dict, findings: list[dict], now: datetime, fix: bool = False) -> 
     """Give each finding a `repair`: {kind, state, text}, state one of
         done     fixed this run            would    a kind not in [checkup] fix: what it would do
         due      on and ready: serve's next --fix makes it (a run without --fix)
-        waiting  fixes later (text: when)  capped   max_repairs used up: it needs a person
+        waiting  on, fixes later (text: when)  capped   max_repairs used up: it needs a person
         failed   the repair raised (text: why)
     (no `repair`: nothing here can fix it). fix: act and write the ledger; without it nothing
     is written. Returns the new ledger entries."""
@@ -230,14 +242,14 @@ def apply(cfg: dict, findings: list[dict], now: datetime, fix: bool = False) -> 
         rep = f["repair"] = {"kind": plan.kind, "state": "", "text": plan.text}
         if tries(log, f["key"], now) >= cap:
             rep.update(state="capped", text=f"tried {cap} times in {CAP_DAYS} days ({plan.text}): it needs you")
-        elif not plan.ready:
-            rep["state"] = "waiting"
         elif plan.kind not in on:
-            rep["state"] = "would"
+            rep["state"] = "would"   # (a would-fix that isn't ready yet isn't logged: it did nothing yet)
             last = max((t for e in log if e.get("key") == f["key"] and not e.get("did")
                         and (t := _when(e.get("at")))), default=None)
-            if fix and (last is None or (now - last).total_seconds() >= WOULD_EVERY_S):
+            if fix and plan.ready and (last is None or (now - last).total_seconds() >= WOULD_EVERY_S):
                 new.append({"at": at, "key": f["key"], "kind": plan.kind, "did": False, "text": plan.text})
+        elif not plan.ready:
+            rep["state"] = "waiting"
         elif not fix:
             rep.update(state="due", text=f"{plan.text} (serve's next checkup --fix)")
         else:

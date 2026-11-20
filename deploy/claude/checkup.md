@@ -14,7 +14,7 @@ restart, no commit, no PR. If a fix needs one of those, say what the user should
 How to read it:
 - A finding may carry "repair" (serve's `clipper checkup --fix`, which runs hourly): "due" = on,
   serve makes it within the hour; "waiting" = on, later (the text says when); "would" = a repair
-  that isn't turned on yet ([checkup] fix); "capped" = repairs ran out; "failed" = the repair
+  that isn't turned on yet ([checkup] fix; the text may say when it would act); "capped" = repairs ran out; "failed" = the repair
   broke. The report's "repairs" are what was fixed (did: true) or would have been in the last 24 h.
 - Findings with "new": false were in last night's report too; say "still" and keep them short.
 - A stream whose run.json heartbeat is fresh is the worker's: read it, never touch it.

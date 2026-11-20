@@ -148,7 +148,7 @@ def test_tmp_finds_old_temp_files_and_deletes_them_when_enabled(defaults, tmp_pa
     assert f["repair"]["state"] == "would"
     cfg["checkup"]["fix"] = ["tmp"]
     (f,) = checkup.run(cfg, only=["housekeeping"], now=NOW, fix=True)["findings"]
-    assert f["repair"] == {"kind": "tmp", "state": "done", "text": "deleted 3 of 3 leftover temp files"}
+    assert f["repair"] == {"kind": "tmp", "state": "done", "text": "deleted 3 leftover temp files"}
     assert not any(p.exists() for p in old)
     assert (root / "kick-1" / "review.json.7.8.tmp").exists() and (root / "kick-1" / "notes.tmp").exists()
     assert checkup.run(cfg, only=["housekeeping"], now=NOW)["findings"] == []
@@ -254,3 +254,51 @@ def test_only_offers_every_check():
     sub = next(a for a in p._subparsers._group_actions if a.dest)
     only = next(a for a in sub.choices["checkup"]._actions if a.dest == "only")
     assert set(only.choices) == set(checkup.CHECKS)
+
+
+def test_a_retry_that_is_off_is_would_even_while_it_waits(defaults, tmp_path):
+    cfg = in_tmp(defaults, tmp_path)
+    cfg["schedule"]["timezone"] = "America/Los_Angeles"
+    failed(cfg, ago=timedelta(hours=1))
+    (f,) = streams_findings(cfg, fix=True)
+    assert f["repair"]["state"] == "would" and repairs.summary([f]) == "would fix 1"
+    assert "after 11-20 06:00" in f["repair"]["text"]          # 13:00 UTC, in the schedule's zone
+    assert repairs.ledger(cfg) == []                           # not ready: nothing it would have done yet
+    cfg["checkup"]["fix"] = ["retry"]
+    (f,) = streams_findings(cfg, fix=True)
+    assert f["repair"]["state"] == "waiting" and repairs.summary([f]) == "will fix 1"
+
+
+def test_a_run_without_updated_waits_from_when_run_json_was_written(defaults, tmp_path):
+    cfg = in_tmp(defaults, tmp_path)
+    cfg["checkup"]["fix"] = ["retry"]
+    d = failed(cfg)
+    run = jsonstate.load(d / "run.json")
+    del run["updated"]
+    jsonstate.write(d / "run.json", run)
+    t = NOW.timestamp() - 4 * 3600
+    os.utime(d / "run.json", (t, t))
+    (f,) = streams_findings(cfg, fix=True)
+    assert f["repair"]["state"] == "done"
+
+
+def test_a_temp_file_that_wont_delete_is_a_failed_repair(defaults, tmp_path, monkeypatch):
+    from pathlib import Path
+
+    cfg = in_tmp(defaults, tmp_path)
+    cfg["checkup"]["fix"] = ["tmp"]
+    old_tmp(cfg["paths"]["streams"] / "run.json.1.1.tmp")
+    old_tmp(cfg["paths"]["streams"] / "kick-1" / "run.json.2.2.tmp")
+    real = Path.unlink
+
+    def busy(self, missing_ok=False):
+        if self.name == "run.json.2.2.tmp":
+            raise PermissionError(13, "Permission denied")
+        return real(self, missing_ok=missing_ok)
+
+    monkeypatch.setattr(Path, "unlink", busy)
+    (f,) = checkup.run(cfg, only=["housekeeping"], now=NOW, fix=True)["findings"]
+    assert f["repair"]["state"] == "failed"
+    assert "deleted 1 of 2" in f["repair"]["text"] and "Permission denied" in f["repair"]["text"]
+    (e,) = repairs.ledger(cfg)
+    assert e["did"] is True and e["ok"] is False
