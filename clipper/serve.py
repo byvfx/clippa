@@ -22,6 +22,7 @@ Jobs (`jobs()`; each runs `clipper ...` as a child process; an interval of 0 tur
     blinds     every [blinds] check_minutes: `clipper blinds check` (the bot asks you about them)
     backup     `clipper backup` when the newest zip is [backup] every_days old (looked at hourly)
     prune      daily with [streams] keep_source_days: `clipper streams prune --yes --older-than N`
+               (and `--while-free-below P` with [streams] keep_free_pct)
     checkup    every [checkup] fix_minutes: `clipper checkup --fix` (#287) over the checks that have
                repairs: the ones [checkup] fix lists act, the others are logged as would-fix
 A job that exits non-zero is queued as a DM (clipper/alerts.py; the bot sends it). One marked
@@ -183,8 +184,10 @@ class Serve:
              lambda: task(self.run_clipper("backup", ["backup"]))),
             Job("prune", 86400 if cfg["streams"]["keep_source_days"] else 0,  # #204: source and audio
              lambda: not self.running("prune"),
-             lambda: task(self.run_clipper("prune", ["streams", "prune", "--yes", "--older-than",
-                                                     str(cfg["streams"]["keep_source_days"])])),
+             lambda: task(self.run_clipper("prune", [
+                 "streams", "prune", "--yes", "--older-than", str(cfg["streams"]["keep_source_days"]),
+                 *(["--while-free-below", str(cfg["streams"]["keep_free_pct"])]
+                   if cfg["streams"]["keep_free_pct"] else [])])),
              retry=True),
             Job("checkup", cfg["checkup"]["fix_minutes"] * 60,  # #287: no model; repairs are capped
              lambda: not self.running("checkup"),

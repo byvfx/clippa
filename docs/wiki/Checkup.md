@@ -26,7 +26,7 @@ clipper checkup --fix            # make the repairs [checkup] fix allows (serve 
 | schedule | nothing at all releases in the next `gap_hours` | `gap_hours` (24; 0 = off) |
 | lint | a title, description or thumbnail text about to go out has one of `words` in it, is over YouTube's limit, or has no description. It checks what `clipper upload` would send (Kitsu's columns, then the draft) | `words` |
 | auto | an item that [approved itself](Review#approval-by-silence) in the last 14 days and that a person then rejected, reopened, held or sent back for changes | `[review] auto_min_*`, `auto_grace_minutes` |
-| housekeeping | temp files (`<file>.<pid>.<thread>.tmp`) a killed write left beside a state file, a day old or more | - |
+| housekeeping | temp files (`<file>.<pid>.<thread>.tmp`) a killed write left beside a state file, a day old or more; and the share's free space under `[streams] keep_free_pct` (off at 0; a warning, bad under half of it; [Backups](Backups#disk-clipper-streams) has what prune then takes) | - |
 
 The settings are `[checkup]` in the config; a show's table or a stream's own `config.toml` can
 override them for its streams and items. A check that crashes is reported as a finding of

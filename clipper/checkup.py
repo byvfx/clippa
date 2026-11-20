@@ -32,7 +32,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import daemon, jsonstate, repairs, services, worker
+from . import daemon, jsonstate, repairs, services, streams, worker
 from .config import for_stream
 from .errors import ClipperError
 
@@ -240,16 +240,33 @@ def check_auto(cfg: dict, now: datetime) -> list[dict]:
     return out
 
 
+def check_disk(cfg: dict) -> list[dict]:
+    """The share's free space under [streams] keep_free_pct (off at 0): serve's daily prune takes
+    streams older than keep_source_days while it is, and this says so without scanning a stream."""
+    want = cfg["streams"]["keep_free_pct"]
+    free = streams.free_pct(cfg) if want else None
+    if free is None or free >= want:
+        return []
+    days = cfg["streams"]["keep_source_days"]
+    look = (f"serve's daily prune removes source and audio older than {days:g} days, oldest first; "
+            "`clipper streams list` shows what that frees" if days else
+            "[streams] keep_source_days is 0, so nothing prunes by itself: `clipper streams prune`")
+    return [finding("disk:free", "housekeeping", BAD if free < want / 2 else WARN,
+                    f"{free:.1f}% of the share is free, under [streams] keep_free_pct {want:g}%", look=look)]
+
+
 def check_housekeeping(cfg: dict, now: datetime) -> list[dict]:
-    """Temp files a killed write left beside a state file (repairs.leftover_tmp)."""
+    """Temp files a killed write left beside a state file (repairs.leftover_tmp), and a share
+    running low on space (check_disk)."""
+    out = check_disk(cfg)
     left = repairs.leftover_tmp(cfg, now.timestamp())
     if not left:
-        return []
+        return out
     oldest = datetime.fromtimestamp(min(left.values()), UTC)
-    return [finding("tmp:leftover", "housekeeping", WARN,
-                    f"{len(left)} temp file{'s' if len(left) != 1 else ''} left by killed writes "
-                    f"(oldest {oldest:%m-%d}, e.g. {next(iter(left)).name})",
-                    look="safe to delete; `clipper checkup --fix` does with [checkup] fix = [\"tmp\"]")]
+    return [*out, finding("tmp:leftover", "housekeeping", WARN,
+                          f"{len(left)} temp file{'s' if len(left) != 1 else ''} left by killed writes "
+                          f"(oldest {oldest:%m-%d}, e.g. {next(iter(left)).name})",
+                          look="safe to delete; `clipper checkup --fix` does with [checkup] fix = [\"tmp\"]")]
 
 
 CHECKS: dict[str, Callable[[dict, datetime], list[dict]]] = {

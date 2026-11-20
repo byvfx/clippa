@@ -77,3 +77,9 @@ A stream is left alone when:
 
 With `[streams] keep_source_days` set, serve runs `clipper streams prune --yes` once a day. It
 is 0 (only by hand) by default.
+
+To keep recordings as long as the disk has room, also set `[streams] keep_free_pct` (say 15): serve's
+daily prune then takes streams older than `keep_source_days` only while the share has less than that
+percent free, oldest first, and stops as soon as it has enough (`clipper streams prune --while-free-below 15`
+does the same by hand). `keep_source_days` stays the floor: nothing younger goes. The checkup warns
+when free space is under `keep_free_pct` ([Checkup](Checkup)).

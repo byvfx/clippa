@@ -151,3 +151,62 @@ def test_listing_totals_and_hides_small_streams(cfg):
 def test_older_than_must_be_a_day(cfg):
     with pytest.raises(ClipperError, match="at least 1 day"):
         streams.prune(cfg, older_than_days=0)
+
+
+def test_prune_while_free_below_goes_oldest_first_and_stops_once_there_is_room(cfg, monkeypatch):
+    make(cfg, "kick-1", 90, {"s01": {"decision": "approved"}})
+    make(cfg, "kick-2", 70, {"s01": {"decision": "approved"}})
+    make(cfg, "kick-3", 50, {"s01": {"decision": "approved"}})
+    free = iter([10.0, 25.0])   # under 20% before the first stream, over it before the second
+    monkeypatch.setattr(streams, "free_pct", lambda cfg, plus=0: next(free))
+    out = streams.prune(cfg, older_than_days=30, yes=True, while_free_below=20)
+    root = cfg["paths"]["streams"]
+    assert not (root / "kick-1" / "source.mkv").exists()
+    assert (root / "kick-2" / "source.mkv").exists() and (root / "kick-3" / "source.mkv").exists()
+    assert any("25.0% of the share is free" in line for line in out)
+
+
+def test_prune_while_free_below_does_nothing_when_there_is_room_and_the_age_floor_still_holds(cfg, monkeypatch):
+    d = make(cfg, "kick-1", 90, {"s01": {"decision": "approved"}})
+    young = make(cfg, "kick-2", 10, {"s01": {"decision": "approved"}})
+    monkeypatch.setattr(streams, "free_pct", lambda cfg, plus=0: 60.0)
+    streams.prune(cfg, older_than_days=30, yes=True, while_free_below=20)
+    assert (d / "source.mkv").exists()
+    monkeypatch.setattr(streams, "free_pct", lambda cfg, plus=0: 5.0)
+    streams.prune(cfg, older_than_days=30, yes=True, while_free_below=20)
+    assert not (d / "source.mkv").exists() and (young / "source.mkv").exists()   # 10 days is under the floor
+
+
+def test_a_dry_run_counts_what_it_would_free_when_it_checks_the_room(cfg, monkeypatch):
+    make(cfg, "kick-1", 90, {"s01": {"decision": "approved"}})
+    seen = []
+    monkeypatch.setattr(streams, "free_pct", lambda cfg, plus=0: seen.append(plus) or 1.0)
+    streams.prune(cfg, older_than_days=30, while_free_below=20)
+    assert seen == [0]
+
+
+def test_oldest_first_goes_by_the_start_time_not_the_day(cfg, monkeypatch):
+    a = make(cfg, "kick-999", 60, {"s01": {"decision": "approved"}})   # sorts first by name
+    b = make(cfg, "yt-abc", 60, {"s01": {"decision": "approved"}})
+    base = datetime.now(UTC) - timedelta(days=60)
+    jsonstate.write(a / "meta.json", {"started_at": (base.replace(hour=20)).isoformat(), "channel": "kinocasinogaming"})
+    jsonstate.write(b / "meta.json", {"started_at": (base.replace(hour=1)).isoformat(), "channel": "kinocasinogaming"})
+    free = iter([5.0, 50.0])
+    monkeypatch.setattr(streams, "free_pct", lambda cfg, plus=0: next(free))
+    streams.prune(cfg, older_than_days=30, yes=True, while_free_below=20)
+    assert not (b / "source.mkv").exists() and (a / "source.mkv").exists()
+
+
+def test_prune_checks_a_stream_again_just_before_removing_it(cfg, monkeypatch):
+    first = make(cfg, "kick-1", 90, {"s01": {"decision": "approved"}})
+    second = make(cfg, "kick-2", 91, {"s01": {"decision": "approved"}})
+    real = streams.removable
+
+    def removable(sdir, c, cuts):
+        if sdir.name == "kick-1":   # a change request lands while prune is busy with the first stream
+            jsonstate.write(second / "review.json", {"s01": {"decision": "changes_requested"}})
+        return real(sdir, c, cuts)
+
+    monkeypatch.setattr(streams, "removable", removable)
+    streams.prune(cfg, older_than_days=30, yes=True)
+    assert not (first / "source.mkv").exists() and (second / "source.mkv").exists()
