@@ -30,10 +30,28 @@ from pathlib import Path
 
 from . import jsonstate
 from .config import base, for_stream
+from .errors import ClipperError
 from .lift import D7_DAYS, median
 from .states import split_key
 
 ANALYTICS_SCOPE = "https://www.googleapis.com/auth/yt-analytics.readonly"
+# Google answers a 500 backendError now and then that works a second later (2026-11-20: one
+# video's 7-day query failed the whole run). Every call retries that itself: googleapiclient's
+# num_retries backs off on 5xx, 429, rate-limit 403s and dropped connections (about a minute
+# at most). A video whose query still fails is skipped and tried again next run; GIVE_UP runs
+# in a row and the run fails, so serve DMs about it.
+RETRIES = 5
+GIVE_UP = 3
+TRANSIENT = {429, 500, 502, 503, 504}
+
+
+def transient(e: Exception) -> bool:
+    """An error a later run will likely not see: a 5xx or 429 from Google, or the network."""
+    from googleapiclient.errors import HttpError
+
+    if isinstance(e, HttpError):
+        return e.resp.status in TRANSIENT
+    return isinstance(e, (TimeoutError, ConnectionError))
 
 
 def path_of(cfg: dict) -> Path:
@@ -94,9 +112,47 @@ def run(cfg: dict, sign_in: bool = False) -> dict:
     ya = build("youtubeAnalytics", "v2", credentials=creds, cache_discovery=False) if has_analytics else None
     now = datetime.now(UTC)
     by_id = {e["video_id"]: e for e in up}
+    p = path_of(cfg)
+    try:
+        refresh_counts(cfg, data, by_id, yt, now)
+        skipped = fill_d7(data, by_id, ya, now) if ya else {}
+        if ya:  # channel-wide totals and traffic sources, for the report and the war room
+            try:
+                fetch_channel(cfg, ya, now)
+            except Exception as e:  # noqa: BLE001  # the per-video numbers still count
+                print(f"  channel totals: {short(e)} (the last ones stay; next run tries again)")
+    finally:  # what came in before an error still counts
+        jsonstate.write(p, data)
+    d7 = sum(1 for r in data.values() if r.get("d7"))
+    print(f"{len(data)} videos in {p.name} ({d7} with 7-day numbers"
+          + ("" if has_analytics else "; run `clipper analytics --sign-in` for those") + ")")
+    if skipped:
+        print(f"  7-day numbers of {len(skipped)} video(s) skipped after retries "
+              f"({next(iter(skipped.values()))}); next run tries again")
+    stuck = {vid: err for vid, err in skipped.items() if data[vid].get("d7_errors", 0) >= GIVE_UP}
+    if stuck:
+        vid, err = next(iter(stuck.items()))
+        raise ClipperError(f"7-day numbers of {len(stuck)} video(s) failed {GIVE_UP}+ runs in a row "
+                           f"(first: {vid}, {err})")
+    return data
+
+
+def short(e: Exception) -> str:
+    """One line for an error: an HttpError's status and reason, not its whole URL."""
+    from googleapiclient.errors import HttpError
+
+    if isinstance(e, HttpError):
+        return f"HttpError {e.resp.status} {getattr(e, 'reason', '') or ''}".strip()
+    return f"{type(e).__name__}: {str(e)[:160]}"
+
+
+def refresh_counts(cfg: dict, data: dict, by_id: dict, yt, now: datetime) -> None:
+    """Views, likes and comments of every uploaded video from the Data API, into data; a
+    video YouTube no longer lists is marked missing."""
     ids = list(by_id)
     for i in range(0, len(ids), 50):
-        res = yt.videos().list(part="statistics,snippet", id=",".join(ids[i:i + 50])).execute()
+        res = yt.videos().list(part="statistics,snippet",
+                               id=",".join(ids[i:i + 50])).execute(num_retries=RETRIES)
         for v in res.get("items", []):
             e = by_id[v["id"]]
             st = v.get("statistics", {})
@@ -110,32 +166,37 @@ def run(cfg: dict, sign_in: bool = False) -> dict:
     gone = [vid for vid in ids if vid in data and data[vid].get("checked_at") != now.isoformat(timespec="seconds")]
     for vid in gone:
         data[vid]["missing"] = True  # deleted or private on YouTube
-    if ya:
-        for vid, rec in data.items():
-            if rec.get("d7") or vid not in by_id:
-                continue
-            pub = datetime.fromisoformat(rec["publish_at"]).astimezone(UTC).date()
-            if (now.date() - pub).days < D7_DAYS:  # Analytics lags ~2 days; wait for a full week
-                continue
+
+
+def fill_d7(data: dict, by_id: dict, ya, now: datetime) -> dict[str, str]:
+    """First-7-days numbers from the Analytics API for each uploaded video a week old that
+    has none yet. One whose query still fails with a passing error after the retries is skipped:
+    its d7_errors counts the runs in a row, and the next run asks again. Returns those
+    skipped, video id -> the error; any other error raises."""
+    skipped = {}
+    for vid, rec in data.items():
+        if rec.get("d7") or vid not in by_id:
+            continue
+        pub = datetime.fromisoformat(rec["publish_at"]).astimezone(UTC).date()
+        if (now.date() - pub).days < D7_DAYS:  # Analytics lags ~2 days; wait for a full week
+            continue
+        try:
             r = ya.reports().query(
                 ids="channel==MINE", startDate=pub.isoformat(),
                 endDate=(pub + timedelta(days=6)).isoformat(), filters=f"video=={vid}",
                 metrics="views,estimatedMinutesWatched,averageViewDuration,"
-                        "averageViewPercentage,subscribersGained,likes").execute()
-            if r.get("rows"):
-                cols = [h["name"] for h in r["columnHeaders"]]
-                rec["d7"] = dict(zip(cols, r["rows"][0]))
-    if ya:  # channel-wide totals and traffic sources, for the report and the war room
-        try:
-            fetch_channel(cfg, ya, now)
-        except Exception as e:  # noqa: BLE001  # the per-video numbers still count
-            print(f"  channel totals: {type(e).__name__}: {str(e)[:200]}")
-    p = path_of(cfg)
-    jsonstate.write(p, data)
-    d7 = sum(1 for r in data.values() if r.get("d7"))
-    print(f"{len(data)} videos in {p.name} ({d7} with 7-day numbers"
-          + ("" if has_analytics else "; run `clipper analytics --sign-in` for those") + ")")
-    return data
+                        "averageViewPercentage,subscribersGained,likes").execute(num_retries=RETRIES)
+        except Exception as e:
+            if not transient(e):
+                raise
+            rec["d7_errors"] = rec.get("d7_errors", 0) + 1
+            skipped[vid] = short(e)
+            continue
+        rec.pop("d7_errors", None)
+        if r.get("rows"):
+            cols = [h["name"] for h in r["columnHeaders"]]
+            rec["d7"] = dict(zip(cols, r["rows"][0]))
+    return skipped
 
 
 def show(cfg: dict) -> None:
@@ -198,7 +259,8 @@ def fetch_channel(cfg: dict, ya, now: datetime) -> dict:
     start = end - timedelta(days=CHANNEL_DAYS)
     r = ya.reports().query(ids="channel==MINE", startDate=start.isoformat(), endDate=end.isoformat(),
                            dimensions="day", sort="day",
-                           metrics="views,estimatedMinutesWatched,subscribersGained,subscribersLost,likes").execute()
+                           metrics="views,estimatedMinutesWatched,subscribersGained,subscribersLost,likes"
+                           ).execute(num_retries=RETRIES)
     cols = [h["name"] for h in r.get("columnHeaders", [])]
     daily = [dict(zip(cols, row, strict=False)) for row in r.get("rows") or []]
     traffic = {}
@@ -207,7 +269,7 @@ def fetch_channel(cfg: dict, ya, now: datetime) -> dict:
         last = min(end, (first + timedelta(days=32)).replace(day=1) - timedelta(days=1))
         t = ya.reports().query(ids="channel==MINE", startDate=first.isoformat(), endDate=last.isoformat(),
                                dimensions="insightTrafficSourceType", sort="-views",
-                               metrics="views,estimatedMinutesWatched").execute()
+                               metrics="views,estimatedMinutesWatched").execute(num_retries=RETRIES)
         traffic[first.strftime("%Y-%m")] = [{"source": row[0], "views": row[1], "minutes": row[2]}
                                             for row in t.get("rows") or []]
         first = (first - timedelta(days=1)).replace(day=1)

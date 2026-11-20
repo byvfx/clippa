@@ -318,7 +318,7 @@ messages: GitHub closes the issue on "fix".
   Kick-first stretch hatched after it and in the show's lane, a dashed bar for a show live on Kick but not recorded,
   from `/api/live`), Uploads (the last 2 days against `max_per_24h`, the 24 h band across every lane) and Open slots
   (drop targets). `kickMs()` in core.js parses Kick's zone-less UTC times. Step 8, the phone and the last plan step,
-  is PR #333, merged 11-19 (Grok reviewed it), **not deployed** (user: notes only): under 700 px the List is an agenda
+  is PR #333, merged 11-19 (Grok reviewed it), deployed 11-20, so all 8 steps are live: under 700 px the List is an agenda
   (past folded into one row, no empty days, open slots only while pinning); tap to pin (`arm()` in panels.js, desktop
   too: tap a Ready to slot chip, then an open slot or a day; the same `dropPin`/`dayPin` and `act(ref, "pin")`; Esc
   puts it down only when no visible window, menu or field has it); the queue's Filters are a bottom sheet on a phone.
