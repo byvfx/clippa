@@ -181,7 +181,8 @@ def fill_d7(data: dict, by_id: dict, ya, now: datetime) -> dict[str, str]:
     has none yet. One whose query still fails with a passing error after the retries is skipped:
     its d7_errors counts the runs in a row, and the next run asks again. Returns those
     skipped, video id -> the error; any other error raises. Once one has used up its retries
-    (Google is down, likely), the rest get one try each rather than a minute of backoff each."""
+    (Google is down, likely), the rest get one try each rather than a minute of backoff each,
+    until one answers: then the retries are back."""
     skipped, retries = {}, RETRIES
     for vid, rec in data.items():
         if rec.get("d7") or vid not in by_id:
@@ -202,6 +203,7 @@ def fill_d7(data: dict, by_id: dict, ya, now: datetime) -> dict[str, str]:
             skipped[vid], retries = short(e), 0
             continue
         rec.pop("d7_errors", None)
+        retries = RETRIES  # Google answers: one video's lasting 500 doesn't cost the next its retries
         if r.get("rows"):
             cols = [h["name"] for h in r["columnHeaders"]]
             rec["d7"] = dict(zip(cols, r["rows"][0]))

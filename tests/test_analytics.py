@@ -73,6 +73,14 @@ def test_an_outage_costs_one_backoff_not_one_per_video():
     assert ya.retries == [analytics.RETRIES, 0, 0]
 
 
+def test_an_answer_brings_the_retries_back():  # Grok on #336
+    data = {v: rec() for v in "abcd"}
+    ya = FakeAnalytics({"a": http_error(500), "c": http_error(500)})
+    assert set(analytics.fill_d7(data, dict.fromkeys(data), ya, NOW)) == {"a", "c"}
+    # a lasting 500 on a, b answers at once, so c (likely a passing one) gets its retries again
+    assert ya.retries == [analytics.RETRIES, 0, analytics.RETRIES, 0]
+
+
 def test_one_video_failing_skips_it_and_keeps_the_rest():
     data = {"a": rec(), "b": rec(), "new": rec("2026-11-18T10:00:00-08:00")}
     ya = FakeAnalytics({"a": http_error(500)})
