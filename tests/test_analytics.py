@@ -19,11 +19,13 @@ def http_error(status, reason="backendError"):
 
 
 class Request:
-    def __init__(self, answer):
-        self.answer = answer
+    def __init__(self, answer, log=None):
+        self.answer, self.log = answer, log
 
     def execute(self, num_retries=0):
-        assert num_retries == analytics.RETRIES  # every call retries a passing error itself
+        assert num_retries in (0, analytics.RETRIES)
+        if self.log is not None:
+            self.log.append(num_retries)
         if isinstance(self.answer, Exception):
             raise self.answer
         return self.answer
@@ -33,7 +35,7 @@ class FakeAnalytics:
     """reports().query(...): the error set for a video, else one row of 7-day numbers."""
     def __init__(self, errors=None):
         self.errors = errors or {}
-        self.asked = []
+        self.asked, self.retries = [], []
 
     def reports(self):
         return self
@@ -44,8 +46,8 @@ class FakeAnalytics:
         vid = kw["filters"].removeprefix("video==")
         self.asked.append(vid)
         if vid in self.errors:
-            return Request(self.errors[vid])
-        return Request({"columnHeaders": [{"name": "views"}], "rows": [[40]]})
+            return Request(self.errors[vid], self.retries)
+        return Request({"columnHeaders": [{"name": "views"}], "rows": [[40]]}, self.retries)
 
 
 def rec(published="2026-11-01T10:00:00-08:00"):
@@ -55,9 +57,28 @@ def rec(published="2026-11-01T10:00:00-08:00"):
 def test_transient():
     assert analytics.transient(http_error(500)) and analytics.transient(http_error(503))
     assert analytics.transient(http_error(429, "rateLimitExceeded"))
+    assert analytics.transient(http_error(403, "rateLimitExceeded"))
     assert analytics.transient(TimeoutError()) and analytics.transient(ConnectionResetError())
+    assert analytics.transient(httplib2.ServerNotFoundError("no DNS"))
     assert not analytics.transient(http_error(403, "forbidden"))
+    assert not analytics.transient(http_error(403, "quotaExceeded"))
+    assert not analytics.transient(http_error(400, "badRequest"))
     assert not analytics.transient(KeyError("rows"))
+
+
+def test_an_outage_costs_one_backoff_not_one_per_video():
+    data = {v: rec() for v in "abc"}
+    ya = FakeAnalytics(dict.fromkeys(data, http_error(503)))
+    assert set(analytics.fill_d7(data, dict.fromkeys(data), ya, NOW)) == {"a", "b", "c"}
+    assert ya.retries == [analytics.RETRIES, 0, 0]
+
+
+def test_an_answer_brings_the_retries_back():  # Grok on #336
+    data = {v: rec() for v in "abcd"}
+    ya = FakeAnalytics({"a": http_error(500), "c": http_error(500)})
+    assert set(analytics.fill_d7(data, dict.fromkeys(data), ya, NOW)) == {"a", "c"}
+    # a lasting 500 on a, b answers at once, so c (likely a passing one) gets its retries again
+    assert ya.retries == [analytics.RETRIES, 0, analytics.RETRIES, 0]
 
 
 def test_one_video_failing_skips_it_and_keeps_the_rest():

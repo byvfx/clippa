@@ -42,16 +42,24 @@ ANALYTICS_SCOPE = "https://www.googleapis.com/auth/yt-analytics.readonly"
 # in a row and the run fails, so serve DMs about it.
 RETRIES = 5
 GIVE_UP = 3
-TRANSIENT = {429, 500, 502, 503, 504}
+RATE_LIMITS = {"rateLimitExceeded", "userRateLimitExceeded"}  # 403s, not quotaExceeded
 
 
 def transient(e: Exception) -> bool:
-    """An error a later run will likely not see: a 5xx or 429 from Google, or the network."""
+    """An error a later run will likely not see: a 5xx, a 429 or a rate-limit 403 from
+    Google, or the network (a timeout, a dropped connection, DNS)."""
     from googleapiclient.errors import HttpError
+    from httplib2 import HttpLib2Error
+
+    from .youtube import RETRY_STATUS
 
     if isinstance(e, HttpError):
-        return e.resp.status in TRANSIENT
-    return isinstance(e, (TimeoutError, ConnectionError))
+        if e.resp.status in RETRY_STATUS | {429}:
+            return True
+        reasons = {d.get("reason") for d in e.error_details if isinstance(d, dict)} \
+            if isinstance(e.error_details, list) else set()
+        return e.resp.status == 403 and bool(reasons & RATE_LIMITS)
+    return isinstance(e, (OSError, HttpLib2Error))  # TimeoutError, ConnectionError are OSErrors
 
 
 def path_of(cfg: dict) -> Path:
@@ -172,8 +180,10 @@ def fill_d7(data: dict, by_id: dict, ya, now: datetime) -> dict[str, str]:
     """First-7-days numbers from the Analytics API for each uploaded video a week old that
     has none yet. One whose query still fails with a passing error after the retries is skipped:
     its d7_errors counts the runs in a row, and the next run asks again. Returns those
-    skipped, video id -> the error; any other error raises."""
-    skipped = {}
+    skipped, video id -> the error; any other error raises. Once one has used up its retries
+    (Google is down, likely), the rest get one try each rather than a minute of backoff each,
+    until one answers: then the retries are back."""
+    skipped, retries = {}, RETRIES
     for vid, rec in data.items():
         if rec.get("d7") or vid not in by_id:
             continue
@@ -185,14 +195,15 @@ def fill_d7(data: dict, by_id: dict, ya, now: datetime) -> dict[str, str]:
                 ids="channel==MINE", startDate=pub.isoformat(),
                 endDate=(pub + timedelta(days=6)).isoformat(), filters=f"video=={vid}",
                 metrics="views,estimatedMinutesWatched,averageViewDuration,"
-                        "averageViewPercentage,subscribersGained,likes").execute(num_retries=RETRIES)
+                        "averageViewPercentage,subscribersGained,likes").execute(num_retries=retries)
         except Exception as e:
             if not transient(e):
                 raise
             rec["d7_errors"] = rec.get("d7_errors", 0) + 1
-            skipped[vid] = short(e)
+            skipped[vid], retries = short(e), 0
             continue
         rec.pop("d7_errors", None)
+        retries = RETRIES  # Google answers: one video's lasting 500 doesn't cost the next its retries
         if r.get("rows"):
             cols = [h["name"] for h in r["columnHeaders"]]
             rec["d7"] = dict(zip(cols, r["rows"][0]))
