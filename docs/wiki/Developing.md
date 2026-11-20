@@ -13,7 +13,7 @@ tests/                offline tests (pytest); CI runs them and ruff on every pus
 docs/wiki/            these pages; pushed to the wiki on every push to main
 HANDOFF.md            current state between work sessions (short); docs/log/ has the dated diary
 studio/               the studio's working files: mockups, research notes, media-heavy reports (not the package)
-reports/              the audits and the monthly analytics reports
+reports/              the monthly analytics reports (the old audits are in docs/archive/)
 ```
 
 ## Shape
