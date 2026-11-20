@@ -114,7 +114,7 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   `CLIPPER_CONFIG` on the laptop points at it), `schedule.json`, secrets/, backups/, logs/, faces/, voices/,
   news/, weekly/, archive/, layouts/, people.json, fonts/. The laptop's old copies: `backups/laptop-state-2026-11-05/`.
   The laptop's scheduled tasks are disabled, not removed (rollback: wiki NAS-hub).
-- **NAS** (192.168.0.155) also runs the recorder container (`deploy/record`, redeployed 2026-11-17 at 28bc0ab,
+- **NAS** (192.168.0.155) also runs the recorder container (`deploy/record`, redeployed 2026-11-20 at 74be7d2,
   watching kinocasinogaming + donflurgundy + chudlogic), Kitsu :8090, the cut container, the streams and photos
   shares. `kick-138291641-2` is Kino 11-17 after the show ended early (Andy playing a game): recorded only, held
   from the worker by `run.json` `{"status": "skip"}`; delete it whenever you like. The `claude` container (`deploy/claude`, wiki Claude-on-the-NAS) drives clipper from the phone.
@@ -156,9 +156,8 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   secrets/openrouter_secret.txt. Moving a stage to another model is a config change whenever the user wants it.
 
 ## Waiting on the user
-- v0.2.0 is released (tag 11-19). The recorder container has been up since its 11-17 deploy (28bc0ab), so it doesn't carry 0.2.0 yet:
-  its next `bash deploy/record/deploy.sh` (no show live) puts the version in its heartbeat. The claude container (up since 11-16)
-  still has the old `checkup.sh`: `bash deploy/claude/deploy.sh` with `CHECKUP_AT` (Checkup, Open work).
+- v0.2.0 is released (tag 11-19). The recorder was redeployed 11-20 at 74be7d2 (`0.2.0+59` in its heartbeat). The claude container
+  (up since 11-16) still has the old `checkup.sh`: `bash deploy/claude/deploy.sh` with `CHECKUP_AT` (Checkup, Open work).
 - Clippa chat works on the phone (user, 11-20). `[chat] model` is Haiku (`claude-haiku-5-5`) by default; any provider's model string
   works there, so BYOK is `[chat] model = "openrouter:<vendor>/<model>"` with `OPENROUTER_API_KEY` (wiki Model-providers); the
   Discord bot doesn't use the chat. The cloud environment named "clipper" (11-18) holds an OpenRouter key for cloud Grok reviews: kept (user).
