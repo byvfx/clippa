@@ -148,9 +148,13 @@ Grok is the backup: Claude says so once CI is green and offers
 runs it on your yes. Merge once Copilot's or Grok's review is in, each finding is fixed or
 answered, and CI is green on both systems.
 
-Until 2026-11-13 a `review` workflow ran Grok (below) on every commit Copilot hadn't reviewed.
-It found real bugs but took about 25 minutes a PR, so it was removed; a branch made before then
-still carries the workflow until it merges main.
+**While Copilot is out of credits (since 2026-11-20, "for a few more days"), Grok is the default
+on GitHub:** the `review` workflow (`.github/workflows/review.yml`) runs on every push to a PR that
+changes code. It waits up to 10 minutes for Copilot, then runs [`clipper codereview
+--pr N`](#clipper-codereview-by-hand) with the repo secret `OPENROUTER_API_KEY` and posts what it
+finds; a commit Copilot reviewed is skipped, so it stands aside by itself once Copilot is back. A
+failed review never fails the PR's checks. It ran this way until 2026-11-13 too, removed then as
+too slow (about 25 minutes a PR); delete the file again once Copilot is reliable.
 
 ### `clipper codereview`, by hand
 

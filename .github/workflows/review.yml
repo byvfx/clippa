@@ -1,0 +1,54 @@
+# The reviewer on every PR that changes code whenever Copilot reviews nothing (out of credits,
+# not requested, or silent for 600 s): back 2026-11-20 while Copilot is out of credits (user: Grok
+# the default "for a few more days"; removed 11-13 as too slow). It steps aside by itself once
+# Copilot reviews a commit again; delete this file when Copilot is reliable. `clipper codereview` sends the diff
+# against main and the changed files to [codereview] reviewer (Grok 4.7 through OpenRouter,
+# about $1 a PR) and posts the bugs it finds on the PR and on the issues the PR
+# links, one comment each, edited in place on later pushes. Needs the repo secret
+# OPENROUTER_API_KEY (wiki Developing). A failed review never fails the PR's checks.
+name: review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths: ["clipper/**", "tests/**", "deploy/**", ".github/**", "pyproject.toml"]
+
+concurrency:  # one review per PR at a time; a push while one runs waits for it (only the newest
+  # waiting one runs), so a paid review already thinking is never thrown away
+  group: review-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  review:
+    # A fork's PR and Dependabot's get no secrets; a draft waits until it is ready.
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository
+      && !github.event.pull_request.draft
+      && github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 75   # Grok thinks for ~25 min on a big PR; this bounds a retry
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0   # the diff needs main's history too
+      - uses: astral-sh/setup-uv@v10.3.3
+      - name: Install (base dependencies only)
+        continue-on-error: true   # like the review: never a red check on the PR
+        run: uv sync --locked --no-dev
+      - name: Review and post
+        continue-on-error: true
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+          # CLIPPER_CODEREVIEW_REVIEWER: openrouter:openai/gpt-5.6-sol-pro   # to try another model
+          CLIPPER_CODEREVIEW_COPILOT_WAIT_S: "600"   # 0 = run even when Copilot reviewed
+        run: >-
+          uv run --no-sync clipper codereview
+          --base origin/${{ github.event.pull_request.base.ref }}
+          --pr ${{ github.event.pull_request.number }}

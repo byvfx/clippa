@@ -137,15 +137,18 @@ Windows notes above don't apply.
   (root `*.md` but for `CHANGELOG.md`, `docs/log/`, `docs/archive/`, `reports/`, `studio/` but for its `streamers.json`):
   that PR shows no checks.
   A PR that changes code (`clipper/`, `tests/`, `deploy/`, `.github/`, `pyproject.toml`) gets two
-  reviews (user, 2026-11-13; Grok's `review` workflow is gone, too slow): yours first, the
+  reviews (user, 2026-11-13): yours first, the
   `code-review` skill at high effort on the branch against main before the first push, findings
   fixed before the PR opens; then Copilot's, which a repo ruleset requests when the PR opens.
   Copilot doesn't review later pushes on its own: run `code-review` again on what each push adds
-  (or ask Copilot with `gh pr edit N --add-reviewer @copilot` for a big one). Grok is the backup
-  (user, 2026-11-18): when Copilot's review isn't in once CI is green (it has reviewed no PR since
-  #285, out of credits, and a request by hand leaves none), say so at once and offer
-  `clipper codereview --pr N` (Grok through OpenRouter, ~$0.80-1, ~25 min; it needs
-  `OPENROUTER_API_KEY`), and run it on the user's yes. Merge once Copilot's or Grok's review is in,
+  (or ask Copilot with `gh pr edit N --add-reviewer @copilot` for a big one). **While Copilot is
+  out of credits (user, 2026-11-20: Grok the default "for a few more days"), the `review` workflow
+  is back** (`.github/workflows/review.yml`): on each push it waits up to 600 s for Copilot, then
+  runs Grok (`clipper codereview --pr N`, ~$0.80-1, ~25 min, the repo secret `OPENROUTER_API_KEY`)
+  and posts on the PR; it skips a commit Copilot reviewed, so it steps aside when the credits are
+  back. Wait for its comment instead of offering Grok by hand; delete the workflow once Copilot is
+  reliable again. By hand (`clipper codereview --pr N`) only when the workflow's review failed or
+  didn't run. Merge once Copilot's or Grok's review is in,
   each finding checked against the code, handled and shown to the user, and CI is green. Green CI
   alone isn't enough. A PR that touches none of those (the wiki, `uv.lock` alone,
   `clipper.example.toml`, `streamers.json`, notes) or comes from Dependabot needs no review: merge on
