@@ -220,6 +220,21 @@ def doctor_role(roles: list[str]) -> str:
     return picked.pop() if len(picked) == 1 else "all" if picked else "nas"
 
 
+KITSU_NEEDED = "every role but a control station reviews through Kitsu"
+
+
+def kitsu_required(roles: list[str]) -> bool:
+    """`clipper doctor` fails without [review] host and the Kitsu token for these roles (#78)."""
+    return roles != ["recorder"] and not control_only(roles)
+
+
+def kitsu_host_error(v: str, required: bool) -> str | None:
+    """Why a typed Kitsu address won't do, or None: empty is a skip unless required."""
+    if not v:
+        return f"needed here: {KITSU_NEEDED} (Ctrl+C stops; `clipper setup` resumes here)" if required else None
+    return None if re.match(r"https?://", v) else "a URL, e.g. http://nas.local:8090"
+
+
 def control_only(roles: list[str]) -> bool:
     """Nothing runs here unattended: control, with the recorder (on the NAS) at most."""
     return "control" in roles and set(roles) <= {"control", "recorder"}
@@ -644,7 +659,9 @@ PROVIDER_KEYS = {
 }
 
 
-def ensure_env_key(cfg: dict, ask: Ask, name: str, what: str, where: str, check: bool = True) -> None:
+def ensure_env_key(cfg: dict, ask: Ask, name: str, what: str, where: str, check: bool = True,
+                   required: str = "") -> None:
+    """Ask for a key, Enter skips it; `required` (why) re-asks instead when typed at a terminal."""
     if user_env(name):
         good, msg = check_key(name, cfg) if check else (True, "set")
         say(f"{name}: {msg}" if good else f"{name} is set, but: {msg}")
@@ -654,8 +671,12 @@ def ensure_env_key(cfg: dict, ask: Ask, name: str, what: str, where: str, check:
         say(f"{name}: {what}. Get one at {where}.")
     while True:
         value = ask.secret(name)
+        if not value and required and ask.interactive:
+            say(f"{name} is needed here: {required}. (Ctrl+C stops; `clipper setup` resumes at this step.)")
+            continue
         if not value:
-            say(f"skipped {name}; `clipper setup --step keys` asks again")
+            say(f"skipped {name}; `clipper doctor` fails until it is set ({required})" if required
+                else f"skipped {name}; `clipper setup --step keys` asks again")
             return
         os.environ[name] = value
         good, msg = check_key(name, cfg) if check else (True, "set")
@@ -692,10 +713,13 @@ def step_keys(cfg: dict, st: dict, ask: Ask) -> None:  # noqa: C901
         else:
             ensure_env_key(cfg, ask, env, f"{prov} models ({uses[0]})", PROVIDER_KEYS[env])
     rc = cfg["review"]
+    need_kitsu = KITSU_NEEDED if kitsu_required(roles) else ""
     if not rc["host"] or "<" in rc["host"]:
         def url_ok(v: str) -> str | None:
-            return None if not v or re.match(r"https?://", v) else "a URL, e.g. http://nas.local:8090"
+            return kitsu_host_error(v, bool(need_kitsu and ask.interactive))
         host = ask.text("kitsu", "Kitsu address (review happens there)", "", url_ok).rstrip("/")
+        if not host and need_kitsu:
+            say(f"skipped the Kitsu address; `clipper doctor` fails until [review] host is set ({need_kitsu})")
         if host:
             host = host if host.endswith("/api") else host + "/api"
             toml_set(base(cfg)["_file"], "review", "host", host)
@@ -703,7 +727,8 @@ def step_keys(cfg: dict, st: dict, ask: Ask) -> None:  # noqa: C901
             cfg = config.load(base(cfg)["_file"])
     have_host = cfg["review"]["host"] and "<" not in cfg["review"]["host"]
     ensure_env_key(cfg, ask, cfg["review"]["token_env"], "a Kitsu bot token",
-                   "Kitsu -> Bots -> New bot (Supervisor) -> copy its token", check=bool(have_host))
+                   "Kitsu -> Bots -> New bot (Supervisor) -> copy its token", check=bool(have_host),
+                   required=need_kitsu)
     if cfg["transcribe"]["backend"] == "modal" and not control_only(roles):
         if (Path.home() / ".modal.toml").exists() and not user_env("MODAL_TOKEN_ID"):
             say("Modal: token in ~/.modal.toml")

@@ -72,7 +72,9 @@ packages, adds a `clipper` command to `~/.local/bin` (on PATH; it runs this fold
    NVENC, QSV, VideoToolbox, libx264 that does.
 4. **Keys.** Anthropic, the Kitsu address and bot token, Modal (when it transcribes there), the
    Discord bot token (bot role, or `[discord] enabled`). Typed hidden, checked against the
-   service, saved as Windows user env vars / in your shell profile / in `secrets/`.
+   service, saved as Windows user env vars / in your shell profile / in `secrets/`. Enter skips
+   one, except the Kitsu address and token on every role but a control station: review happens
+   in Kitsu and doctor fails without them, so setup asks again (Ctrl+C stops; it resumes there).
 5. **Check.** `clipper doctor` for the chosen roles, then what to run next.
 
 On Linux the bootstrap also installs the fonts covers and captions use, which Windows and macOS

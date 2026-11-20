@@ -41,7 +41,7 @@ setup skips the steps it has done: pass `--step <name>` to the bootstrap (or
 - [ ] **Encoder:** the GPU's own (NVENC on an NVIDIA machine, VideoToolbox on a Mac), not
       libx264.
 - [ ] **Keys:** type one wrong on purpose; it's refused with a reason. The right ones are
-      accepted.
+      accepted. Press Enter at the Kitsu token on a worker: it asks again, not skips.
 - [ ] **Linux only:** accept Microsoft's font license when it asks.
 - [ ] It ends with "Ready" and what to run next.
 
