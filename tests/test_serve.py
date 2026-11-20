@@ -53,6 +53,23 @@ def test_run_counts_failures_in_a_row(defaults, tmp_path, monkeypatch):
     assert s.fails()["analytics"] == 2 and s.state["analytics"]["last_exit"] is None
 
 
+def test_an_upload_cycle_is_one_run_however_many_commands(defaults, tmp_path, monkeypatch):  # Grok on #338
+    import asyncio
+
+    s = serve.Serve(cfg_in(defaults, tmp_path))
+    exits = []
+
+    async def fake(name, args, streak=True):
+        assert not streak  # auto_upload counts the cycle itself
+        return exits.pop(0)
+
+    monkeypatch.setattr(s, "run_clipper", fake)
+    for codes, want in [((1, 1), 1), ((0, 1), 2), ((1, 0), 3), ((0, 0), 0), ((None, 0), 1)]:
+        exits[:] = codes
+        asyncio.run(s.auto_upload())
+        assert s.fails()["upload"] == want, codes
+
+
 def test_the_jobs_table_follows_the_config(defaults, tmp_path):
     cfg = cfg_in(defaults, tmp_path, youtube={"auto_upload_minutes": 60}, retake={"auto": True},
                  tiktok={"auto_send_minutes": 0})

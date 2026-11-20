@@ -176,8 +176,10 @@ class Serve:
              retry=True),
         ]
 
-    async def run_clipper(self, name: str, args: list[str]) -> int | None:
-        """Run `clipper <args>` as a child process, its output into the serve log."""
+    async def run_clipper(self, name: str, args: list[str], streak: bool = True) -> int | None:
+        """Run `clipper <args>` as a child process, its output into the serve log. streak:
+        this one call is the job's run, so it counts toward its failures in a row (a job of
+        several commands passes False and calls count_run itself, once)."""
         cmd = actions.clipper_cmd(self.cfg)
         log.info(f"{name}: starting")
         st = self.state.setdefault(name, {})
@@ -194,8 +196,9 @@ class Serve:
                 log.info(f"{name}: {line}")
             log.info(f"{name}: done (exit {proc.returncode})")
             st.update(running=False, last_at=datetime.now(UTC).isoformat(timespec="seconds"),
-                      last_exit=proc.returncode, last_line=(lines[-1] if lines else "")[:200],
-                      fails=st.get("fails", 0) + 1 if proc.returncode else 0)
+                      last_exit=proc.returncode, last_line=(lines[-1] if lines else "")[:200])
+            if streak:
+                self.count_run(name, ok=not proc.returncode)
             if proc.returncode:  # #22: a background job failing is worth a DM (once per cooldown)
                 last = lines[-1].strip() if lines else ""
                 # Keyed on the last line too, verbatim (item keys carry their digits), so a
@@ -207,15 +210,23 @@ class Serve:
         except Exception as e:
             log.exception(f"{name} run failed")
             st.update(running=False, last_at=datetime.now(UTC).isoformat(timespec="seconds"),
-                      last_exit=None, last_line=f"{type(e).__name__}: {e}"[:200], fails=st.get("fails", 0) + 1)
+                      last_exit=None, last_line=f"{type(e).__name__}: {e}"[:200])
+            if streak:
+                self.count_run(name, ok=False)
             return None
+
+    def count_run(self, name: str, ok: bool) -> None:
+        """One run of the job ended: its failures in a row go up by one, or back to 0."""
+        st = self.state.setdefault(name, {})
+        st["fails"] = 0 if ok else st.get("fails", 0) + 1
 
     async def auto_upload(self) -> None:
         """Replan first (slots that passed get new ones), then upload what's due. A failed
         replan (Kitsu down) is DMed on its own and the upload still runs on the last plan,
         so one outage doesn't miss every slot that hour."""
-        await self.run_clipper("upload", ["schedule"])
-        await self.run_clipper("upload", ["upload"])
+        replan = await self.run_clipper("upload", ["schedule"], streak=False)
+        up = await self.run_clipper("upload", ["upload"], streak=False)
+        self.count_run("upload", ok=replan == 0 and up == 0)  # one run of the job, not two
 
     def start_retake(self) -> None:
         """`clipper retake` in the background: act on retake notes, republish for review.
