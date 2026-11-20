@@ -324,7 +324,9 @@ messages: GitHub closes the issue on "fix".
   too: tap a Ready to slot chip, then an open slot or a day; the same `dropPin`/`dayPin` and `act(ref, "pin")`; Esc
   puts it down only when no visible window, menu or field has it); the queue's Filters are a bottom sheet on a phone.
   The full-screen item and swipe were already there (#25). Library/Research/Settings still open the old windows from
-  tiles; the redesign's follow-ups are issues #324-#328.
+  tiles; the redesign's follow-ups are issues #325-#328. #324 is done (PR #339, deployed 11-20): a card shows a
+  one-line `why` under the hook (`review.items` carries it: a Short's or pick's Pass B `reason`, a hand pick's model
+  why, a segment's `score_why`), in full as Why in the item; the score badge and "Score, high first" were there.
 - **War room heat graph (11-16, user asked "can we see the heat graph of a stream in the war room?"):** PR #294,
   merged 11-16 after Grok's review, deployed 11-19. 🔥 heat on a stream (Pipeline panel) or in an item's
   window: the signals curve, the windows, and each cut item where it sits, coloured by review state, plus the twelve
