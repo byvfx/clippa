@@ -142,8 +142,6 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   `story cut --no-review` (never sent to review, so never uploads), a <30 MB 720p copy to the phone; narrated by
   Eric (`[story] voice_id`). First: kevin-langue-show-drama (Kino show, 5:28). Check lead-ins against the
   dossier (one stated a self-claimed role as fact). The DSP story (11-04) went to Kitsu for review instead.
-- **Receipts for Don:** first video private at https://youtu.be/q6gemx2kKMs (2026-10-26); sending it is the
-  user's call. On-screen source links would need a re-cut.
 - **Weekly:** issue 05 (Nov 8-14) built 11-15 in `weekly/2026-11-14/` ($0.78), posted to YouTube as one 10-image post; TikTok and
   the X thread not yet. The faces stage still mislabels (the cover's auto pick was a Disney performer). Issue 06 is Saturday 2026-11-21.
 - **The Udder Truth:** storyboard complete, voice and pipeline chosen; next the newsroom set (Brass Eye refs in
@@ -158,23 +156,23 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   secrets/openrouter_secret.txt. Moving a stage to another model is a config change whenever the user wants it.
 
 ## Waiting on the user
-- **Deploy #341** (`clipper checkup --fix`, merged 11-20 as a506494): `bash deploy/hub/deploy.sh` gives serve its
-  hourly `checkup` job, would-fix only (Checkup below). The claude container's `checkup.md`/`checkup.sh` changes ride
-  on its next `bash deploy/claude/deploy.sh`, which `CHECKUP_AT` needs anyway.
-- v0.2.0 is released (the user pushed the tag 11-19; `release.yml` passed, the Release has the wheel and sdist). The
-  recorder isn't redeployed: its next `bash deploy/record/deploy.sh` (no show live) puts its version in its heartbeat.
-- **Clippa chat after #299** (deployed 11-19 with everything on main): send a few real messages ("approve all
-  comps", "approve s02 from kino 11-14", "undo that", "whats waiting"): chat prompt v3 has only been tried against a
-  scripted stand-in for Haiku, not the model itself (about $0.0005 a message).
-- A cloud environment named "clipper" (11-18) holds an OpenRouter key so cloud sessions can run Grok reviews; it
-  was made for a Haiku test that cloud sessions can't do (Anthropic keys can't be saved there). Keep or delete it.
-- **#293** (`clipper fetch` of Twitch and YouTube VODs, deployed 11-19) is still untested on: a subscriber-only Twitch VOD (the
-  cookies in `secrets/twitch_cookies.txt` are the user's `gadnuck`, a tier 1 sub of `nmnader`, who has no VODs left), a full YouTube
-  video download, and `clipper run` on a `twitch-` or `youtube-` stream. A show claims one by listing its channel in `channels`.
-- **`clipper streams prune`** stays by hand until you set `[streams] keep_source_days` in clipper.toml
-  (111 GB would go at 30 days). The test stream is in `[streams] never_prune` (set 11-13).
-- `secrets/youtube_cookies.netscape.txt` on the share is unused since PR #195 and can be deleted.
-- Close Fusion and merge the `mockups/udder_truth/` leftovers into `studio/mockups/` (ignored by `/mockups/`).
+- v0.2.0 is released (tag 11-19). The recorder container has been up since its 11-17 deploy (28bc0ab), so it doesn't carry 0.2.0 yet:
+  its next `bash deploy/record/deploy.sh` (no show live) puts the version in its heartbeat. The claude container (up since 11-16)
+  still has the old `checkup.sh`: `bash deploy/claude/deploy.sh` with `CHECKUP_AT` (Checkup, Open work).
+- Clippa chat works on the phone (user, 11-20). `[chat] model` is Haiku (`claude-haiku-5-5`) by default; any provider's model string
+  works there, so BYOK is `[chat] model = "openrouter:<vendor>/<model>"` with `OPENROUTER_API_KEY` (wiki Model-providers); the
+  Discord bot doesn't use the chat. The cloud environment named "clipper" (11-18) holds an OpenRouter key for cloud Grok reviews: kept (user).
+- **#293** (`clipper fetch` of Twitch and YouTube VODs, deployed 11-19; #292 closed). YouTube fetch checked 11-20: a 12-minute Kino
+  video downloaded at 360p (a 4K remaster of another video got a 403 on its data). Still untested: a subscriber-only Twitch VOD (the
+  cookies in `secrets/twitch_cookies.txt` are the user's `gadnuck`, a tier 1 sub of `nmnader`, who has no VODs left) and `clipper run`
+  on a `twitch-` or `youtube-` stream (it spends: Modal transcription and the models). A show claims one by listing its channel in `channels`.
+- **`clipper streams prune`:** `[streams] keep_source_days = 60` since 11-20 (user: keep at least two months; backup
+  `backups/clipper.toml.before_keep_source_60_2026-11-20`), so serve's daily `prune` job runs once serve restarts (the next hub
+  deploy). Nothing is that old yet: 0 MB would go at 60 days (streams take 2.5 TB, 23 TB free, about 70 GB a day). Open: a disk-based
+  rule (keep 60 days' worth of source, however many days that is) and a line in the daily checkup. The test stream is in `never_prune`.
+- Close Fusion and merge the leftovers of `mockups/` into `studio/mockups/` (4.2 GB, ignored by `/mockups/`; checked 11-20, not done):
+  `mockups/udder_truth` still has the cast and Moo PNG originals (studio has JPG copies), `refs/`, `takes/`, `voice/` and the
+  `storyboards/test_throw` MP4s; `mockups/demo-intro` is the intro's working folder (it stays).
 - Branches and worktrees (11-20 cleanup, at the user's word): origin keeps only `main` and four unmerged branches on purpose:
   `archive/instagram-source` (the Instagram-source work, base is main as of #215, rebase before a PR), `story-dig`, `jev-lab`
   (`C:\clipper-jevlab`) and `ccr-8319354b-axsr9v` (fan-mag, paused for the user's next tweaks). Local `feat/twitch-youtube-fetch`
@@ -248,8 +246,8 @@ of phone use; #300 (access levels, a local Jev-like classifier in front of the m
 - **Checkup (wiki Checkup):** the nightly run (`deploy/claude/checkup.sh`) is not on yet: the user puts `CHECKUP_AT=08:30` in
   `deploy/claude/env.local` and redeploys the claude container; first run: check headless `claude -p` runs on the Remote Control
   sign-in and the `--allowedTools` rules work (`checkup.sh --dry-run`); then a week of nightly reports. **#287 step 2 is PR #341,
-  merged 11-20, not deployed:** `clipper checkup --fix` (`clipper/repairs.py`, serve every `[checkup] fix_minutes`), repairs `retry` and
-  `tmp`, both would-fix while `[checkup] fix = []`. Next: deploy; a week of would-fix reports; `fix = ["tmp"]`, later `"retry"`, at the
+  merged and deployed 11-20 (serve and bot at a506494, the `checkup` job running):** `clipper checkup --fix` (`clipper/repairs.py`, serve every `[checkup] fix_minutes`), repairs `retry` and
+  `tmp`, both would-fix while `[checkup] fix = []`. Next: a week of would-fix reports; `fix = ["tmp"]`, later `"retry"`, at the
   user's word; new checks (yt-dlp, cookies and tokens, repeat log errors, Kitsu approvals not scheduled); PRs from the nightly run.
 - **Bootstrap follow-up (11-07):** `deploy/bootstrap.sh` installs Homebrew `ffmpeg`, which has no libass (`subtitles`) filter, so a
   Mac worker fails Short captions; `ffmpeg-full` has it but is keg-only: install it and point clipper at it, or document it.
