@@ -160,5 +160,6 @@ def heartbeat_lines(name: str, hb: dict) -> list[str]:
             out.append(f"  {job}: running since {local(j.get('started', ''), '%H:%M')}")
         elif j.get("last_at"):
             out.append(f"  {job}: last {local(j['last_at'])} exit {j.get('last_exit')}"
+                       + (f" ({j['fails']} failed in a row)" if (j.get("fails") or 0) > 1 else "")
                        + (f", next in {j['next_in_s'] / 60:.0f} min" if j.get("next_in_s") is not None else ""))
     return out

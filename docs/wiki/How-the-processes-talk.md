@@ -117,7 +117,11 @@ process instead and logs it to `logs/retake.log`.
   review auto, tiktok, x, analytics, cast auto, news check, blinds check) and copies its output into `logs/serve.log`
   (`[paths] serve_log`). A non-zero exit queues a DM (kind `upload` or `failure`) keyed on the
   command and its last line, so a different item failing the next hour isn't swallowed by the
-  cooldown.
+  cooldown. A failed job waits its own interval before it runs again, except analytics and
+  streams prune (daily, free, safe to repeat): those come back in 30 min, then 1 h, 2 h, 4 h, ...
+  for each failure in a row, never later than their interval, and back to it after a run that works.
+  `clipper services status` shows the streak ("3 failed in a row"). cast auto isn't one of them: each
+  run can spend on labels and image search.
 - **the worker** runs each stage as `python -m clipper.cli <stage> <stream>`, output to
   `streams/<id>/run_<stage>.log`, status in `run.json` (`stages.<name>.status`, and on a failure
   `error: "<stage> exited N: <last three lines>"`). It resumes at the first unfinished stage.
