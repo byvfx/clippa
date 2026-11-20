@@ -8,14 +8,14 @@ const MORE_PAGES = ["money", "stats", "library", "research", "settings"];  // be
 function setView(v) {
   if (!PAGES.includes(v) && !(v === "chat" && PHONE.matches)) v = "queue";  // an old or unknown name
   document.body.dataset.view = v; store.set("warroom.view", v);
+  if (ARMED && v !== "schedule") arm(null);  // an item picked up to pin goes down off its page (panels.js)
   document.querySelectorAll("#views button[data-view]").forEach(b => {
     b.classList.toggle("on", b.dataset.view === v);
     if (b.dataset.view === v) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
   });
   $("#pagesMore").classList.toggle("on", MORE_PAGES.includes(v));
   chatSync();  // the Chat view shows the chat (chatdock.js)
-  const today = v === "schedule" && PHONE.matches && $(".day.today");
-  today ? today.scrollIntoView({ block: "start" }) : scrollTo(0, 0);
+  scrollTo(0, 0);  // a phone's Schedule opens on Next up, then the agenda from now
 }
 setView(store.get("warroom.view") || "queue");
 for (const k of ["warroom.layout", "warroom.layoutName"]) store.set(k, null);  // the layout editor's, retired 2026-11-18
@@ -64,7 +64,7 @@ $("#modal").addEventListener("touchend", e => {
 const KEYS = [
   ["Pages", [["Ctrl K", "go to a page, find an item, run an action (Cmd K on a Mac)"], ["G R", "Review"], ["G S", "Schedule"],
              ["G P", "Pipeline"], ["G M", "Money"], ["G T", "Stats"], ["G L", "Library"], ["G F", "Research"], ["G ,", "Settings"]]],
-  ["Queue", [["J K", "next / previous item (in the item window too)"], ["Enter", "open the item"], ["Esc", "close the window, or clear the selection"]]],
+  ["Queue", [["J K", "next / previous item (in the item window too)"], ["Enter", "open the item"], ["Esc", "close the window, clear the selection, or put down an item picked up to pin"]]],
   ["Decide", [["A", "approve (in the item window: then the next item)"], ["R", "reject, asks why"], ["C", "retake note"],
               ["H", "hold / release"], ["P", "pin a release time"], ["U", "reopen an approved item"]]],
   ["Video (item window)", [["Space", "play / pause"], ["← →", "back / forward 5 s"], ["F", "picture in picture"], ["O", "open the video in its own window"],

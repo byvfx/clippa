@@ -10,6 +10,9 @@ Developing#releases.
 
 ## Unreleased
 
+- War room on a phone: the Schedule is an agenda (what is still to come by day, the earlier ones folded
+  into one row, no empty days), and you pin by tapping an item in Ready to slot and then an open slot
+  or a day; that works on a desktop too. The queue's Filters open as a sheet from the bottom.
 - **War room:** Ctrl+K searches pages, actions and items, and G then a letter jumps to a page.
 - **War room:** the Schedule page gets Next up (the next five uploads), a Week view of blocks in each
   show's colour with open slots to drop onto, and a Ready to slot tray that counts what the Schedule
