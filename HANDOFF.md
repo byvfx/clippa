@@ -313,12 +313,17 @@ messages: GitHub closes the issue on "fix".
   phone always gets it), and the Ready to slot tray (= the Schedule tab count; stale/over-budget is one link to the
   queue's approved + dropped) with Uploads under it. The overview sends `uploaded_at`, entries and open slots out to
   max(14, `horizon_days`), and `ended_at`/`release_at` per stream. Drops still go through `act(ref, "pin")`. Step 6
-  deployed 11-19. Step 7 is PR #331, merged 11-19 (Grok reviewed it), not deployed: the Schedule's Timeline
+  deployed 11-19. Step 7 is PR #331, merged and deployed 11-19 (Grok reviewed it): the Schedule's Timeline
   (`renderTimeline` in schedule.js), 2 days back to 7 ahead, a lane per show plus Recordings (a bar per stream, the
   Kick-first stretch hatched after it and in the show's lane, a dashed bar for a show live on Kick but not recorded,
   from `/api/live`), Uploads (the last 2 days against `max_per_24h`, the 24 h band across every lane) and Open slots
-  (drop targets). `kickMs()` in core.js parses Kick's zone-less UTC times. Next plan step: phone (8).
-  Library/Research/Settings still open the old windows from tiles.
+  (drop targets). `kickMs()` in core.js parses Kick's zone-less UTC times. Step 8, the phone and the last plan step,
+  is PR #333, merged 11-19 (Grok reviewed it), **not deployed** (user: notes only): under 700 px the List is an agenda
+  (past folded into one row, no empty days, open slots only while pinning); tap to pin (`arm()` in panels.js, desktop
+  too: tap a Ready to slot chip, then an open slot or a day; the same `dropPin`/`dayPin` and `act(ref, "pin")`; Esc
+  puts it down only when no visible window, menu or field has it); the queue's Filters are a bottom sheet on a phone.
+  The full-screen item and swipe were already there (#25). Library/Research/Settings still open the old windows from
+  tiles; the redesign's follow-ups are issues #324-#328.
 - **War room heat graph (11-16, user asked "can we see the heat graph of a stream in the war room?"):** PR #294,
   merged 11-16 after Grok's review, deployed 11-19. 🔥 heat on a stream (Pipeline panel) or in an item's
   window: the signals curve, the windows, and each cut item where it sits, coloured by review state, plus the twelve
