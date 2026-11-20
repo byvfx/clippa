@@ -348,6 +348,9 @@ The Money page has the first three, the Stats page the analytics.
   hour, with the best and weakest. `clipper analytics --report` writes the same as
   `reports/analytics/<month>.md` plus a .csv of every upload, and ends with
   [what predicts views](Scheduling-and-uploads#what-predicts-views), which the panel leaves out.
+  serve refreshes the numbers every `[analytics] auto_hours`. A passing Google error (a 500, a
+  rate limit) is retried on the spot; a video still failing is skipped and asked again next run,
+  and only one failing three runs in a row fails the job.
 
 ## On a phone
 

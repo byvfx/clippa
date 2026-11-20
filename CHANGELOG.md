@@ -10,6 +10,9 @@ Developing#releases.
 
 ## Unreleased
 
+- `clipper analytics` rides out Google's passing errors: each call retries a 500 or a rate limit
+  itself, a video whose 7-day numbers still fail is skipped and asked again next run, and what came in
+  is saved either way. Only the same video failing three runs in a row fails the job (and DMs you).
 - War room on a phone: the Schedule is an agenda (what is still to come by day, the earlier ones folded
   into one row, no empty days), and you pin by tapping an item in Ready to slot and then an open slot
   or a day; that works on a desktop too. The queue's Filters open as a sheet from the bottom.
