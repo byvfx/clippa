@@ -22,7 +22,9 @@ Jobs (`jobs()`; each runs `clipper ...` as a child process; an interval of 0 tur
     blinds     every [blinds] check_minutes: `clipper blinds check` (the bot asks you about them)
     backup     `clipper backup` when the newest zip is [backup] every_days old (looked at hourly)
     prune      daily with [streams] keep_source_days: `clipper streams prune --yes --older-than N`
-A job that exits non-zero is queued as a DM (clipper/alerts.py; the bot sends it).
+A job that exits non-zero is queued as a DM (clipper/alerts.py; the bot sends it). One marked
+retry (analytics, prune: free, and a day apart) that fails runs again in RETRY_FAILED_S, doubling
+with each failure in a row, up to its own interval; the others wait their interval.
 
 Every minute it writes <streams>/.serve/status.json (clipper/daemon.py): what ran last,
 what is running, what is due next. `clipper services status`, the war room's Health panel
@@ -59,6 +61,7 @@ log = logging.getLogger("clipper.serve")
 RETAKE_EVERY_S = 600   # with [retake] auto: act on notes review.json already has this often
 RETAKE_SYNC_S = 1800   # ...and run `clipper retake` anyway this often: it syncs Kitsu first
 FIRST_PASS_S = 30      # settle (the war room warms up) before the first job
+RETRY_FAILED_S = 1800  # a retry job that failed: again this soon, then 1 h, 2 h, ... up to its interval
 
 
 def backup_due(cfg: dict, now: float | None = None) -> bool:
@@ -82,12 +85,26 @@ class Job(NamedTuple):
     every_s: float                 # 0 or less: never on its own (POST /api/retake still may)
     ready: Callable[[], bool]
     start: Callable[[], object]
+    # After a failure, sooner than every_s (interval()). Only for a job that is free to run and
+    # safe to repeat: a failing cast auto retried every half hour would spend each time.
+    retry: bool = False
 
 
-def due(jobs: list[Job], last: dict[str, float], now: float) -> list[str]:
+def interval(job: Job, fails: int) -> float:
+    """How long after its last start the job is due: every_s, or for a retry job that failed
+    the last `fails` runs in a row, RETRY_FAILED_S doubled per failure after the first, never
+    more than every_s (so one that keeps failing settles back to its own pace)."""
+    if not (job.retry and fails > 0 and job.every_s > 0):
+        return job.every_s
+    return min(job.every_s, RETRY_FAILED_S * 2 ** min(fails - 1, 20))
+
+
+def due(jobs: list[Job], last: dict[str, float], now: float, fails: dict[str, int] | None = None) -> list[str]:
     """Names of the jobs whose interval has passed since they last started (an interval of
-    0 or less: never)."""
-    return [j.name for j in jobs if j.every_s > 0 and now - last.get(j.name, float("-inf")) >= j.every_s]
+    0 or less: never). fails: job -> failed runs in a row, for interval()."""
+    fails = fails or {}
+    return [j.name for j in jobs
+            if j.every_s > 0 and now - last.get(j.name, float("-inf")) >= interval(j, fails.get(j.name, 0))]
 
 
 class Serve:
@@ -138,7 +155,7 @@ class Serve:
              lambda: task(self.run_clipper("x", ["x", "--auto"]))),
             Job("analytics", cfg["analytics"]["auto_hours"] * 3600,
              lambda: paths["youtube_token"].exists() and has_upload() and not self.running("analytics"),
-             lambda: task(self.run_clipper("analytics", ["analytics"]))),
+             lambda: task(self.run_clipper("analytics", ["analytics"])), retry=True),
             Job("cast", cfg["cast"]["auto_hours"] * 3600,  # #41: photos for anyone short of them
              lambda: bool(cfg["thumbnail"]["photos"]) and has_opencv() and not self.running("cast"),
              lambda: task(self.run_clipper("cast", ["cast", "auto"]))),
@@ -155,11 +172,14 @@ class Serve:
             Job("prune", 86400 if cfg["streams"]["keep_source_days"] else 0,  # #204: source and audio
              lambda: not self.running("prune"),
              lambda: task(self.run_clipper("prune", ["streams", "prune", "--yes", "--older-than",
-                                                     str(cfg["streams"]["keep_source_days"])]))),
+                                                     str(cfg["streams"]["keep_source_days"])])),
+             retry=True),
         ]
 
-    async def run_clipper(self, name: str, args: list[str]) -> int | None:
-        """Run `clipper <args>` as a child process, its output into the serve log."""
+    async def run_clipper(self, name: str, args: list[str], streak: bool = True) -> int | None:
+        """Run `clipper <args>` as a child process, its output into the serve log. streak:
+        this one call is the job's run, so it counts toward its failures in a row (a job of
+        several commands passes False and calls count_run itself, once)."""
         cmd = actions.clipper_cmd(self.cfg)
         log.info(f"{name}: starting")
         st = self.state.setdefault(name, {})
@@ -177,6 +197,8 @@ class Serve:
             log.info(f"{name}: done (exit {proc.returncode})")
             st.update(running=False, last_at=datetime.now(UTC).isoformat(timespec="seconds"),
                       last_exit=proc.returncode, last_line=(lines[-1] if lines else "")[:200])
+            if streak:
+                self.count_run(name, ok=not proc.returncode)
             if proc.returncode:  # #22: a background job failing is worth a DM (once per cooldown)
                 last = lines[-1].strip() if lines else ""
                 # Keyed on the last line too, verbatim (item keys carry their digits), so a
@@ -189,14 +211,22 @@ class Serve:
             log.exception(f"{name} run failed")
             st.update(running=False, last_at=datetime.now(UTC).isoformat(timespec="seconds"),
                       last_exit=None, last_line=f"{type(e).__name__}: {e}"[:200])
+            if streak:
+                self.count_run(name, ok=False)
             return None
+
+    def count_run(self, name: str, ok: bool) -> None:
+        """One run of the job ended: its failures in a row go up by one, or back to 0."""
+        st = self.state.setdefault(name, {})
+        st["fails"] = 0 if ok else st.get("fails", 0) + 1
 
     async def auto_upload(self) -> None:
         """Replan first (slots that passed get new ones), then upload what's due. A failed
         replan (Kitsu down) is DMed on its own and the upload still runs on the last plan,
         so one outage doesn't miss every slot that hour."""
-        await self.run_clipper("upload", ["schedule"])
-        await self.run_clipper("upload", ["upload"])
+        replan = await self.run_clipper("upload", ["schedule"], streak=False)
+        up = await self.run_clipper("upload", ["upload"], streak=False)
+        self.count_run("upload", ok=replan == 0 and up == 0)  # one run of the job, not two
 
     def start_retake(self) -> None:
         """`clipper retake` in the background: act on retake notes, republish for review.
@@ -219,8 +249,9 @@ class Serve:
         await asyncio.sleep(FIRST_PASS_S)
         while True:
             jobs = self.jobs()
+            now_due = set(due(jobs, self.last, time.monotonic(), self.fails()))
             for job in jobs:
-                if job.name not in due(jobs, self.last, time.monotonic()):
+                if job.name not in now_due:
                     continue
                 try:
                     if not await asyncio.to_thread(job.ready):
@@ -231,9 +262,13 @@ class Serve:
                     log.exception(f"{job.name} check failed")
             await asyncio.sleep(60)
 
+    def fails(self) -> dict[str, int]:
+        """Job -> how many of its last runs failed in a row (0 after a run that exits 0)."""
+        return {name: st.get("fails", 0) for name, st in self.state.items()}
+
     def status(self) -> dict:
         """Each job's state for the heartbeat: running, last run, next due."""
-        now, out = time.monotonic(), {}
+        now, out, fails = time.monotonic(), {}, self.fails()
         for job in self.jobs():
             name, every = job.name, job.every_s
             st = dict(self.state.get(name, {}))
@@ -241,7 +276,7 @@ class Serve:
             if every <= 0:
                 st["next_in_s"] = None
             elif name in self.last:
-                st["next_in_s"] = max(0.0, every - (now - self.last[name]))
+                st["next_in_s"] = max(0.0, interval(job, fails.get(name, 0)) - (now - self.last[name]))
             else:
                 st["next_in_s"] = 0.0
             out[name] = st

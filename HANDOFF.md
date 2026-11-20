@@ -182,7 +182,8 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   November's follows up. October: 12.7k views, 68.5 h watch, +28 subs, Shorts 80% of views. Since 11-20 (#335,
   #336) serve's `clipper analytics` retries Google's passing 500s and rate limits, skips a video still failing
   (`d7_errors` in analytics.json counts its runs) and saves the rest; it fails, and DMs, only when one video fails
-  3 runs in a row. Left: serve waits a full `auto_hours` (24) after any failed job; a retry-sooner option on `Job` is unbuilt.
+  3 runs in a row. A failed analytics or streams prune run comes back in 30 min, doubling per failure in a row up
+  to its interval (serve `Job(..., retry=True)`, `RETRY_FAILED_S`; #338); cast auto is left out on purpose (it spends).
 - **Model providers (#72, closed 11-09; its edit-plan proof moved to #67):** the baseline stays Haiku + Sonnet. Tools: `clipper compare score <stream> --model
   openrouter:<vendor>/<model> --dry-run`, `clipper models test <model>` (conformance), `clipper models gold
   propose|confirm|run` (the user's 66-window answer key, `logs/model_tests/gold.json`); OpenRouter key in
