@@ -252,7 +252,7 @@ def check_disk(cfg: dict) -> list[dict]:
             "`clipper streams list` shows what that frees" if days else
             "[streams] keep_source_days is 0, so nothing prunes by itself: `clipper streams prune`")
     return [finding("disk:free", "housekeeping", BAD if free < want / 2 else WARN,
-                    f"{free:.0f}% of the share is free, under [streams] keep_free_pct {want:g}%", look=look)]
+                    f"{free:.1f}% of the share is free, under [streams] keep_free_pct {want:g}%", look=look)]
 
 
 def check_housekeeping(cfg: dict, now: datetime) -> list[dict]:

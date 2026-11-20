@@ -243,6 +243,14 @@ def free_pct(cfg: dict, plus: int = 0) -> float | None:
     return (u.free + plus) * 100 / u.total if u.total else None
 
 
+def _started(sdir: Path) -> tuple[datetime, str]:
+    """When a stream started, for oldest first; a folder prune can't read sorts last."""
+    try:
+        return stream_date(sdir, jsonstate.read(sdir / "meta.json", {})), sdir.name
+    except (OSError, ValueError):
+        return datetime.max.replace(tzinfo=UTC), sdir.name
+
+
 def prune(cfg: dict, older_than_days: float | None = None, cuts: bool = False,
           only: list[str] | None = None, yes: bool = False, while_free_below: float = 0) -> list[str]:
     """Remove what check() allows; without yes, only say what would go. Returns the lines.
@@ -252,16 +260,17 @@ def prune(cfg: dict, older_than_days: float | None = None, cuts: bool = False,
         raise ClipperError("--older-than must be at least 1 day")
     entries = _schedule(cfg)
     out, freed = [], 0
-    checked = [(d, check(cfg, d, entries, older)) for d in _stream_dirs(cfg, only)]
+    dirs = _stream_dirs(cfg, only)
     if while_free_below:
-        checked.sort(key=lambda dc: dc[1]["date"])
-    for d, c in checked:
+        dirs.sort(key=_started)   # the full start time, not the day: two streams a day apart in the hour
+    for d in dirs:
         if while_free_below:
             now = free_pct(cfg, 0 if yes else freed)   # a dry run adds what it would have freed
             if now is not None and now >= while_free_below:
-                out.append(f"{now:.0f}% of the share is free (keep_free_pct {while_free_below:g}%): "
+                out.append(f"{now:.1f}% of the share is free (keep_free_pct {while_free_below:g}%): "
                            f"the rest of the old streams stay")
                 break
+        c = check(cfg, d, entries, older)   # just before removing: a stream's state changes while prune runs
         if not c["ok"]:
             if only:
                 out.append(f"{d.name}: left alone: {c['why']}")

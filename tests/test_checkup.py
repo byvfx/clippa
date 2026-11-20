@@ -213,7 +213,7 @@ def test_the_disk_check_is_off_by_default_and_warns_under_keep_free_pct(defaults
     cfg["streams"]["keep_free_pct"] = 15
     cfg["streams"]["keep_source_days"] = 60
     (f,) = checkup.check_disk(cfg)
-    assert f["key"] == "disk:free" and f["level"] == checkup.BAD and "4%" in f["text"] and "60 days" in f["look"]
+    assert f["key"] == "disk:free" and f["level"] == checkup.BAD and "4.0%" in f["text"] and "60 days" in f["look"]
     monkeypatch.setattr(streams, "free_pct", lambda cfg, plus=0: 12.0)
     assert checkup.check_disk(cfg)[0]["level"] == checkup.WARN
     monkeypatch.setattr(streams, "free_pct", lambda cfg, plus=0: 40.0)
