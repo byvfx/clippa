@@ -15,18 +15,12 @@ config `clipper.toml` (gitignored, on the NAS; `clipper.example.toml` is a track
 the GitHub wiki, built from `docs/wiki/` (`.github/workflows/wiki.yml` pushes it on every push to main);
 README.md and SETUP.md are short pointers; CLAUDE.md the conventions; `reports/` the audits.
 Project memory (`~/.claude/projects/C--clipper/memory/`, MEMORY.md first) holds durable preferences.
-- Plan doc: https://claude.ai/code/artifact/a9bb9e38-ced0-4455-8d8e-18a78122f45f
-- Walkthrough (usage, for presenting; Claude Docs, 2026-10-27): https://claude.ai/code/artifact/0d0e04da-54f6-4f15-bad0-2df72a286383
-- Case study (2026-11-11, refreshed 11-13): https://byvfx.github.io/clippa/ (`clippa/index.html` in
-  byvfx/byvfx.github.io, Pages from main). Its source is the private artifact "Clippa Overview"
-  (https://claude.ai/artifact/HTF3noAawBG1M1JNYsLAMS): edit that, then splice the content from `<div class="figures">`
-  to `<footer` into the site page, which keeps its own head, nav and footer links. The README's hero
-  (`docs/readme/hero-*.png`, #237) is a screenshot of its header; the figures (347 videos, 799 tests) are dated
-  11-13 and go stale: the 11-11 log entry has the re-render recipe. The page has no show names; its documentary
-  case study names no subject, channel or title, and should stay that way. The wiki's `Overview` page
-  (11-18) is a Markdown copy of it (the wiki strips CSS and scripts), with the hero screenshots in
-  `docs/wiki/images/`: when the page's content changes, carry the text over to `Overview.md` too.
-- Interactive demo (HTML, numbers as of 2026-10-27): https://claude.ai/artifact/ASL1grYiajRAELyoqTGitN
+- Plan doc: https://claude.ai/code/artifact/a9bb9e38-ced0-4455-8d8e-18a78122f45f; usage walkthrough (2026-10-27):
+  https://claude.ai/code/artifact/0d0e04da-54f6-4f15-bad0-2df72a286383; interactive demo: https://claude.ai/artifact/ASL1grYiajRAELyoqTGitN
+- Case study (11-11): https://byvfx.github.io/clippa/ (`clippa/index.html` in byvfx/byvfx.github.io), from the private artifact "Clippa
+  Overview" (https://claude.ai/artifact/HTF3noAawBG1M1JNYsLAMS): edit that, splice `<div class="figures">` to `<footer` into the
+  site page, and carry the text to the wiki's `Overview.md` too. No show names on the page; its documentary case study names no
+  subject, channel or title. The figures (347 videos, 799 tests) are dated 11-13; the 11-11 log has the re-render recipe.
 - Keys are Windows **User** env vars (ANTHROPIC_API_KEY, KITSU_TOKEN, ...); agent shells must load them:
   `export KITSU_TOKEN="$(powershell.exe -NoProfile -Command "[Environment]::GetEnvironmentVariable('KITSU_TOKEN','User')" | tr -d '\r')"`
 
@@ -39,16 +33,9 @@ Project memory (`~/.claude/projects/C--clipper/memory/`, MEMORY.md first) holds 
 `schedule` → `upload` (YouTube). Always on, as NAS containers since 11-05: `clipper serve` (the war room, hourly
 replan + upload, pre-show grabs, retakes, daily jobs), the Discord bot (`clipper bot`) and the worker.
 
-Around it (each a subcommand; details in the wiki pages and the log): `record` (NAS Docker recorder),
-`worker` (each finished recording: fast lane clips/Shorts first, then faces, cast, segments), `shorts`
-(vertical, scene-aware layouts, 15-59 s), `retake` (Kitsu notes → re-cut/re-cover automatically), `preshow`
-(Kino's YouTube pre-show whole; also one-offs with `--from/--to/--about`), `pick` (Shorts from a stretch you
-name), `weekly` (ten-page tabloid issue, Saturdays), `receipts` (old clips of an archive subject for a
-stream's stories, Mother Moo voice-over), `archive` (back catalogs on Modal: Jer complete, FTS index, `ask`),
-`investigate` (an archive subject's own videos → verified facts → leads + coverage check), `story` (a brief →
-the swarm, `clipper/swarm.py`: planner → Haiku workers over the web, YouTube, Kick, our streams → dossier →
-narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perform` (Mother Moo), `tiktok`, `x`,
-`rumble`, `analytics`, `costs`, `compare` / `models` (other providers), `status`, `services`, `alert`, `doctor`.
+Around it (each a subcommand; details in the wiki and the log): `record`, `worker`, `shorts`, `retake`, `preshow`, `pick`, `weekly`,
+`receipts`, `archive`, `investigate`, `story` (the swarm, `clipper/swarm.py`), `people`, `faces`, `cast`, `speakers`, `narrate` /
+`perform` (Mother Moo), `tiktok`, `x`, `rumble`, `analytics`, `costs`, `compare` / `models`, `status`, `services`, `alert`, `doctor`.
 
 ## User decisions (keep)
 - The NAS hub's YouTube cookies come from the laptop (11-09, user: "lets just setup that task but note it that it
@@ -108,24 +95,14 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
 - Recorder alerts go to both the webhook channel and DMs (warnings only), twice on purpose (2026-10-28).
 - Model calls are logged to `logs/costs.jsonl` (`clipper costs`); say what a rerun costs before doing it
   (`--dry-run` prices score/segments/meta/thumbs). The taste layer is the asset: see "Back up".
-- Hand-over (2026-11-08 audits, `reports/code-audit-2026-11-08.md` §7): build as a public package but this
-  deployment first, little tech debt, simple for the user; `studio/` holds mockups, research notes and media
-  reports, out of the package; serve and the bot are compose-only, the Windows task scripts stay for a GPU
-  worker only. Merge policy (11-10): a code PR merges once CI is green on both OSes and the review of its
-  head commit is in and each finding is fixed or answered, then delete the branch; green CI alone isn't
-  enough. Reviews since 11-13 (user; Grok's `review` workflow removed, ~25 min a PR was too slow): Claude
-  runs the `code-review` skill locally before the first push and fixes what it finds, then Copilot reviews
-  when the PR opens (repo ruleset "Copilot reviews new PRs", not on later pushes: Claude reviews those, or
-  `gh pr edit N --add-reviewer @copilot`). Wiki Developing#code-review-on-prs. Grok is the backup (user,
-  11-18): when Copilot's review isn't in once CI is green, offer `clipper codereview --pr N` (OpenRouter,
-  ~$0.80) and run it on a yes; its review then stands in for Copilot's. **Since 11-20 (user: Grok the default
-  "for a few more days" while Copilot is out of credits) the `review` workflow is back** (`.github/workflows/review.yml`,
-  `copilot_wait_s` 600): Grok reviews every push Copilot doesn't and posts on the PR; wait for it, then delete
-  the workflow once Copilot reviews again. Code means a PR touching `clipper/`, `tests/`,
-  `deploy/`, `.github/` or `pyproject.toml`: any other PR (the wiki, `uv.lock` alone,
-  `clipper.example.toml`, `streamers.json`) has CI but no review, and a notes-only one (e.g. HANDOFF and the
-  log) has neither since 11-10 (`check.yml` paths); both merge on the user's word, the first once CI is green.
-  A fork's PR: read the diff by hand, then the user's word. The repo secret `OPENROUTER_API_KEY` is the `review` workflow's (back 11-20): keep it.
+- Hand-over (2026-11-08 audits, `reports/code-audit-2026-11-08.md` §7): build as a public package but this deployment first,
+  little tech debt, simple for the user; `studio/` holds mockups, research notes and media reports, out of the package; serve and the
+  bot are compose-only. **Merge policy and reviews are in CLAUDE.md (Checks)** and wiki Developing#code-review-on-prs: a code PR
+  (`clipper/`, `tests/`, `deploy/`, `.github/`, `pyproject.toml`) gets the local `code-review` skill before the first push, then
+  Copilot, or Grok's `review` workflow while Copilot is out of credits (back 11-20 "for a few more days"; delete the workflow once
+  Copilot reviews again; its repo secret `OPENROUTER_API_KEY` stays); merge once the review is in, each finding answered, CI green.
+  Other PRs (wiki, `uv.lock`, `clipper.example.toml`, `streamers.json`) have CI but no review, notes-only ones neither; both merge on
+  the user's word. A fork's PR: read the diff by hand, then the user's word.
 
 ## State now (2026-11-20)
 - **Hub on the NAS** since 2026-11-05 (wiki NAS-hub): compose project `clipper-hub` in `~/clipper-hub`, containers
@@ -243,12 +220,9 @@ show in `[shows.<key>.edit]` only at their word); #67's model edit plan waits un
 `actions.edit_meta` (PR #291) and the `bulk`/`undo`/stream-name tools (PR #299) are all live (wiki Clippa-messenger); next, a week
 of phone use; #300 (access levels, a local Jev-like classifier in front of the model, a lab first); then a small `clipper mcp`.
 
-- **War room redesign (11-18, user: "feel more like you want to use it"):** all 8 steps are live (PRs #314, #316, #318, #321,
-  #329, #331, #333; the last deployed 11-20), and #324 (a card's one-line `why`) is done (PR #339). Plan doc
-  https://claude.ai/artifact/2Ny9Ad8bfWpjhyvtpx87eW, mockup https://claude.ai/artifact/H8uGqKzPmXJcXnAAUcNK4Z. Left: Library/Research/Settings
-  still open the old windows from tiles; follow-ups are issues #325-#328. Details per step: log 11-18 to 11-20.
-- **War room heat graph (PR #294, live 11-19):** 🔥 heat on a stream or in an item's window (`/api/heat`, wiki War-room#heat).
-  Not yet seen on the live page or on a real phone. Copilot has reviewed no PR since #285; the `review` workflow runs Grok (CLAUDE.md).
+- **War room redesign (11-18):** all 8 steps live (PRs #314-#333; #324 done, PR #339); plan https://claude.ai/artifact/2Ny9Ad8bfWpjhyvtpx87eW,
+  mockup https://claude.ai/artifact/H8uGqKzPmXJcXnAAUcNK4Z. Left: Library/Research/Settings still open the old windows from tiles; follow-ups #325-#328.
+- **War room heat graph (PR #294, live 11-19):** 🔥 on a stream or item (`/api/heat`, wiki War-room#heat); not yet seen on a real phone.
 - **Review pre-flight checks and approval by silence (#259):** steps A (`clipper review check`, PR #263) and B (`clipper review
   auto`, PR #265, serve's `auto` job every 10 min), stale-finding rechecks (#270) and hardening (#273) are live (wiki Review).
   **On for Kino since 11-15** (`[shows.kino.review] auto_approve = true`; backup `backups/clipper.toml.before_kino_auto_approve_2026-11-15`).
@@ -256,16 +230,11 @@ of phone use; #300 (access levels, a local Jev-like classifier in front of the m
   Shorts, then close #259. Segments (#258) are merged and deployed (PRs #260-#262). Segment floor, from 7-day views: scores 1-3
   underperform, 4-5 are a coin flip, 6+ do better; suggested `auto_min_segment = 4` (Kino holds 63 of 183 scored, Channel 404 23
   of 106), **not set**: after the Shorts, at the user's word. Shorts backtest: 105 of 181 approved Shorts would have approved themselves.
-- **Demo videos (11-16, user):** a portfolio piece first (about 5:40, real shows on screen, none named in the narration, the user
-  reads it live; it goes on the byvfx site), then an install tutorial recorded during the desktop clean install (#46/#78),
-  published after #207. Script and capture checklist: https://claude.ai/artifact/W48qW95ZPYkA7AE16F4TEX. Build with `clipper doc`
-  (PR #289 lets `doc voice` take a recording per take from `vo/read/`); not tried on a real spoken take or in Resolve.
-  **Intro (25 s, Fusion/Resolve project `clippa_intro`, media `demo-intro/` on the share, sources `mockups/demo-intro/` on the
-  laptop):** the stage set, take 4, comp `intro_v3_stage`; the latest full render is `renders/intro_v3_stage_pop3.mp4` (1080p). The
-  user has heard the sound ("good") and watched an earlier render ("it works"); still for them to judge: the haze's amount, the
-  spot's flicker, the glass reflection's strength (kept), the last 1.78x blow-up of the 720p plate. The shoot page (version 17,
-  `mockups/demo-intro/clippa-demo-shoot.html`) describes this cut. The full build notes (nodes, scripts, ComfyUI passes, Fusion
-  tips, what the video models get wrong) are in log 11-17/11-18 and the HANDOFF text moved there 11-20.
+- **Demo videos (11-16, user):** a portfolio piece first (about 5:40, real shows, none named in the narration, the user reads it live;
+  on the byvfx site), then an install tutorial recorded during the desktop clean install (#46/#78). Script and checklist:
+  https://claude.ai/artifact/W48qW95ZPYkA7AE16F4TEX; build with `clipper doc`. **Intro (25 s):** Resolve project `clippa_intro`, media
+  `demo-intro/` on the share, sources `mockups/demo-intro/` on the laptop; latest full render `renders/intro_v3_stage_pop3.mp4`; the
+  user heard the sound ("good"); still theirs to judge: the haze, the spot's flicker, the last 1.78x blow-up. Build notes: log 11-17/18.
 - **Documentaries (PR #233, live 11-13):** `clipper doc new|voice|build|master|leak|kit` (wiki Documentaries). Untried because they
   cost: `voice` against ElevenLabs, `leak` on Modal (`--dry-run` first); reels at another frame rate than the timeline. On the
   first real piece, listen to every take and watch the first built timeline. `[story] lufs = -14` is new (a story cut before it is
@@ -276,21 +245,17 @@ of phone use; #300 (access levels, a local Jev-like classifier in front of the m
   "Popcorn function" maths plot (`commons-c2e98328`) from the clip art.
 - **Usability review (11-10):** built and merged 11-13 (#199, #204, #228, #205). Still open: new users and the public repo #207
   (this install's values in tracked files, packaging).
-- **Checkup:** `clipper checkup` and `clipper alert send` are merged (#189); the nightly run (`deploy/claude/checkup.sh`) is not on
-  yet. Left: (1) the user puts `CHECKUP_AT=08:30` in `deploy/claude/env.local` and redeploys the claude container; (2) first run on
-  the NAS: check headless `claude -p` runs on the Remote Control sign-in and the `--allowedTools` rules work (`checkup.sh --dry-run`
-  first); (3) a week of nightly reports, then decide on hourly runs and PRs (#158). **Self-maintenance (#287):** step 2 is PR #341,
-  merged 11-20, **not deployed** (wiki Checkup#repairs, `clipper/repairs.py`): `clipper checkup --fix` every `[checkup] fix_minutes` (60);
-  repairs `retry` and `tmp`, both would-fix while `[checkup] fix = []` (`streams/.checkup/repairs.json`, `max_repairs` 2 per finding
-  in 7 days). Next: deploy; step 1; a week of would-fix reports; then `fix = ["tmp"]`, later `"retry"`, at the user's word; then new
-  checks (yt-dlp, cookies and tokens, repeat log errors, Kitsu approvals not scheduled); then PRs from the nightly run.
+- **Checkup (wiki Checkup):** the nightly run (`deploy/claude/checkup.sh`) is not on yet: the user puts `CHECKUP_AT=08:30` in
+  `deploy/claude/env.local` and redeploys the claude container; first run: check headless `claude -p` runs on the Remote Control
+  sign-in and the `--allowedTools` rules work (`checkup.sh --dry-run`); then a week of nightly reports. **#287 step 2 is PR #341,
+  merged 11-20, not deployed:** `clipper checkup --fix` (`clipper/repairs.py`, serve every `[checkup] fix_minutes`), repairs `retry` and
+  `tmp`, both would-fix while `[checkup] fix = []`. Next: deploy; a week of would-fix reports; `fix = ["tmp"]`, later `"retry"`, at the
+  user's word; new checks (yt-dlp, cookies and tokens, repeat log errors, Kitsu approvals not scheduled); PRs from the nightly run.
 - **Bootstrap follow-up (11-07):** `deploy/bootstrap.sh` installs Homebrew `ffmpeg`, which has no libass (`subtitles`) filter, so a
   Mac worker fails Short captions; `ffmpeg-full` has it but is keg-only: install it and point clipper at it, or document it.
   `deploy/hub/deploy.sh` from `lofn` needs `deploy/hub/env.local` (it overwrites the NAS `.env`).
-- **Investigate anyone (#138; part 1 `clipper people` merged 11-04, people.json is the record):** next, in the issue's order: speaker
-  attribution (needs #53 embeddings) → `investigate start` → X reads (check the read price first) → Obsidian vault → watchlist →
-  public records → `investigate eval` on known stories → Good/Noise buttons + `tune`. Also a review gate before a lead becomes
-  content, Wayback snapshots, a never-read list (Kiwi Farms).
+- **Investigate anyone (#138; `clipper people` merged 11-04):** next, in the issue's order: speaker attribution (needs #53) →
+  `investigate start` → X reads (check the price) → Obsidian vault → watchlist → public records → `investigate eval` → Good/Noise + `tune`.
 - **Story/swarm leftovers:** `investigate check` on the swarm (branch `investigate-swarm`, unmerged). YouTube downloads in a story
   hit the bot check from this IP: a fresh cookie export or the Firefox profile. Modal cold starts dominate a story's few items.
 - **Code audits (10-28, 11-03, 11-08, `reports/`):** all plan items done. Still open from 11-03: #15, #24/#25, #29-#35, #37, #41,
@@ -300,12 +265,10 @@ of phone use; #300 (access levels, a local Jev-like classifier in front of the m
   `deep-<YYYY-MM>.md`; the claude container runs both after the checkup (`audit.sh`). Backups are `[backup]` (`backups/taste`, every 7
   days by serve). Dependabot opens grouped weekly PRs (ruff, torch, torchaudio and torchvision ignored; no review, no secrets); its
   security alerts are a separate repo switch, off as of 11-10.
-- **Blind items #111 (wiki Blind-items), steps 1-2 live since 11-16:** `clipper blinds` collects gossip blinds, reads their clues
-  (Haiku, never a name), pairs twins, and you guess first (war room Blinds window, Discord, `clipper blinds answer`). The NAS
-  clipper.toml has one source, CDAN (add Blind Gossip's site when it's back), `[blinds] check_minutes = 30`, `sensitive_alerts =
-  true`; the bot made a private `#blinds` with `alert = "digest"`. Not built: typed answers in the thread, a Hide this kind button.
-  **Next: step 3**, investigate after the answer, then step 4, reveals and the scorecard. Flow artifact:
-  https://claude.ai/artifact/1m3obUigUkkA5ZVdmmiLWn
+- **Blind items #111 (wiki Blind-items), steps 1-2 live since 11-16:** the NAS clipper.toml has one source, CDAN (add Blind Gossip's
+  site when it's back), `[blinds] check_minutes = 30`, `sensitive_alerts = true`, a private `#blinds` with `alert = "digest"`. Not
+  built: typed answers in the thread, a Hide this kind button. **Next: step 3**, investigate after the answer; step 4, reveals and the
+  scorecard. Flow: https://claude.ai/artifact/1m3obUigUkkA5ZVdmmiLWn
 - **News watcher #110:** off since 2026-11-03 at the user's word (`[news] check_minutes = 0`, no terms); `auto_watch = true` brings back
   the cast/figures/library list; `#news` exists in Discord.
 - **Older notes not on an issue:** republish the 2026-10-19 re-cut streams to Kitsu (user said not yet); Blade compilation's Discord
@@ -341,29 +304,19 @@ of phone use; #300 (access levels, a local Jev-like classifier in front of the m
   `kick_first_hours = 0`, more picks). `CLIPPER_SCHEDULE_START=<date> clipper schedule --reshuffle` refills today.
 - **Checks:** `clipper doctor --role gpu --offline`, `uvx ruff@0.17.3 check clipper tests`,
   `.venv/Scripts/python.exe -m pytest -q`, test stream `kick-131151926`.
-- **Clean-Windows test of the install (#78):** `git archive HEAD` into a folder, a `.wsb` that maps it
-  read-only plus an answers file and a writable out folder, and a LogonCommand script that copies the code
-  to `C:\clipper`, runs `deploy\bootstrap.ps1 --answers ... --offline`, then doctor and `setup --check`
-  into the out folder. No keys go in. Launch the `.wsb`, wait for a DONE file (~1 min), close the Sandbox.
-- **Clean-Linux test of bootstrap.sh:** Docker Desktop on the laptop (start it; restart it if the engine
-  returns 500s), `ubuntu:24.04` with the archive, answers and out folder mounted; as root install sudo +
-  curl, `rm -rf /var/lib/apt/lists/*`, add a sudo user, then `su - user -c` a script that runs
-  `bash deploy/bootstrap.sh --answers ... --offline` and `bash -ic 'clipper doctor ...'` (a new terminal).
-  ~5 min (ffmpeg from apt). The font EULA goes unanswered there. Then the by-hand wiki Install-checklist.
+- **Clean installs (#78):** Windows via a Sandbox `.wsb` running `deploy\bootstrap.ps1 --answers ... --offline`, Linux via Docker
+  `ubuntu:24.04` running `bash deploy/bootstrap.sh --answers ... --offline` (~5 min); no keys go in; then the wiki Install-checklist.
+  The full steps are in the log (11-04 to 11-07 entries).
 
 ## Back up the taste layer (user, 2026-10-24)
 The Python is replaceable; the months of editorial judgement are in prompts and config. Treat them
 like footage. `clipper backup` (PR #248, #204; wiki Backups) zips the list below into `backups/taste/`
 (about 17 MB, 390 files; the newest 8 kept; secrets only with `--with-secrets`), and serve makes one every 7 days. The first was made by hand 11-13 (`backups/taste/taste-2026-11-13-1707.zip`,
 no secrets). Copy one off the NAS now and then. Not in it: `deploy/*/env.local` and the Kitsu volumes.
-- **In git (push it):** `clipper/prompts/` (every version, never edit one that produced reviewed output),
-  `clipper.example.toml`, `studio/`, `reports/`, this file.
-- **Not in git, copy by hand or script** (all in the NAS folder since 2026-11-05): `clipper.toml` (show tables,
-  house_style, stream_context, scoring rules) and `backups/` (`clipper.before_*`, `schedule.before_*`: hand-edit
-  backups go there, not the repo root), each `streams/<id>/config.toml` (lost with the stream folder), `secrets/`
-  (YouTube/TikTok tokens are a re-consent to recreate), `faces/known.json` (enrolled faces), the photos share
-  (`photos/`, cast.json), `layouts/` (Shorts layout references and per-show `enquirer.toml`), `people.json`,
-  `schedule.json`, `deploy/*/env.local`, and the Kitsu volumes on the NAS (every review decision and note).
+- **In git:** `clipper/prompts/` (never edit a version that produced reviewed output), `clipper.example.toml`, `studio/`, `reports/`, this file.
+- **Not in git (all in the NAS folder):** `clipper.toml`, `backups/`, each `streams/<id>/config.toml`, `secrets/` (tokens are a
+  re-consent to recreate), `faces/known.json`, `photos/` + cast.json, `layouts/`, `people.json`, `schedule.json`, `deploy/*/env.local`,
+  and the Kitsu volumes (every review decision and note).
 - Also the project memory `~/.claude/projects/C--clipper/memory/` on the laptop: it holds decisions
   that never made it into HANDOFF.
 
@@ -377,11 +330,9 @@ no secrets). Copy one off the NAS now and then. Not in it: `deploy/*/env.local` 
   imports fail with long paths off); `tzdata` must be a direct dependency (Windows has no zone database).
 - Kick: yt-dlp VOD extractor 404s; resolve via the channel videos API (kick.py). Chat history API ~2 req/s,
   429 with Retry-After: 0 → adaptive limiter.
-- Stream-copy cuts must start on a keyframe (every ~4 s) or audio drifts; `.ts` seeking for re-encodes needs
-  keyframe seek + output trim. ffmpeg backs input seeks off by 3/23 s when video has B-frames: `.ts` lands on
-  the keyframe at/after the target, `.mkv` (NAS recorder) at/before it, so `copy_cut` seeks k+0.005 for .ts
-  and k+0.15 otherwise, and fails the cut on a sync gap or wrong length. Each compilation part ends with a
-  concat `outpoint` where the next file begins, or joins replay 1-5 s (the H3 video, 10-28).
+- Stream-copy cuts must start on a keyframe (every ~4 s) or audio drifts; `copy_cut` seeks k+0.005 for `.ts` and k+0.15 otherwise
+  (ffmpeg backs input seeks off by 3/23 s with B-frames) and fails the cut on a sync gap or wrong length. Each compilation part ends
+  with a concat `outpoint` where the next file begins, or joins replay 1-5 s (the H3 video, 10-28).
 - Reading a shared JSON file on the NAS while another process replaces it raises PermissionError on Windows
   and lands mid-replace over SMB. Read state files with `jsonstate.read`, which retries for ~9 s like `write`
   does, never `json.loads(path.read_text())`; heartbeats go through `daemon.read_heartbeat` (three reads, and
@@ -409,12 +360,10 @@ no secrets). Copy one off the NAS now and then. Not in it: `deploy/*/env.local` 
 - YouTube sign-in: the OAuth app is In production since 2026-10-30 (tokens from before kept the 7-day
   Testing limit; the user signed in again 11-02, so the token shouldn't lapse). `clipper doctor` (online)
   refreshes it to test it; `upload --sign-in` keeps the analytics scope.
-- YouTube bot-checks this IP for yt-dlp: pre-show, one-off and story grabs retry signed in through the
-  dedicated Firefox profile (`[youtube] cookies_from_browser = "firefox:clipper"`, doctor checks it is signed
-  in) or secrets/youtube_cookies.txt (browsers rotate exports: re-export when "cookies are no longer valid").
-  A pre-show stuck on the bot check DMs once per video. A PO-token provider doesn't get past it. The hub
-  containers have no browser (compose empties the setting), so since the 11-05 move they read the file; the
-  laptop's `clipper-cookies` task refreshes it (wiki Archives#keeping-the-nas-hubs-cookies-fresh).
+- YouTube bot-checks this IP for yt-dlp: pre-show, one-off and story grabs retry signed in through the dedicated Firefox profile
+  (`[youtube] cookies_from_browser = "firefox:clipper"`) or secrets/youtube_cookies.txt (re-export when "cookies are no longer
+  valid"). A stuck pre-show DMs once per video; a PO-token provider doesn't help. The hub containers have no browser, so they read
+  the file, which the laptop's `clipper-cookies` task refreshes (wiki Archives#keeping-the-nas-hubs-cookies-fresh).
 - Kino's pre-shows are on the main channel @TheKinoCasino since 11-04 (`clipper.toml` since 11-06). That
   feed's RSS 404s from the NAS, so the check reads yt-dlp's undated listing: entries below a grabbed pre-show
   count as older (#162). After a channel switch, grab the latest by hand.
