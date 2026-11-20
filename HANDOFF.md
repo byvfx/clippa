@@ -13,7 +13,7 @@ the user said so 2026-11-10; every tracked file, issue and PR comment is readabl
 Python package `clipper/` (`clipper/defaults.toml` is every setting, documented; prompts in `clipper/prompts/`),
 config `clipper.toml` (gitignored, on the NAS; `clipper.example.toml` is a tracked starter). The user docs are
 the GitHub wiki, built from `docs/wiki/` (`.github/workflows/wiki.yml` pushes it on every push to main);
-README.md and SETUP.md are short pointers; CLAUDE.md the conventions; `reports/` the audits.
+README.md and SETUP.md are short pointers; CLAUDE.md the conventions; `reports/` the monthly analytics; `docs/archive/` the old audits.
 Project memory (`~/.claude/projects/C--clipper/memory/`, MEMORY.md first) holds durable preferences.
 - Plan doc: https://claude.ai/code/artifact/a9bb9e38-ced0-4455-8d8e-18a78122f45f; usage walkthrough (2026-10-27):
   https://claude.ai/code/artifact/0d0e04da-54f6-4f15-bad0-2df72a286383; interactive demo: https://claude.ai/artifact/ASL1grYiajRAELyoqTGitN
@@ -95,7 +95,7 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
 - Recorder alerts go to both the webhook channel and DMs (warnings only), twice on purpose (2026-10-28).
 - Model calls are logged to `logs/costs.jsonl` (`clipper costs`); say what a rerun costs before doing it
   (`--dry-run` prices score/segments/meta/thumbs). The taste layer is the asset: see "Back up".
-- Hand-over (2026-11-08 audits, `reports/code-audit-2026-11-08.md` §7): build as a public package but this deployment first,
+- Hand-over (2026-11-08 audits, `docs/archive/code-audit-2026-11-08.md` §7): build as a public package but this deployment first,
   little tech debt, simple for the user; `studio/` holds mockups, research notes and media reports, out of the package; serve and the
   bot are compose-only. **Merge policy and reviews are in CLAUDE.md (Checks)** and wiki Developing#code-review-on-prs: a code PR
   (`clipper/`, `tests/`, `deploy/`, `.github/`, `pyproject.toml`) gets the local `code-review` skill before the first push, then
@@ -254,7 +254,7 @@ of phone use; #300 (access levels, a local Jev-like classifier in front of the m
   `investigate start` → X reads (check the price) → Obsidian vault → watchlist → public records → `investigate eval` → Good/Noise + `tune`.
 - **Story/swarm leftovers:** `investigate check` on the swarm (branch `investigate-swarm`, unmerged). YouTube downloads in a story
   hit the bot check from this IP: a fresh cookie export or the Firefox profile. Modal cold starts dominate a story's few items.
-- **Code audits (10-28, 11-03, 11-08, `reports/`):** all plan items done. Still open from 11-03: #15, #24/#25, #29-#35, #37, #41,
+- **Code audits (10-28, 11-03, 11-08, `docs/archive/`):** all plan items done. Still open from 11-03: #15, #24/#25, #29-#35, #37, #41,
   #46-#50 (lows), #42's lock part. `tests/test_modules_have_tests.py` lists 13 untested modules (the list may only shrink); 17
   functions over McCabe 15 carry `# noqa: C901`, split when touched.
 - **Weekly and monthly audit (wiki Audit):** `clipper audit` DMs how the week went; on the 1st a read-only `claude -p` leaves
