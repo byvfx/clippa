@@ -118,7 +118,10 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   when the PR opens (repo ruleset "Copilot reviews new PRs", not on later pushes: Claude reviews those, or
   `gh pr edit N --add-reviewer @copilot`). Wiki Developing#code-review-on-prs. Grok is the backup (user,
   11-18): when Copilot's review isn't in once CI is green, offer `clipper codereview --pr N` (OpenRouter,
-  ~$0.80) and run it on a yes; its review then stands in for Copilot's. Code means a PR touching `clipper/`, `tests/`,
+  ~$0.80) and run it on a yes; its review then stands in for Copilot's. **Since 11-20 (user: Grok the default
+  "for a few more days" while Copilot is out of credits) the `review` workflow is back** (`.github/workflows/review.yml`,
+  `copilot_wait_s` 600): Grok reviews every push Copilot doesn't and posts on the PR; wait for it, then delete
+  the workflow once Copilot reviews again. Code means a PR touching `clipper/`, `tests/`,
   `deploy/`, `.github/` or `pyproject.toml`: any other PR (the wiki, `uv.lock` alone,
   `clipper.example.toml`, `streamers.json`) has CI but no review, and a notes-only one (e.g. HANDOFF and the
   log) has neither since 11-10 (`check.yml` paths); both merge on the user's word, the first once CI is green.
@@ -193,14 +196,11 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   Moving a stage (e.g. Pass A to DeepSeek V4 Pro) is a config change whenever the user wants it.
 
 ## Waiting on the user
-- **Push the v0.2.0 tag** (PR #319 merged 11-19 as 958a33d: version stamp, the 0.2.0 bump, `release.yml`, the changelog
-  backfill and its lead; wiki Developing#releases and #changelog). The hub was deployed from it 11-19 00:19 and
-  `clipper services status` shows each service's version. The tag exists **locally only** (annotated, on 958a33d; the
-  auto-mode classifier blocked the push from a session): `git push origin v0.2.0` makes the GitHub Release (wheel,
-  sdist, the changelog lead as the notes and a link to the file). It is the first run of `release.yml`; if it fails,
-  fix it by a PR and move the tag (`git push --delete origin v0.2.0`, retag, push). The recorder isn't redeployed:
-  its next `bash deploy/record/deploy.sh` (no show live) puts its version in its heartbeat. A new machine: wiki
-  Install#a-release-on-a-new-machine (needs the tag pushed).
+- **Deploy #341** (`clipper checkup --fix`, merged 11-20 as a506494): `bash deploy/hub/deploy.sh` gives serve its
+  hourly `checkup` job, would-fix only (Checkup below). The claude container's `checkup.md`/`checkup.sh` changes ride
+  on its next `bash deploy/claude/deploy.sh`, which `CHECKUP_AT` needs anyway.
+- v0.2.0 is released (the user pushed the tag 11-19; `release.yml` passed, the Release has the wheel and sdist). The
+  recorder isn't redeployed: its next `bash deploy/record/deploy.sh` (no show live) puts its version in its heartbeat.
 - **Clippa chat after #299** (deployed 11-19 with everything on main): send a few real messages ("approve all
   comps", "approve s02 from kino 11-14", "undo that", "whats waiting"): chat prompt v3 has only been tried against a
   scripted stand-in for Haiku, not the model itself (about $0.0005 a message).
@@ -332,8 +332,8 @@ messages: GitHub closes the issue on "fix".
   window: the signals curve, the windows, and each cut item where it sits, coloured by review state, plus the twelve
   hottest windows and what was cut from each (`/api/heat`, `clipper/warroom/heat.py`, `web/js/heat.js`, wiki
   War-room#heat). It is also the demo video's "how it finds moments" shot. Not yet seen on the live page or on a real phone.
-  Copilot has reviewed no PR since #285 (11-16; a request by hand leaves none): Grok is the backup (CLAUDE.md,
-  11-18): offer `clipper codereview --pr N` (about $0.80) per PR as soon as CI is green.
+  Copilot has reviewed no PR since #285 (11-16; a request by hand leaves none): since 11-20 the `review` workflow
+  runs Grok on every PR push Copilot doesn't review (CLAUDE.md).
 - **Review pre-flight checks and approval by silence (#259, 11-14):** step A, `clipper review check` (wiki
   Review#pre-flight-checks), is PR #263, merged and deployed 11-14; the webcam panels are marked `cam = true`
   in clipper.toml (backup `backups/clipper.toml.before_cam_marks_2026-11-14`). Step B, `clipper review auto`
@@ -428,11 +428,16 @@ messages: GitHub closes the issue on "fix".
   2. First run on the NAS: check that headless `claude -p` runs on the Remote Control sign-in, and that the
      `--allowedTools` rules work (`checkup.sh --dry-run` first).
   3. A week of nightly reports, then decide on hourly runs and PRs (#158's "act within limits").
-  **Self-maintenance (#287, 11-16, `p1-now`, nothing built):** `clipper checkup --fix`, repairs from a short
-  allowlist with no model (capped per finding key, a ledger, "fixed 2, need you 1" in the DM), a week of
-  would-fix reports before `[checkup] fix = true`; then the planned checks (yt-dlp, cookies and tokens, repeat
-  log errors), then PRs from the nightly run. Step 1 is the turn-on above. The worker already takes over a
-  stale lock and retries to `max_attempts`, so the repairs start past that.
+  **Self-maintenance (#287, `p1-now`): step 2 is PR #341, merged 11-20, not deployed** (wiki Checkup#repairs,
+  `clipper/repairs.py`): `clipper checkup --fix`, run by serve every `[checkup] fix_minutes` (60) over the streams
+  and housekeeping checks. Two repairs: `retry` (a run out of retries on a `[checkup] passing` error gets one
+  attempt back `retry_after_hours` (3) after it failed; the rerun may call models) and `tmp` (jsonstate temp files
+  a day old). `[checkup] fix = []`: both are would-fix, logged once a day per finding in
+  `streams/.checkup/repairs.json`; at most `max_repairs` (2) per finding key in 7 days. Late releases, stale locks
+  and queued streams were left out (serve and the worker handle them). Reviewed by the local skill (9 fixed) and
+  Grok (4 fixed). Next: deploy; step 1 (`CHECKUP_AT`); a week of would-fix reports with the nightly ones; then
+  `fix = ["tmp"]`, later `"retry"`, at the user's word; then the new checks (yt-dlp, cookies and tokens, repeat
+  log errors, Kitsu approvals not scheduled); then PRs from the nightly run.
 - **Bootstrap follow-up (11-07):** `deploy/bootstrap.sh` installs Homebrew `ffmpeg`, which has no `subtitles`
   (libass) filter, so a Mac worker fails Short captions; `ffmpeg-full` has it but is keg-only. Pick one:
   install `ffmpeg-full` and point clipper at it, or document it. `deploy/hub/deploy.sh` from `lofn` needs
