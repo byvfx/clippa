@@ -39,7 +39,8 @@ mark=--mark
 report=$(clipper checkup --json $mark 2>/tmp/checkup.err)
 code=$?
 if [ "$code" -eq 0 ]; then
-    echo "Checkup $day: all good." | dm
+    # and what serve's `checkup --fix` repaired (or would have) in the last 24 h, when anything (#287)
+    { echo "Checkup $day: all good."; clipper checkup 2>/dev/null | tail -n +2; } | dm
     exit 0
 fi
 # Exit 1 is findings only with a report; without one (a CLI error, --mark's write failing) the

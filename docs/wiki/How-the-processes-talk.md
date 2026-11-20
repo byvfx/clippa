@@ -18,6 +18,7 @@ streams/.bot/status.json
 streams/.record/status.json
 streams/.notify/outbox/      DMs waiting for the bot, one JSON file each
 streams/.checkup/state.json  the findings the last scheduled checkup saw (Checkup)
+streams/.checkup/repairs.json  what checkup --fix repaired, or would have (Checkup#repairs)
 streams/.audit/              the saved weekly digests and monthly deep audits (Audit)
 ```
 
@@ -114,7 +115,7 @@ process instead and logs it to `logs/retake.log`.
 ## Child processes
 
 - **serve** runs each background job as a `clipper <args>` child (upload, preshow check, retake,
-  review auto, tiktok, x, analytics, cast auto, news check, blinds check) and copies its output into `logs/serve.log`
+  review auto, tiktok, x, analytics, cast auto, news check, blinds check, checkup --fix) and copies its output into `logs/serve.log`
   (`[paths] serve_log`). A non-zero exit queues a DM (kind `upload` or `failure`) keyed on the
   command and its last line, so a different item failing the next hour isn't swallowed by the
   cooldown. A failed job waits its own interval before it runs again, except analytics and

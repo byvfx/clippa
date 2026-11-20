@@ -1227,11 +1227,14 @@ def cmd_checkup(cfg: dict, args: argparse.Namespace) -> None:
 
     from . import checkup
 
-    report = checkup.run(cfg, only=args.only, mark=args.mark)
+    report = checkup.run(cfg, only=args.only, mark=args.mark, fix=args.fix)
     if args.json:
         print(json.dumps(report, indent=1, ensure_ascii=False))
     else:
         print("\n".join(checkup.lines(report, ZoneInfo(cfg["schedule"]["timezone"]))))
+    if args.fix:  # serve's job: findings are the nightly report's; only a repair that broke fails it
+        raise SystemExit(1 if any((f.get("repair") or {}).get("state") == "failed"
+                                  for f in report["findings"]) else 0)
     raise SystemExit(1 if report["findings"] else 0)
 
 
@@ -1678,11 +1681,15 @@ def add_services(sub) -> None:
 
     p = sub.add_parser("checkup", help="what the alerts don't catch: stuck streams, quiet services, late uploads, "
                                        "title slips (reads files; exit 1 on findings)")
-    p.add_argument("--only", action="append", choices=("services", "streams", "schedule", "lint"),
+    p.add_argument("--only", action="append",
+                   choices=("services", "streams", "schedule", "lint", "auto", "housekeeping"),
                    help="just this check (repeatable)")
     p.add_argument("--json", action="store_true", help="the report as JSON (the nightly Claude run reads it)")
     p.add_argument("--mark", action="store_true",
                    help="remember these findings, so the next run says which are new (the scheduled run)")
+    p.add_argument("--fix", action="store_true",
+                   help="run the repairs [checkup] fix lists, log the others as would-fix (serve's checkup "
+                        "job); exit 1 only when a repair failed")
     p.set_defaults(fn=cmd_checkup)
 
     p = sub.add_parser("audit", help="how the week went: runs, uploads, spend, backups, what is parked "

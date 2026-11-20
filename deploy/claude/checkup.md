@@ -12,6 +12,10 @@ no model call, no upload, no schedule or config edit, no Kitsu decision, no depl
 restart, no commit, no PR. If a fix needs one of those, say what the user should run.
 
 How to read it:
+- A finding may carry "repair" (serve's `clipper checkup --fix`, which runs hourly): "done" = fixed
+  this run, "would" = a repair that isn't turned on yet ([checkup] fix), "waiting" = it will be
+  fixed later (the text says when), "capped" = repairs ran out, "failed" = the repair broke. The
+  report's "repairs" are what was fixed (did: true) or would have been in the last 24 h.
 - Findings with "new": false were in last night's report too; say "still" and keep them short.
 - A stream whose run.json heartbeat is fresh is the worker's: read it, never touch it.
 - For a stuck or failed stage, the end of streams/<id>/run_<stage>.log usually names
@@ -20,7 +24,8 @@ How to read it:
 - Don't guess past the evidence: "not clear from the logs" is a fine answer.
 
 The DM: plain text, at most 1800 characters, no Markdown tables. First line
-"Checkup <MM-DD>: <n> problem(s)". Then per finding, worst first: what is wrong (stream id or
+"Checkup <MM-DD>: <n> problem(s)", then the counts that aren't 0 from "fixed N, would fix N,
+need you N" (repairs in the last 24 h count as fixed). Then per finding, worst first: what is wrong (stream id or
 item), the likely cause in one sentence, and the next step (a command for the user to run, or
 "nothing to do, it will clear when ..."). Never use the word "hosts". Send it with:
 
