@@ -1,4 +1,4 @@
-# Clippa handoff (current state, rewritten 2026-11-08)
+# Clippa handoff (current state, trimmed 2026-11-20)
 
 This file is the **current state** between sessions: what runs where, what the user decided,
 what is waiting on them, open work, recipes, gotchas. Keep it short (under ~300 lines): update
@@ -127,7 +127,7 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   log) has neither since 11-10 (`check.yml` paths); both merge on the user's word, the first once CI is green.
   A fork's PR: read the diff by hand, then the user's word. The repo secret `OPENROUTER_API_KEY` is the `review` workflow's (back 11-20): keep it.
 
-## State now (2026-11-08)
+## State now (2026-11-20)
 - **Hub on the NAS** since 2026-11-05 (wiki NAS-hub): compose project `clipper-hub` in `~/clipper-hub`, containers
   `serve` (war room on 127.0.0.1:8765, on the tailnet as https://clipper.taile415cd.ts.net/; heartbeat
   `streams/.serve/status.json`), `bot` (`streams/.bot/status.json`) and `worker` (cuts with QSV on the iGPU).
@@ -154,12 +154,10 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   8 h, Channel 404 `segment = 6`; slots a day: 9 Shorts (09/11/13/15/16/18/19/20/21), 6 segments
   (08/10/12/14/17/22), compilation 23:00 for big-story nights only (`docs/big-story.toml` into the stream's
   config.toml). If good items keep going stale while streams overlap, try `stale_days = 4`.
-- **Chud overnight test: over (11-20).** All 71 chud segments pinned 23:00-07:00 went out on time, private with
-  publishAt, then public; YouTube took up to 26 in a rolling 24 h with no `uploadLimitExceeded`/`quotaExceeded`
-  (peak 7,203 units a day, no regular entry late or dropped). Caps back to 15 (`backups/clipper.toml.before_chud_overnight_end_2026-11-20`);
-  keeping more than 15 is the user's call. Two of the 71 (kick-136479997 s06/s07, Russell Brand) no longer show on
-  YouTube. The 71 have `captions_error = "deferred: ..."` (`backups/schedule.json.before_chud_captions_2026-11-20`)
-  for the hourly backfill from spare quota (400 units each, about a week or two); drop this bullet once all have `captions_set`.
+- **Chud overnight test: over (11-20).** All 71 chud segments pinned 23:00-07:00 went out on time with no `uploadLimitExceeded`
+  (peak 7,203 units a day); caps back to 15 (`backups/clipper.toml.before_chud_overnight_end_2026-11-20`); more than 15 is the user's
+  call. The 71 carry `captions_error = "deferred: ..."` for the hourly backfill from spare quota (400 units each, a week or two); drop
+  this bullet once all have `captions_set`.
 - **Archive:** Jer (The Quartering) 11,571 items / 2,732 h transcribed on Modal, FTS index built, `archive ask`
   works; link checks built but not yet run against the real services. #44 Jerry Banfield, #45 Papa Meat and
   #47 Ben Avery wait on the desktop install and permissions.
@@ -169,31 +167,18 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   dossier (one stated a self-claimed role as fact). The DSP story (11-04) went to Kitsu for review instead.
 - **Receipts for Don:** first video private at https://youtu.be/q6gemx2kKMs (2026-10-26); sending it is the
   user's call. On-screen source links would need a re-cut.
-- **Weekly:** issue 04 (Nov 1-7, Jer cover) in `weekly/2026-11-07/`. Issue 05 (Nov 8-14, "Lindsay's Cruise
-  Hell!", the user's pick) built 2026-11-15 in `weekly/2026-11-14/`, $0.78; the cover is a real teary
-  close-up of her from Wed's stream (the user wanted "very unflattering", crying), pinned by hand (log
-  11-15). Posted to YouTube 2026-11-15 as ONE image post of all ten square pages (Posts take 10 images now;
-  https://www.youtube.com/post/Ugkxr4rSrdhyE8_O5oKIz9pBoc-0k5t12ADH, the two captions joined). TikTok and the X
-  thread not yet. The faces stage still mislabels
-  (her auto pick was a Disney performer from her video). Issue 06 is Saturday 2026-11-21.
+- **Weekly:** issue 05 (Nov 8-14) built 11-15 in `weekly/2026-11-14/` ($0.78), posted to YouTube as one 10-image post; TikTok and
+  the X thread not yet. The faces stage still mislabels (the cover's auto pick was a Disney performer). Issue 06 is Saturday 2026-11-21.
 - **The Udder Truth:** storyboard complete, voice and pipeline chosen; next the newsroom set (Brass Eye refs in
   studio/mockups/udder_truth/refs/), new desk plates, then Moo's WAN renders (~1,550 Runway credits).
-- **Costs and analytics:** October ~$200 in model/GPU spend, ~$184 of it the Jer archive; Haiku scoring
-  $0.67 in Oct-Nov, the spend is segments, thumbs, meta. `clipper costs`, war room Costs, `--providers`
-  (Claude's own count needs `ANTHROPIC_ADMIN_KEY`, not set). Monthly analytics check-in task on the 1st at
-  09:00; October's (`reports/analytics/2026-10-checkin.md`): 1-4 taken, 5 skipped, its Decisions section is what
-  November's follows up. October: 12.7k views, 68.5 h watch, +28 subs, Shorts 80% of views. Since 11-20 (#335,
-  #336) serve's `clipper analytics` retries Google's passing 500s and rate limits, skips a video still failing
-  (`d7_errors` in analytics.json counts its runs) and saves the rest; it fails, and DMs, only when one video fails
-  3 runs in a row. A failed analytics or streams prune run comes back in 30 min, doubling per failure in a row up
-  to its interval (serve `Job(..., retry=True)`, `RETRY_FAILED_S`; #338); cast auto is left out on purpose (it spends).
-- **Model providers (#72, closed 11-09; its edit-plan proof moved to #67):** the baseline stays Haiku + Sonnet. Tools: `clipper compare score <stream> --model
-  openrouter:<vendor>/<model> --dry-run`, `clipper models test <model>` (conformance), `clipper models gold
-  propose|confirm|run` (the user's 66-window answer key, `logs/model_tests/gold.json`); OpenRouter key in
-  secrets/openrouter_secret.txt, no OpenAI/Gemini key, no Ollama. Findings (wiki Model-providers, log 11-04/05):
-  no model near the baseline; on the gold set v7 Haiku 39/66, DeepSeek V4 Pro 48/66 (27 cents a run, no image
-  input), Qwen 3.8 Flash 40/66; Haiku over-calls needs_context, every model keeps 5-11 of the 21 non-keeps.
-  Moving a stage (e.g. Pass A to DeepSeek V4 Pro) is a config change whenever the user wants it.
+- **Costs and analytics:** October ~$200 in model/GPU spend, ~$184 of it the Jer archive. `clipper costs`, war room Costs,
+  `--providers` (Claude's own count needs `ANTHROPIC_ADMIN_KEY`, not set). Monthly analytics check-in task on the 1st at 09:00
+  (October's: `reports/analytics/2026-10-checkin.md`; its Decisions section is what November's follows up). Serve's `clipper
+  analytics` retries Google's passing errors and skips a video still failing (#335, #336); a failed analytics or prune run comes
+  back in 30 min, doubling per failure (`RETRY_FAILED_S`, #338). Details: log 11-20.
+- **Model providers (#72, closed 11-09):** the baseline stays Haiku + Sonnet; no other model came near it on the user's 66-window
+  gold set (wiki Model-providers, log 11-04/05). Tools: `clipper compare score`, `clipper models test|gold`; OpenRouter key in
+  secrets/openrouter_secret.txt. Moving a stage to another model is a config change whenever the user wants it.
 
 ## Waiting on the user
 - **Deploy #341** (`clipper checkup --fix`, merged 11-20 as a506494): `bash deploy/hub/deploy.sh` gives serve its
@@ -206,24 +191,17 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   scripted stand-in for Haiku, not the model itself (about $0.0005 a message).
 - A cloud environment named "clipper" (11-18) holds an OpenRouter key so cloud sessions can run Grok reviews; it
   was made for a Haiku test that cloud sessions can't do (Anthropic keys can't be saved there). Keep or delete it.
-- **#293** (`clipper fetch` of Twitch and YouTube VODs, merged 11-16 at the user's word, no Copilot review; deployed
-  11-19). Still untested: a subscriber-only Twitch
-  VOD (the cookies in `secrets/twitch_cookies.txt` are the user's personal account `gadnuck`, a tier 1 sub of
-  `nmnader`, whose last stream was 4 April so no VODs are left), a full YouTube video download, and `clipper run`
-  on a `twitch-` or `youtube-` stream. A show claims one by listing the channel (`vanillamace`, `donflurgundy`) in `channels`.
+- **#293** (`clipper fetch` of Twitch and YouTube VODs, deployed 11-19) is still untested on: a subscriber-only Twitch VOD (the
+  cookies in `secrets/twitch_cookies.txt` are the user's `gadnuck`, a tier 1 sub of `nmnader`, who has no VODs left), a full YouTube
+  video download, and `clipper run` on a `twitch-` or `youtube-` stream. A show claims one by listing its channel in `channels`.
 - **`clipper streams prune`** stays by hand until you set `[streams] keep_source_days` in clipper.toml
   (111 GB would go at 30 days). The test stream is in `[streams] never_prune` (set 11-13).
 - `secrets/youtube_cookies.netscape.txt` on the share is unused since PR #195 and can be deleted.
 - Close Fusion and merge the `mockups/udder_truth/` leftovers into `studio/mockups/` (ignored by `/mockups/`).
-- `C:\clipper` is back on main and clean (11-14). The fanmag work is on `ccr-8319354b-axsr9v` (pushed,
-  "fan-mag paused for the user's next tweaks"). Still check `git branch --show-current` there before branching.
-- Branches and worktrees were cleaned up again 11-13: everything merged is gone, plus the old `ccr-*` and
-  `claude/clipper-investigate-command-*` branches and the swarm worktree, all at the user's word. Kept on
-  purpose: `story-dig` and `jev-lab` (`C:\clipper-jevlab`; it holds `jev-gate`'s commit), both pushed and
-  unmerged. `.claude/worktrees/instagram` (`archive/instagram-source`) holds the Instagram-source work
-  (`clipper/instagram.py`, its test, 14 files), committed and pushed 11-13 (b270e5c), unmerged; its base is
-  main as of #215, so rebase before a PR. `.claude/worktrees/elated-snyder-52f189` is clean (detached on main) and can go once no
-  session uses it.
+- Branches and worktrees (11-20 cleanup, at the user's word): origin keeps only `main` and four unmerged branches on purpose:
+  `archive/instagram-source` (the Instagram-source work, base is main as of #215, rebase before a PR), `story-dig`, `jev-lab`
+  (`C:\clipper-jevlab`) and `ccr-8319354b-axsr9v` (fan-mag, paused for the user's next tweaks). Local `feat/twitch-youtube-fetch`
+  was never pushed and is probably covered by #293: diff against main, then delete. Check `git branch --show-current` before branching.
 - The DSP story video is in Kitsu for review (Kino Casino / "2026-11-04 story-dsp-credit-score-590", 3:14).
 - TikTok drafts to post by hand: the 10/25 batch (kick-133940023 v04_t04, v05_t05, v07_t14, v08_t18) would
   need `--resend` once there is room.
@@ -231,12 +209,10 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   alone until the user says. The four Shorts from kick-136292920 went up with Chud's old cam crop; they stay
   that way unless deleted and re-uploaded.
 - Content ID: check new pre-show/one-off uploads in Studio (video → Copyright; the API only sees region blocks).
-- Shorts "related video" (Studio only): a weekly scheduled Claude task sets them Sundays 10:00 while the app
-  is open (`clipper-weekly-related-videos`; 11-15: 12 set by hand in the session, 0 left due; the pane's Google
-  sign-in opens Studio on the byvfx channel: switch to Lolcow Cinema or every Short's page errors; the task
-  sets each Short with one in-page script and stops on a sign-in page or the wrong channel). `clipper upload --related` lists
-  what's due and records what you set; six Shorts match no scheduled segment (pick one by hand or leave them).
-  Verify whether `thumbnails.set` works on Shorts before turning on `[youtube] short_thumbnails`.
+- Shorts "related video" (Studio only): a weekly scheduled Claude task (`clipper-weekly-related-videos`, Sundays 10:00 while the app
+  is open; switch the pane's Studio to Lolcow Cinema or every Short's page errors) sets them; `clipper upload --related` lists what's
+  due and records what you set; six Shorts match no scheduled segment. Verify whether `thumbnails.set` works on Shorts before turning
+  on `[youtube] short_thumbnails`.
 - Old approved Short titles/descriptions that still say "hosts" (Kitsu text): a war-room find-and-replace dry
   run found 14; not applied.
 - Decisions on #66 (transcript-framed edits): which item kinds, replace or sit beside the plain cut, sound
@@ -249,241 +225,93 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   desktop/storage (#44).
 - `clipper setup` (#78) phase 1 passed in Windows Sandbox (2026-10-28). Next: the real install on the desktop
   (#46; clone into a short folder like `C:\clipper`, run `deploy\bootstrap.ps1`), then the MacBook as #78's join-mode test (#7 closed into #78, 11-13).
-- Weekly issue 04: post it by hand from Discord `#weekly`; the X thread goes out by the scheduled task
-  (State now). The bot has full permissions since 11-02 (could be cut back to Send Messages + Attach Files).
 - `ANTHROPIC_ADMIN_KEY` for Claude's own usage count on Costs, if wanted.
 
 ## Open work
-**Priority labels (user, 2026-11-13):** every open issue carries one: `p1-now` (built 11-13, one PR each, all merged
-and deployed 11-13: #199 PR #247, #204 PR #248, #228 PR #249,
-#205 PR #250; #201, #203 and #206 closed; 11-13 also closed #7 into #78 and #57 as built), `p2-dated` (#192 after 11-16), `p3-track` (one big track at a time, the user picks: desktop install #46 → #44/#47/#45/#78;
-Udder Truth #58-#60; archive tooling #221-#227 before the next mini-doc; b-roll #229), `waiting` (#80, #48, #45),
-`parked` (the rest). `gh issue list --label p1-now` is the queue. **Milestones (user, 11-16)** group the issues
-that move together, a finish line each: "Runs itself" (#259, #258, #287; due 12-06, a first guess), "Second
-channel (Sloth Beat)" (#46, #78, #44, #47, #45), "The Udder Truth: episode 1" (#58-#60), "Next mini-doc toolkit"
-(#221-#227, #229, #254); only the track in play gets a date; parked and waiting issues have none, nor do #111,
-#158, #192, #279, #286. A new issue gets a priority label, and a milestone when it belongs to one. 11-16 labels:
-#259 and #258 `p2-dated`, #254 `p3-track`, #111 parked → `p3-track`, #158 parked → `p2-dated` (both in work). 11-13: #13 folded into #158, #200 closed (its
-setup/doctor bug moved to #78), #70 narrowed to punch-ins/emphasis (tighten built). 11-15 (user): #41 and #55 closed as built, #67-#71
-folded into #66 (each a section there).
-Tracked as GitHub issues (byvfx/clipper); roadmaps are issues only: (NAS hub #14 and self-checks #185
-closed 11-09; checkup's turn-on steps are under Checkup below),
-Posts blind items #36 (the rest of the YouTube Posts roadmap #30 closed 11-09), Instagram Reels #39, lore-order playlists #43,
-archive fun #63, transcript-framed edits #66 (one issue since 11-15, sections #67-#71; 11-09 the user wasn't sure #67 is needed, so #70's tighten
-came first: built 11-09, PR #191, `[edit] tighten`. The user found it "better than I thought" on the
-test stream but wants it **off** until it clearly helps; turn it on per show (`[shows.<key>.edit]`)
-only at their word. #67's model edit plan waits until edited Shorts prove themselves), crisis mode #73, setup #78,
-live clips #81, blind items #111 (steps 1-2 of 4 built and live 11-15/16, below), investigate anyone #138, agent exploration #158 (11-15 spec comment: the Clippa
-messenger. v1 merged (PR #285) and deployed to the hub 11-16: `/chat` on serve's page, wiki
-Clippa-messenger, `clipper/catalog.py` + `clipper/chat.py`, `[chat]`, Haiku ~$0.0005 a message, ledger `chat`; chats in
-`[paths] chats` on the share; four looks in `web/themes/`, `[chat] theme`. In the war room (PR #290, merged and deployed 11-17):
-`/chat` docked at the right in a frame (Chat button / M, a Chat tab on a phone) and the looks dress the whole war
-room, one pick for both (`theme.js`; `themes/warroom.css` is the default and the only home of the war room's colours).
-Renaming a video that's up (user, 11-16: Clippa "really need[s] to be the point of control"): PR #291 (merged and deployed 11-17): `youtube.retitle`
-behind `actions.edit_meta`, so every title edit of a video that's up (war room, bot, chat, CLI, undo) renames it on
-YouTube; chat prompt v2; YouTube's other edits (description, cover, privacy) still Kitsu-only / Studio. PR #299 (merged
-11-18, deployed 11-19) after "approve all comps" came back as a list: the `bulk` tool (several items on one card, one
-undo entry), `undo`, streams named "kino 11-14" / "the kino one" / "from last night" (`catalog.stream_named`,
-`stream_span`, `ShowNames`), "what's waiting" listing items, a typed yes/no for the one fresh write card, prompt v3.
-Next, a week of phone use; #300 (access levels and a local Jev-like classifier in front of the model, a lab first);
-then a small `clipper mcp`; #13 may fold into it), Modal ideas #53, #56,
-Udder Truth #58/#59/#60, P&L #50 (revenue once monetized). Write "#77 L6" rather than "fix #77" in commit
-messages: GitHub closes the issue on "fix".
-- **War room redesign (11-18, user: make it "feel more like you want to use it", every function kept):** a designer
-  review and three rounds of questions (memory `warroom-redesign`), plan doc https://claude.ai/artifact/2Ny9Ad8bfWpjhyvtpx87eW
-  (8 steps), mockup https://claude.ai/artifact/H8uGqKzPmXJcXnAAUcNK4Z (look signed off "looks good"). Step 2 (pages and
-  the top bar, layout editor and `/api/layouts` removed) is PR #314, merged and deployed 11-18. Step 3, the Review page,
-  is PR #316, merged: the item docks beside the grid (`#modal` shown non-modal inside the Review
-  page; moved to `<body>` when it opens on top, since a dialog in a hidden page has no box), J/K open and move it, Esc
-  closes, drag its edge (`warroom.paneW`); Filters button with chips; show tags coloured by the overview's `hue`
-  (`warroom.show_hues`, place in `[shows]`) and `--show-1..6` in each look; Retakes is queue tab 7 (panel gone); "Nothing
-  waiting" with the next upload; Undo under ⋯. Step 4, the look, is PR #318, merged 11-18 (Grok reviewed it; Copilot
-  never came): `themes/warroom.css` is a quiet editor palette with Inter and JetBrains Mono bundled in `web/fonts/`
-  (OFL, served `max-age` a month); one line-icon SVG sprite in `warroom.html`, `ic(name)` in core.js, `.ic` is
-  `pointer-events: none` so handlers that test `e.target.id` still see the button; skeletons until the first answer;
-  `millennium` is the one alternate (also the chat page's default), `retro` and `pager` deleted, and theme.js forgets a
-  kept pick serve no longer lists. Step 5 is PR #321, merged 11-19 (Grok reviewed it): Ctrl+K / Cmd+K or Search in the
-  top bar opens `js/palette.js` (`<dialog id="palette">`): the pages, items by title/show/kind/name (best 8), the ⋯
-  actions, the tile windows, the other look, the chat, a live show, the queue tabs; on a phone Search… under More. G then
-  R S P M T L F `,` jumps to a page (`GO_KEYS` in palette.js, `goPage` closes an item on top first; a held letter's
-  repeats are swallowed); a test ties GO_KEYS, the palette's names and the ? list to `PAGES`. It also fixed step 4's
-  Stats arrows (chart rules are `svg:not(.ic)`). Steps 2 to 5 are live (step 5 with the second 11-19 deploy). Step 6 is
-  PR #329, merged 11-19 (Grok reviewed it on the second try; the first gave an empty answer), not deployed: the Schedule
-  page (`js/schedule.js`) is Next up (the next 5, with upload room), the Week (7 days from today, paged to
-  `horizon_days`, a block per entry coloured by show with a kind stripe, dashed open slots, a now line) or the List (the
-  phone always gets it), and the Ready to slot tray (= the Schedule tab count; stale/over-budget is one link to the
-  queue's approved + dropped) with Uploads under it. The overview sends `uploaded_at`, entries and open slots out to
-  max(14, `horizon_days`), and `ended_at`/`release_at` per stream. Drops still go through `act(ref, "pin")`. Step 6
-  deployed 11-19. Step 7 is PR #331, merged and deployed 11-19 (Grok reviewed it): the Schedule's Timeline
-  (`renderTimeline` in schedule.js), 2 days back to 7 ahead, a lane per show plus Recordings (a bar per stream, the
-  Kick-first stretch hatched after it and in the show's lane, a dashed bar for a show live on Kick but not recorded,
-  from `/api/live`), Uploads (the last 2 days against `max_per_24h`, the 24 h band across every lane) and Open slots
-  (drop targets). `kickMs()` in core.js parses Kick's zone-less UTC times. Step 8, the phone and the last plan step,
-  is PR #333, merged 11-19 (Grok reviewed it), deployed 11-20, so all 8 steps are live: under 700 px the List is an agenda
-  (past folded into one row, no empty days, open slots only while pinning); tap to pin (`arm()` in panels.js, desktop
-  too: tap a Ready to slot chip, then an open slot or a day; the same `dropPin`/`dayPin` and `act(ref, "pin")`; Esc
-  puts it down only when no visible window, menu or field has it); the queue's Filters are a bottom sheet on a phone.
-  The full-screen item and swipe were already there (#25). Library/Research/Settings still open the old windows from
-  tiles; the redesign's follow-ups are issues #325-#328. #324 is done (PR #339, deployed 11-20): a card shows a
-  one-line `why` under the hook (`review.items` carries it: a Short's or pick's Pass B `reason`, a hand pick's model
-  why, a segment's `score_why`), in full as Why in the item; the score badge and "Score, high first" were there.
-- **War room heat graph (11-16, user asked "can we see the heat graph of a stream in the war room?"):** PR #294,
-  merged 11-16 after Grok's review, deployed 11-19. 🔥 heat on a stream (Pipeline panel) or in an item's
-  window: the signals curve, the windows, and each cut item where it sits, coloured by review state, plus the twelve
-  hottest windows and what was cut from each (`/api/heat`, `clipper/warroom/heat.py`, `web/js/heat.js`, wiki
-  War-room#heat). It is also the demo video's "how it finds moments" shot. Not yet seen on the live page or on a real phone.
-  Copilot has reviewed no PR since #285 (11-16; a request by hand leaves none): since 11-20 the `review` workflow
-  runs Grok on every PR push Copilot doesn't review (CLAUDE.md).
-- **Review pre-flight checks and approval by silence (#259, 11-14):** step A, `clipper review check` (wiki
-  Review#pre-flight-checks), is PR #263, merged and deployed 11-14; the webcam panels are marked `cam = true`
-  in clipper.toml (backup `backups/clipper.toml.before_cam_marks_2026-11-14`). Step B, `clipper review auto`
-  (`clipper/review_auto.py`, serve's `auto` job every 10 min, wiki Review#approval-by-silence), is PR #265,
-  merged and deployed 11-14 (Copilot's 9 findings fixed, and 5 of a second local review's 7; Copilot
-  didn't see the two fix commits). Stale findings (PR #270, deployed 11-15): the auto job re-checks, at
-  most hourly per stream (`recheck.json`), items held only by their findings. Hardening (11-15, PR #273,
-  merged and deployed 11-15): the approval's Kitsu calls run under a 25 s deadline
-  (`review.kitsu_deadline`), the re-read after the lock; a lost answer Kitsu took counts as automatic
-  (`claimed_at`); every check run but a publish's writes the Kitsu Checks column (never read as a
-  person's edit); shows without auto get the hourly recheck too (vision only when an item's inputs
-  changed); items gone from review aren't re-asked. Left on purpose: a response that keeps trickling
-  isn't cut by the deadline, and a person approving in Kitsu's own page right after a lost answer
-  would count as automatic. **On for Kino since 11-15** (user): `[shows.kino.review] auto_approve = true` in the
-  NAS clipper.toml (backup `backups/clipper.toml.before_kino_auto_approve_2026-11-15`), serve restarted, its
-  `auto` job in the heartbeat; at turn-on Kino had no open Shorts (11 segments, 5 compilations, which wait).
-  Next, after a few days of Kino with nothing undone (checkup's `auto` check, `clipper review auto --dry-run`):
-  Channel 404's Shorts, then close #259. Segments: #258 is merged and deployed (PRs #260-#262, the worker
-  scores each stream's segments). Segment floor backtest (11-15, no model calls): 527 of 529 reviewed
-  segments were approved, so the floor is set by 7-day views instead. Scores 1-3 clearly
-  underperform (10 of 40 uploads above the show's median views), 4-5 are a coin flip, 6+ clearly do
-  better. Suggested `auto_min_segment = 4`: on Kino it holds 63 of 183 scored segments (~6 a stream), on
-  Channel 404 23 of 106 (~3). Not set: after the Shorts, at the user's word. Shorts backtest: 105 of 181 approved Shorts would have approved
-  themselves, and 1 of 4 rejected ones ("too much Jer", a taste call the window is for).
-- **Demo videos (11-16, user):** a portfolio piece first (about 5:40, real shows on screen, none named in the
-  narration, the user reads it live; it goes on the byvfx site, linked from GitHub), then an install tutorial.
-  The script (ten takes, not locked) and the capture checklist are one private page:
-  https://claude.ai/artifact/W48qW95ZPYkA7AE16F4TEX (ticks kept with the page; its Install day tab is the
-  install checklist with each step tied to a tutorial chapter). The "how it finds moments" shot is the war
-  room's heat graph (above; merged, deployed 11-19). Build the piece with `clipper doc`; PR #289
-  (merged 11-16 after Grok's review, no deploy needed: `doc` runs on the laptop, pull main there) lets
-  `doc voice` take a recording per take from the piece's `vo/read/`. Not tried on a real spoken take or in
-  Resolve: the demo is the first. Tutorial (user, 11-16): recorded during the desktop clean install (#46/#78),
-  one continuous capture with the microphone on; published after #207.
-  **Its intro (11-17, 25 s under the first take):** a console TV in a dark room comes on, static for a second,
-  channels change faster and faster while the camera pushes in, black comes up everywhere but the letters of
-  "Clippa" (12-15 s), the set cuts off at 0:20 (user: keep it there), plain letters to 0:25. Rough 5 is the
-  locked cut. The user finishes it in Fusion and Resolve on a generated moving plate: Resolve project
-  `clippa_intro` (24 fps, 1080p), media in `demo-intro/` on the NAS share (`W:\clipper\demo-intro`), bins
-  Plate/Screen/Sound/Reference, timeline `intro_v1` (the elements stacked, beat markers) and `intro_v2_comp`,
-  where plate and screen clip are one Fusion clip: the picture pinned into the tube on a fitted path, matted
-  by the plate's own static (keyed, then grown a few pixels onto the tube's dark edge), the room lit by the picture's mean, a CRT look (soften, phosphor stripes and
-  scanlines that grow with the push to about 10 px a cell, a vignette, the tube's own shading, bloom), a finish on everything (`FinalTint`, `FinalTone`,
-  `FinalVignette`, `FinalGrain`: cool shadows, less colour, dark corners, light grain), and rough 5's push and fade: the plate retimed and pushed so the
-  picture fills the frame at 12.5 s, black up around the letters over the same picture (12-15 s), the letters
-  filled with static from 19.5 s, folding to a line at 20 s under the plain letters coming up. The
-  sound is the seven generated set sounds cut to the same plan (`stem_set_real_24.wav` and the channels alone, `stem_clips_24_v3.wav`, from `work/sound7.py`; `set_sound_cues.txt` says what is where), placed by measurement and never heard. Picture and letters carry a barrel bulge; from 20.4 to 21.9 s the letters' bulge, soft
-  edge, scanlines and glow ease to nothing, leaving flat clean text. Built by script and checked on stills
-  only, not played. The sources are in `mockups/demo-intro/` on the laptop (gitignored): `kit/` (the chosen plate
-  `plate_move_720_take2_antenna.mp4`, 15 s 720p 24 fps, its still and the tube's track; the channels as a flat
-  4:3 clip, the light they throw, the title matte, sound stems, seven set sounds, times; at 24 and 30 fps),
-  `work/` (clips, stills and the scripts that re-make the kit: `kit5.py`), `wall.py`, `measure_plate.py`.
-  Open: the last 1.78x of the push is a blow-up of the 720p plate (soft bezel just before the picture fills
-  the frame); the look's and the finish's amounts are first guesses for the user to judge; nobody has played it or heard the sound; 1080p waits until the 720p cut is right.
-  The set's floor is open again (11-17). The shag version went all the way (still `mockups/demo-intro/tv/set_spot_shag_endless.png`, passes `tv/aov/endless_*.png`, take 3 `kit/plate_move_720_take3_spot.mp4` with its track, and `kit/plate_move_720_take3_spot_locked.mp4` from `work/carpet_lock.py`, which projects the still's carpet on the floor plane to stop it crawling) and the user then dropped shag: video models crawl on fine dense texture. The user picked the stage: black-painted boards, a patch worn to bare wood in front of the screen, same set, framing, overhead spot and black void, clear air, no cord (the black-water alternative is `tv/set_water.png`). The antenna's foil, which the user said looked like diamonds, is the model's doing: it speckles foil in every still, however it is worded (six of six), so don't ask it for foil again. `tv/set_stage_rods.png` has plain chrome rabbit ears instead and is the set (the user: "bare rods"); `tv/set_stage_foil.png` is the last foil try. What carries over whatever the floor: stills are made whole in one pass, never joined from layers; the move is made from a clear-air plate and the haze is its own element over everything, tube picture included (`work/haze_dial.py` wrote a still one for the shag set; a moving one built in Fusion is the better end); light passes by edit are the same scene within 2 px, not exactly additive, so mix from the spot pass to the full picture on the set's on-curve; `work/track_take.py` tracks a take's tube; the still's utility passes come from the user's ComfyUI (they asked for "a traditional vfx pipeline" and allowed its downloads): `tv/aov/stage_{beauty,depth,matte_tube,matte_cabinet,matte_antenna,matte_floor,matte_worn_patch}.exr`, 32-bit, made by the workflow `clippa_aov_passes` in the ComfyUI app (Depth Anything V2 for depth, relative and soft-edged; Segment Anything 2.1 for tube, cabinet and floor; keys in a garbage box for the antenna and the worn patch, which the segmenter can't hold) or by `work/comfy_passes.py` against a running ComfyUI, sheet from `work/passes_sheet.py`, the workflow file from `work/comfy_ui_graph.py`. ComfyUI here is 0.44 under `AppData/Local/Comfy-Desktop/ComfyUI-Installs/ComfyUI`, venv and custom nodes in `Documents/ComfyUI`; never start the old copy under `AppData/Local/Programs/@comfyorgcomfyui-electron`, whose Manager downgrades numpy at startup (the log has the day's account and what was installed). The move is generated (the user chose it over a camera projection in Fusion): take 4, `kit/plate_move_720_take4_stage.mp4` with `kit/plate_take4_track_24.csv`, tube 17% of the frame's width at 0 s, 49% at 12 s, 91% at 15 s, set and void held, the floor steady in stabilised crops; with the user to watch at speed. The still's passes match the take's first frame only, so for the take the tube key comes from the track and the other mattes need re-making per frame (SAM2's video mode in the same pack) if the comp wants them. The comp on take 4 is timeline `intro_v3_stage` (11-18), a copy of `intro_v2_comp`, which stays as the old set's: take 4 through a Loader as a PNG sequence (`kit/plate_take4_seq/` on the NAS share), the path refitted (`work/fit_take4.py`: the approved push with only a 1.25x blow-up at the end where the old one had 1.78x), the key at 0.62-0.70 with the still's SAM tube matte filling its inside (`TubeFill`; take 4's static is dark in the tube's top corners), the spot on at frame 8 before the set at 1.2 s (`LightMix`: the plate lit by spot x (1 - share) + screen light x share, the share measured from a light pass since 11-18, `kit/stage_tv_share_v2.png`, see below), the dead tube as dark grey glass until the set comes on, the haze as its own element over everything (`HazeAdd`; `HazeLevel.Gain` 0.12 turns it), and the spot's switch on A3 (a generated sound since 11-18, `kit/spot_on_cue_24_v2.wav`). A render of it is `mockups/demo-intro/renders/intro_v3_stage_preview.mp4` (with a 720p copy; 45 minutes to render, about 4.5 s a frame), checked on frames by `work/check_render.py`. The user watched it and said it works (11-18), then had the two stand-ins replaced ("run light pass and spot sound", 9 Runway credits): the still regenerated with the set off (`tv/aov/stage_spot.png`) gives the share by measurement (`work/tv_share2.py`: about 0.7 across the whole bezel, 0.2 on the boards in front falling to 0.1 at the frame's foot, where my drawing had 0.75 on a thin ring and 0.45 in a fan; the pass came back with haze and its own levels, which the script takes off, and its boards are regenerated, so only the broad difference is used there), and the spot's switch is its own sound (`kit/sfx/spot_switch_on.mp3` through `work/sound9.py`, the hit still on frame 8). The drawn map and the stand-in cue are kept beside them (`kit/stage_tv_share.png`, `kit/spot_on_cue_24.wav`): `TVShareFile`'s clip and the A3 clip are the two things to point back. The full render with them is `renders/intro_v3_stage_lightpass.mp4` (36 minutes, 720p copy beside it; `work/check_open.py` compares its opening with the first render). After that render, on the user's notes (11-18): the tube's matte is blurred to a 3 px edge (`TubeEdgeSoft`, Blur 1.0 on `TubeFill`, feeding `Merge2`; a Fusion blur of 2.5 is an 8 px edge) and a light wrap puts the picture's light on the bezel for about 10 px (`WrapScreen` > `WrapSoft` 12 > `WrapGain` 0.5 > `Wrap`, added outside the matte, between `Merge2` and `Bloom`). The key's shape itself wobbled 1-3 px inside the tube's blue rim and wandered along the bottom (stills in `renders/matte_check/`, made by `work/matte_sheet.py`), so the user drew a roto shape: `TubeRoto`, a 13-point polygon keyed once on comp frame 201 over the unpushed plate (`Merge1`), pinned to the track by its Center and Size expressions (the tube's path times the tube's size over its size on that frame). It is now the matte: the input of `TubeEdgeSoft` and the mask of `WrapScreen` and `ScreenOnly`; `TubeMatte` and `TubeFill` are still in the comp, feeding nothing. The first shape sat 3-4 % inside the blue rim (it was drawn over the wrong plate; `renders/intro_v3_stage_roto.mp4` shows the pale band that left), so the user moved its points out to the rim on the same key with `PlatePush` in the viewer. Rendered with the blur and wrap as `renders/intro_v3_stage_roto2.mp4` (13 minutes; 720p copy beside it, stills `renders/matte_check/roto2_*`): the edge is on the rim through the push and the rim is out of frame by 272. The user's "the crts look sqaure lets make sure they are the 4:3 ratio" (11-18) meant the phosphor grid: its cells are now 4 wide to 3 tall (`T=0.75*N*W*1920/(H*1080)` in `CRTPhosphor`'s six expressions and `CRTSoft`'s two: 4x3 px far, 8x6 at frame 210, 14x10 under the title), rendered as `renders/intro_v3_stage_grid43.mp4` (21 minutes), the latest full render. Still true and untouched: the take's tube is 1.22:1 at the rim and `ScreenPin` squeezes the 4:3 picture 6 % across to fit it. The glass now carries a reflection, asked for by the user ("could just run a reflection pass"): a Runway pass of the spot-lit set with the tube glossy and off (`tv/aov/stage_reflect.png`, task ae863aad-9119-4678-85d4-a5b511b88e06, nano-banana-2.1 at 2K, 6 credits, approved; balance 15,824), from which `work/tube_reflect.py` makes `kit/stage_tube_reflect_v2.png` (the spot's glint top right, the boards across the lower glass). In the comp: `ReflFile` > `ReflTrack` (the share map's track) > `ReflGain` (0.8 times the spot's curve, out over frames 235-285) > `Reflect`, added inside `TubeEdgeSoft` between `Merge2` and `Wrap`. Rendered as `renders/intro_v3_stage_reflect.mp4`, the latest full render; it lifts the picture's blacks a little and glares across the top near frame 240, and the user keeps it at that strength (11-18, after the full render). (A first try from the spot pass alone, `python tube_reflect.py spot`, gave only a soft sheen.) The ending has a harder cut since (the user: it felt soft): the switch-off line now wipes the CRT texture off the letters (`OffBand`, the fold's own height, masks `PlainWhite` into `PlainLetters`; clean letters outside the band at 0.55, white by frame 489) and the letters' bulge, blur and glow snap flat over 485-491. Three notes on that ending are in too: the collapsing band is motion blurred (`OffFold` and `OffBand`, shutter 300, quality 10), the dark line it left across the letters for four frames is gone (the white has no hole after the fold, and `LineMax`, a Custom tool, takes the lighter of the white and the line, so the line can only brighten), and the final letters are brighter (`PlainWhite` times 1.085: 252 of 255 in the render, was 230). After that render the user turned on motion blur on `TitleBulge` by hand (shutter 600 to exaggerate, quality 10), so the letters smear outward as they go flat over 485-491: left on for every frame it made the render seven times slower, so `TitleBulge.MotionBlur` carries an expression (on for 484-492 only, the same picture). The current full render has it: `renders/intro_v3_stage_pop3.mp4` (1080p, 20 minutes to render, with a `_720` copy); `intro_v3_stage_pop2.mp4` is the same without the letters' blur, and the `_ending_pop2`/`_ending_pop3` files are frames 440-599 alone. The Fusion flow is tidied: a left-to-right spine at row 0, branches above and below in named underlays, the nodes that feed nothing in one marked `Unused__feeds_nothing` (not deleted). An underlay is made by `comp.Paste` of a settings table (`__ctor` `Underlay`, `ViewInfo` `UnderlayInfo` with `Size`, every sub-table with `__flags` 256), then `flow.SetPos`; a tool added with `comp.AddTool` can come back wired into whatever was selected, so check its output's consumers. A Fusion Loader keeps showing a file's old contents after it is rewritten: point `Clip` at another file and back. The shoot page is version 17 (11-18): the intro's beats, the Resolve paragraph and "where it stands" describe this cut and name `intro_v3_stage_pop3.mp4`; the user has heard the sound ("the sound is good"). Left as first set, never looked at by the user: the haze level and the spot's flicker. An Audacity MCP for the voice-over was looked at and dropped here (the user's Audacity is 4.0.2; xDarkzx/Audacity-MCP drives only 3.x, Audacity4-MCP needs a fork of Audacity 4 built from source): the user is sorting that in another thread, nothing was installed. Still guesses for the user to judge: the haze's amount and shape, the spot's flicker. the shoot page (version 16, source kept at `mockups/demo-intro/clippa-demo-shoot.html`) describes this version.
-- **Documentaries (11-13, PR #233, merged and deployed):** `clipper doc
-  new|voice|build|master|leak|kit` (wiki Documentaries; `clipper/doc.py`, `doc_resolve.py`), the reusable form
-  of the first mini-documentary's one-off Resolve scripts. A piece is `[paths] documentaries/<slug>/` on the
-  share (plan.toml, banned.txt, media), never the repo. Tried: take processing, word timing, the take
-  split and mastering on real files; `build`, the render and `master` against live Resolve 21.2 with a
-  synthetic piece (its Resolve project is deleted; the folder `C:\clipper-doc-test` on the laptop is the
-  user's to delete). Not tried, because they cost: `voice` against ElevenLabs, `leak` on Modal; `--dry-run`
-  first: `voice` prints the characters it would buy (not a price: work it out from the ElevenLabs plan),
-  `leak` prints a dollar estimate. Reels at another frame rate than the timeline are untried too. On the
-  first real piece, listen to every take and watch the first built timeline. `[story] lufs = -14` is new: a story cut before it is
-  rendered again, and its cover picked again, on its next cut.
-- **B-roll library #229 (11-12, steps 1-2 of 4, PR #230):** `clipper broll find|add|list|keep|drop`
-  (wiki B-roll): NASA, DVIDS (the B-Roll category; keys in `secrets/dvids_secret.txt`, public key first,
-  added by the user 11-12), Prelinger and Commons; public domain / CC0 only, no sound by default (NASA
-  music). Pixabay stock video too (11-14, branch `broll-pixabay`; same key as clip art, live footage only,
-  its licence kept by default). Next: the National Archives (key by email from NARA), `[story] broll` in story cuts, then a war
-  room window. The library is `[paths] broll` on the share.
-- **Clip art library (11-14, PR #255, merged; no deploy needed):** `clipper clipart find|add|list|keep|drop`
-  (wiki Clip-art): Commons (SVG drawings first, photos only when a find wants more), the Met, Cleveland (CC0),
-  Iconify emoji/icons (logo sets never), Pixabay (key in `secrets/pixabay_secret.txt` since 11-14, tried:
-  works). `add` takes a folder (Kenney packs, `--licence CC0`). The library is `[paths] clipart` on the
-  share: 10 popcorn pictures from the first test (the four off-target ones dropped), plus a "Popcorn function"
-  maths plot (`commons-c2e98328`) worth dropping. Not yet used by covers or the weekly. Left from review:
-  a search for scans ("engraving") gets SVG drawings first; Commons metadata parsing is in broll, cast and
-  clipart. Openclipart (account key) and the Library of Congress (20 requests/min) could be sources later.
-- **Usability review (11-10):** built and merged 11-13: `clipper status` with "needs you" first, 60 s to 12 s
-  on the share (#199, PR #247); `clipper streams list|prune` and `clipper backup`, both also serve jobs (#204,
-  PR #248); Modal per-call overhead in the archive/story estimates (#228, PR #249); CLI polish: `latest`,
-  `latest:<show>` and id prefixes, `--json` on the read commands, `config diff`, `completion bash|powershell`
-  (#205, PR #250; `--quiet`/`--verbose` left out on purpose). War room #201-#203 and #206 closed (#206's
-  closing comment lists the three items left on purpose); #200 closed. Still open: new users and the public
-  repo #207 (this install's values in tracked files, packaging).
-- **Checkup (#185 closed 11-09, the rest is tracked here):** `clipper checkup` (services, streams, schedule,
-  lint; `[checkup]`; wiki Checkup) and `clipper alert send` are merged (#189). The nightly run
-  (`deploy/claude/checkup.sh`, prompt `checkup.md`, both baked into the image) is not on yet. Left:
-  1. The user puts `CHECKUP_AT=08:30` in `deploy/claude/env.local` and redeploys the claude container.
-  2. First run on the NAS: check that headless `claude -p` runs on the Remote Control sign-in, and that the
-     `--allowedTools` rules work (`checkup.sh --dry-run` first).
-  3. A week of nightly reports, then decide on hourly runs and PRs (#158's "act within limits").
-  **Self-maintenance (#287, `p1-now`): step 2 is PR #341, merged 11-20, not deployed** (wiki Checkup#repairs,
-  `clipper/repairs.py`): `clipper checkup --fix`, run by serve every `[checkup] fix_minutes` (60) over the streams
-  and housekeeping checks. Two repairs: `retry` (a run out of retries on a `[checkup] passing` error gets one
-  attempt back `retry_after_hours` (3) after it failed; the rerun may call models) and `tmp` (jsonstate temp files
-  a day old). `[checkup] fix = []`: both are would-fix, logged once a day per finding in
-  `streams/.checkup/repairs.json`; at most `max_repairs` (2) per finding key in 7 days. Late releases, stale locks
-  and queued streams were left out (serve and the worker handle them). Reviewed by the local skill (9 fixed) and
-  Grok (4 fixed). Next: deploy; step 1 (`CHECKUP_AT`); a week of would-fix reports with the nightly ones; then
-  `fix = ["tmp"]`, later `"retry"`, at the user's word; then the new checks (yt-dlp, cookies and tokens, repeat
-  log errors, Kitsu approvals not scheduled); then PRs from the nightly run.
-- **Bootstrap follow-up (11-07):** `deploy/bootstrap.sh` installs Homebrew `ffmpeg`, which has no `subtitles`
-  (libass) filter, so a Mac worker fails Short captions; `ffmpeg-full` has it but is keg-only. Pick one:
-  install `ffmpeg-full` and point clipper at it, or document it. `deploy/hub/deploy.sh` from `lofn` needs
-  `deploy/hub/env.local` (it overwrites the NAS `.env`).
-- **Investigate anyone (#138; part 1 `clipper people` merged 11-04, people.json is the record, 23 people
-  imported).** Next, in the issue's order: speaker attribution (needs #53 embeddings, new facts prompt) →
-  `investigate start` (swarm finds a person's channels and X handles, the user approves, a sample is
-  transcribed) → X reads (check the pay-per-use read price first) → Obsidian vault → watchlist → public
-  records (CourtListener token) → `investigate eval` on known stories (Huck, DSP) → Good/Noise buttons +
-  `tune`. Also a review gate before a lead becomes content, Wayback snapshots, a never-read list (Kiwi Farms).
-- **Story/swarm leftovers:** `investigate check` on the swarm (branch `investigate-swarm`, unmerged: the old
-  four searches seed a small swarm per lead, then his own titles). YouTube downloads in a story hit the bot
-  check from this IP: a fresh cookie export or the Firefox profile. Modal cold starts dominate a story's few
-  items (`[story] parallel` 2).
-- **Code audits:** 10-28 (maintainability) and 11-03 (correctness, `reports/code-audit-2026-11-03.md`) done
-  and merged; still open from 11-03: #15 (example toml commented), #24/#25 (lock edges), #29-#35, #37, #41,
-  #46-#50 (lows), #42's lock part. 11-08 (hand-over, `reports/code-audit-2026-11-08.md`): all 20 plan items
-  done the same day (PRs #170-#182 and #184; each change is a CHANGELOG.md 11-08 bullet, the log has the PR
-  list) and deployed 21:51. Left for later: `tests/test_modules_have_tests.py` lists 13 untested modules (the
-  list may only shrink); 17 functions over McCabe 15 carry `# noqa: C901`, split when touched.
-- **Weekly and monthly audit (11-10, wiki Audit):** `clipper audit` (no model) DMs how the week went and saves
-  `streams/.audit/weekly-<date>.json`; on the 1st a read-only `claude -p` reads the saved weeks, traces repeat
-  problems and leaves `deep-<YYYY-MM>.md`. The claude container runs both after the checkup (`audit.sh`), so it
-  needs `bash deploy/claude/deploy.sh` once. Since PR #248 the backup settings are `[backup]` (folder
-  `backups/taste`, every 7 days by serve), and the digest and doctor read the newest zip there. Dependabot opens grouped weekly PRs (ruff ignored; no review, no secrets). Its security
-  alerts are a separate repo switch, off as of 11-10.
-- **Blind items #111 (wiki Blind-items), steps 1-2 live since 11-16:** `clipper blinds` collects gossip
-  blinds, reads their clues (Haiku, never a name), pairs twins across sources, and you guess first: in the
-  war room's **Blinds** window, in Discord, or `clipper blinds answer`. Step 1 PR #277 (store, clue pass,
-  pairing), the window PR #278, step 2 PR #280 (serve's check, the bot's questions). The NAS clipper.toml has
-  one source, CDAN (Blind Gossip's site answered 500 on 11-15: add it when it's back), `[blinds]
-  check_minutes = 30` and `sensitive_alerts = true` ("no censoring for me": the user filters with `hide`);
-  backups `backups/clipper.toml.before_blinds_sources_2026-11-15` and `..._alerts_2026-11-16`. The bot made
-  a private `#blinds`; `alert = "digest"`: a thread a day at 20:00, plus an alert of its own for each that
-  could be about someone followed. Store 11-16: 722 CDAN posts, 551 waiting, 14 unread (the clue pass skips
-  some; after 3 tries they wait without clues). Costs: ~$0.0002 a blind. Not built: typed answers in the thread
-  (no Message Content intent), a Hide this kind button. **Next: step 3**, investigate after the answer (the
-  user's name first, the swarm, the judge's score), then step 4, reveals and the scorecard. The flow
-  artifact: https://claude.ai/artifact/1m3obUigUkkA5ZVdmmiLWn
-- **News watcher #110:** off since 2026-11-03 at the user's word (`[news] check_minutes = 0`, no terms); only
-  `[news] watch` / `[shows.<key>.news] watch` terms are watched, `auto_watch = true` brings back the
-  cast/figures/library list; `#news` exists in Discord.
-- **Older notes not on an issue:** republish the 2026-10-19 re-cut streams to Kitsu (user said not yet); Blade
-  compilation's Discord card never posted (`review notify kick-131151926 --keys comp-blade-in-vegas`); a daily
-  "post kit" folder; thumbs: reject a picked frame with no face, `--frame-at <s>`; Discord excerpts for one-offs
-  could start after the intro; pick/preshow/retake prompts don't read speaker tags yet.
+**Priority labels (user, 2026-11-13):** every open issue carries one: `p1-now` (the queue, `gh issue list --label p1-now`),
+`p2-dated` (#192 after 11-16, #258, #259, #158), `p3-track` (one big track at a time, the user picks: desktop install #46 →
+#44/#47/#45/#78; Udder Truth #58-#60; archive tooling #221-#227 before the next mini-doc; b-roll #229), `waiting` (#80, #48,
+#45), `parked` (the rest). **Milestones (user, 11-16):** "Runs itself" (#259, #258, #287; due 12-06, a first guess), "Second
+channel (Sloth Beat)" (#46, #78, #44, #47, #45), "The Udder Truth: episode 1" (#58-#60), "Next mini-doc toolkit" (#221-#227,
+#229, #254); only the track in play gets a date. A new issue gets a priority label, and a milestone when it belongs to one.
+Write "#77 L6" rather than "fix #77" in commit messages: GitHub closes the issue on "fix". Roadmaps are issues only (byvfx/clipper):
+Posts blind items #36, Instagram Reels #39, lore-order playlists #43, archive fun #63, crisis mode #73, setup #78, live clips #81,
+blind items #111, investigate anyone #138, Modal ideas #53/#56, P&L #50. **Transcript-framed edits #66** (one issue; sections
+#67-#71): #70's tighten is built (`[edit] tighten`, PR #191) but the user wants it **off** until it clearly helps (turn it on per
+show in `[shows.<key>.edit]` only at their word); #67's model edit plan waits until edited Shorts prove themselves.
+**Agent exploration #158 (Clippa messenger):** v1 (PR #285), in the war room (PR #290), `youtube.retitle` behind
+`actions.edit_meta` (PR #291) and the `bulk`/`undo`/stream-name tools (PR #299) are all live (wiki Clippa-messenger); next, a week
+of phone use; #300 (access levels, a local Jev-like classifier in front of the model, a lab first); then a small `clipper mcp`.
+
+- **War room redesign (11-18, user: "feel more like you want to use it"):** all 8 steps are live (PRs #314, #316, #318, #321,
+  #329, #331, #333; the last deployed 11-20), and #324 (a card's one-line `why`) is done (PR #339). Plan doc
+  https://claude.ai/artifact/2Ny9Ad8bfWpjhyvtpx87eW, mockup https://claude.ai/artifact/H8uGqKzPmXJcXnAAUcNK4Z. Left: Library/Research/Settings
+  still open the old windows from tiles; follow-ups are issues #325-#328. Details per step: log 11-18 to 11-20.
+- **War room heat graph (PR #294, live 11-19):** 🔥 heat on a stream or in an item's window (`/api/heat`, wiki War-room#heat).
+  Not yet seen on the live page or on a real phone. Copilot has reviewed no PR since #285; the `review` workflow runs Grok (CLAUDE.md).
+- **Review pre-flight checks and approval by silence (#259):** steps A (`clipper review check`, PR #263) and B (`clipper review
+  auto`, PR #265, serve's `auto` job every 10 min), stale-finding rechecks (#270) and hardening (#273) are live (wiki Review).
+  **On for Kino since 11-15** (`[shows.kino.review] auto_approve = true`; backup `backups/clipper.toml.before_kino_auto_approve_2026-11-15`).
+  Next, after a few days of Kino with nothing undone (checkup's `auto` check, `clipper review auto --dry-run`): Channel 404's
+  Shorts, then close #259. Segments (#258) are merged and deployed (PRs #260-#262). Segment floor, from 7-day views: scores 1-3
+  underperform, 4-5 are a coin flip, 6+ do better; suggested `auto_min_segment = 4` (Kino holds 63 of 183 scored, Channel 404 23
+  of 106), **not set**: after the Shorts, at the user's word. Shorts backtest: 105 of 181 approved Shorts would have approved themselves.
+- **Demo videos (11-16, user):** a portfolio piece first (about 5:40, real shows on screen, none named in the narration, the user
+  reads it live; it goes on the byvfx site), then an install tutorial recorded during the desktop clean install (#46/#78),
+  published after #207. Script and capture checklist: https://claude.ai/artifact/W48qW95ZPYkA7AE16F4TEX. Build with `clipper doc`
+  (PR #289 lets `doc voice` take a recording per take from `vo/read/`); not tried on a real spoken take or in Resolve.
+  **Intro (25 s, Fusion/Resolve project `clippa_intro`, media `demo-intro/` on the share, sources `mockups/demo-intro/` on the
+  laptop):** the stage set, take 4, comp `intro_v3_stage`; the latest full render is `renders/intro_v3_stage_pop3.mp4` (1080p). The
+  user has heard the sound ("good") and watched an earlier render ("it works"); still for them to judge: the haze's amount, the
+  spot's flicker, the glass reflection's strength (kept), the last 1.78x blow-up of the 720p plate. The shoot page (version 17,
+  `mockups/demo-intro/clippa-demo-shoot.html`) describes this cut. The full build notes (nodes, scripts, ComfyUI passes, Fusion
+  tips, what the video models get wrong) are in log 11-17/11-18 and the HANDOFF text moved there 11-20.
+- **Documentaries (PR #233, live 11-13):** `clipper doc new|voice|build|master|leak|kit` (wiki Documentaries). Untried because they
+  cost: `voice` against ElevenLabs, `leak` on Modal (`--dry-run` first); reels at another frame rate than the timeline. On the
+  first real piece, listen to every take and watch the first built timeline. `[story] lufs = -14` is new (a story cut before it is
+  re-rendered on its next cut).
+- **B-roll #229 (steps 1-2 of 4) and clip art (PR #255):** `clipper broll ...` (NASA, DVIDS, Prelinger, Commons, Pixabay) and
+  `clipper clipart ...` (wiki B-roll, Clip-art); libraries `[paths] broll` / `clipart` on the share. Next for b-roll: the National
+  Archives (key by email from NARA), `[story] broll` in story cuts, a war room window. Not yet used by covers or the weekly. Drop the
+  "Popcorn function" maths plot (`commons-c2e98328`) from the clip art.
+- **Usability review (11-10):** built and merged 11-13 (#199, #204, #228, #205). Still open: new users and the public repo #207
+  (this install's values in tracked files, packaging).
+- **Checkup:** `clipper checkup` and `clipper alert send` are merged (#189); the nightly run (`deploy/claude/checkup.sh`) is not on
+  yet. Left: (1) the user puts `CHECKUP_AT=08:30` in `deploy/claude/env.local` and redeploys the claude container; (2) first run on
+  the NAS: check headless `claude -p` runs on the Remote Control sign-in and the `--allowedTools` rules work (`checkup.sh --dry-run`
+  first); (3) a week of nightly reports, then decide on hourly runs and PRs (#158). **Self-maintenance (#287):** step 2 is PR #341,
+  merged 11-20, **not deployed** (wiki Checkup#repairs, `clipper/repairs.py`): `clipper checkup --fix` every `[checkup] fix_minutes` (60);
+  repairs `retry` and `tmp`, both would-fix while `[checkup] fix = []` (`streams/.checkup/repairs.json`, `max_repairs` 2 per finding
+  in 7 days). Next: deploy; step 1; a week of would-fix reports; then `fix = ["tmp"]`, later `"retry"`, at the user's word; then new
+  checks (yt-dlp, cookies and tokens, repeat log errors, Kitsu approvals not scheduled); then PRs from the nightly run.
+- **Bootstrap follow-up (11-07):** `deploy/bootstrap.sh` installs Homebrew `ffmpeg`, which has no libass (`subtitles`) filter, so a
+  Mac worker fails Short captions; `ffmpeg-full` has it but is keg-only: install it and point clipper at it, or document it.
+  `deploy/hub/deploy.sh` from `lofn` needs `deploy/hub/env.local` (it overwrites the NAS `.env`).
+- **Investigate anyone (#138; part 1 `clipper people` merged 11-04, people.json is the record):** next, in the issue's order: speaker
+  attribution (needs #53 embeddings) → `investigate start` → X reads (check the read price first) → Obsidian vault → watchlist →
+  public records → `investigate eval` on known stories → Good/Noise buttons + `tune`. Also a review gate before a lead becomes
+  content, Wayback snapshots, a never-read list (Kiwi Farms).
+- **Story/swarm leftovers:** `investigate check` on the swarm (branch `investigate-swarm`, unmerged). YouTube downloads in a story
+  hit the bot check from this IP: a fresh cookie export or the Firefox profile. Modal cold starts dominate a story's few items.
+- **Code audits (10-28, 11-03, 11-08, `reports/`):** all plan items done. Still open from 11-03: #15, #24/#25, #29-#35, #37, #41,
+  #46-#50 (lows), #42's lock part. `tests/test_modules_have_tests.py` lists 13 untested modules (the list may only shrink); 17
+  functions over McCabe 15 carry `# noqa: C901`, split when touched.
+- **Weekly and monthly audit (wiki Audit):** `clipper audit` DMs how the week went; on the 1st a read-only `claude -p` leaves
+  `deep-<YYYY-MM>.md`; the claude container runs both after the checkup (`audit.sh`). Backups are `[backup]` (`backups/taste`, every 7
+  days by serve). Dependabot opens grouped weekly PRs (ruff, torch, torchaudio and torchvision ignored; no review, no secrets); its
+  security alerts are a separate repo switch, off as of 11-10.
+- **Blind items #111 (wiki Blind-items), steps 1-2 live since 11-16:** `clipper blinds` collects gossip blinds, reads their clues
+  (Haiku, never a name), pairs twins, and you guess first (war room Blinds window, Discord, `clipper blinds answer`). The NAS
+  clipper.toml has one source, CDAN (add Blind Gossip's site when it's back), `[blinds] check_minutes = 30`, `sensitive_alerts =
+  true`; the bot made a private `#blinds` with `alert = "digest"`. Not built: typed answers in the thread, a Hide this kind button.
+  **Next: step 3**, investigate after the answer, then step 4, reveals and the scorecard. Flow artifact:
+  https://claude.ai/artifact/1m3obUigUkkA5ZVdmmiLWn
+- **News watcher #110:** off since 2026-11-03 at the user's word (`[news] check_minutes = 0`, no terms); `auto_watch = true` brings back
+  the cast/figures/library list; `#news` exists in Discord.
+- **Older notes not on an issue:** republish the 2026-10-19 re-cut streams to Kitsu (user said not yet); Blade compilation's Discord
+  card never posted (`review notify kick-131151926 --keys comp-blade-in-vegas`); a daily "post kit" folder; thumbs: reject a picked
+  frame with no face, `--frame-at <s>`; Discord excerpts for one-offs could start after the intro; pick/preshow/retake prompts don't
+  read speaker tags yet.
 
 ## Recipes (how we did it last time; details in the log)
 - **Restart serve / the bot / the worker:** `clipper services restart serve|bot|worker` (docker compose on the
