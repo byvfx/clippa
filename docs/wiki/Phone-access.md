@@ -49,3 +49,22 @@ clipper containers aren't root and can't change Tailscale's settings; `--tailnet
 Open `https://clipper.<tailnet>.ts.net/?key=<token>` once on the phone, with the token from
 `secrets/warroom_token.txt` in the NAS folder. Turn the laptop's off (`clipper warroom --tailnet
 off` there).
+
+## Keep the machine's key from expiring
+
+Tailscale expires a machine's node key after 180 days by default. When it does, the machine drops
+off the tailnet and the war room stops answering on the phone until you sign in again. The
+`clipper` machine is meant to run unattended, so turn expiry off for it once:
+
+1. Open the admin console's Machines page (https://login.tailscale.com/admin/machines).
+2. Find `clipper` (the NAS container; the laptop and phone are separate rows), click its `...`
+   menu at the right of the row, and choose **Disable key expiry**.
+3. Check the row: it now shows an **Expiry disabled** badge under the machine's name.
+
+Do this once after the first sign-in; it survives restarts and updates, and sticks to the machine
+for as long as it stays registered. If you ever remove the machine and sign in again (a lost
+`tailscale-state` volume, say), it is a new machine and the setting needs doing again.
+
+An auth key (`TS_AUTHKEY`) has its own expiry, but that only matters for the first sign-in: once
+the machine has logged in, the key is no longer used. Disabling key expiry on the machine is the
+step that keeps it signed in.
