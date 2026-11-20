@@ -203,3 +203,19 @@ def test_alert_send_reads_cut_utf8_from_stdin_and_trims_to_discord(defaults, tmp
     text = jsonstate.load(f)["text"]
     assert text.startswith("é" * 10) and len(text) <= 1900
     assert "rest is cut" in capsys.readouterr().err
+
+
+def test_the_disk_check_is_off_by_default_and_warns_under_keep_free_pct(defaults, tmp_path, monkeypatch):
+    from clipper import streams
+    cfg = in_tmp(defaults, tmp_path)
+    monkeypatch.setattr(streams, "free_pct", lambda cfg, plus=0: 4.0)
+    assert checkup.check_disk(cfg) == []                       # keep_free_pct = 0
+    cfg["streams"]["keep_free_pct"] = 15
+    cfg["streams"]["keep_source_days"] = 60
+    (f,) = checkup.check_disk(cfg)
+    assert f["key"] == "disk:free" and f["level"] == checkup.BAD and "4%" in f["text"] and "60 days" in f["look"]
+    monkeypatch.setattr(streams, "free_pct", lambda cfg, plus=0: 12.0)
+    assert checkup.check_disk(cfg)[0]["level"] == checkup.WARN
+    monkeypatch.setattr(streams, "free_pct", lambda cfg, plus=0: 40.0)
+    assert checkup.check_disk(cfg) == []
+    assert keys(checkup.check_housekeeping(cfg, NOW)) == set()

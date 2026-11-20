@@ -19,7 +19,10 @@ written to the stream's pruned.json; a stage that needs the source afterwards sa
 A stream is left alone while it is recording, while the worker runs it, before it is in review,
 while an item waits on a decision, is scheduled and not uploaded yet, or is held while it could
 still go out ([schedule] stale_days after the stream). serve runs `prune --yes` daily when
-[streams] keep_source_days is set (0 = only by hand)."""
+[streams] keep_source_days is set (0 = only by hand). With [streams] keep_free_pct as well it passes
+--while-free-below: streams older than keep_source_days go oldest first, and only while the share's
+free space is under that percent, so recordings stay as long as the disk has room; the checkup warns
+when free space is under it."""
 from __future__ import annotations
 
 import os
@@ -230,16 +233,35 @@ def default_days(cfg: dict) -> float:
     return cfg["streams"]["keep_source_days"] or 30
 
 
+def free_pct(cfg: dict, plus: int = 0) -> float | None:
+    """Free space on the streams' share as a percent of its size (plus: bytes about to be freed);
+    None when the folder isn't there."""
+    root: Path = cfg["paths"]["streams"]
+    if not root.is_dir():
+        return None
+    u = shutil.disk_usage(root)
+    return (u.free + plus) * 100 / u.total if u.total else None
+
+
 def prune(cfg: dict, older_than_days: float | None = None, cuts: bool = False,
-          only: list[str] | None = None, yes: bool = False) -> list[str]:
-    """Remove what check() allows; without yes, only say what would go. Returns the lines."""
+          only: list[str] | None = None, yes: bool = False, while_free_below: float = 0) -> list[str]:
+    """Remove what check() allows; without yes, only say what would go. Returns the lines.
+    while_free_below (a percent): oldest first, and stop as soon as the share has that much free."""
     older = default_days(cfg) if older_than_days is None else older_than_days
     if older < 1:
         raise ClipperError("--older-than must be at least 1 day")
     entries = _schedule(cfg)
     out, freed = [], 0
-    for d in _stream_dirs(cfg, only):
-        c = check(cfg, d, entries, older)
+    checked = [(d, check(cfg, d, entries, older)) for d in _stream_dirs(cfg, only)]
+    if while_free_below:
+        checked.sort(key=lambda dc: dc[1]["date"])
+    for d, c in checked:
+        if while_free_below:
+            now = free_pct(cfg, 0 if yes else freed)   # a dry run adds what it would have freed
+            if now is not None and now >= while_free_below:
+                out.append(f"{now:.0f}% of the share is free (keep_free_pct {while_free_below:g}%): "
+                           f"the rest of the old streams stay")
+                break
         if not c["ok"]:
             if only:
                 out.append(f"{d.name}: left alone: {c['why']}")

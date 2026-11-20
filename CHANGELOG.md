@@ -10,6 +10,10 @@ Developing#releases.
 
 ## Unreleased
 
+- `[streams] keep_free_pct` makes the daily source-and-audio prune disk-aware: with it set (say 15), streams older
+  than `keep_source_days` go oldest first only while the share has less than that percent free, so recordings
+  stay as long as there's room. The checkup warns when free space is under it. `clipper streams prune
+  --while-free-below PCT` does the same by hand. Off at 0, as before.
 - `clipper checkup --fix` (serve runs it hourly) repairs what it can without asking: a run that
   failed on a rate limit or a dropped connection gets one more attempt, and temp files a killed
   write left are deleted. Each repair stays would-fix (reported, nothing changed) until you list it in

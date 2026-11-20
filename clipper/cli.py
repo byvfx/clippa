@@ -1275,7 +1275,8 @@ def cmd_streams(cfg: dict, args: argparse.Namespace) -> None:
         print(json.dumps(s, indent=1, default=str) if args.json else "\n".join(streams.listing_lines(s)))
     else:
         print("\n".join(streams.prune(cfg, older_than_days=args.older_than, cuts=args.cuts,
-                                      only=args.only, yes=args.yes)))
+                                      only=args.only, yes=args.yes,
+                                      while_free_below=args.while_free_below)))
 
 
 def cmd_backup(cfg: dict, args: argparse.Namespace) -> None:
@@ -2277,6 +2278,9 @@ def add_setup(sub) -> None:
                    help="also the segment and compilation videos and review previews of uploaded or rejected items")
     r.add_argument("--stream", dest="only", action="append", metavar="ID",
                    help="only this stream (repeatable); says why when it's left alone")
+    r.add_argument("--while-free-below", type=float, metavar="PCT", default=0,
+                   help="oldest first, and stop once the share has this percent free (serve passes "
+                        "[streams] keep_free_pct)")
     r.add_argument("--yes", action="store_true", help="remove them (without it, only list what would go)")
 
     p = sub.add_parser("backup", help="a dated zip of the taste layer: config, schedule, faces, voices, layouts, "

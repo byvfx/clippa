@@ -743,6 +743,10 @@ max_age_days = 8             # `clipper audit` and doctor: the newest zip older 
 # recording and audio of streams that are done with (every item decided, none waiting on an upload).
 keep_source_days = 0         # serve prunes source and audio this many days after a stream, daily;
                              # 0 = only by hand (`clipper streams prune`, 30 days unless --older-than)
+keep_free_pct = 0            # 0 = off. With keep_source_days set, serve's daily prune takes streams older than
+                             # that only while the share has less than this percent free, oldest first, so
+                             # recordings stay as long as the disk has room (e.g. 15); the checkup warns when
+                             # free space is under it
 never_prune = []             # stream ids prune always leaves whole (a test stream you re-cut)
 
 [serve]
