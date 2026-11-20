@@ -11,6 +11,11 @@ updates:
         patterns: ["*"]
     ignore:
       - dependency-name: ruff   # pinned with [tool.ruff] required-version and CI: bumped together by hand
+      # pinned to the cu128 builds ([tool.uv.sources]); a bump to a version PyTorch's cu128 index
+      # doesn't carry makes uv's resolution fail and the whole run produce no PR (11-12, 11-18)
+      - dependency-name: torch
+      - dependency-name: torchaudio
+      - dependency-name: torchvision
   - package-ecosystem: github-actions
     directory: /
     schedule:

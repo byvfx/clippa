@@ -58,3 +58,7 @@ news/
 # Resolve export media for the 8-Bit Guy explainer prototype
 studio/reports/8bitguy-explainer/resolve/media/
 studio/reports/8bitguy-explainer/resolve/roomtone/
+
+# Claude Code: its worktrees and this machine's own settings
+.claude/worktrees/
+.claude/settings.local.json
