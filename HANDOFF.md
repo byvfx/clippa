@@ -169,9 +169,9 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
 - **`clipper streams prune`:** `[streams] keep_source_days = 60` since 11-20 (user: keep at least two months; backup
   `backups/clipper.toml.before_keep_source_60_2026-11-20`), so serve's daily `prune` job runs once serve restarts (the next hub
   deploy). Nothing is that old yet: 0 MB would go at 60 days (streams take 2.5 TB, 23 TB free, about 70 GB a day).
-  PR #347 adds `[streams] keep_free_pct` (merge, deploy, then set it, say 15, in the NAS clipper.toml with a backup): the daily prune
-  then takes streams older than 60 days only while the share has less than that percent free, oldest first, and the checkup warns
-  under it. The test stream is in `never_prune`.
+  `[streams] keep_free_pct = 15` since 11-20 (PR #347, deployed at f70e26b, serve restarted; backup
+  `backups/clipper.toml.before_keep_free_pct_2026-11-20`): the daily prune takes streams older than 60 days only while the share has
+  less than 15% free, oldest first (48% free now, so nothing goes), and the checkup warns under 15%. The test stream is in `never_prune`.
 - Close Fusion and merge the leftovers of `mockups/` into `studio/mockups/` (4.2 GB, ignored by `/mockups/`; checked 11-20, not done):
   `mockups/udder_truth` still has the cast and Moo PNG originals (studio has JPG copies), `refs/`, `takes/`, `voice/` and the
   `storyboards/test_throw` MP4s; `mockups/demo-intro` is the intro's working folder (it stays).
