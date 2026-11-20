@@ -129,7 +129,7 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   `serve` (war room on 127.0.0.1:8765, on the tailnet as https://clipper.taile415cd.ts.net/; heartbeat
   `streams/.serve/status.json`), `bot` (`streams/.bot/status.json`) and `worker` (cuts with QSV on the iGPU).
   Code changes go out with `bash deploy/hub/deploy.sh` from a main checkout; `clipper services status|restart ...`
-  runs docker compose there (`[serve] hub`). Last deploy 2026-11-19 00:19: main as of #319, v0.2.0 (serve, bot and worker report `0.2.0`; the recorder is older). **The config and
+  runs docker compose there (`[serve] hub`). Last deploy 2026-11-20 ~09:00 (user): main as of #336, the analytics fix (serve, bot and worker report `0.2.0` plus the commit; the recorder is older). **The config and
   all state are on the NAS:** `//192.168.0.155/docker/clipper` (`/data`) holds `clipper.toml` (the one copy;
   `CLIPPER_CONFIG` on the laptop points at it), `schedule.json`, secrets/, backups/, logs/, faces/, voices/,
   news/, weekly/, archive/, layouts/, people.json, fonts/. The laptop's old copies: `backups/laptop-state-2026-11-05/`.
@@ -151,15 +151,12 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   8 h, Channel 404 `segment = 6`; slots a day: 9 Shorts (09/11/13/15/16/18/19/20/21), 6 segments
   (08/10/12/14/17/22), compilation 23:00 for big-story nights only (`docs/big-story.toml` into the stream's
   config.toml). If good items keep going stale while streams overlap, try `stale_days = 4`.
-- **Chud overnight test (11-12 to 11-20, user):** chud's segment budget is 0 since 11-10 (the user stopped
-  recording him and gave his slots to Kino and Don), which left 71 approved segments out. All 71 are pinned in Kitsu hourly
-  23:00-07:00, Fri 11-13 00:00 through Fri 11-20 07:00 (9 a night, no compilations); the hub uploads them 48 h
-  ahead. For it, in `clipper.toml`: `[schedule] max_per_day` 24 (was 15), `[youtube] max_per_24h` 26 (was 15),
-  `[shows.chud.youtube] captions = false` (quota: captions are 400 units, ~7 extra a day fit). **After 11-20**
-  (the scheduled task `chud-overnight-wrapup` does this Fri 11-20 09:00 and reports; it stops if a pin isn't
-  uploaded; the pin list is `backups/chud_overnight_pins_2026-11-12.json`): put both caps back to 15 unless the user keeps them, remove the chud youtube table, set
-  `captions_error = "deferred"` on those 71 schedule.json entries (back it up) so the hourly backfill adds the
-  captions from spare quota, restart serve. Backup: `backups/clipper.toml.before_chud_overnight_2026-11-12`.
+- **Chud overnight test: over (11-20).** All 71 chud segments pinned 23:00-07:00 went out on time, private with
+  publishAt, then public; YouTube took up to 26 in a rolling 24 h with no `uploadLimitExceeded`/`quotaExceeded`
+  (peak 7,203 units a day, no regular entry late or dropped). Caps back to 15 (`backups/clipper.toml.before_chud_overnight_end_2026-11-20`);
+  keeping more than 15 is the user's call. Two of the 71 (kick-136479997 s06/s07, Russell Brand) no longer show on
+  YouTube. The 71 have `captions_error = "deferred: ..."` (`backups/schedule.json.before_chud_captions_2026-11-20`)
+  for the hourly backfill from spare quota (400 units each, about a week or two); drop this bullet once all have `captions_set`.
 - **Archive:** Jer (The Quartering) 11,571 items / 2,732 h transcribed on Modal, FTS index built, `archive ask`
   works; link checks built but not yet run against the real services. #44 Jerry Banfield, #45 Papa Meat and
   #47 Ben Avery wait on the desktop install and permissions.
@@ -182,7 +179,10 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   $0.67 in Oct-Nov, the spend is segments, thumbs, meta. `clipper costs`, war room Costs, `--providers`
   (Claude's own count needs `ANTHROPIC_ADMIN_KEY`, not set). Monthly analytics check-in task on the 1st at
   09:00; October's (`reports/analytics/2026-10-checkin.md`): 1-4 taken, 5 skipped, its Decisions section is what
-  November's follows up. October: 12.7k views, 68.5 h watch, +28 subs, Shorts 80% of views.
+  November's follows up. October: 12.7k views, 68.5 h watch, +28 subs, Shorts 80% of views. Since 11-20 (#335,
+  #336) serve's `clipper analytics` retries Google's passing 500s and rate limits, skips a video still failing
+  (`d7_errors` in analytics.json counts its runs) and saves the rest; it fails, and DMs, only when one video fails
+  3 runs in a row. Left: serve waits a full `auto_hours` (24) after any failed job; a retry-sooner option on `Job` is unbuilt.
 - **Model providers (#72, closed 11-09; its edit-plan proof moved to #67):** the baseline stays Haiku + Sonnet. Tools: `clipper compare score <stream> --model
   openrouter:<vendor>/<model> --dry-run`, `clipper models test <model>` (conformance), `clipper models gold
   propose|confirm|run` (the user's 66-window answer key, `logs/model_tests/gold.json`); OpenRouter key in
