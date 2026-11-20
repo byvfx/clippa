@@ -42,26 +42,30 @@ doesn't, so it never hides anything from the next scheduled run.
 Some findings have a fixed repair, from a short list, with no model call (`clipper/repairs.py`,
 #287). Every checkup says, under such a finding, what its repair did or would do (`fix: would:
 one more attempt ...`), and the first line counts them: `3 findings; fixed 1, would fix 1, need
-you 1`.
+you 1`. "Will fix" is a repair that is on and either waiting for its time or due on serve's next
+run (a checkup without `--fix`, like the nightly one, changes nothing).
 
 | Repair | For | What it does |
 |---|---|---|
 | `retry` | a run that failed with no retries left, when its error is a passing one: a rate limit, a dropped connection, a remote server's 5xx (`passing`, whole words) | `retry_after_hours` (3) after the run failed, gives back one attempt in `run.json`; the worker runs it again on its next pass. Never while a worker holds the stream, nor for a run held on a rejected key |
 | `tmp` | the housekeeping finding | deletes those temp files |
 
-serve runs `clipper checkup --fix` every `fix_minutes` (60). Only the kinds listed in `fix` act; the
+serve runs `clipper checkup --fix` every `fix_minutes` (60), over the checks that have repairs
+(streams and housekeeping). Only the kinds listed in `fix` act; the
 others are **would-fix**: what they would have done goes in the ledger
 (`streams/.checkup/repairs.json`), once a day per finding, and nothing else changes. `fix` is
 empty to start, so the first week only reports. Read it with the nightly reports, then turn the
 repairs on one at a time in clipper.toml, for example `[checkup] fix = ["tmp"]`. A name that isn't a
 repair stops `--fix` with an error.
 
-Every repair is safe to repeat and capped: at most `max_repairs` (2) tries per finding key, ever,
-counted in the ledger, a failed try included. After that the finding says "tried 2 times already:
-it needs you" and stays for you. `--fix` exits 1 only when a repair failed (serve DMs that); a
-finding alone is the nightly report's business. No repair ever uploads or publishes, makes a Kitsu
-decision, touches the recorder or source footage, edits the config or viewer-facing text, restarts
-anything or calls a model.
+Every repair is safe to repeat and capped: at most `max_repairs` (2) tries per finding key in 7
+days, counted in the ledger, a failed try included. After that the finding says "tried 2 times in
+7 days: it needs you" and stays for you. `--fix` exits 1 only when a repair failed (serve DMs
+that); a finding alone is the nightly report's business. No repair ever uploads or publishes,
+makes a Kitsu decision, touches the recorder or source footage, edits the config or viewer-facing
+text, or restarts anything. No repair calls a model itself, but a run given one more attempt
+reruns its failed stage, which calls models or Modal as it always does (score, segments,
+transcription): at most twice a week per stream.
 
 Checked and left out, because a service already does them: a late release (serve's upload job
 replans every hour), a stale run lock (the worker takes it over), a stream queued while nothing

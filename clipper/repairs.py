@@ -14,12 +14,15 @@ Checked and left out, because a service already does it: a late release (serve r
 upload run), a stale run lock (the worker takes it over), a queued stream (the worker polls; when
 it doesn't, the fix is the container, which nothing here can reach).
 
-Every repair is safe to repeat and capped: at most [checkup] max_repairs per finding key, counted
-in the ledger (<streams>/.checkup/repairs.json), then the finding waits for a person again. Only
-the kinds listed in [checkup] fix act; the others are would-fix: what they would have done goes in
-the ledger (once a day per finding), so a week of reports shows what turning one on would do.
+Every repair is safe to repeat and capped: at most [checkup] max_repairs tries per finding key in
+CAP_DAYS, counted in the ledger (<streams>/.checkup/repairs.json), then the finding waits for a
+person. Only the kinds listed in [checkup] fix act; the others are would-fix: what they would have
+done goes in the ledger (once a day per finding), so a week of reports shows what turning one on
+would do. A checkup without --fix (the nightly one) changes nothing and says "due" for a kind
+that is on: serve's next --fix makes it.
 Never, whatever is listed: an upload or publish, a Kitsu decision, the recorder, source footage,
-the config, viewer-facing text, a restart, a model call.
+the config, viewer-facing text, a restart. No repair calls a model itself, but a retried run
+reruns its failed stage, which may (score, segments, transcription on Modal): the cap bounds it.
 """
 from __future__ import annotations
 
@@ -34,7 +37,8 @@ from . import jsonstate
 from .config import for_stream
 from .errors import ClipperError
 
-KEEP = 1000            # ledger entries kept
+KEEP = 1000            # ledger entries kept (the cap reads only the last CAP_DAYS)
+CAP_DAYS = 7           # max_repairs is per finding key in this window: a new leftover next month is new
 WOULD_EVERY_S = 86400  # a would-fix is logged once a day per finding
 TMP_AGE_S = 86400      # a temp file this old can't belong to a write in flight
 TMP_RX = re.compile(r"\.\d+\.\d+\.tmp$")
@@ -105,27 +109,35 @@ def plan_retry(cfg: dict, f: dict, now: datetime) -> Plan | None:
 
 # ---------- tmp: temp files a killed write left ----------
 
-def leftover_tmp(cfg: dict, now_s: float | None = None) -> list[Path]:
-    """jsonstate temp files TMP_AGE_S old: in the streams folder, a stream's folder and one below
-    (live/ and metadata/<folder>/ in it), and beside schedule.json."""
+_scanned: dict[tuple, dict[Path, float]] = {}   # the last scan, so the check and the repair share it
+
+
+def leftover_tmp(cfg: dict, now_s: float | None = None) -> dict[Path, float]:
+    """jsonstate temp files TMP_AGE_S old -> their mtime: in the streams folder, a stream's folder
+    (with live/ and metadata/<folder>/ in it), and beside schedule.json. One scan per now_s."""
     root: Path = cfg["paths"]["streams"]
     now_s = now_s or time.time()
-    dirs = {root, cfg["paths"]["schedule"].parent}
-    found = set()
-    for base in dirs:
+    key = (str(root), str(cfg["paths"]["schedule"].parent), now_s)
+    if key in _scanned:
+        return dict(_scanned[key])
+    found: dict[Path, float] = {}
+    for base in {root, cfg["paths"]["schedule"].parent}:
         if not base.is_dir():
             continue
         for pattern in TMP_GLOBS if base == root else ("*.tmp",):
             for p in base.glob(pattern):
                 try:
-                    if TMP_RX.search(p.name) and p.is_file() and now_s - p.stat().st_mtime >= TMP_AGE_S:
-                        found.add(p)
+                    if TMP_RX.search(p.name) and p.is_file() and now_s - (t := p.stat().st_mtime) >= TMP_AGE_S:
+                        found[p] = t
                 except OSError:
                     continue
-    return sorted(found)
+    _scanned.clear()
+    _scanned[key] = dict(sorted(found.items()))
+    return dict(_scanned[key])
 
 
 def _delete(paths: list[Path]) -> str:
+    _scanned.clear()
     gone = 0
     for p in paths:
         try:
@@ -140,15 +152,21 @@ def plan_tmp(cfg: dict, f: dict, now: datetime) -> Plan | None:
     paths = leftover_tmp(cfg, now.timestamp())
     if not paths:
         return None
-    return Plan("tmp", True, f"delete {len(paths)} leftover temp files", lambda: _delete(paths))
+    return Plan("tmp", True, f"delete {len(paths)} leftover temp files", lambda: _delete(list(paths)))
 
 
 # ---------- the allowlist ----------
 
-REPAIRS: dict[str, tuple[str, Callable[[dict, dict, datetime], Plan | None]]] = {
-    "retry": ("failed:", plan_retry),
-    "tmp": ("tmp:", plan_tmp),
+# kind -> (the finding keys it repairs, by prefix; the checkup check that finds them; its planner)
+REPAIRS: dict[str, tuple[str, str, Callable[[dict, dict, datetime], Plan | None]]] = {
+    "retry": ("failed:", "streams", plan_retry),
+    "tmp": ("tmp:", "housekeeping", plan_tmp),
 }
+
+
+def checks() -> list[str]:
+    """The checkup checks whose findings have a repair: all serve's --fix job needs to run."""
+    return list(dict.fromkeys(check for _, check, _ in REPAIRS.values()))
 
 
 def enabled(cfg: dict) -> set[str]:
@@ -169,12 +187,15 @@ def ledger(cfg: dict) -> list[dict]:
     return jsonstate.read_or(ledger_path(cfg), {}).get("log", [])
 
 
-def tries(log: list[dict], key: str) -> int:
-    return sum(1 for e in log if e.get("key") == key and e.get("did"))
+def tries(log: list[dict], key: str, now: datetime) -> int:
+    """Repairs made (or tried) for this finding key in the last CAP_DAYS."""
+    since = now - timedelta(days=CAP_DAYS)
+    return sum(1 for e in log if e.get("key") == key and e.get("did")
+               and (t := _when(e.get("at"))) and t >= since)
 
 
 def _plan(cfg: dict, f: dict, now: datetime) -> Plan | None:
-    for prefix, planner in REPAIRS.values():
+    for prefix, _, planner in REPAIRS.values():
         if f["key"].startswith(prefix):
             return planner(cfg, f, now)
     return None
@@ -183,11 +204,17 @@ def _plan(cfg: dict, f: dict, now: datetime) -> Plan | None:
 def apply(cfg: dict, findings: list[dict], now: datetime, fix: bool = False) -> list[dict]:
     """Give each finding a `repair`: {kind, state, text}, state one of
         done     fixed this run            would    a kind not in [checkup] fix: what it would do
+        due      on and ready: serve's next --fix makes it (a run without --fix)
         waiting  fixes later (text: when)  capped   max_repairs used up: it needs a person
         failed   the repair raised (text: why)
     (no `repair`: nothing here can fix it). fix: act and write the ledger; without it nothing
-    is written and a ready repair is "would" whatever is enabled. Returns the new ledger entries."""
-    on = enabled(cfg) if fix else set()
+    is written. Returns the new ledger entries."""
+    try:
+        on = enabled(cfg)
+    except ClipperError:
+        if fix:
+            raise
+        on = set()   # a plain checkup still reports; --fix says what is wrong with the list
     cap = cfg["checkup"]["max_repairs"]
     log = ledger(cfg)
     at = now.isoformat(timespec="seconds")
@@ -201,16 +228,18 @@ def apply(cfg: dict, findings: list[dict], now: datetime, fix: bool = False) -> 
         if plan is None:
             continue
         rep = f["repair"] = {"kind": plan.kind, "state": "", "text": plan.text}
-        if tries(log, f["key"]) >= cap:
-            rep.update(state="capped", text=f"tried {cap} times already ({plan.text}): it needs you")
+        if tries(log, f["key"], now) >= cap:
+            rep.update(state="capped", text=f"tried {cap} times in {CAP_DAYS} days ({plan.text}): it needs you")
         elif not plan.ready:
             rep["state"] = "waiting"
         elif plan.kind not in on:
             rep["state"] = "would"
-            last = max((_when(e["at"]) for e in log if e.get("key") == f["key"] and not e.get("did")),
-                       default=None)
+            last = max((t for e in log if e.get("key") == f["key"] and not e.get("did")
+                        and (t := _when(e.get("at")))), default=None)
             if fix and (last is None or (now - last).total_seconds() >= WOULD_EVERY_S):
                 new.append({"at": at, "key": f["key"], "kind": plan.kind, "did": False, "text": plan.text})
+        elif not fix:
+            rep.update(state="due", text=f"{plan.text} (serve's next checkup --fix)")
         else:
             try:
                 rep.update(state="done", text=plan.act())
@@ -233,11 +262,12 @@ def recent(cfg: dict, now: datetime, hours: float = 24) -> list[dict]:
 
 
 def counts(findings: list[dict]) -> dict[str, int]:
-    """fixed / would fix / waiting / need you over a run's findings."""
-    out = {"fixed": 0, "would fix": 0, "waiting": 0, "need you": 0}
+    """fixed / will fix / would fix / need you over a run's findings."""
+    out = {"fixed": 0, "will fix": 0, "would fix": 0, "need you": 0}
     for f in findings:
         state = (f.get("repair") or {}).get("state")
-        out[{"done": "fixed", "would": "would fix", "waiting": "waiting"}.get(state, "need you")] += 1
+        out[{"done": "fixed", "due": "will fix", "waiting": "will fix", "would": "would fix"}
+            .get(state, "need you")] += 1
     return out
 
 

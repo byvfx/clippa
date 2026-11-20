@@ -22,8 +22,8 @@ Jobs (`jobs()`; each runs `clipper ...` as a child process; an interval of 0 tur
     blinds     every [blinds] check_minutes: `clipper blinds check` (the bot asks you about them)
     backup     `clipper backup` when the newest zip is [backup] every_days old (looked at hourly)
     prune      daily with [streams] keep_source_days: `clipper streams prune --yes --older-than N`
-    checkup    every [checkup] fix_minutes: `clipper checkup --fix` (#287), the repairs [checkup] fix
-               lists, the others logged as would-fix
+    checkup    every [checkup] fix_minutes: `clipper checkup --fix` (#287) over the checks that have
+               repairs: the ones [checkup] fix lists act, the others are logged as would-fix
 A job that exits non-zero is queued as a DM (clipper/alerts.py; the bot sends it). One marked
 retry (analytics, prune: free, and a day apart) that fails runs again in RETRY_FAILED_S, doubling
 with each failure in a row, up to its own interval; the others wait their interval.
@@ -54,7 +54,17 @@ from typing import NamedTuple
 
 import requests
 
-from . import actions, alerts, daemon, news, preshow, retake, review_auto, warroom
+from . import (
+    actions,
+    alerts,
+    daemon,
+    news,
+    preshow,
+    repairs,
+    retake,
+    review_auto,
+    warroom,
+)
 from .config import base
 from .errors import ClipperError
 
@@ -178,7 +188,8 @@ class Serve:
              retry=True),
             Job("checkup", cfg["checkup"]["fix_minutes"] * 60,  # #287: no model; repairs are capped
              lambda: not self.running("checkup"),
-             lambda: task(self.run_clipper("checkup", ["checkup", "--fix"]))),
+             lambda: task(self.run_clipper("checkup", ["checkup", "--fix", *(
+                 a for c in repairs.checks() for a in ("--only", c))]))),
         ]
 
     async def run_clipper(self, name: str, args: list[str], streak: bool = True) -> int | None:

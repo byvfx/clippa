@@ -245,10 +245,10 @@ def check_housekeeping(cfg: dict, now: datetime) -> list[dict]:
     left = repairs.leftover_tmp(cfg, now.timestamp())
     if not left:
         return []
-    oldest = datetime.fromtimestamp(min(p.stat().st_mtime for p in left), UTC)
+    oldest = datetime.fromtimestamp(min(left.values()), UTC)
     return [finding("tmp:leftover", "housekeeping", WARN,
                     f"{len(left)} temp file{'s' if len(left) != 1 else ''} left by killed writes "
-                    f"(oldest {oldest:%m-%d}, e.g. {left[0].name})",
+                    f"(oldest {oldest:%m-%d}, e.g. {next(iter(left)).name})",
                     look="safe to delete; `clipper checkup --fix` does with [checkup] fix = [\"tmp\"]")]
 
 

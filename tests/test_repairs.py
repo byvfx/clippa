@@ -1,6 +1,7 @@
 """`clipper checkup --fix` (#287): capped repairs from an allowlist, would-fix until enabled."""
 import os
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 
 import pytest
 
@@ -102,7 +103,7 @@ def test_retry_is_capped_per_finding_key(defaults, tmp_path):
     (f,) = streams_findings(cfg, fix=True, now=NOW + timedelta(hours=5))
     assert f["repair"]["state"] == "capped" and "needs you" in f["repair"]["text"]
     assert jsonstate.load(d / "run.json")["attempts"] == cfg["worker"]["max_attempts"]
-    assert repairs.tries(repairs.ledger(cfg), "failed:kick-1") == cfg["checkup"]["max_repairs"]
+    assert repairs.tries(repairs.ledger(cfg), "failed:kick-1", NOW) == cfg["checkup"]["max_repairs"]
 
 
 def test_retry_leaves_a_stream_a_worker_holds(defaults, tmp_path):
@@ -194,3 +195,62 @@ def test_fix_exits_0_on_findings_and_1_when_a_repair_failed(defaults, tmp_path, 
     with pytest.raises(SystemExit) as out:
         cli.cmd_checkup(cfg, args)
     assert out.value.code == 1
+
+
+def test_the_cap_is_per_week_so_a_new_leftover_later_is_fixed(defaults, tmp_path):
+    cfg = in_tmp(defaults, tmp_path)
+    cfg["checkup"]["fix"] = ["tmp"]
+    p = cfg["paths"]["streams"] / "run.json.1.1.tmp"
+    for day in (0, 1):
+        old_tmp(p)
+        (f,) = checkup.run(cfg, only=["housekeeping"], now=NOW + timedelta(days=day), fix=True)["findings"]
+        assert f["repair"]["state"] == "done"
+    old_tmp(p)
+    (f,) = checkup.run(cfg, only=["housekeeping"], now=NOW + timedelta(days=2), fix=True)["findings"]
+    assert f["repair"]["state"] == "capped" and p.exists()
+    (f,) = checkup.run(cfg, only=["housekeeping"], now=NOW + timedelta(days=repairs.CAP_DAYS + 1),
+                       fix=True)["findings"]
+    assert f["repair"]["state"] == "done" and not p.exists()
+
+
+def test_without_fix_an_enabled_repair_is_due_and_nothing_changes(defaults, tmp_path):
+    cfg = in_tmp(defaults, tmp_path)
+    cfg["checkup"]["fix"] = ["retry"]
+    d = failed(cfg)
+    (f,) = streams_findings(cfg)
+    assert f["repair"]["state"] == "due" and "serve's next checkup --fix" in f["repair"]["text"]
+    assert repairs.summary([f]) == "will fix 1"
+    assert jsonstate.load(d / "run.json")["attempts"] == 3 and not repairs.ledger_path(cfg).exists()
+
+
+def test_a_ledger_entry_without_a_time_is_skipped(defaults, tmp_path):
+    cfg = in_tmp(defaults, tmp_path)
+    failed(cfg)
+    path = repairs.ledger_path(cfg)
+    path.parent.mkdir(parents=True)
+    jsonstate.write(path, {"log": [{"key": "failed:kick-1", "did": False}, {"key": "failed:kick-1", "at": "x"}]})
+    (f,) = streams_findings(cfg, fix=True)
+    assert f["repair"]["state"] == "would" and len(repairs.ledger(cfg)) == 3
+
+
+def test_serve_runs_only_the_checks_with_repairs(defaults, tmp_path):
+    from clipper import serve
+
+    assert repairs.checks() == ["streams", "housekeeping"]
+    assert set(repairs.checks()) <= set(checkup.CHECKS)
+    cfg = in_tmp(defaults, tmp_path)
+    s = serve.Serve(cfg)
+    started = []
+    s.run_clipper = lambda name, args, streak=True: (name, args)
+    s.loop = SimpleNamespace(create_task=started.append)
+    (job,) = [j for j in s.jobs() if j.name == "checkup"]
+    job.start()
+    assert job.every_s == 3600
+    assert started == [("checkup", ["checkup", "--fix", "--only", "streams", "--only", "housekeeping"])]
+
+
+def test_only_offers_every_check():
+    p = cli.build_parser()
+    sub = next(a for a in p._subparsers._group_actions if a.dest)
+    only = next(a for a in sub.choices["checkup"]._actions if a.dest == "only")
+    assert set(only.choices) == set(checkup.CHECKS)
