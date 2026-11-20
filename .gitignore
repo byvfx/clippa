@@ -36,8 +36,8 @@ people.json
 analytics.json
 analytics_channel.json
 
-# The old mockups/ folder: ignored leftovers (takes, voice tests) that a running Fusion kept the
-# move from taking along; merge them into studio/mockups/ by hand, then this line goes.
+# The old mockups/ folder: only the demo intro's working folder (mockups/demo-intro, large renders) is
+# left in it, kept out of git. Its Udder Truth leftovers moved into studio/mockups/ on 11-20.
 /mockups/
 
 # Udder Truth performance takes (large phone video), under studio/

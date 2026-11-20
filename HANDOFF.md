@@ -172,9 +172,6 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   `[streams] keep_free_pct = 15` since 11-20 (PR #347, deployed at f70e26b, serve restarted; backup
   `backups/clipper.toml.before_keep_free_pct_2026-11-20`): the daily prune takes streams older than 60 days only while the share has
   less than 15% free, oldest first (48% free now, so nothing goes), and the checkup warns under 15%. The test stream is in `never_prune`.
-- Close Fusion and merge the leftovers of `mockups/` into `studio/mockups/` (4.2 GB, ignored by `/mockups/`; checked 11-20, not done):
-  `mockups/udder_truth` still has the cast and Moo PNG originals (studio has JPG copies), `refs/`, `takes/`, `voice/` and the
-  `storyboards/test_throw` MP4s; `mockups/demo-intro` is the intro's working folder (it stays).
 - Branches and worktrees (11-20 cleanup, at the user's word): origin keeps only `main` and four unmerged branches on purpose:
   `archive/instagram-source` (the Instagram-source work, base is main as of #215, rebase before a PR), `story-dig`, `jev-lab`
   (`C:\clipper-jevlab`) and `ccr-8319354b-axsr9v` (fan-mag, paused for the user's next tweaks). Local `feat/twitch-youtube-fetch`
