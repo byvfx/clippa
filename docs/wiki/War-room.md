@@ -112,6 +112,11 @@ It works from the keyboard:
 | <kbd>G</kbd> then a letter | [jump to a page](#search-and-the-g-keys) |
 | <kbd>Esc</kbd> | close the item |
 
+Each card shows the item's score (when it has one) and, under the hook, one line on why it was
+picked: the editor pass's reason for a clip or a Short (or the model's for a [hand pick](Pipeline#shorts-from-a-stretch-you-name)),
+the segment score's reason for a segment; items with neither, like a compilation, have none. Hover it for the whole line; the open item shows
+it in full under **Why**.
+
 <kbd>Tab</kbd> reaches the card titles, schedule slots and live chips too; <kbd>Enter</kbd> or
 <kbd>Space</kbd> opens them. The card buttons name their key on hover.
 

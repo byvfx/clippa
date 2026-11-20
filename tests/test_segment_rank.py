@@ -107,3 +107,21 @@ def test_kitsu_shows_the_score_from_segments_json(stream):
         (sdir / "segments" / s["file"]).write_bytes(b"")              # items only lists cut videos
     got = {it["key"]: it["fields"].get("Score") for it in review.items(sdir, ["segments"])}
     assert got == {"s01_t": 3, "s02_t": 9, "s03_t": 9}
+
+
+def test_each_item_says_why_it_was_picked(stream):
+    """#324: the card's one line. A segment's score_why (segments.json's, newer than its sidecar's),
+    a pick's or a Short's Pass B reason; nothing when there is none."""
+    cfg, sdir = stream
+    data = jsonstate.load(sdir / "segments.json")
+    data["segments"][1]["score_why"] = "the strongest take"
+    jsonstate.write(sdir / "segments.json", data)
+    for s in data["segments"]:
+        jsonstate.write(sdir / "segments" / s["file"].replace(".mp4", ".json"), {**s, "score_why": "old"})
+        (sdir / "segments" / s["file"]).write_bytes(b"")
+    (sdir / "clips").mkdir()
+    jsonstate.write(sdir / "clips" / "01_t20_x.json", {"id": "t20", "title": "T", "hook": "h", "reason": "Don's own joke",
+                                                       "in_s": 150.0, "out_s": 180.0, "score_a": 7})
+    (sdir / "clips" / "01_t20_x.mp4").write_bytes(b"")
+    got = {it["key"]: it["why"] for it in review.items(sdir, ["segments", "picks"])}
+    assert got == {"s01_t": "old", "s02_t": "the strongest take", "s03_t": "old", "c01_t20": "Don's own joke"}

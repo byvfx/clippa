@@ -393,8 +393,9 @@ function card(i) {
       <span class="dur">${mmss(i.duration_s)}</span>${i.video_url ? `<button class="pop" data-pop="${esc(i.ref)}" title="Open the video in its own window" aria-label="Pop out">${ic("popout")}</button>` : ""}</div>
     <div class="body">
       <div class="title" data-open="${esc(i.ref)}" role="button" tabindex="0" title="${esc(i.title)}">${esc(bare(i.title, i.show_name))}</div>
-      <div class="sub">${showTag(i.show, i.show_name)}<span>${esc(i.date)}</span><span>${esc(i.short.split("/")[1])}</span>${i.score ? `<span class="score" title="Score">${esc(i.score)}</span>` : ""}${sched ? `<span>${sched}</span>` : ""}${i.issues?.length ? `<span class="issues" title="${esc(i.issues.map(x => x.msg).join("\n"))}">${ic("warn")}${i.issues.length}</span>` : ""}</div>
+      <div class="sub">${showTag(i.show, i.show_name)}<span>${esc(i.date)}</span><span>${esc(i.short.split("/")[1])}</span>${i.score ? `<span class="score" title="Score (Filters: sort by score)">${esc(i.score)}</span>` : ""}${sched ? `<span>${sched}</span>` : ""}${i.issues?.length ? `<span class="issues" title="${esc(i.issues.map(x => x.msg).join("\n"))}">${ic("warn")}${i.issues.length}</span>` : ""}</div>
       ${i.hook ? `<div class="hook">${esc(i.hook)}</div>` : ""}
+      ${i.why ? `<div class="why" title="${esc(i.why)}">${esc(i.why)}</div>` : ""}
       ${hit ? `<div class="hit" title="Said in the video">${ic("said")}${esc(hit)}</div>` : ""}
       ${i.decision === "changes_requested" && i.comment ? `<div class="note">${ic("edit")}${esc(i.comment)}</div>` : ""}
       ${TAB === "retakes" && RETAKEN.has(i.ref) ? (h => `<div class="ev"><div class="w">${esc(ago(h.at))}${h.cost_usd != null ? " · " + usd(h.cost_usd) : ""}</div><q>${esc(h.comment)}</q>${retakeResult(h)}</div>`)(RETAKEN.get(i.ref)) : ""}

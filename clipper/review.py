@@ -238,6 +238,7 @@ def items(stream_dir: Path, include: list[str], cfg: dict | None = None) -> list
     starts = [s["start_s"] for s in cut_segs]
     # the model score (#258): segments.json's, newer than a cut sidecar's when --score ran later
     scores = {s["id"]: s["score"] for s in seg_data["segments"] if "score" in s}
+    score_whys = {s["id"]: s["score_why"] for s in seg_data["segments"] if s.get("score_why")}
 
     def segment_of(t: float) -> dict | None:
         i = bisect.bisect_right(starts, t) - 1
@@ -254,7 +255,7 @@ def items(stream_dir: Path, include: list[str], cfg: dict | None = None) -> list
                         "duration_s": d["end_s"] - d.get("cut_start_s", d["start_s"]),
                         "fields": {"Topic": d["topic"], "Source audio": d["source_share"],
                                    "Score": scores.get(d["id"], d.get("score"))},
-                        "meta": d})
+                        "why": score_whys.get(d["id"], d.get("score_why", "")), "meta": d})
     if "picks" in include:
         for side in sorted((stream_dir / "clips").glob("*.json")):
             d = jsonstate.load(side)
@@ -269,7 +270,7 @@ def items(stream_dir: Path, include: list[str], cfg: dict | None = None) -> list
                         "fields": {"Hook": d["hook"], "Category": d.get("category"),
                                    "Score": d.get("score_a"),
                                    "Found by": found_by(d["id"])},
-                        "meta": d})
+                        "why": d.get("reason", ""), "meta": d})
     if "shorts" in include:
         for side in sorted((stream_dir / "shorts").glob("v*.json")):
             d = jsonstate.load(side)
@@ -284,7 +285,7 @@ def items(stream_dir: Path, include: list[str], cfg: dict | None = None) -> list
                                    "Score": d.get("score_a"), "Layout": d["layout"],
                                    "Tightened": tighten.label(d.get("tightened", {}).get("pauses", [])),
                                    "Found by": found_by(d["id"]), **source_hold(d, cfg)},
-                        "meta": d})
+                        "why": d.get("reason", ""), "meta": d})
     if "compilations" in include:
         for side in sorted((stream_dir / "compilations").glob("*.json")):
             d = jsonstate.load(side)
