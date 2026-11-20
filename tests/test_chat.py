@@ -224,10 +224,11 @@ def test_ask_options_run_the_same_tool(cfg, monkeypatch, no_model):
                                                                     {"ref": "kick-1/s07_b", "title": "B"}])
         return card_plan()
     monkeypatch.setattr(catalog, "prepare", prepare)
-    m = chat.handle(cfg, "pin s0 fri 15:00")["messages"][-1]
-    assert m["ask"] == {"tool": "pin", "args": {"when": "2026-11-20 15:00"}}
+    when = chat.parse_when("fri 15:00", datetime.now(ZoneInfo(cfg["schedule"]["timezone"])))   # the real clock: this
+    m = chat.handle(cfg, "pin s0 fri 15:00")["messages"][-1]                                  # test once hard-coded a date
+    assert m["ask"] == {"tool": "pin", "args": {"when": when}}
     v = chat.pick(cfg, m["id"], "kick-1/s07_b")
-    assert calls[-1] == ("pin", {"when": "2026-11-20 15:00", "item": "kick-1/s07_b"})
+    assert calls[-1] == ("pin", {"when": when, "item": "kick-1/s07_b"})
     assert v["messages"][-1]["card"]
     with pytest.raises(ClipperError):
         chat.pick(cfg, m["id"], "kick-9/x")
