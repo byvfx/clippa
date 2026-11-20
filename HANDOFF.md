@@ -125,7 +125,7 @@ narrated catch-up cut), `people`, `faces`, `cast`, `speakers`, `narrate` / `perf
   `deploy/`, `.github/` or `pyproject.toml`: any other PR (the wiki, `uv.lock` alone,
   `clipper.example.toml`, `streamers.json`) has CI but no review, and a notes-only one (e.g. HANDOFF and the
   log) has neither since 11-10 (`check.yml` paths); both merge on the user's word, the first once CI is green.
-  A fork's PR: read the diff by hand, then the user's word. The repo secret `OPENROUTER_API_KEY` is unused now.
+  A fork's PR: read the diff by hand, then the user's word. The repo secret `OPENROUTER_API_KEY` is the `review` workflow's (back 11-20): keep it.
 
 ## State now (2026-11-08)
 - **Hub on the NAS** since 2026-11-05 (wiki NAS-hub): compose project `clipper-hub` in `~/clipper-hub`, containers

@@ -13,9 +13,10 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths: ["clipper/**", "tests/**", "deploy/**", ".github/**", "pyproject.toml"]
 
-concurrency:  # a new push replaces a review still running for the old one
+concurrency:  # one review per PR at a time; a push while one runs waits for it (only the newest
+  # waiting one runs), so a paid review already thinking is never thrown away
   group: review-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -38,6 +39,7 @@ jobs:
           fetch-depth: 0   # the diff needs main's history too
       - uses: astral-sh/setup-uv@v10.3.3
       - name: Install (base dependencies only)
+        continue-on-error: true   # like the review: never a red check on the PR
         run: uv sync --locked --no-dev
       - name: Review and post
         continue-on-error: true
