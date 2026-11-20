@@ -488,6 +488,8 @@ def describe(cfg: dict, sdir: Path, gazu=None, links: bool = True) -> dict[str, 
             "score": fields.get("Score") or proposed.get("Score") or "",
             "found_by": fields.get("Found by") or proposed.get("Found by") or "",
             "topic": fields.get("Topic") or proposed.get("Topic") or "",
+            # #324: why it was picked, one line on the card (Pass B's reason; a segment's score_why)
+            "why": it.get("why") or "",
             "duration_s": it.get("duration_s"),
             "decision": r.get("decision", "pending"), "status": r.get("status", "wfa"),
             "comment": r.get("comment", ""),

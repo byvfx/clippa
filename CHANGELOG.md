@@ -10,6 +10,8 @@ Developing#releases.
 
 ## Unreleased
 
+- War room: each Review card says in one line why the item was picked (the open item shows it in full
+  under Why), beside its score.
 - `clipper analytics` rides out Google's passing errors: each call retries a 500 or a rate limit
   itself, a video whose 7-day numbers still fail is skipped and asked again next run, and what came in
   is saved either way. Only the same video failing three runs in a row fails the job (and DMs you).

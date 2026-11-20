@@ -314,6 +314,7 @@ function openModal(ref, checked) {  // checked: the caller has already asked abo
           <b>Length</b><span>${mmss(i.duration_s)}</span>
           <b>Stream</b><span>${esc(i.stream)} · ${esc(i.date)} · <button class="lnk" data-heat="${esc(i.stream)}" data-heatfocus="${esc(i.ref)}" title="Where this sits in the stream, and how hot it ran">${ic("heat")}heat</button></span>
           ${i.score ? `<b>Score</b><span>${esc(i.score)} · ${esc(i.category)} · ${esc(i.found_by)}</span>` : ""}
+          ${i.why ? `<b>Why</b><span>${esc(i.why)}</span>` : ""}
           <b>Revision</b><span>${esc(i.revision)} ${i.synced_at ? "· synced " + ago(i.synced_at) : ""}</span>
           <b>Links</b><span><a href="${esc(i.kitsu_url)}" target="_blank">Kitsu</a>${i.youtube_url ? ` · <a href="${esc(i.youtube_url)}" target="_blank">YouTube</a>` : ""}</span>
           ${i.auto ? `<b>Auto</b><span>${esc(i.auto)}</span>` : ""}

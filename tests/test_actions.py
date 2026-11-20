@@ -22,7 +22,7 @@ def test_describe_builds_a_row_from_the_local_files(defaults, tmp_path, monkeypa
     jsonstate.write(sdir / "meta.json", {"started_at": "2026-11-07T20:00:00-08:00"})
     monkeypatch.setattr(actions, "for_stream", lambda cfg, d: cfg)
     monkeypatch.setattr(review, "ensure_links", lambda d, cfg, gazu=None: state)
-    monkeypatch.setattr(review, "items", lambda d, include, cfg: [{"key": "c01_t20", "duration_s": 42.0}])
+    monkeypatch.setattr(review, "items", lambda d, include, cfg: [{"key": "c01_t20", "duration_s": 42.0, "why": "Don's own take"}])
     monkeypatch.setattr(actions, "schedule_entries", lambda cfg: {
         "kick-1/c01_t20": {"publish_at": "2026-11-09T16:00:00-08:00", "status": "uploaded"}})
     monkeypatch.setattr(actions, "schedule_dropped", lambda cfg: {})
@@ -34,6 +34,7 @@ def test_describe_builds_a_row_from_the_local_files(defaults, tmp_path, monkeypa
     assert row["duration_s"] == 42.0 and row["date"] == "2026-11-07" and row["thumbnail"] is None
     assert row["ref"] == "kick-1/c01_t20" and row["short"] == "kick-1/c01" and row["revision"] == 2
     assert row["kitsu_url"] == "http://k/t" and row["synced_at"] == "2026-11-08T10:00:00"
+    assert row["why"] == "Don's own take" and row["score"] == "8"   # #324: the card's badge and line
 
 
 def test_describe_defaults_for_an_item_nobody_decided_on(defaults, tmp_path, monkeypatch):
@@ -50,4 +51,4 @@ def test_describe_defaults_for_an_item_nobody_decided_on(defaults, tmp_path, mon
     row = actions.describe(defaults, sdir)["s02_topic"]
     assert (row["title"], row["decision"], row["status"], row["hold"]) == ("s02_topic", "pending", "wfa", False)
     assert row["scheduled"] == "" and row["uploaded"] is False and row["dropped"] == "stale"
-    assert row["duration_s"] is None and row["date"] == ""
+    assert row["duration_s"] is None and row["date"] == "" and row["why"] == ""
