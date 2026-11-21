@@ -40,7 +40,6 @@ import contextlib
 import io
 import logging
 import os
-import re
 import time
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
@@ -124,12 +123,13 @@ DETAILS = [("YouTube title", "title", "YouTube title", 100, False),
 
 
 def same_text(a: str, b: str) -> bool:
-    """A form field left as it was: the same words in the same paragraphs. Discord may re-wrap
-    text (so line breaks and spaces inside a paragraph don't count), but a blank line added or
-    taken out is an edit."""
-    def paras(t: str) -> list[list[str]]:
-        return [p.split() for p in re.split(r"\n\s*\n", (t or "").replace("\r\n", "\n").strip()) if p.strip()]
-    return paras(a) == paras(b)
+    """A form field left as it was: the same words, and the same blank lines between them.
+    Discord may re-wrap text (so line breaks and spaces inside a paragraph don't count), but a
+    blank line added or taken out is an edit, a second one too."""
+    def words(t: str) -> list[str]:  # "" for each blank line: split() never yields one
+        lines = (t or "").replace("\r\n", "\n").strip().split("\n")
+        return [w for line in lines for w in (line.split() or [""])]
+    return words(a) == words(b)
 
 
 class Details(discord.ui.Modal):

@@ -461,3 +461,43 @@ def test_a_youtube_retry_keeps_a_finished_download(defaults, tmp_path, monkeypat
     with pytest.raises(RuntimeError, match="stop here"):
         archive.transcribe_item(cfg, idir, it, "L4")
     assert sent == [(b"done", ".m4a")]
+
+
+def test_a_youtube_download_is_the_one_its_info_names(defaults, tmp_path, monkeypatch):
+    """yt-dlp can date a file by the upload (Last-Modified), and a crashed run leaves a .ytdl
+    resume note: this run's file is the ext its info names, and every leftover goes once it's done."""
+    idir = tmp_path / "yt-x"
+    idir.mkdir()
+    (idir / "audio.webm.ytdl").write_text("{}", encoding="utf-8")  # a crashed run's resume note
+    (idir / "audio.webm").write_bytes(b"other format")
+    cfg = {**defaults, "paths": {**defaults["paths"], "modal_runs": tmp_path / "modal_runs.jsonl"}}
+    monkeypatch.setattr(archive.transcribe, "modal_settings", lambda tc, diarize: {})
+    sent = []
+
+    class Worker:
+        class transcribe:
+            @staticmethod
+            def remote(data, suffix, settings):
+                sent.append((data, suffix))
+                raise RuntimeError("stop here")
+
+    monkeypatch.setattr(archive.transcribe, "modal_worker", lambda tc, gpu: Worker)
+
+    class Done:
+        returncode, stdout, stderr = 0, "", ""
+
+    seen = []
+
+    def run_retrying(cfg, *args, retry_on):
+        seen.extend(args)
+        (idir / "audio.m4a").write_bytes(b"this run")
+        os.utime(idir / "audio.m4a", (1_000_000, 1_000_000))  # dated by the upload, years ago
+        (idir / "audio.info.json").write_text(json.dumps({"title": "x", "duration": 60, "ext": "m4a"}),
+                                              encoding="utf-8")
+        return Done(), False
+
+    monkeypatch.setattr(archive.ytdl, "run_retrying", run_retrying)
+    it = {"id": "yt-x", "source": "youtube", "title": "x", "duration_s": 60.0, "url": "https://youtu.be/x"}
+    with pytest.raises(RuntimeError, match="stop here"):
+        archive.transcribe_item(cfg, idir, it, "L4")
+    assert sent == [(b"this run", ".m4a")] and "--no-mtime" in seen

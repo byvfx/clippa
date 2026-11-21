@@ -195,4 +195,6 @@ def test_a_form_edit_counts_paragraphs_not_wrapping():
     assert bot.same_text("a b\r\n\r\nc", "a  b\n\nc ")                     # CRLF and spaces: no edit
     assert not bot.same_text("Line one\n\nLine two", "Line one\nLine two")  # a paragraph break: an edit
     assert not bot.same_text("one two", "one three")
+    assert not bot.same_text("Thanks.\n\nSubscribe.", "Thanks.\n\n\nSubscribe.")  # a second blank line: an edit
+    assert bot.same_text("a\n \nb", "a\n\nb")                                  # a line of spaces is blank
     assert bot.same_text("", "") and bot.same_text("\n\n", "")

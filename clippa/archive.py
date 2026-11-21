@@ -314,26 +314,28 @@ def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[s
         return out, cost
 
     if it["source"] == "youtube":
-        args = ["-f", cfg["archive"]["youtube_format"], "--write-info-json", "--no-playlist",
+        args = ["-f", cfg["archive"]["youtube_format"], "--write-info-json", "--no-playlist", "--no-mtime",
                 "-o", str(idir / "audio.%(ext)s"), it["url"]]
         r, signed_in = ytdl.run_retrying(cfg, *args, retry_on=retry_on)  # see ytdl's docstring
-        # A finished download left by a run that died later is kept (yt-dlp calls it downloaded);
-        # beside one in another format, the newest is this run's.
-        audio = sorted((p for p in idir.glob("audio.*") if p.suffix not in (".json", ".part")),
-                       key=lambda p: p.stat().st_mtime, reverse=True)
+        # A finished download left by a run that died later is kept (yt-dlp calls it downloaded).
+        # This run's file is the one its info names; beside a leftover in another format and
+        # with no ext in the info, the newest (--no-mtime: written now, not the upload's date).
+        audio = [p for p in idir.glob("audio.*") if p.suffix not in (".json", ".part", ".ytdl")]
         if r.returncode or not audio:
             raise RuntimeError(f"yt-dlp: {ytdl.last_error(r)}")
         info_path = idir / "audio.info.json"
         info = jsonstate.load(info_path)
         info_path.unlink()
+        named = idir / f"audio.{info['ext']}" if info.get("ext") else None
+        mine = named if named in audio else max(audio, key=lambda p: p.stat().st_mtime)
         ts = info.get("timestamp") or info.get("release_timestamp")
         meta.update(title=info.get("title") or it["title"], description=info.get("description") or "",
                     channel=info.get("channel") or info.get("uploader") or it.get("channel") or "",
                     duration_s=float(info.get("duration") or it["duration_s"]),
                     date=datetime.fromtimestamp(ts, UTC).date().isoformat() if ts else None)
-        data = audio[0].read_bytes()
-        out, cost = call(worker.transcribe, data, audio[0].suffix, settings)
-        for p in audio:  # transcribed: this one and any older leftover go
+        data = mine.read_bytes()
+        out, cost = call(worker.transcribe, data, mine.suffix, settings)
+        for p in idir.glob("audio.*"):  # transcribed: this one and every leftover (other formats, resume notes) go
             p.unlink()
     elif it["source"] in ("kick", "hei"):
         # The video `archive video` kept, else the stream's smallest download: Kick's HLS
