@@ -15,7 +15,8 @@ process that is always up and has the Discord token, picks them up every minute 
   crash, a background job failing), recorder (stalls, crashes, finalize failures), disk
   (the streams share filling up), digest (daily summary at digest_time), spend (Modal's
   month passing each [modal] alert_every_usd, checked hourly), checkup (the nightly
-  `clipper checkup` report, deploy/claude/checkup.sh);
+  `clipper checkup` report, deploy/claude/checkup.sh; a sign-in that is gone, from serve's
+  hourly `checkup --alert`);
 - the same problem (same key) at most once per cooldown_hours;
 - nothing during quiet_hours: held, then sent together when they end.
 The bot itself adds the disk check, the digest and "can't read the streams share" (which
@@ -52,8 +53,9 @@ def outbox(cfg: dict) -> Path:
     return Path(cfg["paths"]["streams"]) / ".notify" / "outbox"
 
 
-def send(cfg: dict, kind: str, text: str, key: str = "") -> None:
-    """Queue a notification for the bot. Never raises: a lost alert mustn't stop the caller.
+def send(cfg: dict, kind: str, text: str, key: str = "") -> bool:
+    """Queue a notification for the bot. Never raises: a lost alert mustn't stop the caller;
+    False when it couldn't be queued.
     key: what counts as "the same problem" for cooldown_hours (default: the text, digits
     ignored, so "no video for 61 s" and "... 75 s" are one)."""
     try:
@@ -67,8 +69,10 @@ def send(cfg: dict, kind: str, text: str, key: str = "") -> None:
         tmp = d / f"{name}.tmp"  # whole files only: other machines read this folder
         tmp.write_text(json.dumps(ev, ensure_ascii=False), encoding="utf-8")
         tmp.replace(d / name)
+        return True
     except OSError as e:
         log.warning("notification not queued (%s): %s", e, text)
+        return False
 
 
 class Alerts:

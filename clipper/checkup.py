@@ -21,8 +21,9 @@ misses its upload, a title that breaks the house rules. This looks for those:
     approvals  an approved item the plan never saw; a plan serve stopped replanning
 
 --fix (#287, clipper/repairs.py) repairs what it can from a short allowlist and logs it; a run
-without it still says, per finding, what a repair would do. No model, no network; nothing
-written unless --mark or --fix.
+without it still says, per finding, what a repair would do. --alert DMs a sign-in that is gone,
+once, without waiting for the morning (serve's hourly run passes both). No model, no network;
+nothing written unless --mark, --fix or --alert.
 
 Each finding has a stable key; --mark
 keeps the keys in <streams>/.checkup/state.json, so the next run can say which are new (the
@@ -36,7 +37,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import daemon, jsonstate, repairs, services, streams, worker
+from . import alerts, daemon, jsonstate, repairs, services, streams, worker
 from .config import for_stream
 from .errors import ClipperError
 
@@ -503,6 +504,50 @@ def run(cfg: dict, only: list[str] | None = None, mark: bool = False,
         jsonstate.write(path, {"at": at, "seen": {
             **kept, **{f["key"]: {"first_seen": f["first_seen"], "check": f["check"]} for f in found}}}, indent=1)
     return {"at": at, "checks": names, "findings": found, "repairs": repairs.recent(cfg, now)}
+
+
+# --alert: the checks whose bad findings can't wait for the morning report. A sign-in that is
+# gone fails the next signed-in grab; one that is expiring (a warning) has days left.
+ALERT_CHECKS = ("signins",)
+
+
+def _alerted_path(cfg: dict) -> Path:
+    return cfg["paths"]["streams"] / ".checkup" / "alerted.json"
+
+
+def alert(cfg: dict, report: dict) -> list[dict]:
+    """--alert (serve's hourly run): DM each bad finding of ALERT_CHECKS once, when it first shows
+    (kind "checkup"); the warnings and everything else are the nightly report's. A finding that
+    clears is forgotten (<streams>/.checkup/alerted.json), so one that comes back is DMed again.
+    Returns the findings DMed; nothing is read or written when none of those checks ran, and
+    nothing written in the usual hour, when nothing changed."""
+    ran = [c for c in report["checks"] if c in ALERT_CHECKS]
+    if not ran:
+        return []
+    bad = {f["key"]: f for f in report["findings"] if f["check"] in ran and f["level"] == BAD}
+    crashed = {c for c in ran if f"check:{c}" in bad}   # its real findings are unknown this run
+    path = _alerted_path(cfg)
+    data = jsonstate.read_or(path, {})
+    sent = data.get("sent") if isinstance(data, dict) else None
+    sent = {k: v for k, v in (sent if isinstance(sent, dict) else {}).items() if isinstance(v, dict)}
+    # forgotten: a key its check no longer finds; kept: one of a check that didn't run, or crashed
+    keep = {k: v for k, v in sent.items()
+            if k in bad or v.get("check") not in ran or v.get("check") in crashed}
+    new = []
+    for key, f in bad.items():
+        if key in sent:
+            continue
+        # The outbox key is this occurrence's own: alerted.json is what makes it once, and the
+        # bot's cooldown on a shared key would swallow a sign-in that goes again the same day.
+        # One that couldn't be queued isn't remembered, so the next hour tries again.
+        if alerts.send(cfg, "checkup", f["text"] + (f"\nlook: {f['look']}" if f["look"] else ""),
+                       key=f"checkup:{key}:{report['at']}"):
+            keep[key] = {"at": report["at"], "check": f["check"]}
+            new.append(f)
+    if keep != sent:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        jsonstate.write(path, {"sent": keep}, indent=1)
+    return new
 
 
 def repair_lines(entries: list[dict], tz: ZoneInfo, hours: int = 24) -> list[str]:

@@ -7,7 +7,8 @@ next releases and this month's spend. Nothing is started, written or asked over 
 only --sync calls Kitsu, for fresh decisions and links.
 
 What needs a person comes first (#199): streams with items waiting on a decision or held, and
-checkup's findings on the services, the worker's runs and the schedule. Below it, only streams
+checkup's findings on the services, the worker's runs, the schedule and the sign-ins (cookies
+files and tokens, a few small reads). Below it, only streams
 from the last RECENT_DAYS or still unfinished; --all lists every one. Review counts come from
 review.json alone (actions.stream_counts), not every item's sidecar: a minute over SMB before."""
 from __future__ import annotations
@@ -19,7 +20,7 @@ from . import actions, checkup, costs, daemon, schedule, services, worker
 
 SERVICES = ("serve", "bot")   # the worker has no heartbeat file: see its streams
 RECENT_DAYS = 7
-CHECKS = ("services", "streams", "schedule")   # checkup's lint reads every item: not here
+CHECKS = ("services", "streams", "schedule", "signins")   # checkup's lint reads every item: not here
 
 
 def _age_days(day: str, now: datetime) -> int | None:

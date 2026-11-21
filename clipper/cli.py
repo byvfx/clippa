@@ -1232,6 +1232,9 @@ def cmd_checkup(cfg: dict, args: argparse.Namespace) -> None:
         print(json.dumps(report, indent=1, ensure_ascii=False))
     else:
         print("\n".join(checkup.lines(report, ZoneInfo(cfg["schedule"]["timezone"]))))
+    if args.alert:
+        for f in checkup.alert(cfg, report):
+            print(f"DM queued: {f['text']}", file=sys.stderr if args.json else sys.stdout)
     if args.fix:  # serve's job: findings are the nightly report's; only a repair that broke fails it
         raise SystemExit(1 if any((f.get("repair") or {}).get("state") == "failed"
                                   for f in report["findings"]) else 0)
@@ -1692,6 +1695,8 @@ def add_services(sub) -> None:
     p.add_argument("--fix", action="store_true",
                    help="run the repairs [checkup] fix lists, log the others as would-fix (serve's checkup "
                         "job); exit 1 only when a repair failed")
+    p.add_argument("--alert", action="store_true",
+                   help="DM a sign-in that is gone, once, when it first shows (serve's checkup job)")
     p.set_defaults(fn=cmd_checkup)
 
     p = sub.add_parser("audit", help="how the week went: runs, uploads, spend, backups, what is parked "

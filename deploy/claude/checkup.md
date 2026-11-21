@@ -40,6 +40,8 @@ How to read it:
   serve makes it within the hour; "waiting" = on, later (the text says when); "would" = a repair
   that isn't turned on yet ([checkup] fix; the text may say when it would act); "capped" = repairs ran out; "failed" = the repair
   broke. The report's "repairs" are what was fixed (did: true) or would have been in the last 24 h.
+- A signins finding with level "bad" may already have been DMed once by serve's hourly run
+  (`checkup --alert`), as one bare line: still report it in full, with its cause and next step.
 - Findings with "new": false were in last night's report too; say "still" and keep them short.
 - A stream whose run.json heartbeat is fresh is the worker's: read it, never touch it.
 - For a stuck or failed stage, the end of streams/<id>/run_<stage>.log usually names

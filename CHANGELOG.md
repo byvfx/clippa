@@ -10,6 +10,10 @@ Developing#releases.
 
 ## Unreleased
 
+- A sign-in that is gone (a cookies file with no live sign-in, an expired TikTok or X sign-in) is
+  DMed within the hour, once, not only in the morning checkup: serve's hourly checkup reads the
+  `signins` check too (`clipper checkup --alert`). `clipper status` lists sign-in findings under
+  "needs you".
 - `clipper checkup` has four more checks: `tools` (yt-dlp over `ytdlp_days` old), `signins` (a
   cookies file's sign-in gone or expiring, the YouTube export stale, a TikTok or X sign-in
   expiring), `logs` (the same error repeating in serve's or the bot's log) and `approvals` (an
