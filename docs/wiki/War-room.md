@@ -14,7 +14,9 @@ and Investigations) and **Settings** (the keys, the keyboard shortcuts and the l
 remembers the page. Review counts what waits for you; Schedule counts the approved items with no
 slot. Library, Research and Settings open today's windows from a tile each for now.
 
-The top bar is one row: the live shows, four widgets, **Search**, **Chat** and **⋯**.
+The top bar is one row: the live shows, four widgets, **Search**, **Chat** and **⋯**. When the
+live shows don't fit beside the rest (a narrower window, the chat open, a show gone live), they move
+to a row of their own under it, whole, rather than wrapping inside the bar.
 
 - **Uploads**: the last 24 hours against `max_per_24h`, as a meter. Opens Schedule.
 - **Spend**: this month's model and Modal spend, the Costs panel's total. Opens Money.

@@ -22,6 +22,7 @@ for (const k of ["warroom.layout", "warroom.layoutName"]) store.set(k, null);  /
 PHONE.addEventListener("change", () => { if (!PHONE.matches && document.body.dataset.view === "chat") setView("queue"); });
 // the page bar sticks under the header, however tall the header wraps, and the docked pane under both
 new ResizeObserver(() => {
+  requestAnimationFrame(fitHeader);  // a narrower window or the chat opening; next frame, so it isn't a resize loop
   document.body.style.setProperty("--head-h", `${$("header").offsetHeight}px`);
   document.body.style.setProperty("--bar-h", `${$("#views").offsetHeight}px`);
 }).observe($("header"));

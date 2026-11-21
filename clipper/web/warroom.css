@@ -35,12 +35,13 @@ header { position: sticky; top: 0; z-index: 5; display: flex; align-items: cente
 .brand { font: 600 12px var(--sans); letter-spacing: .14em; white-space: nowrap; }
 .brand b { color: var(--accent); }
 .brand, .widgets, header > .btn { flex: none; }
-.lives { display: flex; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.lives { display: flex; gap: 8px; flex-wrap: nowrap; min-width: 0; }
 .lives .live { white-space: nowrap; }
-/* narrower, the live shows take a row of their own (app.js keeps --head-h to the header's height) */
-@media (min-width: 701px) and (max-width: 1250px) {
-  header { flex-wrap: wrap; height: auto; min-height: 48px; padding: 8px 16px; row-gap: 8px; }
-  .lives { order: 3; width: 100%; }
+/* when the live shows don't fit beside the rest (four shows, or one gone live), they take a row of their
+   own rather than wrapping inside the 48 px bar: core.js fitHeader measures, app.js keeps --head-h */
+@media (min-width: 701px) {
+  header.stack { flex-wrap: wrap; height: auto; min-height: 48px; padding: 8px 16px; row-gap: 8px; }
+  header.stack .lives { order: 3; width: 100%; flex-wrap: wrap; }
 }
 /* the four widgets: each opens its page (core.js renderWidgets and tick, panels.js refreshCosts) */
 .widgets { display: flex; gap: 6px; margin-left: auto; }
@@ -54,6 +55,7 @@ header { position: sticky; top: 0; z-index: 5; display: flex; align-items: cente
 .widget .meter i.full { background: var(--amber); }
 .widget .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
 #wHealth .lbl { letter-spacing: 0; text-transform: none; }
+#updated { min-width: 5.5ch; font-variant-numeric: tabular-nums; }  /* "9 s" to "10 s" doesn't nudge the bar */
 #wHealth[data-level="ok"] .dot { background: var(--green); }
 #wHealth[data-level="mid"] .dot { background: var(--amber); } #wHealth[data-level="mid"] b { color: var(--amber); }
 #wHealth[data-level="bad"] .dot { background: var(--red); } #wHealth[data-level="bad"] b { color: var(--red); }
