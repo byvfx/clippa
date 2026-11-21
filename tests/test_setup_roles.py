@@ -43,13 +43,15 @@ def test_required_key_asks_again_instead_of_skipping(monkeypatch, capsys):
     ask = setup.Ask({})
     ask.interactive = True
     typed = iter(["", "tok"])
-    monkeypatch.setattr(ask, "secret", lambda name: next(typed))
+    hints = []
+    monkeypatch.setattr(ask, "secret", lambda name, skip=True: hints.append(skip) or next(typed))
     monkeypatch.setattr(setup, "user_env", lambda name: "")
     monkeypatch.setattr(setup, "set_user_env", lambda name, value: "a user env var")
     monkeypatch.delenv("CLIPPER_TEST_TOKEN", raising=False)
     setup.ensure_env_key({}, ask, "CLIPPER_TEST_TOKEN", "a token", "somewhere", check=False, required="why")
     out = capsys.readouterr().out
     assert "is needed here: why" in out and "Saved as a user env var" in out
+    assert hints == [False, False]  # the prompt doesn't offer "Enter to skip" for a required key
     monkeypatch.delenv("CLIPPER_TEST_TOKEN", raising=False)
 
 
@@ -58,3 +60,18 @@ def test_required_key_skip_says_doctor_fails_when_not_interactive(monkeypatch, c
     setup.ensure_env_key({}, setup.Ask({}), "CLIPPER_TEST_TOKEN", "a token", "somewhere", check=False,
                          required="why")
     assert "`clipper doctor` fails until it is set (why)" in capsys.readouterr().out
+
+
+def test_ctrl_c_in_a_done_step_clears_it_so_setup_asks_again(monkeypatch):
+    st = {"done": {"mode": 1, "roles": 1, "machine": 1, "keys": 1}, "roles": ["worker"]}
+    saved = []
+    monkeypatch.setattr(setup.config, "load", lambda path=None: {})
+    monkeypatch.setattr(setup, "load_state", lambda cfg: st)
+    monkeypatch.setattr(setup, "load_user_env", lambda cfg: None)
+    monkeypatch.setattr(setup, "save_state", lambda cfg, state: saved.append(dict(state["done"])))
+
+    def interrupted(cfg, state, ask):
+        raise KeyboardInterrupt
+    monkeypatch.setattr(setup, "step_keys", interrupted)
+    assert setup.main(None, step="keys") == 130
+    assert "keys" not in st["done"] and saved and "keys" not in saved[-1]

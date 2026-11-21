@@ -182,9 +182,10 @@ class Ask:
         raw = input(f"  {prompt} [{'Y/n' if default else 'y/N'}]: ").strip().lower()
         return default if not raw else raw.startswith("y")
 
-    def secret(self, prompt: str) -> str:
+    def secret(self, prompt: str, skip: bool = True) -> str:
         """Typed without echo. Never from the answers file: keys come from the environment."""
-        return getpass.getpass(f"  {prompt} (hidden, Enter to skip): ").strip() if self.interactive else ""
+        hint = "hidden, Enter to skip" if skip else "hidden"
+        return getpass.getpass(f"  {prompt} ({hint}): ").strip() if self.interactive else ""
 
 
 def say(text: str = "") -> None:
@@ -670,7 +671,7 @@ def ensure_env_key(cfg: dict, ask: Ask, name: str, what: str, where: str, check:
     else:
         say(f"{name}: {what}. Get one at {where}.")
     while True:
-        value = ask.secret(name)
+        value = ask.secret(name, skip=not required)
         if not value and required and ask.interactive:
             say(f"{name} is needed here: {required}. (Ctrl+C stops; `clipper setup` resumes at this step.)")
             continue
@@ -838,6 +839,8 @@ def main(cfg_path: str | None, step: str | None = None, answers: str | None = No
         try:
             {"mode": step_mode, "roles": step_roles, "machine": step_machine, "keys": step_keys}[s](cfg, st, ask)
         except KeyboardInterrupt:
+            st["done"].pop(s, None)  # a step done before (or redone with --step) is asked again next run
+            save_state(cfg, st)
             print(f"\nStopped; `clipper setup` carries on from {s}.")
             return 130
         cfg = config.load(cfg_path)
