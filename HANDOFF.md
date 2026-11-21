@@ -198,6 +198,8 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   desktop/storage (#44).
 - `clipper setup` (#78) phase 1 passed in Windows Sandbox (2026-10-28). Next: the real install on the desktop
   (#46; clone into a short folder like `C:\clipper`, run `deploy\bootstrap.ps1`), then the MacBook as #78's join-mode test (#7 closed into #78, 11-13).
+  PR #352 (11-20): setup no longer lets a worker, serve or bot machine skip the Kitsu address and token (doctor failed
+  without them); merge once Grok's review of 068588d is clean and CI is green (the user's word, 11-20).
 - `ANTHROPIC_ADMIN_KEY` for Claude's own usage count on Costs, if wanted.
 
 ## Open work
@@ -206,10 +208,11 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
 #44/#47/#45/#78; Udder Truth #58-#60; archive tooling #221-#227 before the next mini-doc; b-roll #229), `waiting` (#80, #48,
 #45), `parked` (the rest). **Milestones (user, 11-16):** "Runs itself" (#259, #258, #287; due 12-06, a first guess), "Second
 channel (Sloth Beat)" (#46, #78, #44, #47, #45), "The Udder Truth: episode 1" (#58-#60), "Next mini-doc toolkit" (#221-#227,
-#229, #254); only the track in play gets a date. A new issue gets a priority label, and a milestone when it belongs to one.
+#229, #254), "Review and retakes" (#306, #309, #326, #327; 11-20); only the track in play gets a date. A new issue gets a priority label, and a milestone when it belongs to one.
 Write "#77 L6" rather than "fix #77" in commit messages: GitHub closes the issue on "fix". Roadmaps are issues only (byvfx/clipper):
-Posts blind items #36, Instagram Reels #39, lore-order playlists #43, archive fun #63, crisis mode #73, setup #78, live clips #81,
-blind items #111, investigate anyone #138, Modal ideas #53/#56, P&L #50. **Transcript-framed edits #66** (one issue; sections
+Instagram Reels #39, lore-order playlists #43, archive fun #63, crisis mode #73, setup #78, live clips #81,
+blind items #111, investigate anyone #138, meaning search #53, P&L revenue #50 (the cost ledger is built). Old-issue triage
+11-20: #36 closed (its Posts parents #30/#32 went 11-09), #56 folded into #48 as a checkbox; the rest checked and kept. **Transcript-framed edits #66** (one issue; sections
 #67-#71): #70's tighten is built (`[edit] tighten`, PR #191) but the user wants it **off** until it clearly helps (turn it on per
 show in `[shows.<key>.edit]` only at their word); #67's model edit plan waits until edited Shorts prove themselves.
 **Agent exploration #158 (Clippa messenger):** v1 (PR #285), in the war room (PR #290), `youtube.retitle` behind
@@ -223,9 +226,10 @@ of phone use; #300 (access levels, a local Jev-like classifier in front of the m
   auto`, PR #265, serve's `auto` job every 10 min), stale-finding rechecks (#270) and hardening (#273) are live (wiki Review).
   **On for Kino since 11-15** (`[shows.kino.review] auto_approve = true`; backup `backups/clipper.toml.before_kino_auto_approve_2026-11-15`).
   Next, after a few days of Kino with nothing undone (checkup's `auto` check, `clipper review auto --dry-run`): Channel 404's
-  Shorts, then close #259. Segments (#258) are merged and deployed (PRs #260-#262). Segment floor, from 7-day views: scores 1-3
+  Shorts, then close #259. Segments (#258 A-C) are merged and deployed (PRs #260-#262). Segment floor, from 7-day views: scores 1-3
   underperform, 4-5 are a coin flip, 6+ do better; suggested `auto_min_segment = 4` (Kino holds 63 of 183 scored, Channel 404 23
-  of 106), **not set**: after the Shorts, at the user's word. Shorts backtest: 105 of 181 approved Shorts would have approved themselves.
+  of 106), **not set**: after the Shorts, at the user's word (a checkbox on #259). #258 stays open for step D only,
+  `[segments] min_score` (not cutting low segments at all), after two weeks of `lift` tables (~11-29), at the user's word. Shorts backtest: 105 of 181 approved Shorts would have approved themselves.
 - **Demo videos (11-16, user):** a portfolio piece first (about 5:40, real shows, none named in the narration, the user reads it live;
   on the byvfx site), then an install tutorial recorded during the desktop clean install (#46/#78). Script and checklist:
   https://claude.ai/artifact/W48qW95ZPYkA7AE16F4TEX; build with `clipper doc`. **Intro (25 s):** Resolve project `clippa_intro`, media
@@ -240,7 +244,7 @@ of phone use; #300 (access levels, a local Jev-like classifier in front of the m
   Archives (key by email from NARA), `[story] broll` in story cuts, a war room window. Not yet used by covers or the weekly. Drop the
   "Popcorn function" maths plot (`commons-c2e98328`) from the clip art.
 - **Usability review (11-10):** built and merged 11-13 (#199, #204, #228, #205). Still open: new users and the public repo #207
-  (this install's values in tracked files, packaging).
+  (this install's values in tracked files, packaging; its Getting-started scheduled-task line fixed in PR #353, 11-20).
 - **Checkup (wiki Checkup):** the nightly run (`deploy/claude/checkup.sh`) is not on yet: the user puts `CHECKUP_AT=08:30` in
   `deploy/claude/env.local` and redeploys the claude container; first run: check headless `claude -p` runs on the Remote Control
   sign-in and the `--allowedTools` rules work (`checkup.sh --dry-run`); then a week of nightly reports. **#287 step 2 is PR #341,
@@ -317,6 +321,8 @@ no secrets). Copy one off the NAS now and then. Not in it: `deploy/*/env.local` 
   that never made it into HANDOFF.
 
 ## Gotchas learned
+- `gh pr merge --auto` merges at once here: main's ruleset requires no checks, so there is nothing to wait for (PR #353,
+  11-20). "Merge when green" means waiting for the runs (`gh run watch`) and the review, then `gh pr merge --merge`.
 - Deploys from PowerShell: plain `bash` is WSL's (broken: "getpwuid(0) failed", "Failed to translate"). Use
   `& "C:\Program Files\Git\bin\bash.exe" deploy/hub/deploy.sh`; the user forgets, so always give that form.
 - The claude container: its clone sits on a mount where every file is executable, so ruff there needs
