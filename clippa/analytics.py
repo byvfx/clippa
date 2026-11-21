@@ -345,6 +345,7 @@ def report(cfg: dict, month: str = "", lift: bool = False) -> dict:
                 "category": r.get("category", ""), "score": r.get("score", ""), "topic": r.get("topic", "")}
 
     ranked = sorted(d7, key=lambda r: -r["d7"]["views"])
+    best, worst = best_and_worst(ranked)
     return {
         "month": month, "prev_month": prev, "fetched_at": ch.get("fetched_at", ""),
         "totals": totals(month), "prev_totals": totals(prev),
@@ -356,8 +357,8 @@ def report(cfg: dict, month: str = "", lift: bool = False) -> dict:
         "by_weekday": sorted(_group(d7, lambda r: WEEKDAYS[r["local"].weekday()]),
                              key=lambda g: WEEKDAYS.index(g["key"])),
         "by_hour": sorted(_group(d7, lambda r: f"{r['local'].hour:02d}:00"), key=lambda g: g["key"]),
-        "best": [row(r) for r in best_and_worst(ranked)[0]],
-        "worst": [row(r) for r in best_and_worst(ranked)[1]],
+        "best": [row(r) for r in best],
+        "worst": [row(r) for r in worst],
         "traffic": [{**t, "label": TRAFFIC.get(t["source"], t["source"].replace("_", " ").title())}
                     for t in (ch.get("traffic") or {}).get(month, [])],
         "daily": [{"day": d["day"], "views": d["views"], "minutes": d["estimatedMinutesWatched"],

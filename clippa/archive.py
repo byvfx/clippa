@@ -758,7 +758,7 @@ def check_links(cfg: dict, subject: str, ids: list[str] | None, everything: bool
     print(f"{subject}: {counts['alive']} alive, {counts['restricted']} restricted, "
           f"{counts['dead']} dead, {counts['unknown']} could not be checked")
     for it, was, now in changed:
-        kept = " (transcript kept)" if (d / it["id"] / "words.jsonl").exists() else ""
+        kept = " (transcript kept)" if (item_dir(d, it) / "words.jsonl").exists() else ""
         print(f"  {was} -> {now}{kept}: {it['id']} {it['title'][:60]!r} {it['url']}")
     if ids:
         for it in todo:
