@@ -92,13 +92,13 @@ def chunks(lines: list[str], size: int = 3900) -> list[str]:
 
 
 class CardButton(discord.ui.DynamicItem[discord.ui.Button],
-                 template=r"clipp(?:er|a):(?P<action>[a-z]+):(?P<ref>\S+)"):  # clippa: from #286 on
+                 template=r"clipp(?:er|a):(?P<action>[a-z]+):(?P<ref>\S+)"):  # clipper: on cards sent before #286
     """Every card button, also on cards posted before the bot (re)started."""
 
     def __init__(self, action: str, ref: str, label: str | None = None,
                  style: discord.ButtonStyle = discord.ButtonStyle.secondary, row: int | None = None):
         super().__init__(discord.ui.Button(label=label or action, style=style, row=row,
-                                           custom_id=f"clipper:{action}:{ref}"))
+                                           custom_id=f"clippa:{action}:{ref}"))
         self.action, self.ref = action, ref
 
     @classmethod

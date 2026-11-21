@@ -93,7 +93,7 @@ def test_bot_notes_in_either_prefix_are_not_reviewer_comments():
                 {"id": "3", "text": "trim the end", "task_status_id": "S", "created_at": "1"}]
     gazu = type("G", (), {"task": type("T", (), {"all_comments_for_task": staticmethod(lambda t: comments)})})
     assert review.decision_comment_entry(gazu, task) == ("3", "trim the end")
-    assert review.NOTE_PREFIX == "[clipper]"   # still written with the old one until pass 2
+    assert review.NOTE_PREFIX == "[clippa]"   # written with the new one since pass 2
 
 
 def test_card_buttons_in_either_prefix():

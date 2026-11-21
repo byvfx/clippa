@@ -10,7 +10,7 @@ button), a model reads the note with the item's transcript, cut points and thumb
 returns edits from a fixed list: trim the start/end, a Short's layout, the title /
 description / hashtags, a new thumbnail (picked again with the note as guidance) or new
 thumbnail words. clipper applies them (re-cuts only that video, re-renders its captions
-and thumbnail), publishes a new Kitsu revision waiting for approval with a "[clipper]
+and thumbnail), publishes a new Kitsu revision waiting for approval with a "[clippa]
 Retake applied: ..." note, and posts a fresh Discord card. What it can't do (cutting out
 a middle part, effects) it says in a note on the task, and the item stays in retake.
 

@@ -17,7 +17,7 @@ in Kitsu:
               checked against YouTube's limits, never emptied (an empty column falls
               back to the generated metadata)
     thumbtext Thumbnail text column (2-4 words); the sync re-renders the .jpg
-Column changes also leave a "[clipper] ..." comment on the task, so Kitsu shows who
+Column changes also leave a "[clippa] ..." comment on the task, so Kitsu shows who
 changed what. A person's title change on a video that's up renames it on YouTube first
 (edit_meta's rename_live, youtube.retitle): the CLI, the bot, the war room (its edits, find
 and replace, undo) and the chat. A retake's planned title never does.
@@ -281,7 +281,7 @@ def style_issues(cfg: dict, values: dict[str, str]) -> list[dict]:
     return out
 
 
-# Kitsu column: (check, what the "[clipper] ..." note calls it)
+# Kitsu column: (check, what the "[clippa] ..." note calls it)
 META = {"YouTube title": (check_title, "Retitled"),
         "YouTube description": (check_description, "Description"),
         "Hashtags": (check_hashtags, "Hashtags"),

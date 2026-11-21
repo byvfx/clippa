@@ -110,8 +110,8 @@ def test_the_bot_posts_alerts_then_the_digest_in_a_thread(defaults, monkeypatch)
         return chan
     monkeypatch.setattr(b, "blinds_channel", channel)
     asyncio.run(b.post_blinds())
-    assert chan.sent[0] == ("0:cdan-1", ["clipper:blindguess:cdan-1", "clipper:blindnone:cdan-1",
-                                         "clipper:blindnot:cdan-1"])
+    assert chan.sent[0] == ("0:cdan-1", ["clippa:blindguess:cdan-1", "clippa:blindnone:cdan-1",
+                                         "clippa:blindnot:cdan-1"])
     assert "2 new" in chan.sent[1][0] and "3 older" in chan.sent[1][0] and chan.sent[1][1] == []
     name, thread = chan.threads[0]
     assert name == "Blinds 2026-11-15" and [t for t, _ in thread.sent] == ["1:cdan-1", "2:cdan-2"]

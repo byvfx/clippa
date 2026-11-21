@@ -139,8 +139,8 @@ ADVISORY = (CHECKS_COL,)
 SEQUENCE_KINDS = ("segment", "compilation")
 # Comments clipper adds to record a column change (Hold, Publish at, title); sync never
 # takes one of these as the reason for a decision.
-NOTE_PREFIX = "[clipper]"
-# Every prefix a bot note may start with: [clippa] from #286's pass 2 on, [clipper] before.
+NOTE_PREFIX = "[clippa]"
+# Every prefix a bot note may start with: [clippa] since #286's pass 2, [clipper] on older notes.
 NOTE_PREFIXES = ("[clipper]", "[clippa]")
 
 

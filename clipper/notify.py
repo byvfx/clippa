@@ -146,7 +146,7 @@ def card(r: dict) -> tuple[dict, list[dict]]:
              "color": color, "fields": fields,
              "footer": {"text": f"{r['short']} · {r['date']} · rev {r['revision']}"}}
     rows = [{"type": 1, "components": [
-        {"type": 2, "style": style, "label": label, "custom_id": f"clipper:{action}:{r['short']}"}
+        {"type": 2, "style": style, "label": label, "custom_id": f"clippa:{action}:{r['short']}"}
         for action, label, style in row]} for row in BUTTONS]
     links = [{"type": 2, "style": 5, "label": "Open in Kitsu", "url": r["kitsu_url"]}]
     if r["youtube_url"]:
