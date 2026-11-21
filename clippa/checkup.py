@@ -379,7 +379,8 @@ LOG_TAIL_BYTES = 4 << 20   # the end of each log is enough for a day; a rotated 
 def error_shape(msg: str) -> str:
     """An error line with what changes between repeats (ids, numbers, quoted values) blanked, so
     the same error from different streams counts as one."""
-    s = re.sub(r"'[^']*'|\"[^\"]*\"", "'…'", msg)
+    s = re.sub(r"^clipper\.", "clippa.", msg)  # the logger's old name (#286): one shape across the rename
+    s = re.sub(r"'[^']*'|\"[^\"]*\"", "'…'", s)
     s = re.sub(r"\b[0-9a-f]{8,}\b|\d+", "N", s)
     return s[:160]
 

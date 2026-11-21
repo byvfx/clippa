@@ -40,7 +40,7 @@ from zoneinfo import ZoneInfo
 from . import catalog, jsonstate
 from .errors import ClipperError
 
-log = logging.getLogger("clipper.chat")
+log = logging.getLogger("clippa.chat")
 
 MAX_TEXT = 2000          # characters of one message
 KEEP = 600               # messages kept in current.json; older ones go to the archive

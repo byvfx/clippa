@@ -80,9 +80,13 @@ def test_a_missing_clipper_command_points_at_the_bootstrap(monkeypatch):
     monkeypatch.setattr(doctor.shutil, "which", lambda name: None)
     (status, _, _, hint), = doctor.collect(doctor.check_command)
     assert status == "WARN" and "bootstrap" in hint
-    monkeypatch.setattr(doctor.shutil, "which", lambda name: "/home/me/.local/bin/clipper")
+    # a bootstrap from before #286 made only `clipper`: say clippa is the one missing
+    monkeypatch.setattr(doctor.shutil, "which", lambda name: "/home/me/.local/bin/clipper" if name == "clipper" else None)
     (status, _, what, _), = doctor.collect(doctor.check_command)
-    assert status == "OK" and what.endswith(".local/bin/clipper")
+    assert status == "WARN" and "`clippa`" in what and "`clipper`" not in what
+    monkeypatch.setattr(doctor.shutil, "which", lambda name: f"/home/me/.local/bin/{name}")
+    (status, _, what, _), = doctor.collect(doctor.check_command)
+    assert status == "OK" and what.endswith(".local/bin/clipper") and "clippa -> " in what
 
 
 def test_font_hints_name_the_linux_packages_only_on_linux(monkeypatch):

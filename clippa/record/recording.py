@@ -20,7 +20,7 @@ from .client import Kick
 from .hls import Segment, parse_media, pick_variant
 from .state import Part, State, _iso, _now
 
-log = logging.getLogger("clipper.record")
+log = logging.getLogger("clippa.record")
 
 
 class Recording:

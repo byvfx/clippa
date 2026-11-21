@@ -53,7 +53,7 @@ def _count(path: Path, now: datetime | None, fn) -> None:
             for old in sorted(data)[:-KEEP_DAYS]:
                 del data[old]
     except Exception as e:  # noqa: BLE001
-        logging.getLogger("clipper.ytquota").warning("quota count not written: %s", e)
+        logging.getLogger("clippa.ytquota").warning("quota count not written: %s", e)
 
 
 def spend(path: Path, method: str, now: datetime | None = None) -> None:

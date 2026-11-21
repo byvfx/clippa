@@ -23,7 +23,7 @@ from .finalize import finalize
 from .recording import Recording
 from .state import STATE, State, _iso, _now
 
-log = logging.getLogger("clipper.record")
+log = logging.getLogger("clippa.record")
 
 
 def channel_list(rc: dict) -> list[dict]:

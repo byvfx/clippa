@@ -10,6 +10,10 @@ Developing#releases.
 
 ## Unreleased
 
+- The services log as `clippa.serve`, `clippa.bot`, `clippa.worker`, `clippa.record` and so on
+  (#286, pass 2c): grep for `clipp` to catch lines from before and after. The war room's last-upload
+  box and checkup's repeated-error count read both. The bootstrap now adds a `clippa` command to
+  `~/.local/bin` beside `clipper` (run it again to get one), and doctor's `command` line checks both.
 - The package folder is `clippa/` now (#286, pass 2b), and the project is named `clippa`. Imports,
   `python -m clippa.cli` and the deploy files follow; the `clipper` and `clippa` commands both still
   work, as do `clipper.toml` and the log labels (`clipper.serve: ...`). **After pulling this, reinstall

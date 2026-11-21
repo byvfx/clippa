@@ -52,7 +52,7 @@ from .search import search_transcripts
 from .state import TAILNET, token
 from .tailscale import tailnet_status
 
-log = logging.getLogger("clipper.warroom")
+log = logging.getLogger("clippa.warroom")
 
 WEB = Path(__file__).resolve().parents[1] / "web"
 

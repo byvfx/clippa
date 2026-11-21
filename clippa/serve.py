@@ -71,7 +71,7 @@ from . import (
 from .config import base
 from .errors import ClipperError
 
-log = logging.getLogger("clipper.serve")
+log = logging.getLogger("clippa.serve")
 
 RETAKE_EVERY_S = 600   # with [retake] auto: act on notes review.json already has this often
 RETAKE_SYNC_S = 1800   # ...and run `clipper retake` anyway this often: it syncs Kitsu first

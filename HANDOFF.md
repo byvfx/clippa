@@ -47,8 +47,9 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   writes `clippa:` button ids and `[clippa]` Kitsu notes (old cards and notes still answer to both);
   2b moves the package to `clippa/` (project `clippa`; a venv made before it needs `uv pip uninstall
   clipper` + `uv pip install --no-deps -e .` once; the claude container needs a redeploy for
-  checkup-pr's allowed paths). Next: 2c text and docs, logger labels (`clipper.serve:` is parsed by
-  warroom/data.py and checkup: accept both first) and a `clippa` command on PATH; then pass 3 (deploy
+  checkup-pr's allowed paths). 2c-1 renames the logger labels to `clippa.*` (warroom/data.py and
+  checkup read both) and has the bootstrap add a `clippa` command to ~/.local/bin; next 2c-2, the
+  text: messages, docs and `clipper <cmd>` mentions (keep `clipper.toml`/`CLIPPER_*` until pass 3); then pass 3 (deploy
   day: compose projects, Modal apps, `deploy/` env names; stop the old compose project first), 4 the
   repo name, 5 drop the fallbacks.
 - Titles/descriptions/cut points approved as-is; fun descriptions are liked. Long video per recurring topic

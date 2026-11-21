@@ -632,3 +632,24 @@ def test_a_taken_slot_past_three_weeks_is_not_offered_again(tmp_path, defaults, 
     out = warroom.overview(cfg)
     assert [e["key"] for e in out["schedule"]] == ["kick-1/s01"]
     assert late["at"][:16] not in {f["at"][:16] for f in out["free_slots"]}
+
+
+def test_the_last_upload_run_reads_both_logger_names(defaults, tmp_path):
+    """serve's logger is clippa.serve since #286 pass 2c; the log rotated before it says clipper.serve."""
+    cfg = {**defaults, "paths": {**defaults["paths"], "serve_log": tmp_path / "serve.log"}}
+    old = ["2026-11-21 09:00:00 INFO    clipper.serve: upload: starting",
+           "2026-11-21 09:00:05 INFO    clipper.serve: upload: 1 due within 6 h",
+           "2026-11-21 09:00:09 INFO    clipper.serve: upload: done (exit 0)"]
+    new = ["2026-11-21 10:00:00 INFO    clippa.serve: upload: starting",
+           "2026-11-21 10:00:05 INFO    clippa.serve: upload: 2 due within 6 h",
+           "2026-11-21 10:00:06 INFO    clippa.serve: upload: uploading kick-1/v01",
+           "2026-11-21 10:00:09 INFO    clippa.serve: upload: done (exit 1)"]
+    (tmp_path / "serve.log.1").write_text("\n".join(old) + "\n", encoding="utf-8")
+    (tmp_path / "serve.log").write_text("\n".join(new) + "\n", encoding="utf-8")
+    from clippa.warroom import data
+
+    run = data.last_upload_run(cfg)
+    assert run["at"] == "2026-11-21 10:00:00" and run["exit"] == "1"
+    assert run["lines"] == ["2 due within 6 h", "uploading kick-1/v01"]
+    (tmp_path / "serve.log").write_text("", encoding="utf-8")
+    assert data.last_upload_run(cfg)["at"] == "2026-11-21 09:00:00"

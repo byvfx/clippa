@@ -23,7 +23,7 @@ from pathlib import Path
 from . import buildinfo, jsonstate
 from .errors import ClipperError
 
-log = logging.getLogger("clipper.daemon")
+log = logging.getLogger("clippa.daemon")
 
 BEAT_S = 60          # how often a service writes its heartbeat
 HEARTBEAT_S = 180    # without one for this long, it's down

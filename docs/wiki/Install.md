@@ -51,8 +51,9 @@ bash deploy/bootstrap.sh                                         # macOS / Linux
 
 The bootstrap installs uv (which brings Python 3.12) and ffmpeg if they're missing (winget,
 else uv's installer and BtbN's ffmpeg build; Homebrew or apt on macOS/Linux), syncs the
-packages, adds a `clipper` command to `~/.local/bin` (on PATH; it runs this folder's
-`.venv`, so `clipper` works in any folder and new terminal), then runs `clipper setup`:
+packages, adds `clippa` and `clipper` commands to `~/.local/bin` (on PATH; they run this folder's
+`.venv`, so either works in any folder and new terminal; `clipper` is the old name, #286), then
+runs `clipper setup`:
 
 1. **Join or start fresh.** Join takes the main machine's `clipper.toml` from the share or a path
    (`~/Downloads/clipper.toml`, the folder that holds it, or the file dragged into the terminal).
