@@ -37,6 +37,7 @@ def test_kitsu_required_where_doctor_fails_without_it():
     assert "needed here" in setup.kitsu_host_error("", required=True)
     assert setup.kitsu_host_error("http://nas.local:8090", required=True) is None
     assert "a URL" in setup.kitsu_host_error("nas.local", required=False)
+    assert "a URL" in setup.kitsu_host_error("http://", required=True)  # no host: was saved as http:/api
 
 
 def test_required_key_asks_again_instead_of_skipping(monkeypatch, capsys):
@@ -75,3 +76,20 @@ def test_ctrl_c_in_a_done_step_clears_it_so_setup_asks_again(monkeypatch):
     monkeypatch.setattr(setup, "step_keys", interrupted)
     assert setup.main(None, step="keys") == 130
     assert "keys" not in st["done"] and saved and "keys" not in saved[-1]
+
+
+def test_a_refused_required_key_lets_enter_skip(monkeypatch, capsys):
+    # #352 review: a wrong saved Kitsu address fails every token, so Enter must not trap the user
+    ask = setup.Ask({})
+    ask.interactive = True
+    typed = iter(["wrong", ""])
+    hints = []
+    monkeypatch.setattr(ask, "secret", lambda name, skip=True: hints.append(skip) or next(typed))
+    monkeypatch.setattr(setup, "user_env", lambda name: "")
+    monkeypatch.setattr(setup, "check_key", lambda name, cfg: (False, "Kitsu refused it"))
+    setup.ensure_env_key({}, ask, "CLIPPER_TEST_TOKEN", "a token", "somewhere", required="why",
+                         if_refused="If the address is what's wrong, fix it")
+    out = capsys.readouterr().out
+    assert hints == [False, True]
+    assert "Enter skips it" in out and "fix it" in out and "`clipper doctor` fails" in out
+    assert "CLIPPER_TEST_TOKEN" not in __import__("os").environ
