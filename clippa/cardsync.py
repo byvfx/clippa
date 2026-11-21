@@ -26,7 +26,7 @@ from . import actions, jsonstate, notify, review
 from .config import for_stream
 from .errors import ClipperError
 
-log = logging.getLogger("clipper.cardsync")
+log = logging.getLogger("clippa.cardsync")
 STATE = "discord_cards.json"
 
 

@@ -40,7 +40,7 @@ from . import alerts, jsonstate, media, ytdl
 from .config import for_show, for_stream
 from .states import PRESHOW_PREFIX as PREFIX
 
-log = logging.getLogger("clipper.preshow")
+log = logging.getLogger("clippa.preshow")
 
 FEED = "https://www.youtube.com/feeds/videos.xml?channel_id={}"
 NS = {"a": "http://www.w3.org/2005/Atom", "yt": "http://www.youtube.com/xml/schemas/2015",

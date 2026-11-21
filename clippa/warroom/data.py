@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import threading
 import time
 from datetime import UTC, datetime, timedelta
@@ -17,7 +18,7 @@ from ..config import base, for_stream
 from ..timefmt import age_s
 from .state import SYNC, TAILNET
 
-log = logging.getLogger("clipper.warroom")
+log = logging.getLogger("clippa.warroom")
 
 LIVE_CACHE: dict = {"at": 0.0, "data": []}
 
@@ -269,6 +270,10 @@ def upload_status(cfg: dict, sched: dict) -> dict:
                       "publish_at": e["publish_at"], "last_error": e.get("last_error", ""),
                       "due": datetime.fromisoformat(e["publish_at"]) <= horizon} for e in nxt]}
 
+# serve's logger is clippa.serve since #286 pass 2c; a log from before it says clipper.serve
+UPLOAD_LINE = re.compile(r" clipp(?:er|a)\.serve: upload: ")
+
+
 def last_upload_run(cfg: dict) -> dict:
     """serve's last finished `clipper upload` (not the replan before it): when, exit code,
     what went up and any warnings or errors, from the tail of the serve log (and the rotated
@@ -285,9 +290,10 @@ def last_upload_run(cfg: dict) -> dict:
                 lines += f.read().decode("utf-8", "replace").splitlines()
     runs, cur, prev_done = [], None, ""
     for line in lines:
-        if " clipper.serve: upload: " not in line:
+        m = UPLOAD_LINE.search(line)
+        if not m:
             continue
-        at, msg = line[:19], line.split(" clipper.serve: upload: ", 1)[1]
+        at, msg = line[:19], line[m.end():]
         if msg == "starting":
             # serve replans, then uploads straight after: a start in the same minute as
             # the replan's end is the upload, even before its output is in the log.

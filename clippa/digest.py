@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 
 from . import jsonstate
 
-log = logging.getLogger("clipper.digest")
+log = logging.getLogger("clippa.digest")
 
 
 def text(cfg: dict, now: datetime | None = None) -> str:

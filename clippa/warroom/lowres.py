@@ -12,7 +12,7 @@ from urllib.parse import quote, unquote, urlparse
 from ..errors import ClipperError
 from .data import all_rows
 
-log = logging.getLogger("clipper.warroom")
+log = logging.getLogger("clippa.warroom")
 
 LOWRES: dict = {"queue": [], "busy": "", "error": ""}
 

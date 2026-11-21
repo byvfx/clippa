@@ -72,29 +72,38 @@ if (-not (Test-Command ffmpeg)) {
     }
 }
 
-if (-not (Test-Path $clipper)) {
-    Write-Host '== Python packages (first sync; setup adds the ones its roles need)'
+# A venv that can't run its command gets synced too: one made before the package moved to
+# clippa/ (#286) still has clipper.exe, but it fails on import.
+$runs = $false
+if (Test-Path $clipper) { & $clipper --version *> $null; $runs = ($LASTEXITCODE -eq 0) }
+if (-not $runs) {
+    Write-Host '== Python packages (first sync, or a venv that no longer runs; setup adds the ones its roles need)'
     uv sync
     if ($LASTEXITCODE -ne 0) { throw 'uv sync failed' }
 }
 
-# `clipper` typed anywhere: a command in ~/.local/bin that runs this folder's venv (a .cmd for
-# PowerShell and cmd, a sh script for Git Bash). Bootstrapping another folder points it there.
+# `clippa` (and the old name, `clipper`) typed anywhere: commands in ~/.local/bin that run this
+# folder's venv (a .cmd for PowerShell and cmd, a sh script for Git Bash). Bootstrapping another
+# folder points them there. A venv from before #286 has no clippa.exe until its next sync.
 $bin = Join-Path $env:USERPROFILE '.local\bin'
 New-Item -ItemType Directory -Force $bin | Out-Null
-# cmd reads a .cmd in the OEM code page: a path with other characters goes in as its 8.3 name.
-$exe = $clipper
-if ($exe -match '[^\x20-\x7e]') { $exe = (New-Object -ComObject Scripting.FileSystemObject).GetFile($clipper).ShortPath }
-if ($exe -match '[^\x20-\x7e]') {
-    Write-Host "== No clipper.cmd: cmd can't read this folder's path (no 8.3 name). Run $clipper, or move clipper to a plain folder such as C:\clipper"
-} else {
-    Set-Content -Encoding ascii (Join-Path $bin 'clipper.cmd') "@`"$($exe.Replace('%', '%%'))`" %*"
+foreach ($name in 'clippa', 'clipper') {
+    $venvExe = Join-Path $root ".venv\Scripts\$name.exe"
+    if (-not (Test-Path $venvExe)) { continue }
+    # cmd reads a .cmd in the OEM code page: a path with other characters goes in as its 8.3 name.
+    $exe = $venvExe
+    if ($exe -match '[^\x20-\x7e]') { $exe = (New-Object -ComObject Scripting.FileSystemObject).GetFile($venvExe).ShortPath }
+    if ($exe -match '[^\x20-\x7e]') {
+        Write-Host "== No $name.cmd: cmd can't read this folder's path (no 8.3 name). Run $venvExe, or move the checkout to a plain folder such as C:\clipper"
+    } else {
+        Set-Content -Encoding ascii (Join-Path $bin "$name.cmd") "@`"$($exe.Replace('%', '%%'))`" %*"
+    }
+    # Git Bash reads UTF-8; the path goes in single quotes so $ and ` stay literal
+    $unix = '/' + $venvExe.Substring(0, 1).ToLower() + $venvExe.Substring(2).Replace('\', '/')
+    [IO.File]::WriteAllText((Join-Path $bin $name), "#!/bin/sh`nexec '$($unix.Replace("'", "'\''"))' `"`$@`"`n")
+    Write-Host "== $name command in $bin (runs $venvExe)"
 }
-# Git Bash reads UTF-8; the path goes in single quotes so $ and ` stay literal
-$unix = '/' + $clipper.Substring(0, 1).ToLower() + $clipper.Substring(2).Replace('\', '/')
-[IO.File]::WriteAllText((Join-Path $bin 'clipper'), "#!/bin/sh`nexec '$($unix.Replace("'", "'\''"))' `"`$@`"`n")
 Add-UserPath $bin
-Write-Host "== clipper command in $bin (runs $clipper)"
 
 $env:CLIPPER_BOOTSTRAP = '1'
 for ($i = 0; $i -lt 3; $i++) {

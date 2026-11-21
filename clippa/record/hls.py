@@ -11,7 +11,7 @@ import requests
 
 from .. import kick
 
-log = logging.getLogger("clipper.record")
+log = logging.getLogger("clippa.record")
 
 
 def pick_variant(master: str, base: str, max_height: int) -> str:

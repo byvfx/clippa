@@ -26,7 +26,7 @@ from ..alerts import Alerts
 from ..errors import ClipperError
 from .state import LIVE_CHAT, STATE, Part, State, _iso
 
-log = logging.getLogger("clipper.record")
+log = logging.getLogger("clippa.record")
 
 
 def _uncovered(spans: list[list[float]], a: float, b: float, min_s: float) -> list[tuple[float, float]]:

@@ -42,7 +42,7 @@ import requests
 from . import config, jsonstate
 from .errors import ClipperError
 
-log = logging.getLogger("clipper.alerts")
+log = logging.getLogger("clippa.alerts")
 
 _SEQ = itertools.count()
 ICON = {"ready": "🎬", "upload": "📤", "failure": "❌", "recorder": "🔴", "disk": "💾",

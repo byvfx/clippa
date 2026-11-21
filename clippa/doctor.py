@@ -105,14 +105,16 @@ def check_version() -> None:
 
 
 def check_command() -> None:
-    """`clipper` typed bare: the bootstrap puts a command in ~/.local/bin that runs this venv's."""
-    found = shutil.which("clipper")
-    if found:
-        ok("command", f"clipper -> {found}")
+    """`clippa` (and the old `clipper`, #286) typed bare: the bootstrap puts commands in
+    ~/.local/bin that run this venv's."""
+    found = {name: shutil.which(name) for name in ("clippa", "clipper")}
+    if all(found.values()):
+        ok("command", ", ".join(f"{n} -> {p}" for n, p in found.items()))
     else:
-        warn("command", "`clipper` isn't on PATH (only the venv's own clipper works)",
-             "run the bootstrap again (deploy\\bootstrap.ps1 or deploy/bootstrap.sh): it adds a "
-             "clipper command to ~/.local/bin, then open a new terminal")
+        missing = " and ".join(f"`{n}`" for n, p in found.items() if not p)
+        warn("command", f"{missing} not on PATH (only the venv's own command works)",
+             "run the bootstrap again (deploy\\bootstrap.ps1 or deploy/bootstrap.sh): it adds the "
+             "clippa and clipper commands to ~/.local/bin, then open a new terminal")
 
 
 def check_config(cfg: dict, role: str = "all") -> None:

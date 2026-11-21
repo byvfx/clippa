@@ -58,8 +58,10 @@ if [ "$(uname)" = Linux ] && have apt-get; then
   fi
 fi
 
-if [ ! -x .venv/bin/clipper ]; then
-  echo "== Python packages (first sync; setup adds the ones its roles need)"
+# A venv that can't run its command gets synced too: one made before the package moved to
+# clippa/ (#286) still has bin/clipper, but it fails on import.
+if ! .venv/bin/clipper --version >/dev/null 2>&1; then
+  echo "== Python packages (first sync, or a venv that no longer runs; setup adds the ones its roles need)"
   uv sync
 fi
 
@@ -67,8 +69,12 @@ fi
 # folder points it there. uv's installer puts ~/.local/bin on PATH, but uv from Homebrew or pip
 # doesn't, so add it to the login shell's startup file when it isn't on PATH already.
 mkdir -p "$HOME/.local/bin"
-ln -sf "$PWD/.venv/bin/clipper" "$HOME/.local/bin/clipper"
-echo "== clipper command in ~/.local/bin (runs $PWD/.venv/bin/clipper)"
+for name in clippa clipper; do  # the new name and the old (#286); a venv from before it has no clippa until its next sync
+  if [ -x ".venv/bin/$name" ]; then
+    ln -sf "$PWD/.venv/bin/$name" "$HOME/.local/bin/$name"
+    echo "== $name command in ~/.local/bin (runs $PWD/.venv/bin/$name)"
+  fi
+done
 case ":$LOGIN_PATH:" in
   *":$HOME/.local/bin:"*) ;;
   *)

@@ -62,7 +62,7 @@ from . import (
 from .errors import ClipperError
 from .timefmt import length
 
-log = logging.getLogger("clipper.bot")
+log = logging.getLogger("clippa.bot")
 
 FORMS = {  # action: (modal title, field label, required, max length, multiline)
     "reject": ("Reject", "Why? (becomes a scoring example)", True, 1000, True),

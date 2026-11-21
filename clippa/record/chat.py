@@ -20,7 +20,7 @@ from .state import LIVE_CHAT, _now
 if TYPE_CHECKING:
     from .recording import Recording
 
-log = logging.getLogger("clipper.record")
+log = logging.getLogger("clippa.record")
 
 DEFAULT_CHAT_WS = "wss://realtime.us-east-1.platform.kick.com/connection/websocket"
 

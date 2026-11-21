@@ -385,3 +385,12 @@ def test_approvals_finds_an_item_the_plan_never_saw(defaults, tmp_path):
     assert keys(checkup.check_approvals(cfg, NOW)) == {"approvals:unplanned"}
     cfg["checkup"]["approved_hours"] = 0
     assert checkup.check_approvals(cfg, NOW) == []
+
+
+def test_an_error_counts_as_one_across_the_logger_rename():
+    tz = checkup.ZoneInfo("America/Los_Angeles")
+    since = datetime(2026, 11, 9, 0, 0, tzinfo=tz)
+    text = "\n".join(f"2026-11-09 1{i}:00:00 ERROR   {label}.serve: job x failed with {i}"
+                     for i, label in enumerate(["clipper", "clipper", "clippa", "clippa", "clippa"]))
+    (row,) = checkup.repeated_errors(text, since, 5, tz)
+    assert row[1] == 5

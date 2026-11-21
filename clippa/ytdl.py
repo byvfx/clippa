@@ -21,7 +21,7 @@ from pathlib import Path
 
 from .errors import ClipperError
 
-log = logging.getLogger("clipper.ytdl")
+log = logging.getLogger("clippa.ytdl")
 
 AGE = ("confirm your age", "age-restricted")
 BOT = ("not a bot",)

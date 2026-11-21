@@ -43,7 +43,7 @@ from .llm import keys_fingerprint
 from .states import PRESHOW_PREFIX, is_preshow
 from .timefmt import age_s, now_iso
 
-log = logging.getLogger("clipper.worker")
+log = logging.getLogger("clippa.worker")
 
 # The stage table lives in clippa/stages.py; these names stay for the war room and cli.
 STAGES = stages.NAMES

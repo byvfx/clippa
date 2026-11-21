@@ -7,7 +7,7 @@ import logging
 
 import requests
 
-log = logging.getLogger("clipper.record")
+log = logging.getLogger("clippa.record")
 
 CHANNEL_API = "https://kick.com/api/v2/channels/{slug}"
 REALTIME_API = "https://web.kick.com/api/v1/realtime"
