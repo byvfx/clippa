@@ -166,3 +166,19 @@ def test_the_news_block_names_the_layer_that_is_set(tmp_path, monkeypatch):
     cfg = config.load(tmp_path / "clippa.toml")
     with pytest.raises(config.ClipperError, match=r"set in \$CLIPPA_SCORING_STREAM_CONTEXT, which"):
         news.add_stream_context(cfg, tmp_path, "x")
+
+
+def test_every_review_card_button_is_one_the_bot_answers():
+    pytest.importorskip("discord")
+    from clipper import bot, notify
+
+    class Row(dict):
+        def __missing__(self, key):
+            return ""
+
+    r = Row(kind="short", short="kick-1/c01", title="t", kitsu_url="https://k.invalid/x", decision="pending",
+            duration_s=30, revision=1)
+    _, rows = notify.card(r)
+    pat = bot.CardButton.__discord_ui_compiled_template__
+    ids = [c["custom_id"] for row in rows for c in row["components"] if c["style"] != 5]
+    assert ids and all(i.startswith("clippa:") and pat.fullmatch(i) for i in ids)
