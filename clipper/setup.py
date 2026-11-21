@@ -526,7 +526,7 @@ def step_roles(cfg: dict, st: dict, ask: Ask) -> None:
         args = sync_args(st)
         say()
         say(f"These roles need packages that aren't installed: {', '.join(missing)}.")
-        if os.environ.get("CLIPPER_BOOTSTRAP"):
+        if config.getenv("CLIPPER_BOOTSTRAP"):
             say("Installing them, then setup carries on.")
         else:
             say(f"Run `uv sync {args}`, then `clipper setup` again to carry on.")

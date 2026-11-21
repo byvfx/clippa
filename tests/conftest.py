@@ -13,10 +13,10 @@ ROOT = Path(__file__).resolve().parent.parent
 
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch):
-    """No CLIPPER_* setting from this machine leaks into a test, nor a stream's channel
+    """No CLIPPER_* or CLIPPA_* setting from this machine leaks into a test, nor a stream's channel
     cached by an earlier one."""
     for name in list(os.environ):
-        if name.startswith("CLIPPER_"):
+        if name.startswith(("CLIPPER_", "CLIPPA_")):
             monkeypatch.delenv(name)
     config._CHANNELS.clear()
     # OpenRouter's public model list stays unfetched: tests are offline.
