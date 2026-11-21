@@ -93,7 +93,8 @@ becomes the release's section ([Releases](#releases)). `tests/test_changelog.py`
 
 ## Releases
 
-A release is a git tag `vX.Y.Z` on main. Pushing the tag makes the GitHub Release
+Each minor version has a milestone (`v0.5.0 Review and retakes`) holding the issues meant for it; the release
+closes it. Patch releases get none. A release is a git tag `vX.Y.Z` on main. Pushing the tag makes the GitHub Release
 (`.github/workflows/release.yml`): the wheel and sdist, with the **lead** of that version's
 section of `CHANGELOG.md` (its lines before the first `###`: a sentence on what the release is
 and a short list of highlights) as the notes, and a link to the whole file for the detail by date.
