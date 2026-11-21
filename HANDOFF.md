@@ -42,9 +42,12 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   prevents full offline autonomous usage"): the `clipper-cookies` task runs `clipper cookies export` every 4 h.
   The NAS isn't laptop-free for signed-in yt-dlp retries: with the laptop off for days, pre-show grabs get stuck.
 - The app is **Clippa** (2026-11-09, branding only): war room, Discord status card, wiki Home/sidebar/banner,
-  README. The `clipper` command, package, `CLIPPER_*` env, config files, containers, Modal apps, the
-  `clipper:` button ids and the `[clipper]` Kitsu note prefix keep the old name on purpose (old cards and
-  notes depend on the last two). A full rename needs both prefixes accepted and the old compose project stopped first.
+  README. **The full rename (#286) is under way, in passes:** pass 1 (PR #363, deployed 11-21) reads both
+  names everywhere clipper reads one (`CLIPPA_*` first, `clippa.toml`, a `clippa` command); pass 2a
+  writes `clippa:` button ids and `[clippa]` Kitsu notes (old cards and notes still answer to both).
+  Next: 2b the package folder, 2c text and docs plus a `clippa` command on PATH; then pass 3 (deploy
+  day: compose projects, Modal apps, `deploy/` env names; stop the old compose project first), 4 the
+  repo name, 5 drop the fallbacks.
 - Titles/descriptions/cut points approved as-is; fun descriptions are liked. Long video per recurring topic
   (compilations) plus segments plus short picks. `third_party_audio = "allow_reactions"`,
   `audience_knowledge = "fans"`, Victor/blackjack segments stay; Kino's gambling is commentary, not play

@@ -10,6 +10,9 @@ Developing#releases.
 
 ## Unreleased
 
+- New Discord review buttons are sent as `clippa:...` and new Kitsu bot notes start with `[clippa]`
+  (#286, pass 2a). Cards and notes from before still work: the bot answers both button prefixes and
+  sync still tells both kinds of note from a reviewer's comment.
 - The Clippa names work beside the old ones (#286, the first step of the rename): a `clippa`
   command in the venv, `clippa.toml` and `clippa.local.toml`, and `CLIPPA_*` for every `CLIPPER_*`
   variable clipper reads (the new one wins when both are set; the deploy scripts under `deploy/`
