@@ -1,4 +1,4 @@
-"""`clipper checkup` (#185): the problems alerts miss, found from the files alone."""
+"""`clippa checkup` (#185): the problems alerts miss, found from the files alone."""
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -330,7 +330,7 @@ def test_checkup_alert_queues_the_dm_and_a_finding_alone_never_fails_serves_job(
     assert e.value.code == 0
     assert "DM queued: TikTok sign-in expired" in capsys.readouterr().out
     (f,) = alerts.outbox(cfg).glob("*.json")
-    assert jsonstate.load(f)["text"].endswith("look: clipper tiktok --sign-in")
+    assert jsonstate.load(f)["text"].endswith("look: clippa tiktok --sign-in")
     args = cli.build_parser().parse_args(["checkup", "--only", "signins"])   # by hand: no DM, exit 1
     with pytest.raises(SystemExit) as e:
         cli.cmd_checkup(cfg, args)

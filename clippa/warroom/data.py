@@ -239,7 +239,7 @@ def health(cfg: dict) -> dict:
     out: dict = {"services": {}, "retake_running": (root / ".retake.lock").exists(),
                  "auto_upload_minutes": cfg["youtube"]["auto_upload_minutes"],
                  "sync": SYNC, "tailnet": TAILNET["served"]}
-    for name, label in (("serve", "clipper serve"), ("bot", "Discord bot")):
+    for name, label in (("serve", "clippa serve"), ("bot", "Discord bot")):
         hb = daemon.heartbeat(cfg, name)
         level, text = daemon.state(hb)
         jobs = hb["data"].get("jobs") or {}
@@ -252,7 +252,7 @@ def health(cfg: dict) -> dict:
     return out
 
 def upload_status(cfg: dict, sched: dict) -> dict:
-    """#21: the 24 h cap like `clipper upload` counts it, the last automatic run from the
+    """#21: the 24 h cap like `clippa upload` counts it, the last automatic run from the
     serve log, and what's due next."""
     yc, now = cfg["youtube"], datetime.now(UTC)
     recent = sorted(datetime.fromisoformat(e["uploaded_at"]) for e in sched.get("entries", [])
@@ -275,7 +275,7 @@ UPLOAD_LINE = re.compile(r" clipp(?:er|a)\.serve: upload: ")
 
 
 def last_upload_run(cfg: dict) -> dict:
-    """serve's last finished `clipper upload` (not the replan before it): when, exit code,
+    """serve's last finished `clippa upload` (not the replan before it): when, exit code,
     what went up and any warnings or errors, from the tail of the serve log (and the rotated
     one before it). serve logs a job's output when it ends, so one in progress only shows
     as running."""
@@ -380,7 +380,7 @@ def overview(cfg: dict) -> dict:
             "uploads": upload_status(cfg, sched)}
 
 def analytics_status(cfg: dict, month: str = "") -> dict:
-    """#42: the Analytics panel, the same numbers as `clipper analytics --report`."""
+    """#42: the Analytics panel, the same numbers as `clippa analytics --report`."""
     try:
         from .. import analytics
 

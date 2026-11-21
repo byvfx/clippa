@@ -34,8 +34,8 @@ re-cut.
 
 ## The pipeline
 
-Every stage is a `clipper <stage>` subcommand that reads and writes files in the stream's folder.
-The stages are idempotent, so `clipper run` resumes after a crash, skips finished work, and can
+Every stage is a `clippa <stage>` subcommand that reads and writes files in the stream's folder.
+The stages are idempotent, so `clippa run` resumes after a crash, skips finished work, and can
 redo from any stage with `--from`. One table in the code lists the stages, and the worker, the CLI
 and the war room all read from it. The detail is on [Pipeline](Pipeline).
 
@@ -71,8 +71,8 @@ be on. The same services can also run on a Windows machine as scheduled tasks, a
 setup is kept, switched off, as a rollback.
 
 A new machine is set up by role: GPU worker, serve, bot, recorder, Claude, or a control station
-that runs nothing unattended. `clipper setup` writes that machine's config, and
-`clipper doctor --role ...` checks exactly what that role needs. A Mac on Apple Silicon is set up
+that runs nothing unattended. `clippa setup` writes that machine's config, and
+`clippa doctor --role ...` checks exactly what that role needs. A Mac on Apple Silicon is set up
 as a control station. See [Roles and services](Roles-and-services) and [NAS hub](NAS-hub).
 
 | Where | What lives there |
@@ -196,16 +196,16 @@ automatic retake: Clippa re-cuts or redraws that item and sends it back for revi
 judges the shortlist. Paid stages refuse to rerun without `--force`. Cut keeps picks whose in and
 out points haven't changed, and covers are kept while their cut is unchanged. Every paid stage
 takes `--dry-run`, which builds the prompts it would send and prints the estimated cost without
-calling anything. Every model call is logged with its token counts and price. `clipper costs` and
+calling anything. Every model call is logged with its token counts and price. `clippa costs` and
 the war room break spend down by stage, stream and provider ([Costs](Costs)).
 
 **Models and prompts are swappable and versioned.** All model calls go through one layer, and the
 provider comes from the model string's prefix (Claude, OpenAI, Gemini, OpenRouter or local).
 Prompts are versioned files. A version that produced reviewed output is never edited; changes go
-into a new version. `clipper compare` runs candidate models against a gold set of past reviewer
+into a new version. `clippa compare` runs candidate models against a gold set of past reviewer
 decisions before a stage switches models.
 
-**Measure before switching models.** `clipper compare` runs a candidate model or prompt on streams
+**Measure before switching models.** `clippa compare` runs a candidate model or prompt on streams
 that people have already reviewed, and counts how many of the approved moments it finds and how
 many windows it keeps. Running the same prompt twice first sets a noise floor, so a change is
 adopted only when it beats that. Twelve models were tried through OpenRouter, with reasoning on and
@@ -217,7 +217,7 @@ the gap is within the noise, so it stays a candidate. Every trial and its cost i
 file, then environment variables. Each show gets its own table with cast, style, budgets and
 layouts, and a single stream can override anything. Adding a show is a config table and a Kitsu
 production, with no code changes ([Adding a show](Adding-a-show), [Configuration](Configuration)).
-`clipper doctor` checks every dependency, key and service and prints the fix for each failure.
+`clippa doctor` checks every dependency, key and service and prints the fix for each failure.
 
 **State that survives crashes.** JSON state is written to a temp file, then swapped in. Updates
 take a lock, and readers retry when they catch a file mid-replace. Library code raises one error
@@ -231,12 +231,12 @@ older than a few days drop out, so the channel never falls weeks behind the show
 version queued everything, and the newest stream ended up 15 days behind. Switching to "stay
 current" was a product decision, made from the data.
 
-**It checks on itself.** `clipper checkup` reads only the files the services write: stale
+**It checks on itself.** `clippa checkup` reads only the files the services write: stale
 heartbeats, a stage stuck for hours, a recording nobody picked up, an upload late for its slot, a
-title over YouTube's limits. `clipper status` opens with what needs a person, then puts services,
+title over YouTube's limits. `clippa status` opens with what needs a person, then puts services,
 recent streams, review counts, the next releases and the month's spend on one screen. Housekeeping
-runs on its own too: `clipper streams prune` clears the source video of streams that are finished,
-never anything still waiting, scheduled or pinned, and `clipper backup` zips the parts made by hand
+runs on its own too: `clippa streams prune` clears the source video of streams that are finished,
+never anything still waiting, scheduled or pinned, and `clippa backup` zips the parts made by hand
 (config, schedule, enrolled faces, voices, layouts, cast photos, review state) every week, without
 secrets. A nightly report is built on top: when nothing is wrong it sends a one-line DM with no
 model call; when something is wrong, Claude Code runs headless with read-only tools and sends one DM
@@ -272,7 +272,7 @@ follow-up has to parse as a valid query or channel, and any search for a person'
 private details is dropped. In one 30-task run it found 109 results (44 strong) across five
 platforms for about $0.03.
 
-**Cast library** (`clipper cast`, [Cast library](Cast-library)). Keeps a set of head-and-shoulders
+**Cast library** (`clippa cast`, [Cast library](Cast-library)). Keeps a set of head-and-shoulders
 photos of each regular for cover art. Photos come from the streams themselves, Wikimedia Commons,
 the person's own channels and image search. It fills itself: each new stream adds the sharpest
 frames of anyone still short of photos, and a daily job searches the other sources. Each photo has
@@ -281,7 +281,7 @@ to match the person's enrolled face before it is kept, then gets a 4:5 crop and 
 with a known origin, never from image search or photo agencies. Covers pick the photo whose
 expression fits the story.
 
-**News watcher** (`clipper news`, [News watcher](News-watcher)). Watches headlines for the names
+**News watcher** (`clippa news`, [News watcher](News-watcher)). Watches headlines for the names
 you give it and posts new stories to Discord. One button adds a story to the context for the show's
 next stream, so scoring knows what the audience already knows. An hour before a show usually
 starts, it suggests that day's stories. A cheap model checks each headline: is it really about this
@@ -289,7 +289,7 @@ person and not someone with the same name, is it new, and is it about public con
 private people or anyone's children are never posted. Five outlets on one event become one story.
 Only headlines and links are stored, never the articles. A check costs well under a cent.
 
-**Investigations** (`clipper investigate`, [Investigations](Investigations)). Reads a public
+**Investigations** (`clippa investigate`, [Investigations](Investigations)). Reads a public
 figure's own back catalog and comes back with leads: claims that changed over time, numbers that
 moved, things promised and never delivered, topics that suddenly took over. Then it checks whether
 anyone else has covered each lead. A model pulls checkable statements from each video, and a
@@ -299,7 +299,7 @@ Rejections are kept with the reason. Every receipt links to the exact moment. Le
 for a person, never posted automatically. A full multi-year catalog costs about $14, and later runs
 read only new uploads.
 
-**Story dossiers** (`clipper story`, [Story dossiers](Story-dossiers)). Give it a one-line brief
+**Story dossiers** (`clippa story`, [Story dossiers](Story-dossiers)). Give it a one-line brief
 and a time window. The search swarm finds the videos, triage picks which ones are worth
 transcribing within an hour budget, and the result is a research dossier: summary, timeline, who
 said what, conflicts, gaps and angles. From there it plans an edit with chapters, lower thirds and
@@ -336,7 +336,7 @@ in code. The finished cut went through 19 versions, and each one was rebuilt fro
 director's notes on the last.
 
 That first film took about 145 one-off Resolve scripts, each patched from the last. The same day it
-was published, the method became a command, `clipper doc`, so the next film starts from a plan file
+was published, the method became a command, `clippa doc`, so the next film starts from a plan file
 instead of a pile of scripts. How to use it is on [Documentaries](Documentaries).
 
 - **Research with limits.** The dossier draws only on what the person posts publicly, plus what had
@@ -425,4 +425,4 @@ worked through in tiers:
 - Added CI on Windows alongside Linux.
 - Added tests where the risk was.
 
-The source is this repository, MIT licensed; the command is `clipper`.
+The source is this repository, MIT licensed; the command is `clippa`.

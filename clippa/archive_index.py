@@ -1,8 +1,8 @@
-"""`clipper archive index` / `search`: keyword search over a subject's transcripts (#48, #53).
+"""`clippa archive index` / `search`: keyword search over a subject's transcripts (#48, #53).
 
 Usage:
-    clipper archive index <subject> [--rebuild]
-    clipper archive search <subject> <query> [--limit N] [--since YYYY[-MM-DD]] [--before ...]
+    clippa archive index <subject> [--rebuild]
+    clippa archive search <subject> <query> [--limit N] [--since YYYY[-MM-DD]] [--before ...]
                                              [--by rank|date|oldest] [--years]
 
 The index is <subject>/index.sqlite: an FTS5 table of ~[archive] index_window_s windows of
@@ -16,7 +16,7 @@ at the moment (YouTube ?t=, a few seconds early for context) and the matching wo
 [brackets]. --years counts matching windows per year instead: when did he talk about it.
 Meaning search (embeddings, "the warehouse store" for "Costco") is #53 and can add a table here.
 
-    clipper archive ask <subject> <question> [--since ...] [--before ...] [--limit N]
+    clippa archive ask <subject> <question> [--since ...] [--before ...] [--limit N]
 
 `ask` takes a plain question: [archive] ask_model (Haiku) writes up to ask_max_queries FTS5
 searches (synonyms, names, Whisper's misspellings), the index pools their best windows, and
@@ -74,7 +74,7 @@ def build(cfg: dict, subject: str, rebuild: bool) -> None:
     d = subject_dir(cfg, subject)
     cat = load_catalog(d)
     if not cat:
-        raise ClipperError(f"no catalog for {subject!r}: clipper archive add {subject} <url>")
+        raise ClipperError(f"no catalog for {subject!r}: clippa archive add {subject} <url>")
     if rebuild:
         (d / "index.sqlite").unlink(missing_ok=True)
     db = connect(d)
@@ -125,7 +125,7 @@ def link(url: str, source: str, start: float) -> str:
 def open_index(cfg: dict, subject: str) -> sqlite3.Connection:
     d = subject_dir(cfg, subject)
     if not (d / "index.sqlite").exists():
-        raise ClipperError(f"no index for {subject!r} yet: clipper archive index {subject}")
+        raise ClipperError(f"no index for {subject!r} yet: clippa archive index {subject}")
     return connect(d)
 
 
@@ -240,7 +240,7 @@ def answer(cfg: dict, subject: str, question: str, since: str | None, before: st
            claude) -> list[dict]:
     """Question in plain words -> FTS5 queries (model) -> pooled hits -> the ones that fit (model).
     The fitting hits, strong first then oldest first, each with fit, quote and why added.
-    claude keeps the running cost (`clipper receipts` asks one question per story)."""
+    claude keeps the running cost (`clippa receipts` asks one question per story)."""
     from .prompts import Prompts
 
     ac = cfg["archive"]

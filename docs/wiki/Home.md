@@ -4,9 +4,10 @@
 
 **Clippa** turns long Kick streams into YouTube uploads: full-length segments, topic
 compilations, Shorts, titles, descriptions, chapters and thumbnails, with a person approving
-every one before it goes out. Everything is a `clipper <stage>` command, and the always-on
+every one before it goes out. Everything is a `clippa <stage>` command, and the always-on
 pieces (the recorder, the worker, serve and the Discord bot) run it unattended. (The app was
-called clipper; the command, package, config files and containers still are.)
+called clipper: the old command still works, and the config files, `CLIPPER_*` settings and
+containers keep that name until the rename's deploy step, [Configuration](Configuration).)
 
 > [!TIP]
 > New here? Start with **[Getting started](Getting-started)**: install a machine, run one
@@ -48,7 +49,7 @@ flowchart TB
 <td width="33%" valign="top">
 
 ### Install
-[Install](Install) (`clipper setup`)<br>
+[Install](Install) (`clippa setup`)<br>
 [Kitsu](Kitsu) · [Discord app](Discord-app) · [YouTube sign-in](YouTube-sign-in)<br>
 [Windows](Install-Windows) · [macOS](Install-macOS)<br>
 [Transcribe on Modal](Transcribe-on-Modal)<br>
@@ -92,7 +93,7 @@ flowchart TB
 <td valign="top">
 
 ### Something broke?
-`clipper doctor` prints a fix for each problem; the bot DMs you; `clipper checkup` finds what
+`clippa doctor` prints a fix for each problem; the bot DMs you; `clippa checkup` finds what
 never raised an error; logs are in `logs/`
 ([more](Getting-started#when-something-breaks))
 

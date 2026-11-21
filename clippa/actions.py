@@ -1,8 +1,8 @@
-"""Per-item review actions for the CLI and Discord (`clipper review <verb>`, `clipper bot`).
+"""Per-item review actions for the CLI and Discord (`clippa review <verb>`, `clippa bot`).
 
 Kitsu stays the record of every decision. Each action writes the item's task status
 (with a comment) or one of its custom columns, then refreshes that item in review.json
-the way `clipper review sync` would, so `clipper schedule` treats it like an edit made
+the way `clippa review sync` would, so `clippa schedule` treats it like an edit made
 in Kitsu:
     approve   status approved
     reject    status rejected; the reason is the comment (kept for scoring examples)
@@ -160,7 +160,7 @@ def reopen(cfg: dict, item: Item, who: str = "") -> dict:
 
 def restore(cfg: dict, item: Item, status_short: str, who: str = "") -> dict:
     """Put the task back to an earlier status (the war room's undo). The comment is a
-    clipper note, so the decision's reason stays the earlier comment (a retake isn't
+    Clippa note, so the decision's reason stays the earlier comment (a retake isn't
     planned again, a reject keeps its scoring example)."""
     _touched(item, "undo", who)
     _status(cfg, item, status_short, f"{review.NOTE_PREFIX} Undo: back to {status_short}{_by(who)}")
@@ -338,7 +338,7 @@ def thumbtext(cfg: dict, item: Item, text: str, who: str = "") -> dict:
     text = check_text(cfg, " ".join(text.split()))
     thumbs = jsonstate.read(item.stream_dir / "thumbnails.json", {})
     if video_key(item.stream_dir / item.state["file"].replace("\\", "/")) not in thumbs:
-        raise ClipperError(f"{item.ref} has no thumbnail yet; run clipper thumbs first")
+        raise ClipperError(f"{item.ref} has no thumbnail yet; run clippa thumbs first")
     _touched(item, "thumbnail text", who)
     _columns(cfg, item, {review.THUMB_COL: text}, f"Thumbnail text: {text}{_by(who)}")
     return refresh(cfg, item)
@@ -358,7 +358,7 @@ REPLANS = ("approve", "reject", "changes", "reopen", "hold", "pin")  # these mov
 
 
 # The review verbs that change one YouTube column, and the column each one edits. The CLI's
-# `clipper review <verb>`, the bot's forms and the war room all go through decide().
+# `clippa review <verb>`, the bot's forms and the war room all go through decide().
 EDITS = {"retitle": "YouTube title", "description": "YouTube description", "hashtags": "Hashtags",
          "tags": "Tags", "playlist": "Playlist"}
 
@@ -385,9 +385,9 @@ def decide(cfg: dict, item: Item, action: str, who: str, text: str = "", on: boo
 
 
 def replan(cfg: dict, item: Item, action: str, row: dict, via=None) -> tuple[dict, str]:
-    """After an action that moves the schedule ([discord] replan on): `clipper schedule`
+    """After an action that moves the schedule ([discord] replan on): `clippa schedule`
     without a Kitsu sync, then the item's card data again and a note on where it landed.
-    via(cfg): how to run it. The bot passes serve.replan (`clipper serve` owns schedule.json);
+    via(cfg): how to run it. The bot passes serve.replan (`clippa serve` owns schedule.json);
     a serve that isn't up leaves a note instead of failing the decision."""
     from . import schedule
 
@@ -411,7 +411,7 @@ def replan(cfg: dict, item: Item, action: str, row: dict, via=None) -> tuple[dic
 
 
 def clipper_cmd(cfg: dict) -> list[str]:
-    """The command line for a background `clipper` run with this config."""
+    """The command line for a background `clippa` run with this config."""
     cmd = [sys.executable, "-m", "clippa.cli"]
     if base(cfg).get("_file"):
         cmd += ["--config", str(base(cfg)["_file"])]
@@ -453,7 +453,7 @@ def is_held(fields: dict) -> bool:
 def describe(cfg: dict, sdir: Path, gazu=None, links: bool = True) -> dict[str, dict]:
     """Everything a card or list row shows, per item, from local files (review.json is
     as of the last sync). Kitsu is only asked for links older publishes didn't save, and not
-    even that with links=False (`clipper status`: files only)."""
+    even that with links=False (`clippa status`: files only)."""
     cfg = for_stream(cfg, sdir)
     state = review.ensure_links(sdir, cfg, gazu) if links else jsonstate.load(sdir / "review_state.json")
     decisions = jsonstate.read(sdir / "review.json", {})
@@ -549,7 +549,7 @@ def hold_waiting(fields: dict, stale: datetime | None, now: datetime) -> bool:
 def stream_counts(cfg: dict, sdir: Path, links: bool = False, now: datetime | None = None) -> dict:
     """One stream's decision counts from review_state.json and review.json alone: three small
     reads, where describe() opens every item's sidecar (1,913 reads over SMB for 41 streams made
-    `clipper status` take a minute, #199). links=True asks Kitsu for links older publishes lack."""
+    `clippa status` take a minute, #199). links=True asks Kitsu for links older publishes lack."""
     state = review.ensure_links(sdir, cfg) if links else jsonstate.load(sdir / "review_state.json")
     decisions = jsonstate.read(sdir / "review.json", {})
     meta = jsonstate.read(sdir / "meta.json", {})

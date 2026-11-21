@@ -1,8 +1,8 @@
-"""`clipper streams` (#204): what each stream folder takes on the share, and pruning the big
+"""`clippa streams` (#204): what each stream folder takes on the share, and pruning the big
 files of streams that are done with.
 
-    clipper streams list [--all] [--json]
-    clipper streams prune [--older-than 30] [--cuts] [--stream ID ...] [--yes]
+    clippa streams list [--all] [--json]
+    clippa streams prune [--older-than 30] [--cuts] [--stream ID ...] [--yes]
 
 A stream's folder keeps everything forever: the source recording (~30 GB a Kino night), the
 audio for transcription, the cuts and the review previews. Nothing else frees the disk; the bot
@@ -224,7 +224,7 @@ def listing_lines(s: dict) -> list[str]:
     if s["hidden"]:
         out.append(f"({s['hidden']} small streams not shown: --all lists them)")
     free = f", {gb(s['free'])} free on the share" if s["free"] is not None else ""
-    out.append(f"streams take {gb(s['total'])}{free}; `clipper streams prune` (older than "
+    out.append(f"streams take {gb(s['total'])}{free}; `clippa streams prune` (older than "
                f"{s['older_than_days']:g} days) would free {gb(s['prunable'])} of source and audio")
     return out
 
@@ -307,6 +307,6 @@ def prune(cfg: dict, older_than_days: float | None = None, cuts: bool = False,
 
 
 def pruned_note(sdir: Path) -> str:
-    """For an error about a missing source: " (removed by clipper streams prune on <date>)"."""
+    """For an error about a missing source: " (removed by clippa streams prune on <date>)"."""
     p = jsonstate.read(Path(sdir) / PRUNED, {})
-    return f" (removed by `clipper streams prune` on {p['at'][:10]})" if p.get("at") else ""
+    return f" (removed by `clippa streams prune` on {p['at'][:10]})" if p.get("at") else ""

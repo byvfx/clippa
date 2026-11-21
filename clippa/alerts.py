@@ -1,11 +1,11 @@
 """Notifications (#22): Discord DMs from the bot when something needs you.
 
 Usage:
-    clipper alert test            queue a test DM (the bot sends it within a minute)
-    clipper alert digest          print today's digest (--send: DM it now)
-    clipper alert send TEXT       queue TEXT ('-': stdin) as a DM, kind --kind (default checkup)
+    clippa alert test            queue a test DM (the bot sends it within a minute)
+    clippa alert digest          print today's digest (--send: DM it now)
+    clippa alert send TEXT       queue TEXT ('-': stdin) as a DM, kind --kind (default checkup)
 
-Any clipper process (the worker, the NAS recorder, uploads, the bot) calls
+Any Clippa process (the worker, the NAS recorder, uploads, the bot) calls
 `alerts.send(cfg, kind, text)`, which drops one small JSON file into
 streams/.notify/outbox/ (the streams share every machine already reaches). The bot, the one
 process that is always up and has the Discord token, picks them up every minute and DMs
@@ -15,7 +15,7 @@ process that is always up and has the Discord token, picks them up every minute 
   crash, a background job failing), recorder (stalls, crashes, finalize failures), disk
   (the streams share filling up), digest (daily summary at digest_time), spend (Modal's
   month passing each [modal] alert_every_usd, checked hourly), checkup (the nightly
-  `clipper checkup` report, deploy/claude/checkup.sh; a sign-in that is gone, from serve's
+  `clippa checkup` report, deploy/claude/checkup.sh; a sign-in that is gone, from serve's
   hourly `checkup --alert`);
 - the same problem (same key) at most once per cooldown_hours;
 - nothing during quiet_hours: held, then sent together when they end.

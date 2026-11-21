@@ -157,7 +157,7 @@ def test_env_for_an_unset_default():
 
 
 def test_show_flag_sticks_for_a_stream(tmp_path):
-    """B4: `clipper --show c404 meta <a kino stream>` used c404's settings nowhere."""
+    """B4: `clippa --show c404 meta <a kino stream>` used c404's settings nowhere."""
     path = tmp_path / "clipper.toml"
     path.write_text('[shows.kino]\nchannels = ["kinocasino"]\n[shows.kino.meta]\nsrt_max_s = 4\n'
                     '[shows.c404]\nchannels = ["donflurgundy"]\n[shows.c404.meta]\nsrt_max_s = 8\n',

@@ -1,4 +1,4 @@
-"""`clipper backup` (#204): one zip of the taste layer; secrets only when asked, never the
+"""`clippa backup` (#204): one zip of the taste layer; secrets only when asked, never the
 recordings, and old zips dropped past [backup] keep."""
 import os
 import time
@@ -106,7 +106,7 @@ def test_a_backup_elsewhere_never_takes_the_zips_in_backups(cfg, tmp_path):
 
 
 def test_a_show_pinned_config_backs_up_the_install(cfg):
-    """`clipper --show kino backup`: a show's config has no _dir; the install's is used."""
+    """`clippa --show kino backup`: a show's config has no _dir; the install's is used."""
     cfg["shows"] = {"kino": {"channels": ["k"], "overrides": {"thumbnail": {"photos": str(cfg["_dir"] / "kino_photos")}}}}
     cfg["_root"] = cfg
     (cfg["_dir"] / "kino_photos" / "PPP").mkdir(parents=True)

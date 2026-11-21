@@ -52,7 +52,7 @@ def test_publish_and_post_reads_the_streams_own_discord_setting(monkeypatch, tmp
 
 
 def test_invite_adds_a_discord_id_to_the_allowlist_once(tmp_path):
-    """`clipper review invite`: the id lands in clipper.toml's [discord] allowed_user_ids, once; a
+    """`clippa review invite`: the id lands in clipper.toml's [discord] allowed_user_ids, once; a
     non-id is refused with the recipe."""
     from clippa import config
     from clippa.errors import ClipperError

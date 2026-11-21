@@ -36,13 +36,13 @@ Pixabay under the user OpenClipart-Vectors.
 
 ## Commands
 
-- `clipper clipart find "cow engraving"`: searches every source in `[clipart] sources` and adds
+- `clippa clipart find "cow engraving"`: searches every source in `[clipart] sources` and adds
   up to `[clipart] per_source` new pictures from each, tagged with the search. `--source met`
   searches one source; `-n 10` takes more.
-- `clipper clipart list [--tag cow] [--source iconify] [--status new|kept] [--json]`: the
+- `clippa clipart list [--tag cow] [--source iconify] [--status new|kept] [--json]`: the
   library, newest first, with each picture's size, credit and licence. `--json` adds each
   file's path.
-- `clipper clipart add <address|set:icon|file|folder> [--tag X]`: one picture. It can be:
+- `clippa clipart add <address|set:icon|file|folder> [--tag X]`: one picture. It can be:
   - a Commons `File:` page, a metmuseum.org/art/collection/search, clevelandart.org/art or
     pixabay.com page;
   - an Iconify name such as `fluent-emoji:cow-face` (from icon-sets.iconify.design, whose
@@ -52,8 +52,8 @@ Pixabay under the user OpenClipart-Vectors.
 
   A downloaded pack goes in whole, for example the CC0 packs from kenney.nl (speech bubbles,
   emotes):
-  `clipper clipart add Downloads/kenney_emotes-pack --credit "Kenney (kenney.nl)" --licence CC0 --tag emote`.
-- `clipper clipart keep|drop <id> ...`: a dropped picture's file is deleted, and the next find
+  `clippa clipart add Downloads/kenney_emotes-pack --credit "Kenney (kenney.nl)" --licence CC0 --tag emote`.
+- `clippa clipart keep|drop <id> ...`: a dropped picture's file is deleted, and the next find
   doesn't bring its source back. Adding it by hand brings it back.
 
 The files and `clipart.json` are in `[paths] clipart`. A file is `<id>.<ext>`: `.png`, `.jpg`,
@@ -90,7 +90,7 @@ Noncommercial, no-derivatives and GPL licences are never kept.
 ## Choosing by hand
 
 Some sources are good but have no API, or don't want scripts; for these, download what you
-pick and `clipper clipart add` the file:
+pick and `clippa clipart add` the file:
 
 - [Old Book Illustrations](https://www.oldbookillustrations.com), engravings on white,
   ideal for cut-outs.
@@ -106,5 +106,5 @@ to what they serve.
 ## Settings
 
 `[clipart]` in `clippa/defaults.toml`: `sources`, `per_source`, `licences`, `commons_pictures`, `max_px`,
-`max_mb`, `iconify_sets`, `pixabay_type`, `pixabay_transparent`, `timeout_s`. `clipper doctor`
+`max_mb`, `iconify_sets`, `pixabay_type`, `pixabay_transparent`, `timeout_s`. `clippa doctor`
 checks the source and licence names, warns when Pixabay has no key, and counts the library.

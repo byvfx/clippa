@@ -1,13 +1,13 @@
-`clipper receipts` turns a stream's stories about the archive subject (`[receipts] subject`, with
+`clippa receipts` turns a stream's stories about the archive subject (`[receipts] subject`, with
 `topics` and `figures` naming them the way the show does; unset until you fill them in, and
-`clipper receipts find` says so) into one video of their own old clips, to send to the show:
+`clippa receipts find` says so) into one video of their own old clips, to send to the show:
 
 ```bash
-clipper receipts find kick-<id>     # Sonnet names the stories + a search each; `archive ask` finds the clips (~$0.20)
-clipper receipts list kick-<id>     # stories, receipts ([x] = used), quotes, links
-clipper receipts script kick-<id>   # Opus writes Mother Moo's voice-over for the used ones (~$0.02)
-clipper receipts cut kick-<id>      # receipts/receipts.mp4 + description.txt; voices changed lines (ElevenLabs)
-clipper receipts upload kick-<id>   # private, outside the schedule; the link goes in receipts.json
+clippa receipts find kick-<id>     # Sonnet names the stories + a search each; `archive ask` finds the clips (~$0.20)
+clippa receipts list kick-<id>     # stories, receipts ([x] = used), quotes, links
+clippa receipts script kick-<id>   # Opus writes Mother Moo's voice-over for the used ones (~$0.02)
+clippa receipts cut kick-<id>      # receipts/receipts.mp4 + description.txt; voices changed lines (ElevenLabs)
+clippa receipts upload kick-<id>   # private, outside the schedule; the link goes in receipts.json
 ```
 
 The edit is `streams/<id>/receipts/receipts.json`: flip `use`, reorder, trim `start`/`end`

@@ -514,7 +514,7 @@ def test_cli_and_doctor(cfg, monkeypatch, capsys):
 
 def test_list(cfg, monkeypatch, capsys):
     clipart.show_list(cfg)
-    assert "clipper clipart find" in capsys.readouterr().out
+    assert "clippa clipart find" in capsys.readouterr().out
     monkeypatch.setitem(clipart.FINDERS, "commons", lambda q, n, cfg: [cand()])
     clipart.find(cfg, "cow", ["commons"], say=lambda s: None)
     clipart.show_list(cfg, tag="co")

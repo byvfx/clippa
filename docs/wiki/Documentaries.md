@@ -1,24 +1,24 @@
-`clipper doc` builds a narrated mini-documentary from a plan you write by hand: your script,
+`clippa doc` builds a narrated mini-documentary from a plan you write by hand: your script,
 the subject's own clips, cover shots cut to the words. It buys the narration (or takes
 [your own recording](#your-own-voice) of it), builds the timeline in DaVinci Resolve, masters the render to YouTube's loudness, checks the result for
 anything that must not be in it, and writes the publish kit.
 
 It differs from a [story cut](Story-dossiers): a story is planned by a model and rendered
 by ffmpeg as cards and clips; a documentary is your script and your edit, finished in Resolve.
-Research for one still comes from `clipper story run`, [archives](Archives) and
+Research for one still comes from `clippa story run`, [archives](Archives) and
 [b-roll](B-roll).
 
 ## Order of work
 
-1. `clipper doc new <slug>`: the piece's folder.
+1. `clippa doc new <slug>`: the piece's folder.
 2. Fill in `banned.txt` and write `plan.toml`. Lock the script before buying narration: most
    rebuilds are narration changes.
-3. `clipper doc voice <slug> --dry-run`, then without `--dry-run`. Listen to every take.
+3. `clippa doc voice <slug> --dry-run`, then without `--dry-run`. Listen to every take.
    Reading it yourself: record each take into `vo/read/` first ([Your own voice](#your-own-voice)).
-4. `clipper doc build <slug>`: a new timeline version in Resolve. Watch it, change the plan,
+4. `clippa doc build <slug>`: a new timeline version in Resolve. Watch it, change the plan,
    build again.
-5. `clipper doc master <slug>`: the render, the loudness, the leak check.
-6. `clipper doc kit <slug>`: chapters, description, credits. You upload in Studio by hand.
+5. `clippa doc master <slug>`: the render, the loudness, the leak check.
+6. `clippa doc kit <slug>`: chapters, description, credits. You upload in Studio by hand.
 
 ## The piece's folder
 
@@ -106,7 +106,7 @@ no fade. A line with no `take` is a read of its own.
 
 ## Narration
 
-`clipper doc voice` buys each take from ElevenLabs once (`[narrate]`'s key and `tts_model`,
+`clippa doc voice` buys each take from ElevenLabs once (`[narrate]`'s key and `tts_model`,
 the plan's `voice_id` or `[doc] voice_id`), unless you [recorded it yourself](#your-own-voice). `--dry-run` checks the plan and prints how many
 characters it would buy. A take is bought again only when its words, the voice or the voice
 settings change.
@@ -123,7 +123,7 @@ The narration is refused when a line contains a term from `banned.txt`.
 
 To read a take yourself, record it and save it as `vo/read/<take>.wav` in the piece's folder,
 named for the take (`take = "open"` in the plan is `vo/read/open.wav`; `.flac`, `.aif`, `.mp3`,
-`.m4a`, `.aac`, `.ogg` and `.opus` work too; `Open.wav` is the same take). `clipper doc voice` then uses your recording for
+`.m4a`, `.aac`, `.ogg` and `.opus` work too; `Open.wav` is the same take). `clippa doc voice` then uses your recording for
 that take and buys nothing for it. A piece can mix the two: takes with a recording are yours,
 the rest are bought. `--dry-run` lists which is which, and names any file in `vo/read/` that
 matches no take.
@@ -137,9 +137,9 @@ matches no take.
   times from the local Whisper. In a room louder than `[doc] silence_db` no pause is found
   and nothing is trimmed: raise it (towards 0) until the pauses are.
 - The words are matched to the script. When under 80% of a take's words are heard,
-  `clipper doc voice` says so each time it runs: change the lines in `plan.toml` to what you
+  `clippa doc voice` says so each time it runs: change the lines in `plan.toml` to what you
   said, or read the take again.
-- A new recording under the same name is processed again; run `clipper doc voice` after
+- A new recording under the same name is processed again; run `clippa doc voice` after
   saving it, then `build`.
 
 When every take in the last build is your own, the kit leaves out the AI-voice line (see
@@ -147,7 +147,7 @@ When every take in the last build is your own, the kit leaves out the AI-voice l
 
 ## Build
 
-`clipper doc build` turns the plan into frames (`work/build.json`) and builds a new timeline
+`clippa doc build` turns the plan into frames (`work/build.json`) and builds a new timeline
 named `<title> vNN` in the open Resolve project. An earlier version is never changed.
 `--dry-run` stops before Resolve.
 
@@ -178,14 +178,14 @@ it, or a gain or fade Resolve refused, is an error.
 ### Resolve
 
 Resolve Studio must be running on the same machine, with Preferences > System > General >
-"External scripting using" set to Local. clipper finds the scripting module where Resolve
+"External scripting using" set to Local. Clippa finds the scripting module where Resolve
 installs it; `[doc] resolve_api` and `resolve_lib` (or `RESOLVE_SCRIPT_API` and
-`RESOLVE_SCRIPT_LIB`) name another place. `clipper doctor` reports whether it is found once a
+`RESOLVE_SCRIPT_LIB`) name another place. `clippa doctor` reports whether it is found once a
 piece exists.
 
 ## Master
 
-`clipper doc master` renders the last built timeline to `renders/` (`--timeline NAME` for
+`clippa doc master` renders the last built timeline to `renders/` (`--timeline NAME` for
 another, `--file` for a render you made yourself), measures it, and writes
 `<name>.master.mp4` with the sound brought to `[doc] lufs` (-14 for YouTube) by gain and a
 limiter at `[doc] true_peak`. The picture is copied, not re-encoded. It prints the loudness
@@ -196,7 +196,7 @@ Then it runs the leak check; `--no-leak` skips it.
 
 ## Leak check
 
-`clipper doc leak` transcribes the mastered render on [Modal](Transcribe-on-Modal) (a few
+`clippa doc leak` transcribes the mastered render on [Modal](Transcribe-on-Modal) (a few
 cents, mostly the container's start; `--dry-run` prints the estimate) and fails when a term
 from `banned.txt` is heard, printing the time and the words. It also reads `kit.md`. A
 transcript is kept per file, so a second run on the same render costs nothing.
@@ -213,7 +213,7 @@ are yours to read.
 
 ## Kit
 
-`clipper doc kit` writes `kit.md` from the plan and the last build: the title, the
+`clippa doc kit` writes `kit.md` from the plan and the last build: the title, the
 description with chapters (from the sections: the first at 0:00, each at least ten seconds
 after the one before and before the end, none when there are fewer than three), the credits (the plan's
 `credits` and each `credit` on a music cue or the room tone), the disclosure lines, the

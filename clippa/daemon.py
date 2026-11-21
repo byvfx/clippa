@@ -1,11 +1,11 @@
-"""What clipper's long-running commands share (`clipper serve`, `clipper bot`): a rotated
+"""What Clippa's long-running commands share (`clippa serve`, `clippa bot`): a rotated
 log file, one instance per streams folder, and a heartbeat on the streams share.
 
 A heartbeat is <streams>/.<name>/status.json, like the recorder's (clippa/record):
 {"at": <iso>, "host", "pid", "started_at", "version" (clippa/buildinfo.py: which commit the
 container runs), ...whatever the service adds}. The service writes
-it every BEAT_S; a reader (`clipper services status`, the war room's Health panel,
-`clipper doctor`) calls it down after HEARTBEAT_S without one, from any machine that sees
+it every BEAT_S; a reader (`clippa services status`, the war room's Health panel,
+`clippa doctor`) calls it down after HEARTBEAT_S without one, from any machine that sees
 the share. A lock file alone can't say that: it stays behind when a process is killed.
 """
 
@@ -60,7 +60,7 @@ def single_instance(cfg: dict, name: str):
             fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:
         f.close()
-        raise ClipperError(f"another clipper {name} is already running (lock {path})") from None
+        raise ClipperError(f"another clippa {name} is already running (lock {path})") from None
     return f
 
 
@@ -90,7 +90,7 @@ def read_heartbeat(path: Path, tries: int = 3, wait_s: float = 0.3) -> dict:
     here has no folder and is answered at once. A file that is there but still can't be read or
     parsed on the last try raises that OSError or ValueError: the state is unknown then, not
     empty, and the recorder's deploy guard must not take it for "nothing live". (2026-11-08: one
-    read mid-replace made `clipper record status` say "no heartbeat", exit 0, mid-show, which
+    read mid-replace made `clippa record status` say "no heartbeat", exit 0, mid-show, which
     would have let deploy/record/deploy.sh restart the recorder.)"""
     for attempt in range(tries):
         try:
@@ -144,7 +144,7 @@ def local(iso: str, fmt: str = "%m-%d %H:%M") -> str:
 
 
 def heartbeat_lines(name: str, hb: dict) -> list[str]:
-    """`clipper services status` lines for a service's heartbeat."""
+    """`clippa services status` lines for a service's heartbeat."""
     if hb.get("error"):
         return [f"{name}: heartbeat unreadable at {hb['path']} ({hb['error']}): can't tell whether it runs"]
     if hb["age_s"] is None:

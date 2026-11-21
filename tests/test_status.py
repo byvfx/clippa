@@ -1,4 +1,4 @@
-"""`clipper status`: one screen from the files the services write, nothing called."""
+"""`clippa status`: one screen from the files the services write, nothing called."""
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -38,7 +38,7 @@ def test_status_with_nothing_at_all(defaults, tmp_path):
 
 
 def test_status_counts_reviews_from_files_without_kitsu(defaults, tmp_path, monkeypatch):
-    """An old publish saved no Kitsu links; plain `clipper status` still never asks Kitsu for them."""
+    """An old publish saved no Kitsu links; plain `clippa status` still never asks Kitsu for them."""
     from clippa import review
 
     defaults = in_tmp(defaults, tmp_path)
@@ -91,7 +91,7 @@ def test_a_gone_sign_in_is_under_needs_you(defaults, tmp_path):
     out = status.lines(cfg, days=1)
     needs = out[1:out.index("")]
     assert any(x.startswith("  BAD  X sign-in expired") for x in needs)
-    assert "       look: clipper x --sign-in" in needs
+    assert "       look: clippa x --sign-in" in needs
 
 
 def test_held_counts_only_what_could_still_go_out(defaults, tmp_path):

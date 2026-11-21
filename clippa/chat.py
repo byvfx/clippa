@@ -1,4 +1,4 @@
-"""The Clippa messenger (#158): one box where you tell clipper what to do, answered by Clippa.
+"""The Clippa messenger (#158): one box where you tell Clippa what to do, answered by Clippa.
 
 A message goes, in order, to:
   1. a box command: /new, /bye, /clear, /history, /cost, /away, /back, /help
@@ -17,7 +17,7 @@ or by itself after [chat] quiet_hours without a message; the old one ends with a
 (messages, actions, model cost) and its open cards expire. /clear moves the chat to
 <[paths] chats>/archive/ and starts an empty one; Kitsu keeps the decisions either way.
 
-Spends run as `clipper <argv>` child processes; when one ends its report goes into whichever
+Spends run as `clippa <argv>` child processes; when one ends its report goes into whichever
 topic is open then (or waits while you're /away). Stored by serve in [paths] chats/current.json
 through jsonstate, so the phone and the laptop see the same chat.
 """
@@ -378,7 +378,7 @@ def _bulk_args(verb: str, refs: list[str], kind: str, many: bool, stream: str, l
 
 
 def match(text: str, now: datetime, shows: catalog.ShowNames | None = None) -> tuple[str, dict] | None:
-    """(tool, args) for the phrases clipper knows without a model; None for the rest. shows: how
+    """(tool, args) for the phrases Clippa knows without a model; None for the rest. shows: how
     the config's shows are named ("from kino 11-14"); none known, only stream ids name a stream."""
     shows = shows or catalog.ShowNames()
     t = " ".join(text.strip().split())
@@ -720,7 +720,7 @@ def tap(cfg: dict, card_id: str, yes: bool) -> dict:
 # ---------- jobs: spend cards, in the background ----------
 
 def start_job(cfg: dict, card: dict) -> tuple[str, bool]:
-    """(what to say, whether it started): `clipper <argv>` in a thread of its own."""
+    """(what to say, whether it started): `clippa <argv>` in a thread of its own."""
     from .actions import clipper_cmd
 
     argv = [str(a) for a in card.get("argv") or []]
@@ -737,11 +737,11 @@ def start_job(cfg: dict, card: dict) -> tuple[str, bool]:
                           name=f"chat-{job['id']}", daemon=True)
     _JOBS[job["id"]] = th
     th.start()
-    return f"Started `clipper {' '.join(argv[:2])}`. I'll say here when it's done.", True
+    return f"Started `clippa {' '.join(argv[:2])}`. I'll say here when it's done.", True
 
 
 def _run_job(cfg: dict, job: dict, cmd: list[str]) -> None:
-    log.info(f"chat job {job['id']}: clipper {' '.join(job['argv'])}")
+    log.info(f"chat job {job['id']}: clippa {' '.join(job['argv'])}")
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace",
                            timeout=JOB_TIMEOUT_S, env={**os.environ, "PYTHONIOENCODING": "utf-8"},
@@ -766,7 +766,7 @@ def finish(cfg: dict, job_id: str, code: int | None, lines: list[str]) -> None:
         if not job:
             return
         job.update(state="done" if code == 0 else "failed", exit=code, ended_at=now_iso())
-        what = f"`clipper {' '.join(job['argv'][:2])}`"
+        what = f"`clippa {' '.join(job['argv'][:2])}`"
         text = (f"{what} is done." if code == 0 else f"{what} failed (exit {code}).") + (f"\n{tail}" if tail else "")
         if chat["away"]:
             chat["held"].append({"text": text, "job": job_id})
@@ -793,7 +793,7 @@ def lost_jobs(cfg: dict) -> int:
             if j["state"] == "running" and j.get("host") == socket.gethostname() and j.get("boot") != BOOT:
                 j.update(state="lost", ended_at=now_iso())
                 ensure_topic(chat, cfg)
-                _post(chat, "clippa", f"`clipper {' '.join(j['argv'][:2])}` was cut off by a restart; "
+                _post(chat, "clippa", f"`clippa {' '.join(j['argv'][:2])}` was cut off by a restart; "
                       "its own status command says how far it got.", kind="report", job=j["id"])
                 n += 1
     return n

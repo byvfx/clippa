@@ -1,17 +1,17 @@
-"""`clipper blinds` (#111, steps 1 and 2): collect gossip blind items, read their clues, pair
+"""`clippa blinds` (#111, steps 1 and 2): collect gossip blind items, read their clues, pair
 twins, and pick what the bot asks you about in Discord.
 
-    clipper blinds check [--backfill DAYS] [--no-clues] [--dry-run]
+    clippa blinds check [--backfill DAYS] [--no-clues] [--dry-run]
                                     fetch each source, store new blinds and reveals, read the
                                     clues of what is unread, pair twins across sources
-    clipper blinds list [--days 14] [--status S] [--source NAME] [--all] [--json]
-    clipper blinds show <blind> [--json]
-    clipper blinds guess "<text>" [--no-clues]   a blind from anywhere else, by hand
-    clipper blinds answer <blind> "<name>" [--why "..."] | --none | --not-ours
-    clipper blinds sources          each source: last fetch, error, how many stored
+    clippa blinds list [--days 14] [--status S] [--source NAME] [--all] [--json]
+    clippa blinds show <blind> [--json]
+    clippa blinds guess "<text>" [--no-clues]   a blind from anywhere else, by hand
+    clippa blinds answer <blind> "<name>" [--why "..."] | --none | --not-ours
+    clippa blinds sources          each source: last fetch, error, how many stored
 
 A blind is a gossip item with the name left out and clues left in. The user is asked first
-who it is about (here, in the war room or in Discord), and only then does clipper investigate
+who it is about (here, in the war room or in Discord), and only then does clippa investigate
 (step 3); reveals score both guesses (step 4).
 
 Sources are [[blinds.sources]] entries, none by default: name, feed, kind (the parser:
@@ -22,7 +22,7 @@ blinds afresh each day ("Blind Item #16"), so such a blind's id is its source, d
 
 The clue pass ([blinds] clues_model, prompts/blinds_clues_<v>.md) reads each unread blind
 and returns its clues (each typed, weighted by [blinds] weights), the claim, the fields it
-points at, whether it could be about someone this install follows (`clipper people` and
+points at, whether it could be about someone this install follows (`clippa people` and
 the news watchlist), and flags for a sensitive claim or a private person. It never guesses
 a name: the user's guess comes first and must be their own. Tags (source, field, sensitive,
 private, ours) are what [blinds] hide filters on. Twins from different sources within
@@ -332,7 +332,7 @@ def fetch_source(db: sqlite3.Connection, src: dict, backfill_days: float = 0, ma
 # ---------- the clue pass ----------
 
 def followed(cfg: dict) -> list[str]:
-    """Who this install follows, by name: `clipper people` and the news watchlist."""
+    """Who this install follows, by name: `clippa people` and the news watchlist."""
     from . import people
 
     out: dict[str, str] = {}
@@ -644,7 +644,7 @@ def add_by_hand(cfg: dict, text: str, clues: bool = True, claude=None, say=print
 def answer(cfg: dict, bid: str, name: str = "", why: str = "", none: bool = False, not_ours: bool = False,
            who: str = "") -> dict:
     """The user's guess (a name, optionally why), No idea, or Not ours. Discord, the war room and
-    the CLI all answer through this. A name is matched to `clipper people` (its id kept); one
+    the CLI all answer through this. A name is matched to `clippa people` (its id kept); one
     nobody answers to is kept as written. A new answer replaces the last one until a result is in
     (step 3), and the replaced one stays in the history."""
     from . import people
@@ -772,7 +772,7 @@ def show_text(b: dict) -> str:
     if b.get("twin"):
         out.append(f"twin: {b['twin']['id']} ({b['pair_why']})")
     for g in b["guesses"]:
-        out.append(f"your guess: {g['name']}" + (f" ({g['person']})" if g["person"] else " (not in clipper people)")
+        out.append(f"your guess: {g['name']}" + (f" ({g['person']})" if g["person"] else " (not in clippa people)")
                    + (f", because {g['why']}" if g["why"] else "") + (f"  [{g['note']}]" if g.get("note") else ""))
     return "\n".join(x for x in out if x is not None)
 
@@ -957,7 +957,7 @@ def md(text: str) -> str:
 
 
 def alert_text(b: dict, n: int = 0, limit: int = 1900) -> str:
-    """A blind as the bot posts it: the blind, its clues and tags, never a guess of clipper's."""
+    """A blind as the bot posts it: the blind, its clues and tags, never a guess of Clippa's."""
     src = b["source"].upper() if len(b["source"]) <= 5 else b["source"].title()
     title = md(b["title"] or "Blind")
     link = f"[{title}](<{b['url']}>)" if re.match(r"https?://", b["url"] or "") else title

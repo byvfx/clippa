@@ -1,15 +1,15 @@
 The code can be cloned again; the months of editorial judgement can't. That lives in the config,
 the hand-edit backups, the enrolled faces and voices, the cast photos, the layouts and each
-stream's review state. `clipper backup` zips those. `clipper streams` shows what the stream
+stream's review state. `clippa backup` zips those. `clippa streams` shows what the stream
 folders take on the share and frees the big files of streams that are done with.
 
-## clipper backup
+## clippa backup
 
 ```bash
-clipper backup --dry-run        # what would go in, by folder, with sizes
-clipper backup                  # write backups/taste/taste-<date>-<time>.zip
-clipper backup --with-secrets   # secrets/ too
-clipper backup --to D:/offsite  # somewhere else
+clippa backup --dry-run        # what would go in, by folder, with sizes
+clippa backup                  # write backups/taste/taste-<date>-<time>.zip
+clippa backup --with-secrets   # secrets/ too
+clippa backup --to D:/offsite  # somewhere else
 ```
 
 What goes in, relative to the config file's folder (`/data` on the NAS hub):
@@ -31,7 +31,7 @@ redo them), `deploy/*/env.local` on the machine you deploy from, and Kitsu's dat
 this install's zips together come to about 30 MB.
 
 serve makes one when the newest is `[backup] every_days` old (7; 0 = only by hand) and keeps the
-newest `[backup] keep` (8). `clipper doctor` and the weekly [Audit](Audit#backups) say when the
+newest `[backup] keep` (8). `clippa doctor` and the weekly [Audit](Audit#backups) say when the
 newest is older than `[backup] max_age_days`.
 
 A zip on the NAS doesn't survive the NAS. Copy `backups/taste/` to another disk now and then.
@@ -46,14 +46,14 @@ Kitsu, then tar each volume (`docker volume ls` lists them):
 docker run --rm -v <volume>:/v -v "$PWD":/b alpine tar czf /b/kitsu-<volume>.tgz -C /v .
 ```
 
-## Disk: clipper streams
+## Disk: clippa streams
 
 ```bash
-clipper streams list                  # size per stream: source, audio, cuts, previews
-clipper streams prune                 # what prune would remove (older than 30 days)
-clipper streams prune --yes           # remove it
-clipper streams prune --cuts --yes    # and the long cuts of uploaded or rejected items
-clipper streams prune --stream kick-1 # one stream; says why when it's left alone
+clippa streams list                  # size per stream: source, audio, cuts, previews
+clippa streams prune                 # what prune would remove (older than 30 days)
+clippa streams prune --yes           # remove it
+clippa streams prune --cuts --yes    # and the long cuts of uploaded or rejected items
+clippa streams prune --stream kick-1 # one stream; says why when it's left alone
 ```
 
 A Kino night takes 60-90 GB: the source recording is about 30 GB, the audio 1 GB, the segment
@@ -75,11 +75,11 @@ A stream is left alone when:
 - an item is still waiting on a decision, is scheduled and not uploaded, or is held while it
   could still go out (`[schedule] stale_days` after the stream)
 
-With `[streams] keep_source_days` set, serve runs `clipper streams prune --yes` once a day. It
+With `[streams] keep_source_days` set, serve runs `clippa streams prune --yes` once a day. It
 is 0 (only by hand) by default.
 
 To keep recordings as long as the disk has room, also set `[streams] keep_free_pct` (say 15): serve's
 daily prune then takes streams older than `keep_source_days` only while the share has less than that
-percent free, oldest first, and stops as soon as it has enough (`clipper streams prune --while-free-below 15`
+percent free, oldest first, and stops as soon as it has enough (`clippa streams prune --while-free-below 15`
 does the same by hand). `keep_source_days` stays the floor: nothing younger goes. The checkup warns
 when free space is under `keep_free_pct` ([Checkup](Checkup)).

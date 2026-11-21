@@ -1,12 +1,12 @@
-"""`clipper modal`: what Modal is running and what it costs (#49).
+"""`clippa modal`: what Modal is running and what it costs (#49).
 
 Usage:
-    clipper modal               containers up, runs going now, recent runs and failures, this
+    clippa modal               containers up, runs going now, recent runs and failures, this
                                 month's spend and each archive's progress
-    clipper modal --backfill    add runs from before the log (each transcript.json's "modal"
+    clippa modal --backfill    add runs from before the log (each transcript.json's "modal"
                                 record) to it, once
 
-Every Modal call clipper makes (a stream's transcription, an archive item) writes a start and
+Every Modal call Clippa makes (a stream's transcription, an archive item) writes a start and
 an end line to [paths] modal_runs, so a run in progress and a failure with its error show up
 without asking Modal. Spend is Modal's own billing (Workspace.billing), which counts what the
 per-run estimates in those lines miss: cold starts, idle scaledown, parallel containers. The
@@ -259,7 +259,7 @@ def archives(cfg: dict, runs: list[dict]) -> list[dict]:
 
 
 def status(cfg: dict) -> dict:
-    """Everything the war room panel and `clipper modal` show. Modal is asked at most every
+    """Everything the war room panel and `clippa modal` show. Modal is asked at most every
     30 s (containers) and 5 min (billing); the archive folders every 2 min."""
     from .modal_app import APP_NAME, MAX_CONTAINERS
 

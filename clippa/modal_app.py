@@ -1,7 +1,7 @@
 """WhisperX on Modal: the `[transcribe] backend = "modal"` worker (issue #11).
 
 Deploy once per change to this file (needs MODAL_TOKEN_ID / MODAL_TOKEN_SECRET):
-    clipper transcribe --deploy
+    clippa transcribe --deploy
 
 The image pins the same torch/WhisperX versions as the `gpu` extra (uv.lock) and bakes in
 large-v3 and the English alignment model, so a call loads from the image, not the network.
@@ -17,7 +17,7 @@ diarization and returns `turns` ([start, end, SPEAKER_xx]) and one voice embeddi
 the Modal secret HF_SECRET holds HF_TOKEN for a Hugging Face account that accepted its terms, and
 the deploy bakes the model into the image with it.
 
-This file is self-contained (no clipper imports): `modal deploy` loads it as a top-level
+This file is self-contained (no Clippa imports): `modal deploy` loads it as a top-level
 module.
 """
 
@@ -98,7 +98,7 @@ class WhisperX:
 
     def _diarize(self, audio, tc: dict) -> dict:
         """Speaker turns and one embedding per speaker (the same space for every stream, so
-        clipper can match them against a show's enrolled voices)."""
+        Clippa can match them against a show's enrolled voices)."""
         from whisperx.diarize import DiarizationPipeline
 
         name = tc.get("diarize_model") or DIARIZE_MODEL

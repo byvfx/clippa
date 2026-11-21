@@ -31,17 +31,17 @@ The National Archives needs a key from NARA and comes later (#229).
 
 ## Commands
 
-- `clipper broll find "hurricane from orbit"`: searches every source in `[broll] sources` and
+- `clippa broll find "hurricane from orbit"`: searches every source in `[broll] sources` and
   adds up to `[broll] per_source` new clips from each, tagged with the search. `--source nasa`
   searches one source.
-- `clipper broll list [--tag storm] [--status new|kept|long] [--json]`: the library, newest
+- `clippa broll list [--tag storm] [--status new|kept|long] [--json]`: the library, newest
   first. `--json` adds each file's path, which you can import into Resolve.
-- `clipper broll add <address|id|file> [--from 0:01:20 --to 0:01:45] [--tag X]`: one clip, from
+- `clippa broll add <address|id|file> [--from 0:01:20 --to 0:01:45] [--tag X]`: one clip, from
   an images.nasa.gov/details, dvidshub.net/video, archive.org/details, pixabay.com/videos or
   Commons `File:` page.
   With a library id it takes a part of that clip. A video file you downloaded yourself needs
   `--credit "U.S. Navy video by ..."`.
-- `clipper broll keep|drop <id> ...`: a dropped clip's file is deleted, and the next find
+- `clippa broll keep|drop <id> ...`: a dropped clip's file is deleted, and the next find
   doesn't bring its source back.
 
 Times read as everywhere else: `0:01:20` (H:MM:SS), `1m20s`, or seconds. `1:20` means one
@@ -80,5 +80,5 @@ isn't a source. Nor is C-SPAN, whose own camera footage is copyrighted.
 
 `[broll]` in `clippa/defaults.toml`: `sources`, `dvids_category`, `pixabay_type`, `per_source`,
 `max_s`, `max_height`, `licences`, `audio`, `codec` (empty uses `[cut] clip_codec`), `crf`,
-`timeout_s`. `clipper doctor` checks the source and licence names and `pixabay_type`, warns when
+`timeout_s`. `clippa doctor` checks the source and licence names and `pixabay_type`, warns when
 DVIDS or Pixabay has no key, and counts the library.

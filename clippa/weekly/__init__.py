@@ -1,16 +1,16 @@
 """The weekly issue: the week's streams -> a ten-page tabloid issue (issue #35).
 
-  clipper weekly                          this week (Sun-Sat, [schedule] timezone): gather,
+  clippa weekly                          this week (Sun-Sat, [schedule] timezone): gather,
                                           draft, render -> <paths.weekly>/<saturday>/
-  clipper weekly --week 2026-10-24        any day of the week wanted
-  clipper weekly --headline "Ethan Klein" editor's note for the draft: the cover story
-  clipper weekly --render                 only render issue.json again (after editing it)
-  clipper weekly --draft                  draft again from week.json (overwrites issue.json)
-  clipper weekly --gather                 only rebuild week.json and stats.json
-  clipper weekly --only 01,07             render only these pages
-  clipper weekly --write 04,05            write these articles again with the writer prompt
+  clippa weekly --week 2026-10-24        any day of the week wanted
+  clippa weekly --headline "Ethan Klein" editor's note for the draft: the cover story
+  clippa weekly --render                 only render issue.json again (after editing it)
+  clippa weekly --draft                  draft again from week.json (overwrites issue.json)
+  clippa weekly --gather                 only rebuild week.json and stats.json
+  clippa weekly --only 01,07             render only these pages
+  clippa weekly --write 04,05            write these articles again with the writer prompt
                                           (default after a fresh draft: all three)
-  clipper weekly --format youtube         only the square pages (default: [weekly] formats)
+  clippa weekly --format youtube         only the square pages (default: [weekly] formats)
 
 Three idempotent steps in one folder:
 - gather: every stream started in the week (shows and pre-shows) -> week.json (segments
@@ -71,10 +71,10 @@ def issue_folder(cfg: dict, day: str | None) -> Path:
     else:
         drafted = sorted(p.parent for p in root.glob("*/issue.json"))
         if not drafted:
-            raise ClipperError(f"no weekly issue in {root}; run: clipper weekly")
+            raise ClipperError(f"no weekly issue in {root}; run: clippa weekly")
         here = drafted[-1]
     if not (here / "issue.json").exists():
-        raise ClipperError(f"no issue.json in {here}; run: clipper weekly --week {day}")
+        raise ClipperError(f"no issue.json in {here}; run: clippa weekly --week {day}")
     return here
 
 
@@ -89,7 +89,7 @@ def issue_pages(here: Path) -> list[Path]:
         missing = sorted(set(want) - set(nums))
         extra = sorted(n for n in set(nums) if nums.count(n) > 1 or n not in want)
         raise ClipperError(f"{here} needs pages 01-{ISSUE_PAGES:02d} once each (missing {missing or '-'}, "
-                           f"extra {extra or '-'}); run: clipper weekly --render")
+                           f"extra {extra or '-'}); run: clippa weekly --render")
     return pages
 
 

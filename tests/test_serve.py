@@ -122,7 +122,7 @@ def test_a_serve_that_is_down_is_one_clear_error(defaults):
 def test_a_decision_still_lands_when_serve_is_down(defaults):
     """The bot's replan goes through serve; without it the row comes back with a note."""
     def down(cfg):
-        raise ClipperError("clipper serve isn't answering at http://127.0.0.1:8765/")
+        raise ClipperError("clippa serve isn't answering at http://127.0.0.1:8765/")
     row, note = actions.replan(defaults, None, "approve", {"short": "s01"}, via=down)
     assert row == {"short": "s01"} and "next hourly run" in note
 
@@ -159,7 +159,7 @@ def test_the_client_passes_the_war_rooms_checks(running, monkeypatch):
 
 
 def test_retake_runs_on_notes_or_on_its_sync_timer(defaults, tmp_path, monkeypatch):
-    """`clipper retake` syncs Kitsu itself, so without a bot (no card refresh) it still runs
+    """`clippa retake` syncs Kitsu itself, so without a bot (no card refresh) it still runs
     every RETAKE_SYNC_S; an explicit request runs even with [retake] auto off."""
     cfg = cfg_in(defaults, tmp_path, retake={"auto": True})
     s = serve.Serve(cfg)

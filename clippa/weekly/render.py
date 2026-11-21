@@ -31,7 +31,7 @@ class Fonts:
         for key in ("headline", "condensed", "serif_italic", "serif_bold_italic", "black", "bold"):
             p = first_font(wc[f"{key}_fonts"])
             if not p:
-                raise ClipperError(f"[weekly] {key}_fonts: none of {wc[f'{key}_fonts']} exist (clipper doctor)")
+                raise ClipperError(f"[weekly] {key}_fonts: none of {wc[f'{key}_fonts']} exist (clippa doctor)")
             self.paths[key] = p
 
     def impact(self, size: int) -> ImageFont.FreeTypeFont:

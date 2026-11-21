@@ -1,7 +1,7 @@
 """The search swarm (#109): many small searches at once, each free to follow up on what it
 finds, instead of one plan up front and the searches one by one.
 
-Library code for `clipper story` (#84) and `clipper investigate` (#108): they call `run`
+Library code for `clippa story` (#84) and `clippa investigate` (#108): they call `run`
 and expose it through their own flags. One run:
 
 1. Planner ([swarm] planner_model, Sonnet): the goal (a story brief, a lead) and the
@@ -157,7 +157,7 @@ def task_key(kind: str, target: str) -> str:
 
 
 def archives_on_file(cfg: dict) -> list[str]:
-    """Archive subjects with a search index (`clipper archive index`)."""
+    """Archive subjects with a search index (`clippa archive index`)."""
     root = Path(cfg["paths"]["archive"])
     return sorted(p.parent.name for p in root.glob("*/index.sqlite")) if root.is_dir() else []
 

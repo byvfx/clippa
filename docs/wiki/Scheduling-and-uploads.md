@@ -1,20 +1,20 @@
-Approved items get release slots (`clipper schedule`, written to `schedule.json`) and go to
-YouTube as private videos with a publish time (`clipper upload`), or stay private for you to
+Approved items get release slots (`clippa schedule`, written to `schedule.json`) and go to
+YouTube as private videos with a publish time (`clippa upload`), or stay private for you to
 publish by hand with `[youtube] manual_publish`. Everything uploads to one YouTube channel;
 bringing a new one up is [YouTube channel](YouTube-channel).
 
 ## Automatic uploads
 
 > [!NOTE]
-> Uploads are automatic: don't run `clipper upload` or `clipper review publish` by hand
+> Uploads are automatic: don't run `clippa upload` or `clippa review publish` by hand
 > unless you mean to.
 
-`clipper serve` replans and uploads every `[youtube] auto_upload_minutes` (the default 0 means
-only by hand, and `clipper doctor` says so on a serve machine), at most `[youtube] max_per_24h` in any 24 hours, so hourly runs stay under the
+`clippa serve` replans and uploads every `[youtube] auto_upload_minutes` (the default 0 means
+only by hand, and `clippa doctor` says so on a serve machine), at most `[youtube] max_per_24h` in any 24 hours, so hourly runs stay under the
 channel's daily upload limit. Pre-shows and stories set to "asap" go out on the next run,
 outside the release slots.
 
-`clipper status` is the one screen for all of this: the services' heartbeats and the recorder,
+`clippa status` is the one screen for all of this: the services' heartbeats and the recorder,
 the worker's streams, review counts, the next releases and the month's spend (`--days N` looks
 further ahead; `--sync` reads Kitsu first).
 
@@ -34,14 +34,14 @@ item onto a slot to pin it.
 
 ## What predicts views
 
-The budget is only as good as what it ranks by. `clipper analytics --lift` checks each ranker
+The budget is only as good as what it ranks by. `clippa analytics --lift` checks each ranker
 against how the uploads did in their first 7 days (no model call; it reads `analytics.json`, so
-run `clipper analytics` first if it's stale):
+run `clippa analytics` first if it's stale):
 
 ```bash
-clipper analytics --lift                      # every show and kind
-clipper analytics --lift --show kino --kind segment
-clipper analytics --lift --json
+clippa analytics --lift                      # every show and kind
+clippa analytics --lift --show kino --kind segment
+clippa analytics --lift --json
 ```
 
 The rankers are the Score column (Shorts and clips), the chat heat segments and compilations
@@ -58,12 +58,12 @@ stands alone: Kino's uploads draw far more than Channel 404's, so a row pooling 
 mostly measure the show.
 
 Only what went out has views, so a ranker is checked on what it let through, not on what the
-budget dropped. `clipper analytics --report` ends with the same table, over every upload so far.
+budget dropped. `clippa analytics --report` ends with the same table, over every upload so far.
 
 ## Past the daily limit
 
-Upload the file in Studio and `clipper upload --attach <item> <link>` fills in the rest (title,
-description, tags, thumbnail, captions, playlist, Kitsu link). `clipper upload --next 5` lists
+Upload the file in Studio and `clippa upload --attach <item> <link>` fills in the rest (title,
+description, tags, thumbnail, captions, playlist, Kitsu link). `clippa upload --next 5` lists
 what goes out next with each file.
 
 ## Source links
@@ -73,8 +73,8 @@ offset, a segment to its compilation) once that video is public; every upload ru
 link to videos already up when their longer video goes public (`[youtube] source_links`).
 
 A Short's "related video" (the link under it to its segment) can only be set in Studio:
-`clipper upload --related` lists the uploaded Shorts whose segment is out, with the Studio link
-and the segment id to search for, and `clipper upload --related <keys or links>` records the
+`clippa upload --related` lists the uploaded Shorts whose segment is out, with the Studio link
+and the segment id to search for, and `clippa upload --related <keys or links>` records the
 ones you set. The daily digest lists them too.
 
 ## Renaming a video that's up
@@ -82,7 +82,7 @@ ones you set. The daily digest lists them too.
 A new title for an item that's already on YouTube renames the video there too, wherever it's
 made: the [War room](War-room)'s item window or find and replace, the Discord bot's details
 form, the [Clippa messenger](Clippa-messenger#renaming-a-video-thats-up), or
-`clipper review retitle <item> <new title>`. The title gets the show name and bleeps as an
+`clippa review retitle <item> <new title>`. The title gets the show name and bleeps as an
 upload's does, the rest of the video's details stay as YouTube has them, and Kitsu's title
 column changes after YouTube's, so a rename that fails changes neither. Undo renames it back.
 A retake's planned title never goes to a video that's up: only a person's edit does.
@@ -93,6 +93,6 @@ Its description, hashtags, tags and playlist stay Kitsu-only once it's up.
 ## Quota
 
 Every YouTube API call is counted per Pacific day in `logs/youtube_quota.json`; the link
-updates and retries of captions that failed to go up (`clipper upload --captions`) only spend
+updates and retries of captions that failed to go up (`clippa upload --captions`) only spend
 what is left after room for the day's remaining uploads (`[youtube] daily_quota`,
 `upload_units`). Details in [YouTube channel](YouTube-channel), "API quota".

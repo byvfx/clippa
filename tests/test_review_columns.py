@@ -56,6 +56,6 @@ def test_an_empty_proposal_clears_only_its_own_value():
     # Tightened: nothing cut, column empty: nothing to write (not a "" every publish)...
     assert review.columns_to_fill({"f_t": ""}, {}, {}, None, None) == {}
     assert review.columns_to_fill({"f_t": ""}, {"f_t": ""}, {"f_t": ""}, None, None) == {}
-    # ...but the pauses put back clear what clipper wrote there.
+    # ...but the pauses put back clear what Clippa wrote there.
     assert review.columns_to_fill({"f_t": ""}, {"f_t": "4 pauses, 3.2 s"}, {"f_t": "4 pauses, 3.2 s"},
                                   None, None) == {"f_t": ""}

@@ -1,8 +1,8 @@
-# Setting up clipper
+# Setting up Clippa
 
 The setup docs are in the [wiki](https://github.com/byvfx/clipper/wiki/Install) now, built from
 [docs/wiki/](docs/wiki/). Start with `deploy\bootstrap.ps1` (Windows) or `bash deploy/bootstrap.sh`,
-which runs `clipper setup` and then `clipper doctor`.
+which runs `clippa setup` and then `clippa doctor`.
 
 Where each section went, for old links:
 

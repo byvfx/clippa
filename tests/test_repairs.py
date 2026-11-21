@@ -1,4 +1,4 @@
-"""`clipper checkup --fix` (#287): capped repairs from an allowlist, would-fix until enabled."""
+"""`clippa checkup --fix` (#287): capped repairs from an allowlist, would-fix until enabled."""
 import os
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace

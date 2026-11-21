@@ -1,15 +1,15 @@
-"""`clipper investigate`: read an archive subject's own videos, connect the facts, find leads (#108).
+"""`clippa investigate`: read an archive subject's own videos, connect the facts, find leads (#108).
 
 Usage:
-    clipper investigate facts <subject> [--since DATE] [--before DATE] [--limit N] [--new] [--dry-run]
-    clipper investigate leads <subject> [--about "focus"] [--since ...] [--before ...] [--max 10] [--confirm]
-    clipper investigate check <subject> [--lead L03] [--trail]
-    clipper investigate list  <subject>
-    clipper investigate show  <subject> <lead>
-    clipper investigate run   <subject> [--since ...] [--about ...]   facts (--new) -> leads -> check
+    clippa investigate facts <subject> [--since DATE] [--before DATE] [--limit N] [--new] [--dry-run]
+    clippa investigate leads <subject> [--about "focus"] [--since ...] [--before ...] [--max 10] [--confirm]
+    clippa investigate check <subject> [--lead L03] [--trail]
+    clippa investigate list  <subject>
+    clippa investigate show  <subject> <lead>
+    clippa investigate run   <subject> [--since ...] [--about ...]   facts (--new) -> leads -> check
 
 Where `receipts` (#48) starts from a story and finds his old clips, this starts from the person
-and finds the story. It reads the archive subject's transcripts (`clipper archive`), so the
+and finds the story. It reads the archive subject's transcripts (`clippa archive`), so the
 subject needs `archive transcribe` first (and `archive index` for --confirm).
 
 1. facts: [investigate] facts_model (Haiku) reads each item in chunk_s chunks with its date and
@@ -21,7 +21,7 @@ subject needs `archive transcribe` first (and `archive index` for --confirm).
    reads only what is new or re-transcribed. --new takes only items newer than the newest
    one read. --dry-run prints the items, hours and estimated cost and stops.
 2. leads: the facts go into facts.sqlite (entities merged across spellings, by everyone's
-   names in `clipper people` (the subject's person's are him) and any alias -> name pairs in
+   names in `clippa people` (the subject's person's are him) and any alias -> name pairs in
    investigate/aliases.json, which win; a name mapped to "self" is him, like his channels'
    names), and code finds candidate threads in his own claims (numbers are
    followed for anyone): a trend (a name or topic suddenly talked about far more), a contradiction (the same thing
@@ -35,7 +35,7 @@ subject needs `archive transcribe` first (and `archive index` for --confirm).
    the windows it finds (quotes verified the same way) and adjust the confidence.
 3. check: "is anyone else on this?" The search swarm (#109) for each kept lead, seeded with
    one search per source on the lead's search words: YouTube (titles and channels only), the
-   web and Reddit (Brave search, the key `clipper cast` uses; Reddit's own feed without one)
+   web and Reddit (Brave search, the key `clippa cast` uses; Reddit's own feed without one)
    and our own streams' segments. Its planner adds searches and its workers follow up on what
    they find, within [investigate] swarm (a small run: ~$0.01-0.03 a lead). Then the subject's
    own video titles. check_model reads what it found and labels the lead fresh / partly covered
@@ -170,7 +170,7 @@ def items(cfg: dict, subject: str, transcribed: bool = True) -> list[dict]:
     d = subject_dir(cfg, subject)
     cat = load_catalog(d)
     if not cat:
-        raise ClipperError(f"no catalog for {subject!r}: clipper archive add {subject} <url>")
+        raise ClipperError(f"no catalog for {subject!r}: clippa archive add {subject} <url>")
     known: dict[str, dict] = {}
     if (d / "index.sqlite").exists():
         db = sqlite3.connect(d / "index.sqlite")
@@ -530,7 +530,7 @@ def add_keys(facts: list[dict], aliases: dict[str, str] | None = None) -> None:
 
 def build_index(d: Path, people: dict[str, str] | None = None) -> list[dict]:
     """facts.sqlite from facts/*.json (rebuilt whole; no model calls), and the facts with keys.
-    people: `clipper people` names (people.alias_map); aliases.json wins over them."""
+    people: `clippa people` names (people.alias_map); aliases.json wins over them."""
     facts = load_facts(d)
     add_keys(facts, {**(people or {}), **jsonstate.read(d / "aliases.json", {})})
     p = d / "facts.sqlite"
@@ -819,7 +819,7 @@ def rank(leads: list[dict], n: int) -> list[dict]:
 def load_leads(cfg: dict, subject: str) -> dict:
     p = inv_dir(cfg, subject) / "leads.json"
     if not p.exists():
-        raise ClipperError(f"no leads for {subject!r} yet: clipper investigate leads {subject}")
+        raise ClipperError(f"no leads for {subject!r} yet: clippa investigate leads {subject}")
     return jsonstate.load(p)
 
 
@@ -838,7 +838,7 @@ def run_leads(cfg: dict, subject: str, about: str | None = None, since: str | No
 
     facts = [f for f in build_index(d, alias_map(cfg, subject)) if in_range(f["date"], since, before)]
     if not facts:
-        raise ClipperError(f"no facts for {subject!r} in that range: clipper investigate facts {subject}")
+        raise ClipperError(f"no facts for {subject!r} in that range: clippa investigate facts {subject}")
     cands = still_silent(cfg, subject, candidates(facts, ic, about))
     kinds = Counter(c["kind"] for c in cands)
     print(f"{subject}: {len(facts)} facts from {n_items(facts)} videos -> {len(cands)} candidate threads "
@@ -1000,7 +1000,7 @@ def youtube_search(query: str, n: int) -> list[dict]:
 
 
 def brave_search(cfg: dict, query: str, n: int, source: str) -> list[dict]:
-    """Brave web search ($BRAVE_API_KEY or [paths] brave_key, as `clipper cast` uses):
+    """Brave web search ($BRAVE_API_KEY or [paths] brave_key, as `clippa cast` uses):
     titles, sites and ages of the pages."""
     import requests
 
@@ -1203,7 +1203,7 @@ def show_lead(cfg: dict, subject: str, lead_id: str) -> None:
     data = load_leads(cfg, subject)
     lead = next((x for x in data["leads"] if x["id"].lower() == lead_id.lower()), None)
     if not lead:
-        raise ClipperError(f"no lead {lead_id} (clipper investigate list {subject})")
+        raise ClipperError(f"no lead {lead_id} (clippa investigate list {subject})")
     print(lead_md(lead))
 
 
@@ -1316,7 +1316,7 @@ def post_discord(cfg: dict, subject: str, new_thread: bool = False) -> str:
         raise ClipperError(f"no kept leads for {subject!r} to post")
     api = Rest(cfg)
     channel_id = named_channel(api, dc, ic["discord_channel"],
-                               "Investigations: a thread per run of `clipper investigate leads`", kinds=(0, 15))
+                               "Investigations: a thread per run of `clippa investigate leads`", kinds=(0, 15))
     thread_id = state.get("thread_id") if this_run and state.get("channel_id") == channel_id else None
     if thread_id:
         try:
@@ -1367,7 +1367,7 @@ def maybe_post(cfg: dict, subject: str) -> None:
     try:
         post_discord(cfg, subject)
     except Exception as e:  # noqa: BLE001  # the research is saved; Discord can be retried with `post`
-        print(f"discord: not posted ({e}); clipper investigate post {subject}")
+        print(f"discord: not posted ({e}); clippa investigate post {subject}")
 
 
 def run_all(cfg: dict, subject: str, since: str | None = None, before: str | None = None,

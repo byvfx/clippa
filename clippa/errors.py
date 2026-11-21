@@ -1,4 +1,4 @@
-"""clipper's own error: a problem it can explain in one line (a bad setting, a missing file,
+"""Clippa's own error: a problem it can explain in one line (a bad setting, a missing file,
 a refused action, a service that said no).
 
 Library code raises ClipperError; only `cli.main` turns it into an exit (the message on

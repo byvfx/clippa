@@ -1,4 +1,4 @@
-"""heinetwork.tv, On Cinema's own site, as a `clipper archive` source (members only).
+"""heinetwork.tv, On Cinema's own site, as a `clippa archive` source (members only).
 
 The site is WordPress. Its sections (/on-cinema-at-the-cinema/, /oscar-specials/, /decker/,
 /more/) link index pages (a season, a series) and item pages; a member's item page carries
@@ -49,7 +49,7 @@ def session(cookies: Path) -> requests.Session:
     if not cookies.is_file():
         raise ClipperError(f"no HEI cookies at {cookies}: sign in to heinetwork.tv and export them there")
     s = requests.Session()
-    s.headers["User-Agent"] = "Mozilla/5.0 (clipper archive)"
+    s.headers["User-Agent"] = "Mozilla/5.0 (clippa archive)"
     for c in site_cookies(ytdl.live(ytdl.read_cookies(cookies))):
         s.cookies.set(c.name, c.value, domain=c.domain, path=c.path)
     if not any(n.startswith(SIGNED_IN) for n in s.cookies.keys()):

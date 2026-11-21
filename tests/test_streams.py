@@ -1,4 +1,4 @@
-"""`clipper streams list|prune` (#204): sizes per stream, and removing the source and audio of
+"""`clippa streams list|prune` (#204): sizes per stream, and removing the source and audio of
 streams that are done with, never one that still needs them."""
 from datetime import UTC, datetime, timedelta
 
@@ -56,7 +56,7 @@ def test_prune_only_says_without_yes_then_removes_and_keeps_the_json(cfg):
     assert "removed" in out[0] and not (d / "source.mkv").exists() and not (d / "audio.wav").exists()
     assert (d / "transcript.json").exists() and (d / "review.json").exists() and (d / "segments" / "s01.mp4").exists()
     assert jsonstate.load(d / streams.PRUNED)["removed"] == ["audio.wav", "source.mkv"]
-    with pytest.raises(ClipperError, match="clipper streams prune"):
+    with pytest.raises(ClipperError, match="clippa streams prune"):
         media.source_file(d)
 
 

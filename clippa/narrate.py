@@ -1,9 +1,9 @@
-"""`clipper narrate`: the user's performance in a character's voice (issue #57).
+"""`clippa narrate`: the user's performance in a character's voice (issue #57).
 
 Usage:
-    clipper narrate speak <script.txt> [--voice-id ID] [-o OUT]
-    clipper narrate voice <take> [--voice-id ID] [-o OUT]
-    clipper narrate voices [--search TEXT] [--accent british] [--gender female] [--age old]
+    clippa narrate speak <script.txt> [--voice-id ID] [-o OUT]
+    clippa narrate voice <take> [--voice-id ID] [-o OUT]
+    clippa narrate voices [--search TEXT] [--accent british] [--gender female] [--age old]
 
 `voice` sends a take's audio (a video or an audio file) through the ElevenLabs Voice Changer
 (speech-to-speech): the words, timing and delivery stay the performer's, the voice becomes
@@ -129,7 +129,7 @@ def convert(audio: Path, nc: dict, voice_id: str) -> tuple[bytes, str]:
 def voice(take: Path, nc: dict, voice_id: str = "", out: Path | None = None) -> Path:
     voice_id = voice_id or nc["voice_id"]
     if not voice_id:
-        raise ClipperError("no voice: set [narrate] voice_id, or pass --voice-id (clipper narrate voices)")
+        raise ClipperError("no voice: set [narrate] voice_id, or pass --voice-id (clippa narrate voices)")
     dur = media.duration(take)
     if dur > nc["max_s"]:
         raise ClipperError(f"{take.name} is {dur:.0f} s; split takes longer than [narrate] max_s "
@@ -204,7 +204,7 @@ def voices(nc: dict, search: str = "", accent: str = "", gender: str = "", age: 
                                 "page_size": 30}.items() if v}
     lib = requests.get(f"{API}/v1/shared-voices", headers=h, params=params, timeout=30)
     lib.raise_for_status()
-    print("library (add one before using it: clipper narrate voices --add OWNER:VOICE_ID):")
+    print("library (add one before using it: clippa narrate voices --add OWNER:VOICE_ID):")
     for v in lib.json().get("voices", []):
         print(f"  {v['public_owner_id']}:{v['voice_id']}  {v['name'][:24]:<24} {v.get('accent', '')} "
               f"{v.get('gender', '')} {v.get('age', '')}  {(v.get('description') or '')[:70]}")

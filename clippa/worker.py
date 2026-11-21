@@ -1,8 +1,8 @@
 """Hands-off processing of finished recordings.
 
-`clipper run <stream>` chains the pipeline stages for one stream: signals, transcribe,
+`clippa run <stream>` chains the pipeline stages for one stream: signals, transcribe,
 score, segments, cut, meta, thumbs, review publish. Each stage runs as its own
-`clipper <stage>` process (so the GPU memory WhisperX holds is freed after transcribe),
+`clippa <stage>` process (so the GPU memory WhisperX holds is freed after transcribe),
 logging to <stream>/run_<stage>.log. Progress goes to <stream>/run.json, so a failed or
 interrupted run resumes at the stage that didn't finish. A stage that finished before
 run.json existed (a stream processed by hand) counts as done when its output is there.
@@ -13,7 +13,7 @@ publishes those for review; the slow lane then cuts the long segments and compil
 ("cut"), which take hours to cut and preview. The second meta and thumbs pass only fill
 in what the first left out (--missing), so the clips under review keep their drafts.
 
-`clipper worker` (the GPU machine, deploy/worker) polls paths.streams for recordings the
+`clippa worker` (the GPU machine, deploy/worker) polls paths.streams for recordings the
 NAS recorder finished (live/state.json status "done") and runs them: every waiting
 stream's fast lane first, then the slow lanes oldest first, and a slow lane steps aside
 between stages when a newer stream's clips are waiting. paths.streams is the NAS share,
@@ -450,14 +450,14 @@ def watch(cfg: dict, config_path: str | None = None, once: bool = False) -> None
             if time.time() - t <= 60:
                 pass
             elif run.get("status") == "done":
-                alert(f"clipper worker: {d.name} " + (
+                alert(f"clippa worker: {d.name} " + (
                     "had no picks or segments to cut; nothing to review"
                     if run.get("nothing_cut") else "is in review")
                     + f" ({since_end(d, t)})", level=logging.INFO, kind=None)
                 if not run.get("nothing_cut"):
                     alerts.send(cfg, "ready", ready_text(cfg, d, "ready for review"), key=f"ready:{d.name}")
             elif lane == "fast" and run.get("clips_ready") and cut_videos(d, ("clips",)):
-                alert(f"clipper worker: {d.name} clips and Shorts are in review ({since_end(d, t)});"
+                alert(f"clippa worker: {d.name} clips and Shorts are in review ({since_end(d, t)});"
                       " segments next", level=logging.INFO, kind=None)
                 alerts.send(cfg, "ready", ready_text(cfg, d, "clips and Shorts ready for review, "
                                                      "segments next"), key=f"clips:{d.name}")
@@ -465,19 +465,19 @@ def watch(cfg: dict, config_path: str | None = None, once: bool = False) -> None
             log.info("%s", e)
         except Exception as e:
             log.exception("%s: run crashed", d.name)
-            alert(f"clipper worker: {d.name} crashed: {e}", kind="failure", key=f"crash:{d.name}")
+            alert(f"clippa worker: {d.name} crashed: {e}", kind="failure", key=f"crash:{d.name}")
         run = jsonstate.read_or(d / "run.json", {})
         if run.get("status") == "failed" and run.get("key_rejected"):
-            alert(f"clipper worker: {d.name} stopped, an API key was rejected: {run.get('error', '')[:500]}"
+            alert(f"clippa worker: {d.name} stopped, an API key was rejected: {run.get('error', '')[:500]}"
                   " (held, not retried, until a key changes: fix the key the error names, on the hub in"
                   " deploy/hub/env.local and then deploy.sh; the worker picks it up again by itself)",
                   # streams held by one key set share a DM: at most one per [notify] cooldown_hours
                   kind="failure", key=f"key_rejected:{run['key_rejected']}")
         elif run.get("status") == "failed":
             left = wc["max_attempts"] - run.get("attempts", 0)
-            alert(f"clipper worker: {d.name} failed: {run.get('error', '')[:600]}"
+            alert(f"clippa worker: {d.name} failed: {run.get('error', '')[:600]}"
                   + (f" (retry in {wc['retry_minutes']} min, {left} left)" if left > 0
-                     else " (no retries left: fix it, then `clipper run " + d.name + "`)"),
+                     else " (no retries left: fix it, then `clippa run " + d.name + "`)"),
                   kind=None if left > 0 else "failure", key=f"failed:{d.name}")  # DM once retries ran out
 
     reported_offline = False
@@ -488,7 +488,7 @@ def watch(cfg: dict, config_path: str | None = None, once: bool = False) -> None
             reported_offline = False
         except OSError as e:  # share not mounted / NAS asleep
             if not reported_offline:
-                alert(f"clipper worker ({socket.gethostname()}): can't read {root}: {e}", kind=None)
+                alert(f"clippa worker ({socket.gethostname()}): can't read {root}: {e}", kind=None)
                 reported_offline = True
             todo = []
         if wc["fast_lane"]:
@@ -517,7 +517,7 @@ DONE = ("done", "skip")
 def stream_rows(cfg: dict, recent_days: float | None = None) -> list[dict]:
     """A row per stream the worker has touched or the recorder is writing, with its show and
     date. recent_days: leave out runs that are done (or skipped) and older than that, which is
-    most of the folder after a month (`clipper status`, #199); None keeps every one."""
+    most of the folder after a month (`clippa status`, #199); None keeps every one."""
     root: Path = cfg["paths"]["streams"]
     dirs = sorted(p for p in root.iterdir() if (p / "run.json").exists() or (p / "live").is_dir()) \
         if root.is_dir() else []
@@ -551,7 +551,7 @@ def row_line(r: dict) -> str:
 
 
 def status_lines(cfg: dict, recent_days: float | None = None) -> list[str]:
-    """`worker --status` (every stream) and `clipper status` (recent ones)."""
+    """`worker --status` (every stream) and `clippa status` (recent ones)."""
     return [row_line(r) for r in stream_rows(cfg, recent_days)]
 
 

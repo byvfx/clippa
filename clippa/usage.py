@@ -1,9 +1,9 @@
 """What the model providers themselves say this month cost: the Claude API and OpenRouter.
 
 Usage:
-    clipper costs --providers         each provider's own numbers, next to what our log recorded
+    clippa costs --providers         each provider's own numbers, next to what our log recorded
 
-The war room's API usage panel shows the same (/api/usage). `clipper costs` adds up our own
+The war room's API usage panel shows the same (/api/usage). `clippa costs` adds up our own
 log ([paths] costs), priced from [llm] prices or OpenRouter's per-call cost; this asks the
 providers, so a call the log missed (another tool on the same key, the Console's workbench, a
 crash before the line was written) still shows:
@@ -12,7 +12,7 @@ crash before the line was written) still shows:
                 model. Needs an Admin API key (sk-ant-admin..., Console -> Settings -> Admin keys;
                 organizations only), $ANTHROPIC_ADMIN_KEY or [paths] anthropic_admin_key. The
                 normal API key can't read it. Costs appear about 5 minutes after a call.
-    OpenRouter  /api/v1/key for the key clipper uses ($OPENROUTER_API_KEY or [paths]
+    OpenRouter  /api/v1/key for the key Clippa uses ($OPENROUTER_API_KEY or [paths]
                 openrouter_key): today, this week, this month, all time, and what's left of the
                 key's limit; /api/v1/credits for the account balance when the key may read it.
 
@@ -87,7 +87,7 @@ def claude(cfg: dict) -> dict:
     now = datetime.now(UTC)
     params: dict = {"starting_at": month_start(now).strftime("%Y-%m-%dT%H:%M:%SZ"), "bucket_width": "1d",
                     "group_by[]": "description", "limit": 31}
-    headers = {"x-api-key": key, "anthropic-version": ANTHROPIC_VERSION, "User-Agent": "clipper"}
+    headers = {"x-api-key": key, "anthropic-version": ANTHROPIC_VERSION, "User-Agent": "clippa"}
     pages = []
     for _ in range(10):  # a month is 31 daily buckets at most; pages are a guard, not expected
         r = requests.get(f"{ANTHROPIC_BASE}/organizations/cost_report", params=params,

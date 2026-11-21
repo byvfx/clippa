@@ -1,11 +1,11 @@
-"""`clipper people`: one record per person, for story, investigate and the vault (#138, part 1).
+"""`clippa people`: one record per person, for story, investigate and the vault (#138, part 1).
 
-    clipper people list                       everyone, and which lists each record comes from
-    clipper people show <name>                one record: names, channels, archive subject, cast folder
-    clipper people set <name> [--name N] [--alias A]... [--unalias A]... [--channel PLATFORM=ID]...
+    clippa people list                       everyone, and which lists each record comes from
+    clippa people show <name>                one record: names, channels, archive subject, cast folder
+    clippa people set <name> [--name N] [--alias A]... [--unalias A]... [--channel PLATFORM=ID]...
                               [--unchannel PLATFORM=ID]... [--subject S] [--cast NAME] [--notes TEXT]
-    clipper people import [--dry-run]         write the merged view of everyone into people.json
-    clipper people merge <keep> <other>       two records of one person: other's names and channels
+    clippa people import [--dry-run]         write the merged view of everyone into people.json
+    clippa people merge <keep> <other>       two records of one person: other's names and channels
                                               go to keep, and other's record is removed
 
 A record is {name, aliases, channels: {platform: [id, ...]}, subject, cast, notes}, keyed by a
@@ -312,7 +312,7 @@ def set_person(cfg: dict, name: str, new_name: str | None = None, aliases: list[
     older lists is written whole, so people.json holds the full record from then on. subject
     or cast "" unlinks them for good (an empty one in people.json isn't linked by name)."""
     if subject and not (Path(cfg["paths"]["archive"]) / subject).is_dir():
-        raise ClipperError(f"no archive subject {subject!r} (clipper archive add {subject} <url>)")
+        raise ClipperError(f"no archive subject {subject!r} (clippa archive add {subject} <url>)")
     with jsonstate.update(path(cfg), {"people": {}}) as data:
         own = data.setdefault("people", {})
         people = load(cfg, own)   # under the lock: a set at the same time can't be lost
@@ -353,7 +353,7 @@ def merge_people(cfg: dict, keep: str, other: str) -> str:
         a, b = find(cfg, keep, people), find(cfg, other, people)
         for name, hit in ((keep, a), (other, b)):
             if not hit:
-                raise ClipperError(f"nobody called {name!r} (clipper people list)")
+                raise ClipperError(f"nobody called {name!r} (clippa people list)")
         (pid, rec), (gone, rb) = a, b
         if pid == gone:
             raise ClipperError(f"{keep!r} and {other!r} are already one record ({pid})")
@@ -405,13 +405,13 @@ def show_list(cfg: dict) -> None:
         print(f"    {channel_line(rec)}" + "".join(f"; {x}" for x in extra if x)
               + f"  (from {', '.join(rec['from'])})")
     for n, ids in conflicts(people).items():
-        print(f"warning: {n!r} is a name of {', '.join(ids)} (clipper people set <id> --unalias ...)")
+        print(f"warning: {n!r} is a name of {', '.join(ids)} (clippa people set <id> --unalias ...)")
 
 
 def show_person(cfg: dict, name: str) -> None:
     hit = find(cfg, name)
     if not hit:
-        raise ClipperError(f"nobody called {name!r} (clipper people list)")
+        raise ClipperError(f"nobody called {name!r} (clippa people list)")
     pid, rec = hit
     print(f"{pid}: {rec['name']}")
     print(f"  aliases: {', '.join(rec['aliases']) or '-'}")

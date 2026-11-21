@@ -1,16 +1,16 @@
-"""`clipper cast`: the cast library (#41), a few sharp head-and-shoulders photos of each regular
+"""`clippa cast`: the cast library (#41), a few sharp head-and-shoulders photos of each regular
 in [thumbnail] photos/<Person>/, for covers, the weekly and avatars, so the right face is shown
 even when someone is only talked about.
 
-    clipper cast list                          everyone: photos kept, new, and from where
-    clipper cast grab <stream> [--person X]    the sharpest faces `clipper faces` named in a stream
-    clipper cast find <Person> [--source ...]  from the web: Wikimedia Commons, the person's own
+    clippa cast list                          everyone: photos kept, new, and from where
+    clippa cast grab <stream> [--person X]    the sharpest faces `clippa faces` named in a stream
+    clippa cast find <Person> [--source ...]  from the web: Wikimedia Commons, the person's own
                                                channels (avatar, video thumbnails), image search
-    clipper cast add <Person> <file|url>       one photo
-    clipper cast keep|drop <Person> <id> ...   (the war room's Cast window does these too)
-    clipper cast label <Person> <id> <label>
-    clipper cast set <Person> --alias A --channel URL
-    clipper cast auto                          a find for everyone short of [cast] target photos
+    clippa cast add <Person> <file|url>       one photo
+    clippa cast keep|drop <Person> <id> ...   (the war room's Cast window does these too)
+    clippa cast label <Person> <id> <label>
+    clippa cast set <Person> --alias A --channel URL
+    clippa cast auto                          a find for everyone short of [cast] target photos
                                                (serve, every [cast] auto_hours)
 
 Every photo is checked for the face first. With the person enrolled in faces/known.json only a
@@ -384,7 +384,7 @@ def grab(cfg: dict, sdir: Path, person: str | None, n: int, claude=None, say=pri
             jsonstate.write(sdir / "cast_grab.json", {"at": now(), "added": {}})
         return 0
     if not data:
-        raise ClipperError(f"{sdir.name}: no faces.json (clipper faces {sdir.name})")
+        raise ClipperError(f"{sdir.name}: no faces.json (clippa faces {sdir.name})")
     names = sorted({g["name"] for g in data["groups"].values() if g.get("name")})
     if person:
         names = [nm for nm in names if nm.lower() == person.lower()]
@@ -419,7 +419,7 @@ def now() -> str:
 
 
 def auto(cfg: dict, claude=None, say=print) -> int:
-    """`clipper cast auto`: a find from every source for each person (a cast folder or an
+    """`clippa cast auto`: a find from every source for each person (a cast folder or an
     enrolled face) with fewer than [cast] target photos. Someone whose last automatic find
     added nothing is tried again only after [cast] retry_days."""
     from .faces import load_known
@@ -543,7 +543,7 @@ def channel_pictures(cfg: dict, person: str, data: dict, say=print) -> list[dict
     import requests
 
     if not data["channels"]:
-        raise ClipperError(f'no channels for {person}: clipper cast set "{person}" --channel URL')
+        raise ClipperError(f'no channels for {person}: clippa cast set "{person}" --channel URL')
     out = []
     for ch in data["channels"]:
         try:

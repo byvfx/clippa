@@ -1,6 +1,6 @@
-"""`clipper models test <model>`: can a model do clipper's jobs? (#72)
+"""`clippa models test <model>`: can a model do Clippa's jobs? (#72)
 
-  clipper models test openrouter:qwen/qwen3.8-flash [--effort none] [--no-long]
+  clippa models test openrouter:qwen/qwen3.8-flash [--effort none] [--no-long]
 
 No stream needed: the checks bring their own material, the same for every model, so any
 model on any provider can be tried before a stage is moved to it.
@@ -512,7 +512,7 @@ def list_tests(cfg: dict) -> None:
     rows = [r for r in (jsonstate.read(p) or {} for p in d.glob("*.json")) if "checks" in r]  # not the gold files
     rows.sort(key=lambda r: r.get("at", ""), reverse=True)
     if not rows:
-        print(f"no model tests in {d} yet: clipper models test <model>")
+        print(f"no model tests in {d} yet: clippa models test <model>")
         return
     for r in rows:
         c = r["checks"]

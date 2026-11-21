@@ -3,13 +3,13 @@ judged from the segment (title, summary, topic, kind, how much is someone else's
 the show's track record per topic (lift.topic_records), optionally with its transcript.
 
 Usage:
-    clipper segments <stream> --score       score the stream's cut segments now (again);
+    clippa segments <stream> --score       score the stream's cut segments now (again);
                                             [segments] score = true does it after each split
-    clipper segments --backtest [<stream>] [--transcript] [--force] [--dry-run]
+    clippa segments --backtest [<stream>] [--transcript] [--force] [--dry-run]
         every past stream with uploaded segments that have 7-day numbers, scored as of its
         start: the track record holds only uploads whose 7 days were over by then, so nothing
         learned later leaks in. Scores go to segment_scores_backtest.json beside segments.json,
-        one entry per variant ("summary", "transcript"), never into segments.json; `clipper
+        one entry per variant ("summary", "transcript"), never into segments.json; `clippa
         analytics --lift` reads them as the bt and bt_tx rankers.
 
 A stream's cut segments are scored in one call, so they're ranked against each other. The

@@ -1,12 +1,12 @@
-"""The pipeline's stages, one row each: what `clipper run` and the worker run, in order.
+"""The pipeline's stages, one row each: what `clippa run` and the worker run, in order.
 
-A stage is a `clipper <command>` run on one stream. Clips first ([worker] fast_lane): cut,
+A stage is a `clippa <command>` run on one stream. Clips first ([worker] fast_lane): cut,
 meta, thumbs and review each have a fast-lane twin (clips, clips_meta, clips_thumbs,
 clips_review) that does only the picks and their Shorts, so they reach review hours before
 the long segments and compilations are cut. Without the fast lane the twins don't run and
 the slow stages do everything.
 
-Adding a stage: a row here (and its `clipper <command>` in cli.py). The worker, `clipper
+Adding a stage: a row here (and its `clippa <command>` in cli.py). The worker, `clippa
 run --from/--only`, the war room's pipeline panel and the done markers all read this table.
 """
 from __future__ import annotations
@@ -17,7 +17,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class Stage:
     name: str
-    cmd: tuple[str, ...]            # clipper argv; "{stream}" is the stream directory
+    cmd: tuple[str, ...]            # clippa argv; "{stream}" is the stream directory
     done: tuple[str, ...]           # outputs that show it ran before run.json existed (globs)
     fast: bool = False              # in the fast lane: picks and Shorts first
     twin_of: str = ""               # the slow stage this one is the fast-lane twin of
@@ -40,7 +40,7 @@ STAGES = (
     Stage("shorts", ("shorts", S), ("shorts.json",), fast=True, after_cut="cut"),
     Stage("clips_review", ("review", "publish", S), ("review_state.json",), fast=True,
           twin_of="review", after_cut="clips"),
-    # Who is on screen (`clipper faces`, CPU, minutes reading the source): before the slow cut,
+    # Who is on screen (`clippa faces`, CPU, minutes reading the source): before the slow cut,
     # so segment and compilation covers get named faces; the fast lane's covers don't wait.
     Stage("faces", ("faces", S), ("faces.json",)),
     # The cast library (#41): the named faces of people still short of photos, from the source.
@@ -64,8 +64,8 @@ FORCED = {"score": "--force", "cut": "--force", "clips": "--force"}  # stages th
 
 
 def argv(name: str, stream: str, wc: dict, force: bool = False) -> list[str]:
-    """The `clipper` arguments that run stage `name` on `stream` ([worker] settings wc).
-    force: a redo the user asked for (`clipper run --from`, `--force`)."""
+    """The `clippa` arguments that run stage `name` on `stream` ([worker] settings wc).
+    force: a redo the user asked for (`clippa run --from`, `--force`)."""
     st = BY_NAME[name]
     cmd = st.fast_cmd if wc["fast_lane"] and st.fast_cmd else st.cmd
     out = [stream if a == S else a for a in cmd]
@@ -89,7 +89,7 @@ def cut_before(name: str, wc: dict) -> tuple[str, tuple[str, ...]] | None:
 
 
 def from_stage(name: str, wc: dict) -> list[str]:
-    """`clipper run --from name`: that stage and every one after it in this config's order
+    """`clippa run --from name`: that stage and every one after it in this config's order
     (without the fast lane, Shorts come right after cut, so --from cut redoes them too)."""
     full = order(NAMES, wc)
     return full[full.index(name):]

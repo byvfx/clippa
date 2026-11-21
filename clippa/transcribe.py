@@ -1,14 +1,14 @@
 """Stage 2: transcribe a stream with WhisperX and write words.jsonl.
 
 Usage:
-    clipper transcribe <stream_id>     (settings from [transcribe] in clipper.toml)
+    clippa transcribe <stream_id>     (settings from [transcribe] in clipper.toml)
 
 Reads the first source.* file in the stream dir, extracts 16 kHz mono
 audio.wav (skipped if present), transcribes it with word timings and writes:
     transcript.json  raw WhisperX segments (aligned)
     words.jsonl      one word per line: word, start, end, score, speaker, seg
     diarization.json with [transcribe] diarize: speaker turns and voice embeddings (pyannote,
-                     issue #52); `clipper speakers` then names them and fills `speaker`
+                     issue #52); `clippa speakers` then names them and fills `speaker`
 
 [transcribe] backend:
     whisperx  faster-whisper on CUDA + wav2vec2 word alignment (the GPU worker; `uv sync
@@ -18,7 +18,7 @@ audio.wav (skipped if present), transcribes it with word timings and writes:
               refines them on the CPU
     modal     the same WhisperX on a Modal cloud GPU (`uv sync --extra modal`, issue #11);
               audio.wav goes up as FLAC, the aligned segments come back. Deploy the app
-              first: `clipper transcribe --deploy` (clippa/modal_app.py)
+              first: `clippa transcribe --deploy` (clippa/modal_app.py)
 """
 
 from __future__ import annotations
@@ -112,7 +112,7 @@ def transcribe_mlx(wav: Path, tc: dict) -> tuple[list[dict], float]:
 
 def transcribe_modal(wav: Path, tc: dict, runs: Path | None = None, method: str = "transcribe") -> tuple[dict, dict]:
     """WhisperX on Modal: the call's result (segments, dur, diarization) plus what it cost (also
-    logged to `runs`, [paths] modal_runs, for `clipper modal` and the war room). method
+    logged to `runs`, [paths] modal_runs, for `clippa modal` and the war room). method
     "diarize" gets the speaker turns alone."""
     from .modalmon import tracked
 

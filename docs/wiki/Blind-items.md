@@ -1,6 +1,6 @@
-`clipper blinds` collects gossip **blind items**: short stories that leave the name out and the
+`clippa blinds` collects gossip **blind items**: short stories that leave the name out and the
 clues in ("which former A-list actor..."). You say who you think each one is about first, and
-only then does clipper look into it. When a source reveals the answer, your guess and clipper's
+only then does Clippa look into it. When a source reveals the answer, your guess and Clippa's
 are both scored. It works for any gossip source and any kind of drama, not only the people this
 install follows. It is research for you alone: nothing in it is ever published (#111).
 
@@ -25,7 +25,7 @@ reveal = "^Blind Items? Revealed"    # titles that are reveals (checked first)
 
 Anything else in the feed is skipped. `kind` also sets how `--backfill` pages back:
 - **Blogger:** newest-published first, 150 posts a page, by `start-index`. Blogger ignores a page
-  size given without one, so clipper always sets both itself.
+  size given without one, so Clippa always sets both itself.
 - **WordPress:** by `paged`.
 - **rss:** only its one page.
 
@@ -33,7 +33,7 @@ Paging stops at the first page wholly older than the backfill's start, at `[blin
 backfill_pages`, or at a page that holds nothing new. A backfill also reads the clues of
 everything it brought in. An ordinary check reads at most `max_clues`.
 
-`clipper doctor` (the all, serve and bot roles) fails on a bad source entry. Online, it warns
+`clippa doctor` (the all, serve and bot roles) fails on a bad source entry. Online, it warns
 when a feed doesn't answer.
 
 A Blogger blog numbers its blinds afresh each day, so such a blind's id is its source, date and
@@ -48,15 +48,15 @@ day). Blind Gossip's whole site answered HTTP 500 that day, so its entry is unte
 ## Commands
 
 ```bash
-clipper blinds check --backfill 30 --dry-run   # fetch, store nothing, price reading the clues
-clipper blinds check [--backfill DAYS] [--no-clues]
-clipper blinds list [--days 14] [--status waiting] [--source cdan] [--all] [--json]
-clipper blinds show <blind> [--json]
-clipper blinds guess "<text>"                  # a blind from anywhere else (Instagram, X, a screenshot)
-clipper blinds answer <blind> "<name>" [--why "..."]
-clipper blinds answer <blind> --none           # no idea
-clipper blinds answer <blind> --not-ours       # not one to look into
-clipper blinds sources                         # each source: last fetch, error, how many stored
+clippa blinds check --backfill 30 --dry-run   # fetch, store nothing, price reading the clues
+clippa blinds check [--backfill DAYS] [--no-clues]
+clippa blinds list [--days 14] [--status waiting] [--source cdan] [--all] [--json]
+clippa blinds show <blind> [--json]
+clippa blinds guess "<text>"                  # a blind from anywhere else (Instagram, X, a screenshot)
+clippa blinds answer <blind> "<name>" [--why "..."]
+clippa blinds answer <blind> --none           # no idea
+clippa blinds answer <blind> --not-ours       # not one to look into
+clippa blinds sources                         # each source: last fetch, error, how many stored
 ```
 
 A blind's status:
@@ -85,7 +85,7 @@ read on its own, straight away. It returns:
   hint, other) and weighted by `[blinds] weights`
 - **the claim** in one neutral sentence
 - **the fields** the blind is about (film, music, streaming...)
-- **could be ours:** whether the clues could fit someone this install follows (`clipper people`
+- **could be ours:** whether the clues could fit someone this install follows (`clippa people`
   and the [news watcher](News-watcher)'s list)
 - **sensitive:** crime, health, sexuality, abuse or minors
 - **private:** whether it points at a private person
@@ -126,9 +126,9 @@ The war room and Discord answer through the same function.
 
 ## Discord
 
-With `[blinds] check_minutes` set (30 here; 0, the default, is off), serve runs `clipper blinds
+With `[blinds] check_minutes` set (30 here; 0, the default, is off), serve runs `clippa blinds
 check` that often, and the [bot](Discord-app) asks you about what it stored. It shows the blind,
-its source and link, its clues and its tags, and **never a guess of clipper's**, so yours is your
+its source and link, its clues and its tags, and **never a guess of Clippa's**, so yours is your
 own. Each blind has three buttons:
 
 - **I think it's…** opens a form: the name, and why if you like ("he said he was in Vegas that
@@ -168,7 +168,7 @@ is missing, **private**: only the bot and `[discord] allowed_user_ids` can see i
 Manage Channels. If the channel is one @everyone can see, the bot still uses it, but DMs you a
 warning (at most once per `[notify] cooldown_hours`).
 
-`clipper doctor` checks `alert`, `digest_at` and the channel whenever `check_minutes` is on.
+`clippa doctor` checks `alert`, `digest_at` and the channel whenever `check_minutes` is on.
 
 ## The war room
 
@@ -187,7 +187,7 @@ warning (at most once per `[notify] cooldown_hours`).
 - **Answering:** type a name (the people this install follows are suggested) and, if you like,
   why, then **That's my guess** or Enter. **No idea** and **Not ours** are the other two answers.
   An answered blind leaves the Waiting tab. A guess can be changed from any tab.
-- **Paste a blind…** adds one from anywhere else, like `clipper blinds guess`. Its clues are
+- **Paste a blind…** adds one from anywhere else, like `clippa blinds guess`. Its clues are
   read straight away.
 - **Check now** fetches the sources and reads the new blinds' clues in the background, one check
   at a time. The window shows its log until it is done.

@@ -1,4 +1,4 @@
-"""`clipper review check` (#259 step A): the pure parts, and a run over a small fake stream."""
+"""`clippa review check` (#259 step A): the pure parts, and a run over a small fake stream."""
 from __future__ import annotations
 
 import json

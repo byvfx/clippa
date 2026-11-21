@@ -1,4 +1,4 @@
-"""`clipper costs`: what clipper spends, in one place (#50).
+"""`clippa costs`: what Clippa spends, in one place (#50).
 
 Two logs feed it, both written where the money is spent:
     [paths] costs       one line per model call (clippa/llm.py): provider, model, tokens,
@@ -7,7 +7,7 @@ Two logs feed it, both written where the money is spent:
 Plus [costs] monthly (fixed costs: plans, subscriptions) and [costs] credits (a provider's
 monthly credit, shown as credit against that provider's spend, never hidden in the total).
 
-`clipper costs [--month 2026-10]` prints the month by kind, stage, show, stream and model;
+`clippa costs [--month 2026-10]` prints the month by kind, stage, show, stream and model;
 the war room's Costs panel shows the same. `--backfill` adds model spend that earlier runs
 recorded in their output files (candidates.json, segments.json, receipts.json, weekly
 issue.json, one-off segments), once each and marked estimated; stages that only printed a

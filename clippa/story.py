@@ -1,17 +1,17 @@
-"""`clipper story` (#84), phase 1: a news brief in, a research dossier out.
+"""`clippa story` (#84), phase 1: a news brief in, a research dossier out.
 
 Usage:
-    clipper story new "<brief>" [--slug X] [--days N | --since DATE] [--before DATE]
+    clippa story new "<brief>" [--slug X] [--days N | --since DATE] [--before DATE]
                                 [--person NAME]... [--url URL]... [--max-videos N] [--max-hours H]
                                 [--dry-run]
-    clipper story run <slug> [--from swarm|triage|ingest|find|dossier] [--dry-run]
-    clipper story add <slug> <url>...   videos to ingest whatever triage says, then run --from triage
-    clipper story status [<slug>]
-    clipper story trail <slug>          the swarm's task tree: who found what, from which search
-    clipper story show <slug>           the dossier, re-rendered from dossier.json (no model call)
+    clippa story run <slug> [--from swarm|triage|ingest|find|dossier] [--dry-run]
+    clippa story add <slug> <url>...   videos to ingest whatever triage says, then run --from triage
+    clippa story status [<slug>]
+    clippa story trail <slug>          the swarm's task tree: who found what, from which search
+    clippa story show <slug>           the dossier, re-rendered from dossier.json (no model call)
 
 A story is the archive subject paths.archive/story-<slug>/ (catalog.json, one folder per
-item, index.sqlite, as `clipper archive` keeps them) plus its own files: brief.json,
+item, index.sqlite, as `clippa archive` keeps them) plus its own files: brief.json,
 swarm.json (the trail), triage.json, moments.json, dossier.json and dossier.md.
 
 The steps, each skipped when done (--from reruns one and everything after it):
@@ -137,14 +137,14 @@ def check_slug(slug: str) -> str:
 def load_brief(cfg: dict, slug: str) -> dict:
     b = jsonstate.read(story_dir(cfg, slug) / "brief.json", None)
     if not b:
-        raise ClipperError(f"no story {slug!r} (clipper story new \"<brief>\")")
+        raise ClipperError(f"no story {slug!r} (clippa story new \"<brief>\")")
     return b
 
 
 # ---------- 1. brief: who and where ----------
 
 def roster(cfg: dict) -> list[dict]:
-    """Everyone the story step knows: `clipper people` (people.json, with streamers.json,
+    """Everyone the story step knows: `clippa people` (people.json, with streamers.json,
     [story] people and the cast library folded in)."""
     from . import people
 
@@ -168,12 +168,12 @@ def named(brief: str, people: list[dict], extra: list[str] = ()) -> list[dict]:
     want = {canon(x) for x in extra}
     out = [p for p in people if any(f" {a} " in text for a in aliases(p)) or want & aliases(p)]
     if missing := want - {a for p in out for a in aliases(p)}:
-        raise ClipperError(f"--person {', '.join(sorted(missing))}: nobody by that name (clipper people list)")
+        raise ClipperError(f"--person {', '.join(sorted(missing))}: nobody by that name (clippa people list)")
     return out
 
 
 def own_channels(p: dict) -> list[tuple[str, str]]:
-    """(platform, id) for each of a person's channels: lists from `clipper people`, or one
+    """(platform, id) for each of a person's channels: lists from `clippa people`, or one
     string per key in an older brief.json (youtube_live and the like are YouTube)."""
     from .people import platform_of
 
@@ -214,7 +214,7 @@ def new(cfg: dict, brief: str, slug: str | None = None, days: int | None = None,
         old = load_brief(cfg, slug)
         if old["brief"] != brief:
             raise ClipperError(f"story {slug!r} already has another brief: --slug a new one, "
-                               f"or clipper story run {slug}")
+                               f"or clippa story run {slug}")
         return slug
     days = cfg["story"]["days"] if days is None else days
     since = since or (datetime.now(UTC) - timedelta(days=days)).date().isoformat()
@@ -235,7 +235,7 @@ def add(cfg: dict, slug: str, urls: list[str]) -> None:
     load_brief(cfg, slug)
     with jsonstate.update(d / "brief.json", {}) as b:
         b["urls"] = list(dict.fromkeys([*b.get("urls", []), *urls]))
-    print(f"{slug}: {len(urls)} added; clipper story run {slug} --from triage")
+    print(f"{slug}: {len(urls)} added; clippa story run {slug} --from triage")
 
 
 # ---------- 2-3. swarm, triage ----------
@@ -496,7 +496,7 @@ def find(cfg: dict, b: dict, d: Path, claude, budget: Budget, prompts) -> list[d
     sc = cfg["story"]
     subs = searched_subjects(cfg, d)
     if not subs:
-        raise ClipperError(f"{d.name}: nothing transcribed to search (clipper story run {b['slug']} --from triage)")
+        raise ClipperError(f"{d.name}: nothing transcribed to search (clippa story run {b['slug']} --from triage)")
     who = ", ".join(p["name"] for p in b["people"]) or "not on file"
     out = ask(cfg, claude, budget, sc["find_model"], sc["find_effort"],
               prompts.get("story_expand", max_queries=sc["max_queries"]),
@@ -726,7 +726,7 @@ def run(cfg: dict, slug: str, start: str | None = None, dry_run: bool = False, c
     # --from: that step and every one after it; otherwise from the first one not done
     first = STEPS.index(start) if start else next((k for k, s in enumerate(STEPS) if not done(d, s)), len(STEPS))
     if first == len(STEPS):
-        print(f"story {slug}: every step is done (--from <step> reruns one; clipper story show {slug})")
+        print(f"story {slug}: every step is done (--from <step> reruns one; clippa story show {slug})")
     budget = None
     try:
         for step in STEPS[first:]:
@@ -750,7 +750,7 @@ def run(cfg: dict, slug: str, start: str | None = None, dry_run: bool = False, c
         with jsonstate.update(d / "runs.json", []) as runs:
             runs.append({"at": datetime.now(UTC).isoformat(timespec="seconds"), "from": start or "",
                          "dry_run": dry_run, "usd": round(claude.cost, 4)})
-        print(f"story {slug}: models ~${claude.cost:.3f} (Modal is logged in `clipper modal`)")
+        print(f"story {slug}: models ~${claude.cost:.3f} (Modal is logged in `clippa modal`)")
     return claude.cost
 
 
@@ -780,7 +780,7 @@ def show(cfg: dict, slug: str) -> None:
     d = story_dir(cfg, slug)
     data = jsonstate.read(d / "dossier.json", None)
     if not data:
-        raise ClipperError(f"{slug}: no dossier yet (clipper story run {slug})")
+        raise ClipperError(f"{slug}: no dossier yet (clippa story run {slug})")
     text = render(data)
     (d / "dossier.md").write_text(text, encoding="utf-8")
     print(text)

@@ -336,7 +336,7 @@ class LLM:
     def text_call(self, model: str, system: str, user: str | list[dict], effort: str,
                   max_tokens: int = 4000, thinking_tokens: int | None = None,
                   timeout_s: float | None = None) -> tuple[str, dict]:
-        """Plain text answer; "" on refusal. For a long call on another provider (clipper
+        """Plain text answer; "" on refusal. For a long call on another provider (Clippa
         codereview): thinking_tokens in place of [llm] thinking_max_tokens, and timeout_s in
         place of [llm] timeout_s, after which the call fails rather than being sent again
         (each try of a long thinking call is paid for)."""
@@ -528,7 +528,7 @@ class LLM:
             body["usage"] = {"include": True}  # the call's cost in the answer
         headers = {"Authorization": f"Bearer {key}"} if key else {}
         if prov == "openrouter":
-            headers["X-Title"] = "clipper"
+            headers["X-Title"] = "clippa"
         for attempt in range(6):
             try:
                 r = requests.post(f"{base}/chat/completions", json=body, headers=headers,

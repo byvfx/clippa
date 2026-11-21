@@ -1,8 +1,8 @@
 # Big-story night: copy to streams/<id>/config.toml the night a story breaks (October check-in,
 # #42: the H3 night, kick-133940023 on 2026-10-23, was 72% of the month's views). Keys here
 # replace the show's whole value (config.for_stream), so stream_budget and stream_context are
-# given in full. `clipper config get schedule.stream_budget --stream <id>` shows what took.
-# Then `CLIPPER_SCHEDULE_START=<today> clipper schedule --reshuffle` if items are already approved.
+# given in full. `clippa config get schedule.stream_budget --stream <id>` shows what took.
+# Then `CLIPPER_SCHEDULE_START=<today> clippa schedule --reshuffle` if items are already approved.
 
 [signals]
 top_n = 45                 # chat windows sent to Pass A (default 30)

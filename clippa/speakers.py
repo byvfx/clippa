@@ -1,20 +1,20 @@
-"""`clipper speakers`: who is talking, by name (issue #52).
+"""`clippa speakers`: who is talking, by name (issue #52).
 
 Usage:
-    clipper speakers <stream>                    name the diarized speakers, list them with lines
-    clipper speakers <stream> --diarize          diarize first: a stream transcribed without
+    clippa speakers <stream>                    name the diarized speakers, list them with lines
+    clippa speakers <stream> --diarize          diarize first: a stream transcribed without
                                                  [transcribe] diarize (one Modal call, no new transcript)
-    clipper speakers <stream> --name SPEAKER_01=Andy [--enroll]
+    clippa speakers <stream> --name SPEAKER_01=Andy [--enroll]
                                                  name one by hand ("SPEAKER_01=" clears it);
                                                  --enroll keeps that voice for the show
 
-diarization.json (from `clipper transcribe` with [transcribe] diarize, or --diarize) holds
+diarization.json (from `clippa transcribe` with [transcribe] diarize, or --diarize) holds
 pyannote's speaker turns and one voice embedding per speaker. Each speaker with at least
 [speakers] min_talk_s of talk is matched against the show's enrolled voices ([paths] voices,
 <show>.json) by cosine similarity, named when the best is at least [speakers] match; names set
 by hand win. words.jsonl gets `speaker` = that name, or the SPEAKER_xx label when nobody
 matched; speakers.json keeps the mapping, scores and talk time. Turns are audio times, so they
-stay valid when the stream is transcribed again. `clipper transcribe` runs this after it writes
+stay valid when the stream is transcribed again. `clippa transcribe` runs this after it writes
 words.jsonl when diarization.json exists.
 """
 
@@ -121,7 +121,7 @@ def set_names(sdir: Path, names: dict[str, str]) -> None:
     """Hand names ({"SPEAKER_01": "Andy"}; "" clears one) kept in speakers.json for apply()."""
     path = sdir / "speakers.json"
     if not path.exists():
-        raise ClipperError(f"no speakers.json in {sdir}: run `clipper speakers {sdir.name}` first")
+        raise ClipperError(f"no speakers.json in {sdir}: run `clippa speakers {sdir.name}` first")
     data = jsonstate.load(path)
     for label, name in names.items():
         if label not in data["speakers"]:

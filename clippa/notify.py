@@ -1,12 +1,12 @@
 """Discord review cards: a thread (or forum post) per stream in [discord]
 review_channel_id, and one message per item with a small preview, its title, hook and
-Kitsu link, plus buttons that `clipper bot` answers (Approve, Reject, Changes, Hold,
+Kitsu link, plus buttons that `clippa bot` answers (Approve, Reject, Changes, Hold,
 Reopen, Pin, Retitle, Thumbnail text). The YouTube thumbnail (the .jpg beside the video)
 is attached next to the preview when there is one. Every button writes to Kitsu (clippa/actions.py), so Kitsu stays
 the record.
 
-Posting uses Discord's REST API with the bot token, so `clipper review publish` posts
-without the bot running; the buttons only respond while `clipper bot` is up.
+Posting uses Discord's REST API with the bot token, so `clippa review publish` posts
+without the bot running; the buttons only respond while `clippa bot` is up.
 
 Previews are re-rendered for Discord's upload limit (max_upload_mb, 10 MB unless the
 server is boosted): 480p, bitrate sized to fit. Items too long to fit at min_video_kbps
@@ -80,7 +80,7 @@ class Rest:
     def __init__(self, cfg: dict):
         self.s = requests.Session()
         self.s.headers.update({"Authorization": f"Bot {token(cfg)}",
-                               "User-Agent": "DiscordBot (clipper, 0.1)"})
+                               "User-Agent": "DiscordBot (Clippa, 0.1)"})
 
     def __call__(self, method: str, path: str, payload: dict | None = None,
                  files: list[Path] | None = None) -> dict:
@@ -136,7 +136,7 @@ def card(r: dict) -> tuple[dict, list[dict]]:
                                                      if r["hold"] else ""), "inline": False})
     if r.get("auto"):     # #259 B: approval by silence, when the show has it on
         fields.append({"name": "Auto-approve", "value": r["auto"][:200], "inline": False})
-    if r.get("checks"):   # `clipper review check` (#259): what a person should look at
+    if r.get("checks"):   # `clippa review check` (#259): what a person should look at
         fields.append({"name": "Checks", "value": "\n".join(f"⚠ {c}" for c in r["checks"])[:1000],
                        "inline": False})
     if r["comment"]:
@@ -364,7 +364,7 @@ def release_issue(dpath: Path) -> None:
 
 def publish_and_post(stream_dir: Path, cfg: dict, force: bool = False, only: list[str] | None = None,
                      post_cards: bool = True) -> list[str]:
-    """`clipper review publish`, then a card for each item it published. The CLI, `pick`
+    """`clippa review publish`, then a card for each item it published. The CLI, `pick`
     and `story cut` go through here so review.py itself never knows about Discord.
     post_cards=False (`--no-notify`, the worker without [worker] notify) publishes only.
     Returns the published keys."""
@@ -425,7 +425,7 @@ def post_issue(cfg: dict, day: str | None = None) -> int:
 
 
 def invite(cfg: dict, user_id: str) -> tuple[list[str], bool]:
-    """`clipper review invite <discord user id>`: a reviewer onto [discord] allowed_user_ids in
+    """`clippa review invite <discord user id>`: a reviewer onto [discord] allowed_user_ids in
     clipper.toml (the bot reads it at start, so restart it). The file's own list is extended, not
     the resolved one; when clipper.local.toml, a show or an env var sets the list too, that layer
     would win and the invite is refused with where to add the id. (the ids after, whether new)."""
@@ -438,7 +438,7 @@ def invite(cfg: dict, user_id: str) -> tuple[list[str], bool]:
                            "Developer Mode, then right-click the person > Copy User ID)")
     path = base(cfg).get("_file")
     if not path:
-        raise ClipperError("no clipper.toml to write to: run clipper setup first")
+        raise ClipperError("no clipper.toml to write to: run clippa setup first")
     path = Path(path)
     above = [name for name, _ in explain(cfg, "discord.allowed_user_ids")["layers"]
              if name not in ("default", path.name)]

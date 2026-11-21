@@ -36,7 +36,7 @@ function renderFaces() {
   d.innerHTML = `<div class="m-head"><b>Faces</b><span style="color:var(--faint);font-size:12px">${esc(data.stream)}${data.scanned ? ` · ${data.faces} faces in ${data.frames} keyframes` : ""}</span><button class="x" aria-label="Close" title="Close (Esc)" data-close>${ic("close")}</button></div>
     <div class="tbody">
       <div class="fknown"><span class="f">Known faces (every show)</span>${knownChips(data.known)}</div>
-      ${!data.scanned ? `<div class="empty">Not scanned yet: <code>clipper faces ${esc(data.stream)}</code> (about 8 min on a quiet NAS). The box tool in an item window works without it.</div>` : `
+      ${!data.scanned ? `<div class="empty">Not scanned yet: <code>clippa faces ${esc(data.stream)}</code> (about 8 min on a quiet NAS). The box tool in an item window works without it.</div>` : `
       <div class="f" style="font-size:12px;color:var(--dim)">Each sheet's first row is the group's clearest faces, the second a spread over the stream (a group that's two people shows there).
         Name keeps it for this stream; Name + enroll keeps the face for every stream and names its look-alikes here.</div>
       <div><span class="seg">${["all", "unnamed", "named"].map(f => `<button data-fcfilter="${f}" class="${filter === f ? "on" : ""}">${f}</button>`).join("")}</span></div>

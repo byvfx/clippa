@@ -529,7 +529,7 @@ def test_heat_window_gives_the_curve_the_windows_and_where_each_item_sits(tmp_pa
     assert got["heat"] == [] and got["items"] == [] and got["duration_s"] == 90 and not got["error"]
 
     (sdir / "signals.parquet").write_bytes(b"not a parquet file")
-    assert "clipper signals" in warroom.heat_get(cfg, "kick-1")["error"]
+    assert "clippa signals" in warroom.heat_get(cfg, "kick-1")["error"]
     pq.write_table(pa.table({"t": list(range(100)), "heat": [float("nan")] * 10 + [1.0] * 89 + [7.5]}),
                    sdir / "signals.parquet")
     jsonstate.write(sdir / "windows.json", {"chat_coverage": 0.9, "params": {"min_heat": 1.0}, "windows": [

@@ -44,7 +44,7 @@ def test_choose_layout_order():
     assert choose("cams") == ([[0.0, 30.0, "cams"]], "cli")
     edited = {"fields": {"Layout": "cams"}, "edited": ["Layout"]}
     assert choose(rv=edited, prev={"layout": "watch"}) == ([[0.0, 30.0, "cams"]], "kitsu")
-    # The column counts only when someone changed it from what clipper proposed.
+    # The column counts only when someone changed it from what Clippa proposed.
     assert choose(rv={"fields": {"Layout": "cams"}}, prev={"layout": "watch"}) \
         == ([[0.0, 30.0, "watch"]], "model")
     # Set by hand: kept even with --rescene; chosen by the model: labelled again.

@@ -1,7 +1,7 @@
 """Vertical Shorts: each Pass B pick's short window as a 1080x1920 video.
 
 Usage:
-    clipper shorts <stream> [--items t33,w19] [--layout watch] [--force] [--rescene] [--check]
+    clippa shorts <stream> [--items t33,w19] [--layout watch] [--force] [--rescene] [--check]
 
 For every pick in candidates.json (pass_b) this renders shorts/v<NN>_<id>_<slug>.mp4:
   1. the clip's window (in_s..out_s; [shorts] window = "short" uses scoring's 15-60 s
@@ -21,7 +21,7 @@ For every pick in candidates.json (pass_b) this renders shorts/v<NN>_<id>_<slug>
 Writes shorts.json (per-Short state: window, layout, how it was chosen) and an upload
 metadata draft per Short in metadata/shorts/ (the clip's draft plus #Shorts), and a 9:16
 tabloid cover beside each new Short from its clip's thumbnail choice (thumbs.shorts_only;
-`clipper thumbs` redraws them too). Unchanged Shorts, and Shorts already uploaded
+`clippa thumbs` redraws them too). Unchanged Shorts, and Shorts already uploaded
 (schedule.json), are skipped unless --force.
 """
 
@@ -423,7 +423,7 @@ def choose_layout(layout: str | None, rv: dict, prev: dict, layouts: dict, a: fl
     window is the same. again (--rescene, --check): label what the model chose again.
     rv: the item in review.json; prev: its shorts.json entry."""
     dur = round(b - a, 3)
-    # The column only counts once someone changed it from what clipper last proposed.
+    # The column only counts once someone changed it from what Clippa last proposed.
     kitsu_layout = ((rv.get("fields") or {}).get("Layout") or ""
                     if "Layout" in rv.get("edited", []) else "")
     by_model = prev.get("layout_by", "model") in ("model", "only")
@@ -760,10 +760,10 @@ def run(stream_dir: Path, cfg: dict, ids: list[str] | None = None, layout: str |
     out_dir, work = stream_dir / "shorts", stream_dir / "shorts" / "work"
     out_dir.mkdir(exist_ok=True)
     layouts = with_examples(layouts, cfg)
-    # Panels with focus = "face" follow the face found in their box (clipper faces).
+    # Panels with focus = "face" follow the face found in their box (clippa faces).
     faces = (jsonstate.read(stream_dir / "faces.json", {}).get("faces") or None) if wants_faces(layouts) else None
     if wants_faces(layouts) and not faces:
-        print(f"  no faces.json in {stream_dir.name}: face panels keep their middle (clipper faces {stream_dir.name})")
+        print(f"  no faces.json in {stream_dir.name}: face panels keep their middle (clippa faces {stream_dir.name})")
     layout_prompts = Prompts(cfg)
     claude = None
 

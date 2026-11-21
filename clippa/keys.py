@@ -1,4 +1,4 @@
-"""`clipper keys` and the war room's Keys window: which API keys this process has, where each one
+"""`clippa keys` and the war room's Keys window: which API keys this process has, where each one
 comes from (its env var or its file in [paths]), what uses it, and, on asking, whether its
 provider still takes it: one free request each (a model list, a "who am I"), never a paid call.
 
@@ -71,7 +71,7 @@ class Key:
 
 
 def specs(cfg: dict) -> list[Key]:
-    """Every key clipper can use, model providers first."""
+    """Every key Clippa can use, model providers first."""
     return [
         Key("Anthropic", "ANTHROPIC_API_KEY", "anthropic_key", "Claude: scoring, segments, titles, covers, checks",
             _anthropic),
@@ -79,7 +79,7 @@ def specs(cfg: dict) -> list[Key]:
         Key("Gemini", "GEMINI_API_KEY", "gemini_key", "gemini: models", _gemini),
         Key("OpenRouter", "OPENROUTER_API_KEY", "openrouter_key", "openrouter: models",
             _bearer("https://openrouter.ai/api/v1/key")),
-        Key("Anthropic admin", "ANTHROPIC_ADMIN_KEY", "anthropic_admin_key", "Claude's own bill in clipper costs",
+        Key("Anthropic admin", "ANTHROPIC_ADMIN_KEY", "anthropic_admin_key", "Claude's own bill in clippa costs",
             _anthropic_admin),
         Key("Kitsu", cfg["review"]["token_env"], "", "review: the Kitsu bot token", _kitsu),
         Key("Discord", cfg["discord"]["token_env"], "discord_token", "the bot, DMs and alerts", _discord),
@@ -87,7 +87,7 @@ def specs(cfg: dict) -> list[Key]:
         Key("Hugging Face", "HF_TOKEN", "", "speaker diarization models",
             _bearer("https://huggingface.co/api/whoami-v2")),
         Key("Modal", "MODAL_TOKEN_ID", "", "transcription on Modal (with MODAL_TOKEN_SECRET)",
-            why_not="checked by the modal client itself (clipper modal)"),
+            why_not="checked by the modal client itself (clippa modal)"),
         Key("Brave", "BRAVE_API_KEY", "brave_key", "cast image search",
             why_not="every call counts against its monthly plan"),
         Key("Pixabay", "PIXABAY_API_KEY", "pixabay_key", "clip art and b-roll",
@@ -208,7 +208,7 @@ def status(cfg: dict, run_checks: bool | str = False, remember: bool = True) -> 
 
 
 def lines(report: dict) -> list[str]:
-    """`clipper keys`' table."""
+    """`clippa keys`' table."""
     out = []
     for r in report["keys"]:
         last = r["last"] or {}

@@ -1,7 +1,7 @@
 """The war room: a local web page with everything at once.
 
 Usage:
-    clipper warroom [--port 8765] [--open]
+    clippa warroom [--port 8765] [--open]
 
 Serves http://127.0.0.1:<port>/ ([warroom] host/port): which shows are live on Kick, each
 stream's pipeline progress, the review queue with previews and thumbnails (approve, ask for
@@ -9,11 +9,11 @@ changes, reject, hold, pin, edit title / description / hashtags / thumbnail word
 release schedule, retakes, the services' health and who is who on screen (#54: a stream's face
 groups to name, and a box to draw round a face on a paused video). Decisions go through clippa/actions.py,
 so they land in Kitsu exactly like the CLI's and the Discord bot's (Kitsu stays the
-record); a "changes" decision starts `clipper retake` in the background, like the bot.
+record); a "changes" decision starts `clippa retake` in the background, like the bot.
 
 It reads the files the pipeline writes (review.json is as fresh as the last sync: the bot's
-card refresh and the hourly replan sync, and the page's Sync button syncs now). `clipper
-serve` (clippa/serve.py) runs it together with the background jobs; `clipper warroom` runs
+card refresh and the hourly replan sync, and the page's Sync button syncs now). `clippa
+serve` (clippa/serve.py) runs it together with the background jobs; `clippa warroom` runs
 the page alone. Only listens on localhost unless [warroom] host is changed, which then
 needs [warroom] token.
 

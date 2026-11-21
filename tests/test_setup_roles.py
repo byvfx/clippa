@@ -60,7 +60,7 @@ def test_required_key_skip_says_doctor_fails_when_not_interactive(monkeypatch, c
     monkeypatch.setattr(setup, "user_env", lambda name: "")
     setup.ensure_env_key({}, setup.Ask({}), "CLIPPER_TEST_TOKEN", "a token", "somewhere", check=False,
                          required="why")
-    assert "`clipper doctor` fails until it is set (why)" in capsys.readouterr().out
+    assert "`clippa doctor` fails until it is set (why)" in capsys.readouterr().out
 
 
 def test_ctrl_c_in_a_done_step_clears_it_so_setup_asks_again(monkeypatch):
@@ -91,5 +91,5 @@ def test_a_refused_required_key_lets_enter_skip(monkeypatch, capsys):
                          if_refused="If the address is what's wrong, fix it")
     out = capsys.readouterr().out
     assert hints == [False, True]
-    assert "Enter skips it" in out and "fix it" in out and "`clipper doctor` fails" in out
+    assert "Enter skips it" in out and "fix it" in out and "`clippa doctor` fails" in out
     assert "CLIPPER_TEST_TOKEN" not in __import__("os").environ

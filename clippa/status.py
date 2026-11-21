@@ -1,4 +1,4 @@
-"""`clipper status`: the operator's one screen. The audit of 2026-11-08 (item 16) found that
+"""`clippa status`: the operator's one screen. The audit of 2026-11-08 (item 16) found that
 "what is going on" took five commands (`services status`, `worker --status`, `review status`,
 `schedule --list`, `upload --next`) and `costs` for the money. This reads the same files they
 do, in one go: serve's and the bot's heartbeats and the recorder's (the worker keeps its
@@ -33,7 +33,7 @@ def _age_days(day: str, now: datetime) -> int | None:
 
 def collect(cfg: dict, days: int = 2, sync: bool = False, everything: bool = False,
             now: datetime | None = None) -> dict:
-    """Everything the screen shows, as data (`clipper status --json`)."""
+    """Everything the screen shows, as data (`clippa status --json`)."""
     now = now or datetime.now(UTC)
     recent = None if everything else RECENT_DAYS
     review = actions.status(cfg, sync=sync, links=sync, now=now)
@@ -73,7 +73,7 @@ def needs_lines(s: dict) -> list[str]:
         out.append(f"{r['stream']} ({r['date'] or '?'}): {', '.join(parts)}"
                    + (f": {r['title'][:50]}" if r["title"] else ""))
     if s["needs_you"]["review"]:
-        out.append("  (war room, or `clipper review list <stream>`)")
+        out.append("  (war room, or `clippa review list <stream>`)")
     for f in s["needs_you"]["findings"]:
         out.append(f"{'BAD ' if f['level'] == checkup.BAD else 'warn'} {f['text']}")
         if f["look"]:
@@ -111,4 +111,4 @@ def render(s: dict, cfg: dict) -> list[str]:
 def spend_line(rep: dict) -> str:
     top = ", ".join(f"{k} ${v:.2f}" for k, v in list(rep["by_stage"].items())[:5])
     return (f"{rep['month']}: ${rep['net_usd']:.2f} so far" + (f" ({top})" if top else "")
-            + "; `clipper costs` has the detail")
+            + "; `clippa costs` has the detail")

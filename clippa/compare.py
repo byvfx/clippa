@@ -1,6 +1,6 @@
-"""`clipper compare`: another model on a stage that already ran, side by side (#72).
+"""`clippa compare`: another model on a stage that already ran, side by side (#72).
 
-  clipper compare score <stream> --model openrouter:openai/gpt-5-mini [--pass a|b|ab]
+  clippa compare score <stream> --model openrouter:openai/gpt-5-mini [--pass a|b|ab]
 
 Scores the stream again with the candidate model on the same windows and the prompt version
 it was scored with, never touching candidates.json, and reports how the two agree and how
@@ -14,7 +14,7 @@ each did against the review decisions (review.json, synced from Kitsu). Written 
 
 The summary and transcript scan stay as the stream cached them: what is compared is the
 judgments, not the windows (a missing summary is made with the stream's own Pass A model,
-and counted in the estimate). Hand picks (`clipper pick`) are left out on both sides.
+and counted in the estimate). Hand picks (`clippa pick`) are left out on both sides.
 --dry-run prints the estimate; a run whose estimate is over --budget, or that would call a
 model with no known price, is refused.
 """
@@ -60,7 +60,7 @@ def report_stem(label: str, which: str) -> str:
 
 
 def scored_only(base: dict) -> tuple[set[str], list[dict], list[dict]]:
-    """candidates.json without hand picks (`clipper pick`), which were never scored or ranked
+    """candidates.json without hand picks (`clippa pick`), which were never scored or ranked
     and so stay out of both sides and the review totals: (hand ids, pass_a, pass_b picks)."""
     hand = {r["id"] for r in base.get("pass_a", []) if r.get("source") == "hand"}
     return (hand, [r for r in base.get("pass_a", []) if r["id"] not in hand],
@@ -350,7 +350,7 @@ def compare_score(sdir: Path, cfg: dict, model: str, which: str = "a", budget: f
 # ---------- every report on a stream, one table ----------
 
 def summary_row(res: dict) -> dict:
-    """One line of `clipper compare list`: what a report says about its candidate."""
+    """One line of `clippa compare list`: what a report says about its candidate."""
     cand, ag = res["candidate"], res.get("pass_a_agreement") or {}
     approved = cand["review"].get(str(Decision.APPROVED), {"picked": 0, "of": 0})
     statuses = Counter(r["status"] for r in cand.get("pass_a", []))
@@ -371,7 +371,7 @@ def summary_row(res: dict) -> dict:
 def list_reports(sdir: Path) -> list[dict]:
     rows = [summary_row(jsonstate.load(p)) for p in sorted((sdir / "compare").glob("score_*.json"))]
     if not rows:
-        print(f"no comparisons on {sdir.name} yet (clipper compare score {sdir.name} --model ...)")
+        print(f"no comparisons on {sdir.name} yet (clippa compare score {sdir.name} --model ...)")
         return rows
     rows.sort(key=lambda r: (-int(r["approved"].split("/")[0]), r["kept_rejected"] or 0, r["cost_usd"]))
     print(f"{sdir.name}: the stream's own models picked {rows[0]['baseline_approved']} approved\n")

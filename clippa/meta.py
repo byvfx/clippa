@@ -93,7 +93,7 @@ def load_assets(stream_dir: Path) -> list[dict]:
     for side in sorted((stream_dir / "compilations").glob("*.json")):
         d = jsonstate.load(side)
         offsets = {c["id"]: c["start_s"] for c in d["chapters"]}
-        # exact spans and offsets from `clipper cut`; compilations cut before them: the chapters
+        # exact spans and offsets from `clippa cut`; compilations cut before them: the chapters
         parts = ([tuple(p) for p in d["parts"]] if d.get("parts") else
                  [(segs[s].get("cut_start_s", segs[s]["start_s"]), segs[s]["end_s"], offsets[s])
                   for s in d["segments"]])
@@ -288,7 +288,7 @@ def generate(stream_dir: Path, mc: dict, assets: list[dict], lines: list[str],
         raise rejected  # exit KEY_REJECTED, so the stream is held, not retried (#281)
     if errors:
         raise ClipperError("meta: " + "; ".join(errors)[:600] + f"\n(what worked is kept in {ckpt.name}; "
-                         "rerun clipper meta to finish)")
+                         "rerun clippa meta to finish)")
     if saved["gen"] is None:
         raise ClipperError("meta: model refused")
     return saved["gen"], dict(saved["chapters"]), ckpt
@@ -378,7 +378,7 @@ def run(stream_dir: Path, cfg: dict, missing: bool = False, dry_run: bool = Fals
     bleeper = Bleeper({**cfg["bleep"], "patterns": cfg["bleep"]["patterns"]
                        if cfg["bleep"]["mode"] != "off" else []})
     if not assets:
-        raise ClipperError("no cut assets; run `clipper cut` first")
+        raise ClipperError("no cut assets; run `clippa cut` first")
     drafted: dict[str, dict] = {}
     if missing:
         drafted = {x["id"]: jsonstate.load(draft_path(stream_dir, x))

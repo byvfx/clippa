@@ -1,4 +1,4 @@
-"""`clipper checkup` (#185): what the alerts don't catch, from the files the services write.
+"""`clippa checkup` (#185): what the alerts don't catch, from the files the services write.
 
 The alerts (clippa/alerts.py) DM single events: a stage failing after its retries, a crash,
 the recorder stalling. A problem that never raises an error stays quiet there: a stage that
@@ -76,11 +76,11 @@ def check_services(cfg: dict, now: datetime) -> list[dict]:
         if level != "ok":
             why = " (the bot sends the DMs: none arrive while it is down)" if name == "bot" else ""
             out.append(finding(f"service:{name}", "services", BAD, f"{name}: {text}{why}",
-                               look="clipper services status (laptop); the container's logs"))
+                               look="clippa services status (laptop); the container's logs"))
     rec = services.recorder(cfg, now)
     if rec.get("error") or rec["age_s"] is None or not rec["up"]:
         out.append(finding("service:recorder", "services", BAD, services.recorder_lines(rec)[0],
-                           look="clipper record status; deploy/record (only when nothing is live)"))
+                           look="clippa record status; deploy/record (only when nothing is live)"))
     return out
 
 
@@ -141,7 +141,7 @@ def check_streams(cfg: dict, now: datetime) -> list[dict]:
         elif status == "failed" and run.get("attempts", 0) >= wc["max_attempts"]:
             out.append(finding(f"failed:{d.name}", "streams", BAD,
                                f"{d.name}: failed with no retries left: {run.get('error', '')[:300]}",
-                               look=f"streams/{d.name}/run_*.log; then `clipper run {d.name}`",
+                               look=f"streams/{d.name}/run_*.log; then `clippa run {d.name}`",
                                stream=d.name))
     if busy:
         return out   # one worker runs one stream at a time: a queue behind it is expected
@@ -153,7 +153,7 @@ def check_streams(cfg: dict, now: datetime) -> list[dict]:
             out.append(finding(f"queued:{d.name}", "streams", BAD,
                                f"{d.name}: ready for the worker for {_hours(waited)} "
                                f"({run.get('status') or 'not started'}) and nothing is running",
-                               look="the worker container (clipper services status worker)", stream=d.name))
+                               look="the worker container (clippa services status worker)", stream=d.name))
     return out
 
 
@@ -176,7 +176,7 @@ def check_schedule(cfg: dict, now: datetime) -> list[dict]:
             out.append(finding(f"late:{e['key']}", "schedule", BAD,
                                f"{e['key']} ({e.get('kind')}, {t.astimezone(tz):%a %H:%M}) {when} "
                                f"and isn't uploaded: {e.get('title', '')[:80]}",
-                               look="serve's upload job (clipper status); `clipper upload --next`",
+                               look="serve's upload job (clippa status); `clippa upload --next`",
                                stream=e.get("stream", "")))
     if ck["gap_hours"] and not any(t and now <= t <= now + timedelta(hours=ck["gap_hours"])
                                    for _, t in entries):
@@ -184,7 +184,7 @@ def check_schedule(cfg: dict, now: datetime) -> list[dict]:
         nxt = f"; the next is {later.astimezone(tz):%a %m-%d %H:%M}" if later else "; none scheduled at all"
         out.append(finding("schedule:gap", "schedule", WARN,
                            f"nothing releases in the next {ck['gap_hours']} h{nxt}",
-                           look="clipper schedule --list; review counts in clipper status"))
+                           look="clippa schedule --list; review counts in clippa status"))
     return out
 
 
@@ -254,8 +254,8 @@ def check_disk(cfg: dict) -> list[dict]:
         return []
     days = cfg["streams"]["keep_source_days"]
     look = (f"serve's daily prune removes source and audio older than {days:g} days, oldest first; "
-            "`clipper streams list` shows what that frees" if days else
-            "[streams] keep_source_days is 0, so nothing prunes by itself: `clipper streams prune`")
+            "`clippa streams list` shows what that frees" if days else
+            "[streams] keep_source_days is 0, so nothing prunes by itself: `clippa streams prune`")
     return [finding("disk:free", "housekeeping", BAD if free < want / 2 else WARN,
                     f"{free:.1f}% of the share is free, under [streams] keep_free_pct {want:g}%", look=look)]
 
@@ -271,7 +271,7 @@ def check_housekeeping(cfg: dict, now: datetime) -> list[dict]:
     return [*out, finding("tmp:leftover", "housekeeping", WARN,
                           f"{len(left)} temp file{'s' if len(left) != 1 else ''} left by killed writes "
                           f"(oldest {oldest:%m-%d}, e.g. {next(iter(left)).name})",
-                          look="safe to delete; `clipper checkup --fix` does with [checkup] fix = [\"tmp\"]")]
+                          look="safe to delete; `clippa checkup --fix` does with [checkup] fix = [\"tmp\"]")]
 
 
 def ytdlp_version() -> str:
@@ -360,8 +360,8 @@ def check_signins(cfg: dict, now: datetime) -> list[dict]:
     if not warn_s:
         return []
     out = _cookie_findings(cfg, now, warn_s)
-    for label, key, cmd in (("TikTok", "tiktok_token", "clipper tiktok --sign-in"),
-                            ("X", "x_token", "clipper x --sign-in")):
+    for label, key, cmd in (("TikTok", "tiktok_token", "clippa tiktok --sign-in"),
+                            ("X", "x_token", "clippa x --sign-in")):
         tok = jsonstate.read_or(cfg["paths"][key], {})
         until = tok.get("refresh_expires_at") if isinstance(tok, dict) else None
         if isinstance(until, int | float) and until - now.timestamp() < warn_s:
@@ -446,7 +446,7 @@ def check_approvals(cfg: dict, now: datetime) -> list[dict]:
     if plan and every and made > max(hours * 3600, 2 * every * 60):
         out.append(finding("approvals:plan", "approvals", BAD,
                            f"schedule.json was last planned {_hours(made)} ago; serve replans every {every} min",
-                           look="serve's upload job (clipper status; logs/serve.log)"))
+                           look="serve's upload job (clippa status; logs/serve.log)"))
     known = {e.get("key") for e in plan.get("entries", [])} | {
         u.get("key") for u in plan.get("unscheduled", []) if isinstance(u, dict)}
     root: Path = cfg["paths"]["streams"]
@@ -461,7 +461,7 @@ def check_approvals(cfg: dict, now: datetime) -> list[dict]:
         out.append(finding("approvals:unplanned", "approvals", BAD,
                            f"{len(lost)} approved item{'s' if len(lost) != 1 else ''} the plan never saw "
                            f"(approved over {hours} h ago): " + ", ".join(lost[:5]) + (" ..." if len(lost) > 5 else ""),
-                           look="serve's upload job replans hourly (logs/serve.log); `clipper schedule --list`"))
+                           look="serve's upload job replans hourly (logs/serve.log); `clippa schedule --list`"))
     return out
 
 

@@ -452,7 +452,7 @@ def test_a_long_call_isnt_sent_again_after_a_gateway_error(monkeypatch, defaults
 
 
 def test_the_reviewer_is_no_stage_model(defaults):
-    """doctor and `clipper models` read llm.configured: a dev tool's model mustn't make every
+    """doctor and `clippa models` read llm.configured: a dev tool's model mustn't make every
     install need an OpenRouter key."""
     assert defaults["codereview"]["reviewer"].startswith("openrouter:")
     assert not any(k.startswith("codereview.") for k in llm.configured(defaults))

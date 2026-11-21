@@ -49,7 +49,7 @@ def reexports(pkg: str) -> dict[str, str]:
 
 
 def imports_in(tree: ast.AST, all_modules: set[str], packages: set[str]) -> tuple[set[str], dict[str, str]]:
-    """The clipper modules one test file imports, and the packages it binds to a local name."""
+    """The Clippa modules one test file imports, and the packages it binds to a local name."""
     named, aliases = set(), {}
     for n in ast.walk(tree):
         if isinstance(n, ast.ImportFrom) and n.module and n.module.split(".")[0] == "clippa":

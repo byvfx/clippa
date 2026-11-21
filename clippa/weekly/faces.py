@@ -1,5 +1,5 @@
 """Faces for the pages: person -> a face crop, a wide scene, a cut-out, a photo on file or
-initials, from the faces `clipper faces` named (faces.json) and the frames the week's
+initials, from the faces `clippa faces` named (faces.json) and the frames the week's
 thumbnail stage picked (thumbnails.json)."""
 
 from __future__ import annotations

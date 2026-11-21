@@ -1,7 +1,7 @@
-"""`clipper review check` (#259 step A): look at what the reviewer looks at, before they do.
+"""`clippa review check` (#259 step A): look at what the reviewer looks at, before they do.
 
 Usage:
-    clipper review check <stream> [--items v04,s02] [--force] [--no-vision] [--json]
+    clippa review check <stream> [--items v04,s02] [--force] [--no-vision] [--json]
 
 Each review item (review.items) gets a list of findings, in checkup's finding shape:
 
@@ -9,7 +9,7 @@ Each review item (review.items) gets a list of findings, in checkup's finding sh
               description, hashtags, tags and thumbnail text (checkup.lint_text and
               actions.style_issues, the war room's warnings)
     picture   a Short: [review] check_frames frames of the rendered Short through the face
-              detector (`clipper faces`' models); a webcam panel with no face in most frames,
+              detector (`clippa faces`' models); a webcam panel with no face in most frames,
               or one whose face is against the panel's edge (cut off). The webcam panels are
               the ones marked `cam = true` in the show's layouts, or focus = "face"; a layout
               with neither isn't checked
@@ -23,8 +23,8 @@ Each review item (review.items) gets a list of findings, in checkup's finding sh
 
 The findings go in the stream's checks.json ({key: {sig, at, findings, vision}}), keyed by a
 signature of what was checked: an unchanged item is not checked again (no second vision call)
-unless --force. `clipper review publish` runs this first ([review] checks) and puts a one-line
-summary in Kitsu's Checks column; the Discord card, the war room's ⚠ badge and `clipper
+unless --force. `clippa review publish` runs this first ([review] checks) and puts a one-line
+summary in Kitsu's Checks column; the Discord card, the war room's ⚠ badge and `clippa
 status` read checks.json. An item with findings is one that needs a person: step B's automatic
 approval (#259) leaves it alone. A check that fails is a finding too, so a broken check never
 passes an item.

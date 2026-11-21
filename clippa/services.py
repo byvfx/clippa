@@ -1,14 +1,14 @@
-"""clipper's long-running pieces in one place: status, stop and restart.
+"""Clippa's long-running pieces in one place: status, stop and restart.
 
-    clipper services [status]                 serve, the bot, the GPU worker, the recorder, NAS cuts
-    clipper services stop|restart serve|bot|worker|all
-    clipper services stop|restart recorder [--force]
-    clipper record status                     the recorder alone (exit 3 while recording)
+    clippa services [status]                 serve, the bot, the GPU worker, the recorder, NAS cuts
+    clippa services stop|restart serve|bot|worker|all
+    clippa services stop|restart recorder [--force]
+    clippa record status                     the recorder alone (exit 3 while recording)
 
 serve, the bot and the worker are containers on a Docker host when [serve] hub is set
 (deploy/hub; `docker compose` in that folder over ssh). Without it, the worker on Windows is a
 scheduled task (deploy/worker/worker-task.ps1, which also stops the supervisor and the stage
-processes) and serve and the bot are whatever you started by hand (`clipper serve`, `clipper
+processes) and serve and the bot are whatever you started by hand (`clippa serve`, `clippa
 bot`): status shows their heartbeats, stop and restart say so. serve and the bot write a
 heartbeat to the streams share every minute (streams/.serve/status.json, .bot/status.json,
 clippa/daemon.py), shown whatever machine they run on. The recorder is a container on
@@ -77,7 +77,7 @@ def recorder_lines(rec: dict) -> list[str]:
 
 
 def record_status(cfg: dict, now: datetime | None = None) -> None:
-    """`clipper record status`: exit 3 while a show is being recorded, exit 1 when the heartbeat
+    """`clippa record status`: exit 3 while a show is being recorded, exit 1 when the heartbeat
     can't be read (deploy/record/deploy.sh refuses on either, unless --force)."""
     rec = recorder(cfg, now)
     print("\n".join(recorder_lines(rec)))
@@ -112,7 +112,7 @@ def run_task(name: str, action: str, cfg: dict | None = None) -> int:
             print(f"{name}: no [serve] hub here; its heartbeat above is all this machine knows")
             return 0
         print(f"{name}: runs under Docker compose (deploy/hub; set [serve] hub to that folder for {action}) "
-              f"or by hand (`clipper {name}`): nothing to {action} here")
+              f"or by hand (`clippa {name}`): nothing to {action} here")
         return 1
     if sys.platform != "win32":
         print(f"{name}: not a Windows scheduled task on this machine ({TASKS[name].name} is Windows only)")

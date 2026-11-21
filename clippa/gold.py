@@ -1,10 +1,10 @@
-"""`clipper models gold`: Pass A against windows a person has labelled (#72).
+"""`clippa models gold`: Pass A against windows a person has labelled (#72).
 
-  clipper models gold propose [--streams 12]   windows to label, into [paths] model_gold
-  clipper models gold confirm labels.json      labels from elsewhere (the label page), by key
-  clipper models gold run <model> [--effort none] [--prompt-version v6]
+  clippa models gold propose [--streams 12]   windows to label, into [paths] model_gold
+  clippa models gold confirm labels.json      labels from elsewhere (the label page), by key
+  clippa models gold run <model> [--effort none] [--prompt-version v6]
 
-The built-in checks (`clipper models test`) show a model can follow the format; whether it
+The built-in checks (`clippa models test`) show a model can follow the format; whether it
 makes the calls this channel's editor would make needs real windows with the right answer
 known. `propose` gathers them from reviewed streams:
   keep           a Short or pick approved in review (confirmed already: you said so)
@@ -154,7 +154,7 @@ def confirm(cfg: dict, labels: dict[str, dict]) -> int:
     """Set and confirm labels by "<stream>_<id>"; returns how many changed."""
     path = Path(cfg["paths"]["model_gold"])
     if not path.exists():
-        raise ClipperError(f"no {path} yet: clipper models gold propose")
+        raise ClipperError(f"no {path} yet: clippa models gold propose")
     unknown = [k for k, v in labels.items() if v.get("label") not in LABELS]
     if unknown:
         raise ClipperError(f"labels must be one of {', '.join(LABELS)}: {', '.join(unknown[:5])}")
@@ -196,7 +196,7 @@ def run(cfg: dict, model: str, effort: str = "", prompt_version: str = "", budge
     path = Path(cfg["paths"]["model_gold"])
     gold = [i for i in (jsonstate.read(path) or {}).get("items", []) if i.get("confirmed") and i.get("label") in LABELS]
     if not gold:
-        raise ClipperError(f"no confirmed labels in {path}: clipper models gold propose, then label them")
+        raise ClipperError(f"no confirmed labels in {path}: clippa models gold propose, then label them")
     root = Path(cfg["paths"]["streams"])
     by_stream: dict[str, list[dict]] = {}
     for g in gold:

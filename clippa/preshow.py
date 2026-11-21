@@ -5,23 +5,23 @@ on its YouTube channel on show days, usually 11:45-14:45 PT, hours before the li
 The same video also opens the Kick stream, where `segments` marks it kind "intro" and
 skips it.
 
-  clipper preshow check [--run]  read each show's uploads feed ([shows.<key>.preshow]
+  clippa preshow check [--run]  read each show's uploads feed ([shows.<key>.preshow]
                                youtube_channel), grab new uploads matching title_pattern,
-                               and with --run put them through the pipeline. `clipper bot`
+                               and with --run put them through the pipeline. `clippa bot`
                                runs this every [preshow] poll_minutes.
-  clipper preshow fetch <url>  grab one video by hand (any age); --show <key> picks the show
-  clipper preshow fetch <url> --from 1:30:00 [--to ...] --about "..."
+  clippa preshow fetch <url>  grab one video by hand (any age); --show <key> picks the show
+  clippa preshow fetch <url> --from 1:30:00 [--to ...] --about "..."
                                a one-off: ONE long segment out of a stretch of any YouTube
                                video (a podcast episode, say). The model finds the exact
                                start and end inside that window from the transcript.
-  clipper preshow list         what the feeds show and which ones are grabbed
+  clippa preshow list         what the feeds show and which ones are grabbed
 
 A grabbed video becomes streams/yt-<video id>/ (source.mp4 + meta.json, kind "preshow",
 channel = the show's Kick slug so `config.for_stream` finds the show). `--run` (or
-`clipper worker`) puts it through [preshow] stages: transcribe, then `segments` writes ONE segment covering
+`clippa worker`) puts it through [preshow] stages: transcribe, then `segments` writes ONE segment covering
 the whole video (no topic split, no clips, no Shorts), cut, meta, thumbs, review. Once
-approved, `clipper schedule` places it as soon as possible ([preshow] publish = "asap")
-and `clipper upload` publishes it right away.
+approved, `clippa schedule` places it as soon as possible ([preshow] publish = "asap")
+and `clippa upload` publishes it right away.
 """
 
 from __future__ import annotations
@@ -224,7 +224,7 @@ def bot_check_alert(cfg: dict, e: dict) -> None:
 
 
 def run_pending(cfg: dict, config_path: str | None = None) -> None:
-    """`clipper run` each grabbed pre-show whose run isn't done (retries per [worker])."""
+    """`clippa run` each grabbed pre-show whose run isn't done (retries per [worker])."""
     from . import worker
 
     worker.setup_logging()

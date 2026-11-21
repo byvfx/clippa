@@ -1,7 +1,7 @@
 """Where a cover's pictures come from: candidate frames grabbed from the cut video (clips
 around their hook and payoff plus chat-heat peaks; segments and compilations evenly spaced
 plus their hottest chat moments; black or blurry frames nudged a little, then skipped),
-named people's best faces from faces.json (`clipper faces`), and the [thumbnail] photos portraits."""
+named people's best faces from faces.json (`clippa faces`), and the [thumbnail] photos portraits."""
 
 from __future__ import annotations
 
@@ -107,7 +107,7 @@ def frames(x: dict, sig: dict | None, tc: dict, out_dir: Path) -> list[dict]:
 
 
 def face_frames(x: dict, data: dict, tc: dict, out_dir: Path, start: int) -> list[dict]:
-    """faces.json (`clipper faces`): frames where a named person's face was found in this
+    """faces.json (`clippa faces`): frames where a named person's face was found in this
     video, [thumbnail] face_frames of them for each of the face_people people seen most,
     each with "faces": every named face in it ({"person", "face"}). Numbered on from start."""
     from ..faces import local_time, video_faces
@@ -132,7 +132,7 @@ PHOTO_EXT = (".jpg", ".jpeg", ".png", ".webp")
 
 def photos(tc: dict) -> dict[str, Path]:
     """[thumbnail] photos: {person: path}, named by the file names ("Hasan Piker.jpg") or, for
-    the cast library's folders (`clipper cast`, #41), the person's best kept photo."""
+    the cast library's folders (`clippa cast`, #41), the person's best kept photo."""
     from ..cast import best_photo
 
     d = Path(tc["photos"]) if tc.get("photos") else None

@@ -1,4 +1,4 @@
-"""`clipper archive add` of a YouTube channel: listed with approximate dates. Offline: yt-dlp
+"""`clippa archive add` of a YouTube channel: listed with approximate dates. Offline: yt-dlp
 is a stand-in."""
 import json
 
@@ -30,7 +30,7 @@ def test_an_unavailable_video_in_the_listing_is_skipped(monkeypatch):
 
 
 def test_one_of_our_streams_is_never_transcribed_again(tmp_path, monkeypatch):
-    """A `clipper story` item with a `dir` is transcribed by the pipeline there (item_dir)."""
+    """A `clippa story` item with a `dir` is transcribed by the pipeline there (item_dir)."""
     from clippa import config
 
     (tmp_path / "clipper.toml").write_text(f'[paths]\narchive = "{(tmp_path / "archive").as_posix()}"\n',

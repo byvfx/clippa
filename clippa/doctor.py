@@ -1,17 +1,17 @@
-"""`clipper doctor`: check that this machine can run clipper, and say what to fix.
+"""`clippa doctor`: check that this machine can run Clippa, and say what to fix.
 
 Usage:
-    clipper doctor [--offline] [--role all|gpu|serve|bot|nas|claude|control]
+    clippa doctor [--offline] [--role all|gpu|serve|bot|nas|claude|control]
 
 Checks Python, the config and prompt files, ffmpeg (filters and the configured encoders),
 fonts, the GPU stack (torch + WhisperX, only needed where transcribe runs), API keys and
 tokens, and, unless --offline, that Anthropic, Kitsu, Discord and Kick answer. Each line is
 OK, WARN (works, but something is missing or slow) or FAIL (a stage will break); the exit
 code is 1 when anything fails. --role skips what that machine doesn't run: gpu (a worker:
-everything but serve and the bot), serve (`clipper serve`: the war room, uploads, pre-shows,
+everything but serve and the bot), serve (`clippa serve`: the war room, uploads, pre-shows,
 retakes, the daily jobs), bot (the Discord bot, which needs serve to answer), nas (the
 recorder only), claude (Claude Code on the NAS: what a worker needs, plus its sign-in and clone),
-control (a dev/control station: the keys, the war room, and ssh to the hub for `clipper services`).
+control (a dev/control station: the keys, the war room, and ssh to the hub for `clippa services`).
 """
 
 from __future__ import annotations
@@ -51,7 +51,7 @@ def run(cmd: list[str], timeout: int = 30) -> subprocess.CompletedProcess:
 
 
 def collect(check, *args, **kwargs) -> list[tuple[str, str, str, str]]:
-    """Run one check and return its result lines, leaving RESULTS as it was (`clipper setup`)."""
+    """Run one check and return its result lines, leaving RESULTS as it was (`clippa setup`)."""
     start = len(RESULTS)
     check(*args, **kwargs)
     out = RESULTS[start:]
@@ -84,7 +84,7 @@ def check_python() -> None:
     if (v.major, v.minor) == (3, 12):
         ok("python", f"{platform.python_version()} ({sys.executable})")
     else:
-        fail("python", f"{platform.python_version()}: clipper needs 3.12",
+        fail("python", f"{platform.python_version()}: Clippa needs 3.12",
              "uv python install 3.12, then uv sync")
     if sys.platform == "win32" and len(sys.prefix) > 86:  # the folder + \.venv over ~80 characters
         import winreg
@@ -95,13 +95,13 @@ def check_python() -> None:
             long_paths = False
         if not long_paths:
             warn("python", f"the venv's path is {len(sys.prefix)} characters and Windows long paths are off",
-                 "some packages (anthropic) fail to load past 260 characters: move clipper to a short "
+                 "some packages (anthropic) fail to load past 260 characters: move Clippa to a short "
                  "folder such as C:\\clipper, or turn long paths on")
 
 
 def check_version() -> None:
     """Which copy this is (clippa/buildinfo.py): the release, and the commit past it."""
-    ok("version", f"clipper {buildinfo.version()}")
+    ok("version", f"clippa {buildinfo.version()}")
 
 
 def check_command() -> None:
@@ -122,7 +122,7 @@ def check_config(cfg: dict, role: str = "all") -> None:
     if root.get("_file"):
         ok("config", f"{root['_file']}")
     else:
-        fail("config", "no clipper.toml found", "clipper setup (or copy clipper.example.toml to clipper.toml)")
+        fail("config", "no clipper.toml found", "clippa setup (or copy clipper.example.toml to clipper.toml)")
     from .config import old_env_in_use, problems
     for msg in problems(cfg):
         fail("config", msg, "fix the name (clippa/defaults.toml lists every setting) or remove it")
@@ -148,7 +148,7 @@ def check_config(cfg: dict, role: str = "all") -> None:
         if len(lays) > 1 and missing:
             warn("shorts", f"{key}: no reference screenshot for layout(s) {', '.join(missing)}; "
                  "Short scene detection is less reliable without them",
-                 f"clipper shorts <a {key} stream> --save-example <layout> --at <seconds>")
+                 f"clippa shorts <a {key} stream> --save-example <layout> --at <seconds>")
         elif len(lays) > 1:
             ok("shorts", f"{key}: reference screenshots for {', '.join(lays)}")
     streams: Path = cfg["paths"]["streams"]
@@ -249,9 +249,9 @@ def check_ffmpeg(cfg: dict, role: str) -> None:
         if works:
             ok("ffmpeg", f"encoder {codec} works")
         else:
-            hint = {"h264_qsv": "needs an Intel GPU; clipper setup --step machine picks one that works here",
+            hint = {"h264_qsv": "needs an Intel GPU; clippa setup --step machine picks one that works here",
                     "h264_nvenc": "needs an NVIDIA driver new enough for this ffmpeg (610+ for 8.1)",
-                    }.get(codec, "pick another [cut] clip_codec (clipper setup --step machine)")
+                    }.get(codec, "pick another [cut] clip_codec (clippa setup --step machine)")
             fail("ffmpeg", f"encoder {codec} failed: {err[:120]}", hint)
 
 
@@ -283,7 +283,7 @@ def check_fonts(cfg: dict) -> None:
     wc = cfg["weekly"]
     from .weekly import style as weekly_style
     if weekly_style.masthead(wc) is None:
-        warn("config", "[weekly] masthead is not set: `clipper weekly` refuses until it has the cover's two words",
+        warn("config", "[weekly] masthead is not set: `clippa weekly` refuses until it has the cover's two words",
              'masthead = ["DAILY", "PLANET"] (red word, chrome word; "WEEKLY" follows)')
     missing = [k for k in ("headline", "condensed", "serif_italic", "serif_bold_italic", "black", "bold")
                if not first_font(wc[f"{k}_fonts"])]
@@ -346,7 +346,7 @@ def check_gpu(cfg: dict) -> None:
             ok("gpu", "Modal token in ~/.modal.toml")
         else:
             fail("gpu", "no Modal token",
-                 "modal.com -> Settings -> API Tokens, then clipper setup --step keys "
+                 "modal.com -> Settings -> API Tokens, then clippa setup --step keys "
                  "(it saves MODAL_TOKEN_ID and MODAL_TOKEN_SECRET)")
         return
     try:
@@ -411,7 +411,7 @@ def check_llm_keys(cfg: dict, need=None) -> None:
 
 
 def check_llm_prices(cfg: dict) -> None:
-    """Every configured model has an [llm] prices entry, else `clipper costs` counts it as $0."""
+    """Every configured model has an [llm] prices entry, else `clippa costs` counts it as $0."""
     from . import llm
 
     table = llm.prices(cfg)  # the defaults plus [llm.prices], as the client accounts
@@ -477,17 +477,17 @@ def check_keys(cfg: dict, role: str) -> None:
         elif not claude_model(cfg):
             ok("keys", "ANTHROPIC_API_KEY not set; no stage uses Claude")
         else:
-            need("keys", "ANTHROPIC_API_KEY not set", "clipper setup --step keys (or set it as a user env var)")
+            need("keys", "ANTHROPIC_API_KEY not set", "clippa setup --step keys (or set it as a user env var)")
         check_llm_keys(cfg, need)
         check_llm_prices(cfg)
         rc = cfg["review"]
         if rc["host"] and "<" not in rc["host"]:
             ok("keys", f"[review] host = {rc['host']}")
         else:
-            need("keys", "[review] host not set", "clipper setup --step keys, or set it to your Kitsu URL + /api in clipper.toml")
+            need("keys", "[review] host not set", "clippa setup --step keys, or set it to your Kitsu URL + /api in clipper.toml")
         (ok if os.environ.get(rc["token_env"]) else need)(
             "keys", f"${rc['token_env']} (Kitsu bot token) " + ("set" if os.environ.get(rc["token_env"]) else "not set"),
-            "" if os.environ.get(rc["token_env"]) else "Kitsu > Bots > new token; clipper setup --step keys")
+            "" if os.environ.get(rc["token_env"]) else "Kitsu > Bots > new token; clippa setup --step keys")
     if (cfg["discord"]["enabled"] and role != "control") or role == "bot":
         from .notify import token
         try:
@@ -499,16 +499,16 @@ def check_keys(cfg: dict, role: str) -> None:
             import discord  # noqa: F401
             ok("keys", "discord.py installed")
         except ImportError:
-            (fail if role == "bot" else warn)("keys", "discord.py not installed (needed for `clipper bot`)",
+            (fail if role == "bot" else warn)("keys", "discord.py not installed (needed for `clippa bot`)",
                                               "uv sync --extra discord")
     if role in ("all", "serve"):
         p = cfg["paths"]
         if p["youtube_token"].exists():
             ok("keys", f"YouTube sign-in token {p['youtube_token'].name}")
         elif p["youtube_client_secret"].exists():
-            warn("keys", "YouTube client secret present but not signed in", "clipper upload --sign-in")
+            warn("keys", "YouTube client secret present but not signed in", "clippa upload --sign-in")
         else:
-            warn("keys", "no YouTube client secret: `clipper upload` won't work here",
+            warn("keys", "no YouTube client secret: `clippa upload` won't work here",
                  f"copy {p['youtube_client_secret'].name} and {p['youtube_token'].name} into secrets/")
         check_tiktok(cfg)
         check_x(cfg)
@@ -555,7 +555,7 @@ def check_youtube_cookies_file(cfg: dict, now: float | None = None) -> None:
 
 
 def check_hei_cookies(cfg: dict, now: float | None = None) -> None:
-    """[paths] hei_cookies, when there is one (`clipper archive add` of heinetwork.tv): it still
+    """[paths] hei_cookies, when there is one (`clippa archive add` of heinetwork.tv): it still
     holds a live member sign-in. No file: nothing to check, the source is optional."""
     from . import hei, ytdl
 
@@ -576,7 +576,7 @@ def check_hei_cookies(cfg: dict, now: float | None = None) -> None:
 
 
 def check_twitch_cookies(cfg: dict) -> None:
-    """[paths] twitch_cookies, when there is a file (a subscriber-only VOD for `clipper fetch`):
+    """[paths] twitch_cookies, when there is a file (a subscriber-only VOD for `clippa fetch`):
     it is a readable Netscape cookies file. No file: nothing to check, the cookies are optional."""
     from . import ytdl
 
@@ -620,10 +620,10 @@ def check_youtube_cookies(cfg: dict) -> None:
 
 
 def check_tiktok(cfg: dict) -> None:
-    """Optional: only `clipper tiktok` needs it (parked since 2026-11-01, so a stale sign-in warns)."""
+    """Optional: only `clippa tiktok` needs it (parked since 2026-11-01, so a stale sign-in warns)."""
     p = cfg["paths"]
     if not p["tiktok_client"].exists():
-        warn("keys", "no TikTok client key: `clipper tiktok` won't work here (optional)",
+        warn("keys", "no TikTok client key: `clippa tiktok` won't work here (optional)",
              f"save the app's key and secret in {p['tiktok_client']}; {wiki.page('TikTok')}")
         return
     try:
@@ -634,27 +634,27 @@ def check_tiktok(cfg: dict) -> None:
              '{"client_key": "...", "client_secret": "..."}')
         return
     if not p["tiktok_token"].exists():
-        warn("keys", "TikTok client key present but not signed in", "clipper tiktok --sign-in")
+        warn("keys", "TikTok client key present but not signed in", "clippa tiktok --sign-in")
         return
     tok = jsonstate.load(p["tiktok_token"])
     days = (tok.get("refresh_expires_at", 0) - time.time()) / 86400
     if days <= 0:
-        warn("keys", "TikTok sign-in expired (optional)", "clipper tiktok --sign-in")
+        warn("keys", "TikTok sign-in expired (optional)", "clippa tiktok --sign-in")
     elif "video.upload" not in tok.get("scope", ""):
         warn("keys", f"TikTok token lacks video.upload (has {tok.get('scope')!r})",
-             "add the scope to the app, then clipper tiktok --sign-in")
+             "add the scope to the app, then clippa tiktok --sign-in")
     else:
         (warn if days < 14 else ok)("keys", f"TikTok sign-in token {p['tiktok_token'].name} "
-                                    f"(renew within {days:.0f} days)", "clipper tiktok --sign-in")
+                                    f"(renew within {days:.0f} days)", "clippa tiktok --sign-in")
 
 
 def check_x(cfg: dict) -> None:
-    """Optional: only `clipper x` needs it."""
+    """Optional: only `clippa x` needs it."""
     from .xpost import SCOPES
 
     p = cfg["paths"]
     if not p["x_client"].exists():
-        warn("keys", "no X client id: `clipper x` won't work here (optional)",
+        warn("keys", "no X client id: `clippa x` won't work here (optional)",
              f"save the app's client id in {p['x_client']}; {wiki.page('X-posts')}")
         return
     try:
@@ -664,20 +664,20 @@ def check_x(cfg: dict) -> None:
         fail("keys", f"{p['x_client'].name} is not JSON with client_id", '{"client_id": "..."}')
         return
     if not p["x_token"].exists():
-        warn("keys", "X client id present but not signed in", "clipper x --sign-in")
+        warn("keys", "X client id present but not signed in", "clippa x --sign-in")
         return
     tok = jsonstate.load(p["x_token"])
     missing = set(SCOPES.split()) - set(tok.get("scope", "").split())
     if missing:
-        fail("keys", f"X token lacks {' '.join(sorted(missing))}", "clipper x --sign-in")
+        fail("keys", f"X token lacks {' '.join(sorted(missing))}", "clippa x --sign-in")
     elif not tok.get("refresh_token"):
-        warn("keys", "X token has no refresh token: it lapses in 2 h", "clipper x --sign-in")
+        warn("keys", "X token has no refresh token: it lapses in 2 h", "clippa x --sign-in")
     else:
         ok("keys", f"X sign-in token {p['x_token'].name}")
 
 
 def check_narrate(cfg: dict) -> None:
-    """Optional: only `clipper narrate`, receipts' voice-over and story narration need it."""
+    """Optional: only `clippa narrate`, receipts' voice-over and story narration need it."""
     from .narrate import find_key, settings
 
     nc = settings(cfg)
@@ -697,11 +697,11 @@ def check_narrate(cfg: dict) -> None:
             fail("keys", f"[narrate] voice_id is set but there's no ElevenLabs key ({where})",
                  wiki.page("Character-pieces", "narration-voice-elevenlabs"))
         else:
-            warn("keys", f"no ElevenLabs key ({where}): `clipper narrate` won't work here (optional)",
+            warn("keys", f"no ElevenLabs key ({where}): `clippa narrate` won't work here (optional)",
                  wiki.page("Character-pieces", "narration-voice-elevenlabs"))
         return
     if not nc["voice_id"]:
-        warn("keys", "ElevenLabs key found but no [narrate] voice_id", "clipper narrate voices")
+        warn("keys", "ElevenLabs key found but no [narrate] voice_id", "clippa narrate voices")
     else:
         ok("keys", f"ElevenLabs key found, voice {nc['voice_id']}")
 
@@ -749,7 +749,7 @@ def online_elevenlabs(cfg: dict) -> None:
                              headers={"xi-api-key": el_key}, timeout=15)
             (ok if v.ok else fail)("online", f"ElevenLabs voice {nc['voice_id']}: "
                                    + (v.json().get("name", "?") if v.ok else f"HTTP {v.status_code}"),
-                                   "" if v.ok else "clipper narrate voices --add OWNER:VOICE_ID")
+                                   "" if v.ok else "clippa narrate voices --add OWNER:VOICE_ID")
     except requests.RequestException as e:  # unreachable is a finding, not a doctor crash
         fail("online", f"ElevenLabs didn't answer: {type(e).__name__}", "check the network")
 
@@ -764,7 +764,7 @@ def online_youtube(cfg: dict) -> None:
         youtube.credentials(cfg["paths"], force_refresh=True)
         ok("online", "YouTube sign-in works (token refreshed)")
     except ClipperError as e:
-        fail("online", str(e).split("; run:")[0], "clipper upload --sign-in; " + wiki.page("YouTube-channel"))
+        fail("online", str(e).split("; run:")[0], "clippa upload --sign-in; " + wiki.page("YouTube-channel"))
     except ImportError as e:
         warn("online", f"YouTube sign-in not checked: {e}", "uv sync")
 
@@ -798,7 +798,7 @@ def online_kitsu(cfg: dict) -> None:
                 ok("online", f"Kitsu production {name!r}")
             else:
                 warn("online", f"Kitsu production {name!r} doesn't exist yet",
-                     "created by the first `clipper review publish` of that show")
+                     "created by the first `clippa review publish` of that show")
     except Exception as e:  # noqa: BLE001
         fail("online", f"Kitsu: {e}", "is the NAS up, and this machine on its network?")
 
@@ -818,32 +818,32 @@ def online_discord(cfg: dict) -> None:
 
 
 def online_serve(cfg: dict, role: str) -> None:
-    """That `clipper serve` answers at [serve] url: the bot asks it to replan after a decision
+    """That `clippa serve` answers at [serve] url: the bot asks it to replan after a decision
     and to start a retake (a decision still lands in Kitsu without it)."""
     from . import serve
 
     try:
         serve.health(cfg)
-        ok("online", f"clipper serve answers at {serve.url(cfg)}")
+        ok("online", f"clippa serve answers at {serve.url(cfg)}")
     except Exception as e:  # noqa: BLE001
-        hint = ("start it: clipper serve, or its container (deploy/hub); set [serve] url when it "
+        hint = ("start it: clippa serve, or its container (deploy/hub); set [serve] url when it "
                 "runs on another machine")
         if role == "control":
-            hint = ("set [serve] url to the hub's tailnet address: clipper setup --step machine ("
+            hint = ("set [serve] url to the hub's tailnet address: clippa setup --step machine ("
                     + wiki.page("Phone-access") + ")")
         (fail if role == "bot" else warn)("online", f"{e}", hint)
 
 
 def online_hub(cfg: dict) -> None:
     """With [serve] hub: ssh to the NAS works and finds the compose project, which
-    `clipper services` and deploy/hub/deploy.sh need."""
+    `clippa services` and deploy/hub/deploy.sh need."""
     import shlex
 
     from .services import recorder_ssh, ssh
 
     folder = cfg["serve"]["hub"]
     if not folder:
-        warn("online", "[serve] hub not set: `clipper services` runs Windows tasks, not the NAS containers",
+        warn("online", "[serve] hub not set: `clippa services` runs Windows tasks, not the NAS containers",
              "set [serve] hub in clipper.toml (the compose folder on the NAS): " + wiki.page("NAS-hub"))
         return
     host, _, sudo = recorder_ssh(cfg)
@@ -868,7 +868,7 @@ def online_modal(cfg: dict) -> None:
         pass  # check_gpu already failed it
     except Exception as e:  # noqa: BLE001
         fail("online", f"Modal app {cfg['transcribe']['modal_app']!r}: {type(e).__name__}: {str(e)[:120]}",
-             "clipper transcribe --deploy (after setting the Modal token)")
+             "clippa transcribe --deploy (after setting the Modal token)")
     if diarizing(cfg):
         secret = "?"  # (named before the try: modal_app itself can fail to import)
         try:
@@ -881,7 +881,7 @@ def online_modal(cfg: dict) -> None:
             pass
         except Exception as e:  # noqa: BLE001
             fail("online", f"diarize is on but the Modal secret {secret!r}: {type(e).__name__}",
-                 "modal secret create huggingface HF_TOKEN=..., then clipper transcribe --deploy; "
+                 "modal secret create huggingface HF_TOKEN=..., then clippa transcribe --deploy; "
                  + wiki.page("Speakers"))
 
 
@@ -961,7 +961,7 @@ def check_cast(cfg: dict) -> None:
     few = [f"{p['name']} {p['kept']}" for p in people if p["kept"] < cc["min_photos"]]
     if few:
         warn("cast", f"fewer than {cc['min_photos']} photos kept: " + ", ".join(few),
-             "war room > Cast (or clipper cast find <Person>, clipper cast grab <stream>)")
+             "war room > Cast (or clippa cast find <Person>, clippa cast grab <stream>)")
     elif people:
         ok("cast", f"{len(people)} people, {cc['min_photos']}+ photos each")
     if not cast.search_key(cfg):
@@ -977,36 +977,36 @@ def check_people(cfg: dict) -> None:
     try:
         everyone = people.load(cfg)
     except Exception as e:  # noqa: BLE001  # a broken people.json: say so, don't stop doctor
-        fail("people", f"{people.path(cfg)}: {e}", "fix the JSON, or move it aside and run clipper people import")
+        fail("people", f"{people.path(cfg)}: {e}", "fix the JSON, or move it aside and run clippa people import")
         return
     clash = people.conflicts(everyone)
     if clash:
         warn("people", "a name of two people: " + "; ".join(f"{n} ({', '.join(ids)})" for n, ids in clash.items()),
-             "clipper people set <id> --unalias NAME, or fix the name in streamers.json / the cast library")
+             "clippa people set <id> --unalias NAME, or fix the name in streamers.json / the cast library")
     else:
         own = len(people.stored(cfg))
         ok("people", f"{len(everyone)} people, {own} in {people.path(cfg).name}"
-           + ("" if own else " (clipper people import writes them there)"))
+           + ("" if own else " (clippa people import writes them there)"))
 
 
 def check_backup(cfg: dict, now: float | None = None) -> None:
-    """#204: the newest `clipper backup` zip, warned past [backup] max_age_days."""
+    """#204: the newest `clippa backup` zip, warned past [backup] max_age_days."""
     from . import backup
 
     bc = cfg["backup"]
     if not bc["folder"]:
         warn("backup", "no [backup] folder: nothing backs up the config, faces, cast and review state",
-             f"set [backup] folder (e.g. \"backups/taste\"), then clipper backup ({wiki.page('Backups')})")
+             f"set [backup] folder (e.g. \"backups/taste\"), then clippa backup ({wiki.page('Backups')})")
         return
     p = backup.newest(cfg)
     auto = f"serve makes one every {bc['every_days']} days" if bc["every_days"] else "[backup] every_days is 0"
     if p is None:
-        warn("backup", f"no backup yet in {backup.folder(cfg)} ({auto})", "clipper backup")
+        warn("backup", f"no backup yet in {backup.folder(cfg)} ({auto})", "clippa backup")
         return
     age = ((now or time.time()) - p.stat().st_mtime) / 86400
     (warn if age > bc["max_age_days"] else ok)(
         "backup", f"newest {p.name}, {age:.0f} days old ({auto})",
-        "clipper backup; check serve's backup job (clipper services status serve)")
+        "clippa backup; check serve's backup job (clippa services status serve)")
 
 
 def check_news(cfg: dict, offline: bool) -> None:
@@ -1144,7 +1144,7 @@ def check_clipart(cfg: dict) -> None:
 
 
 def check_doc(cfg: dict) -> None:
-    """`clipper doc`, once a piece exists: Resolve's scripting module and the local Whisper."""
+    """`clippa doc`, once a piece exists: Resolve's scripting module and the local Whisper."""
     import importlib.util
 
     from .doc import PLAN
@@ -1158,10 +1158,10 @@ def check_doc(cfg: dict) -> None:
     if (Path(api) / "Modules").is_dir():
         ok("doc", f"{len(pieces)} piece(s) in {root}; Resolve's scripting module found")
     else:
-        warn("doc", f"Resolve's scripting module isn't at {api}: `clipper doc build` and `master` can't reach Resolve "
+        warn("doc", f"Resolve's scripting module isn't at {api}: `clippa doc build` and `master` can't reach Resolve "
              "here", wiki.page("Documentaries", "resolve"))
     if not importlib.util.find_spec("faster_whisper"):
-        warn("doc", "faster-whisper isn't installed: `clipper doc voice` can't time a take's words",
+        warn("doc", "faster-whisper isn't installed: `clippa doc voice` can't time a take's words",
              "uv sync --extra gpu, or uv pip install faster-whisper")
 
 
@@ -1184,7 +1184,7 @@ def check_faces(cfg: dict) -> None:
             fail("faces", "OpenCV not installed, and [worker] stages runs faces on every stream",
                  "uv sync --extra faces, or take \"faces\" out of [worker] stages")
         else:
-            warn("faces", "OpenCV not installed: `clipper faces` can't run here", "uv sync --extra faces")
+            warn("faces", "OpenCV not installed: `clippa faces` can't run here", "uv sync --extra faces")
         return
     missing = [n for n in faces.MODELS if not (faces.model_dir(cfg) / n).exists()]
     ok("faces", f"OpenCV {cv2.__version__}" + (f"; models download on the first scan into {faces.model_dir(cfg)}"
@@ -1194,11 +1194,11 @@ def check_faces(cfg: dict) -> None:
         ok("faces", f"{len(known['people'])} known: " + ", ".join(sorted(known["people"])))
     else:
         warn("faces", f"no known faces in {faces.known_path(cfg)}",
-             "clipper faces <stream>, then --name F01=Name --enroll (or --enroll-photos)")
+             "clippa faces <stream>, then --name F01=Name --enroll (or --enroll-photos)")
 
 
 def check_review_cams(cfg: dict) -> None:
-    """`clipper review check` looks for a face in a Short's webcam panels: those marked cam =
+    """`clippa review check` looks for a face in a Short's webcam panels: those marked cam =
     true (or focus = "face") in the show's layouts. A show with none isn't checked (#259)."""
     from . import review_check, shorts
     from .config import for_show
@@ -1231,7 +1231,7 @@ def check_auto_approve(cfg: dict) -> None:
     hb = daemon.heartbeat(cfg, "serve")
     if not hb["up"]:
         warn("review", f"auto-approve is on but serve isn't running ({daemon.state(hb)[1]}): nothing approves itself",
-             "clipper services status serve")
+             "clippa services status serve")
 
 
 def repo_state(porcelain: str) -> tuple[str, int, int]:
@@ -1315,12 +1315,12 @@ def check_tailnet(cfg: dict, offline: bool) -> None:
                     + wiki.page("Phone-access", "on-the-nas"))
     if not st["served"]:
         return fail("warroom", f"Tailscale is up as {st['name']}, but the war room isn't served",
-                    "clipper warroom --tailnet on" if sys.platform in ("win32", "darwin") else
+                    "clippa warroom --tailnet on" if sys.platform in ("win32", "darwin") else
                     "the tailscale container serves it from deploy/hub/tailscale-serve.json (TS_SERVE_CONFIG): "
                     "redeploy, then docker compose logs tailscale")
     if not token(cfg):
         warn("warroom", "no war room token: any device on the tailnet can open it",
-             "clipper warroom --tailnet on makes one in secrets/")
+             "clippa warroom --tailnet on makes one in secrets/")
     if offline:
         return ok("warroom", f"on the tailnet at {st['served']}")
     import requests
@@ -1333,7 +1333,7 @@ def check_tailnet(cfg: dict, offline: bool) -> None:
         ok("warroom", f"on the tailnet at {st['served']} (answers"
            + (f"; checked at {url}, the address tailscale serve proxies to)" if st.get("userspace") else ")"))
     except Exception as e:  # noqa: BLE001
-        fail("warroom", f"{url} doesn't answer ({type(e).__name__})", "is clipper serve running here?")
+        fail("warroom", f"{url} doesn't answer ({type(e).__name__})", "is clippa serve running here?")
 
 
 def serve_elsewhere(cfg: dict) -> bool:
@@ -1392,11 +1392,11 @@ def check_role_settings(cfg: dict, role: str) -> None:
     if role in ("all", "serve"):
         m = cfg["youtube"]["auto_upload_minutes"]
         (ok if m else warn)("config", f"[youtube] auto_upload_minutes {m}" + ("" if m else ": nothing uploads by itself"),
-                            "" if m else "set it (60 is usual): `clipper serve` then replans and uploads approved items on "
-                                         "that timer; 0 leaves it to `clipper upload` by hand")
+                            "" if m else "set it (60 is usual): `clippa serve` then replans and uploads approved items on "
+                                         "that timer; 0 leaves it to `clippa upload` by hand")
     if role == "bot" and not dc["enabled"]:
         warn("config", "[discord] enabled = false on a bot machine: `review publish` posts no cards, so the bot "
-                       "has none to show", "set [discord] enabled = true (with the ids above), or don't run `clipper bot` here")
+                       "has none to show", "set [discord] enabled = true (with the ids above), or don't run `clippa bot` here")
     if role in ("all", "bot"):
         u = cfg["serve"]["url"]
         (ok if not u or u.startswith(("http://", "https://")) else fail)(

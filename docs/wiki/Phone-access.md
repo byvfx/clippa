@@ -2,22 +2,22 @@ The war room listens on localhost only. To open it from the phone anywhere, put 
 tailnet with `tailscale serve`: HTTPS at the machine's tailnet name, reachable only by your
 own Tailscale devices, nothing on the LAN or the internet, no port forwarding.
 
-1. Install Tailscale on the machine that runs `clipper serve` (https://tailscale.com/download) and
+1. Install Tailscale on the machine that runs `clippa serve` (https://tailscale.com/download) and
    on the phone (App Store / Play Store), and sign in to the same account on both.
 2. In the Tailscale admin console, DNS page: turn on MagicDNS and HTTPS certificates
    (`tailscale serve` asks for this the first time if it is off).
    The first `on` may also print a link to enable Serve for the tailnet: open it, allow, and
    the command carries on.
-3. `clipper warroom --tailnet on`. It makes a war room token in `secrets/warroom_token.txt`
+3. `clippa warroom --tailnet on`. It makes a war room token in `secrets/warroom_token.txt`
    if `[warroom] token` is empty, starts `tailscale serve` (it persists across reboots), and
    prints the link to open once on the phone (`https://<name>.ts.net/?key=...`). The key
    is printed only there; the phone keeps a cookie for a year.
-4. Restart serve (`clipper services restart serve`) so the war room asks for the
+4. Restart serve (`clippa services restart serve`) so the war room asks for the
    token, and set `[warroom] tailnet = true` in clipper.toml.
 5. On the phone, open the link, then Share / menu → Add to Home Screen.
 
-Check: `clipper doctor --role serve` (fetches the war room through the tailnet name), or
-`clipper warroom --tailnet status`. Off again: `clipper warroom --tailnet off`.
+Check: `clippa doctor --role serve` (fetches the war room through the tailnet name), or
+`clippa warroom --tailnet status`. Off again: `clippa warroom --tailnet off`.
 
 ## On the NAS
 
@@ -44,20 +44,20 @@ ssh nas 'docker rm -f ts-login && cd clipper-hub && docker compose up -d tailsca
 ```
 
 Restart serve so its health and the bot's links show the tailnet address. The container serves the war room itself
-from `deploy/hub/tailscale-serve.json`, so `clipper warroom --tailnet on` isn't used there (the
-clipper containers aren't root and can't change Tailscale's settings; `--tailnet status` works).
+from `deploy/hub/tailscale-serve.json`, so `clippa warroom --tailnet on` isn't used there (the
+Clippa containers aren't root and can't change Tailscale's settings; `--tailnet status` works).
 Open `https://clipper.<tailnet>.ts.net/?key=<token>` once on the phone, with the token from
-`secrets/warroom_token.txt` in the NAS folder. Turn the laptop's off (`clipper warroom --tailnet
+`secrets/warroom_token.txt` in the NAS folder. Turn the laptop's off (`clippa warroom --tailnet
 off` there).
 
 ## Keep the machine's key from expiring
 
 Tailscale expires a machine's node key after 180 days by default. When it does, the machine drops
 off the tailnet and the war room stops answering on the phone until you sign in again. The
-`clipper` machine is meant to run unattended, so turn expiry off for it once:
+`clippa` machine is meant to run unattended, so turn expiry off for it once:
 
 1. Open the admin console's Machines page (https://login.tailscale.com/admin/machines).
-2. Find `clipper` (the NAS container; the laptop and phone are separate rows), click its `...`
+2. Find `clippa` (the NAS container; the laptop and phone are separate rows), click its `...`
    menu at the right of the row, and choose **Disable key expiry**.
 3. Check the row: it now shows an **Expiry disabled** badge under the machine's name.
 

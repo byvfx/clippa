@@ -1,5 +1,5 @@
 """The HTTP server: static files, the GET and POST route tables, the token and host checks,
-range requests for video, and `clipper warroom` itself (`run`)."""
+range requests for video, and `clippa warroom` itself (`run`)."""
 from __future__ import annotations
 
 import hmac
@@ -170,7 +170,7 @@ font:16px/1.5 system-ui,sans-serif;padding:16px;box-sizing:border-box}main{max-w
 code{background:#171c22;padding:1px 5px;border-radius:4px}</style></head><body><main>
 <h1>The war room needs its key</h1>
 <p>This browser isn't signed in, or its sign-in has expired. Open the war room's link with
-<code>?key=</code> on the end once more (the operator has it: <code>clipper serve</code> prints it,
+<code>?key=</code> on the end once more (the operator has it: <code>clippa serve</code> prints it,
 and <code>[warroom] token</code> is the key). It keeps you signed in for a year.</p>
 </main></body></html>"""
 
@@ -289,7 +289,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"error": "not found"}, 404)
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             pass
-        except ClipperError as e:  # clipper's own messages (a bad ref): safe to show
+        except ClipperError as e:  # Clippa's own messages (a bad ref): safe to show
             self.send_json({"error": str(e)}, 400)
         except Exception as e:  # noqa: BLE001
             self.fail(e)
@@ -327,7 +327,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(POST_API[u.path](self.cfg, body))
             else:
                 self.send_json({"error": "not found"}, 404)
-        except ClipperError as e:  # clipper's own messages: safe to show
+        except ClipperError as e:  # Clippa's own messages: safe to show
             self.send_json({"error": str(e)}, 400)
         except Exception as e:  # noqa: BLE001
             self.fail(e)
@@ -428,7 +428,7 @@ def run(cfg: dict, port: int | None = None, open_browser: bool = False) -> None:
         srv = server(cfg, port)
     except OSError as e:
         raise ClipperError(f"war room: port {port or base(cfg)['warroom']['port']} is busy ({e}); "
-                         "clipper serve may already be serving it") from None
+                         "clippa serve may already be serving it") from None
     url_ = url(cfg, port)
     print(f"war room on {url_}  (Ctrl+C to stop)", flush=True)
     if open_browser:

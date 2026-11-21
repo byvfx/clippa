@@ -107,7 +107,7 @@ function keyAct(key, ref) {
   else if (key === "r") { const n = ask(`Reject ${i.short}? Say why (kept as a scoring example):`, true); if (n) act(ref, "reject", { text: n }); }
   else if (key === "c") {
     if (OPEN) { $("#fChanges").focus(); return; }
-    const n = ask(`What should change? clipper will re-cut / re-thumbnail it from this note${retakeCost()}:`, true); if (n) act(ref, "changes", { text: n });
+    const n = ask(`What should change? Clippa will re-cut / re-thumbnail it from this note${retakeCost()}:`, true); if (n) act(ref, "changes", { text: n });
   } else if (key === "h") act(ref, "hold", { on: !i.hold });
   else if (key === "p") { if (OPEN !== ref) openModal(ref); $("#fPin").scrollIntoView({ block: "center" }); $("#fPin").focus(); }
 }

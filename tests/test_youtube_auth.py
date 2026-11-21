@@ -31,5 +31,5 @@ def test_a_dead_sign_in_says_how_to_fix_it(tmp_path, monkeypatch):
     monkeypatch.setattr(Credentials, "refresh", refresh)
     paths = {"youtube_token": token(tmp_path, youtube.SCOPES)}
     with pytest.raises(ClipperError, match=r"\(invalid_grant: Token has been expired or revoked\.\); "
-                                           r"run: clipper upload --sign-in.*Testing"):
+                                           r"run: clippa upload --sign-in.*Testing"):
         youtube.credentials(paths)

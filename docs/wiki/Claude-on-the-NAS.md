@@ -1,5 +1,5 @@
 Claude Code can live on the NAS beside the [hub](NAS-hub) and show up in the Claude app on
-the phone (or claude.ai/code in any browser), so clipper can be driven, debugged and changed
+the phone (or claude.ai/code in any browser), so Clippa can be driven, debugged and changed
 from anywhere while the laptop sleeps. It runs `claude remote-control` in a container with its
 own clone of the repo. The NAS dials out to Anthropic: no port forwarding, no tailnet, nothing
 exposed.
@@ -15,7 +15,7 @@ worker keep running the code of the last hub deploy; a merged change reaches the
 `bash deploy/hub/deploy.sh` from the laptop.
 
 It also runs the nightly [checkup](Checkup#the-nightly-report) at `CHECKUP_AT` (in
-`env.local`; empty = off): `clipper checkup`, then, only if that finds something, a
+`env.local`; empty = off): `clippa checkup`, then, only if that finds something, a
 `claude -p` that works out the causes and DMs you one report (read-only, but for one PR for a
 [clear code fix](Checkup#a-pr-for-a-clear-code-fix)). After it, on their days, come the
 weekly digest and the monthly deep [audit](Audit).
@@ -44,9 +44,9 @@ the first start and left alone after that) and `home/` (Claude Code's sign-in, s
 memory, and the uv cache).
 
 Remote Control needs a claude.ai sign-in (Pro or Max), not an API key, and it refuses to start
-where `ANTHROPIC_API_KEY` is set. So the deploy hands the key to clipper as a file
+where `ANTHROPIC_API_KEY` is set. So the deploy hands the key to Clippa as a file
 (`/run/secrets/anthropic_key`, `[paths] anthropic_key`) and keeps it out of the container's
-environment. clipper's model calls still bill the API key as everywhere else; Claude itself
+environment. Clippa's model calls still bill the API key as everywhere else; Claude itself
 uses the subscription.
 
 ## Sign in
@@ -58,8 +58,8 @@ Once, after the first deploy. The container waits until it is signed in:
    back into the terminal.
 2. `ssh -t nas 'docker attach clipper-claude'`. The first start asks to enable Remote Control
    and to trust `/app`: answer `y` to both, then detach with Ctrl-P Ctrl-Q (Ctrl-C would stop it).
-3. In the Claude app on the phone (or claude.ai/code), the session "clipper on the NAS" is in
-   the session list. Ask it to run something small, e.g. `clipper doctor --role claude`.
+3. In the Claude app on the phone (or claude.ai/code), the session "Clippa on the NAS" is in
+   the session list. Ask it to run something small, e.g. `clippa doctor --role claude`.
 
 The sign-in and both answers are kept in `home/`, so later deploys and restarts come back by
 themselves. A claude.ai sign-in expires: the session warns three days before, then stops

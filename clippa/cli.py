@@ -1,4 +1,4 @@
-"""clipper command line: one subcommand per pipeline stage."""
+"""Clippa command line: one subcommand per pipeline stage."""
 
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ class Version(argparse.Action):
         super().__init__(option_strings, dest=dest, default=default, nargs=0, help=help)
 
     def __call__(self, parser, ns, values, option_string=None):
-        print(f"clipper {buildinfo.version()}")
+        print(f"clippa {buildinfo.version()}")
         parser.exit()
 
 
@@ -57,12 +57,12 @@ def add_stream(p, optional: bool = False, help: str = STREAM_HELP) -> None:
 
 def add_subject(p, optional: bool = False) -> None:
     p.add_argument("subject", nargs="?" if optional else None,
-                   help="the archive subject: the short name given to `clipper archive add`")
+                   help="the archive subject: the short name given to `clippa archive add`")
 
 
 def add_slug(p, optional: bool = False) -> None:
     p.add_argument("slug", nargs="?" if optional else None,
-                   help="the story's slug, as `clipper story status` lists them")
+                   help="the story's slug, as `clippa story status` lists them")
 
 
 def add_items(p, help: str, old: tuple[str, ...] = (), many: bool = False) -> None:
@@ -168,7 +168,7 @@ def cmd_preshow(cfg: dict, args: argparse.Namespace) -> None:
             window = {"start_s": parse_time(args.start) if args.start else 0.0,
                       "end_s": parse_time(args.end) if args.end else None, "about": args.about}
         d = preshow.fetch(cfg, args.url, key, window)
-        print(f"{d.name}: grabbed; the worker runs it, or: clipper run {d.name}")
+        print(f"{d.name}: grabbed; the worker runs it, or: clippa run {d.name}")
 
 
 def cmd_narrate(cfg: dict, args: argparse.Namespace) -> None:
@@ -199,7 +199,7 @@ def cmd_perform(cfg: dict, args: argparse.Namespace) -> None:
         if args.deploy:
             return perform.deploy_lipsync()
         if not args.target:
-            raise ClipperError("clipper perform lipsync <dir or video> [--engine ...], or --deploy")
+            raise ClipperError("clippa perform lipsync <dir or video> [--engine ...], or --deploy")
         chosen = args.engine or pc["lipsync_engine"]
         for engine in (["latentsync", "sync"] if chosen == "both" else [chosen]):
             perform.lipsync(Path(args.target), pc, engine, Path(args.audio) if args.audio else None)
@@ -481,7 +481,7 @@ def cmd_transcribe(cfg: dict, args: argparse.Namespace) -> None:
     if args.deploy:
         return transcribe.deploy()
     if not args.stream:
-        raise ClipperError("clipper transcribe <stream>, or --deploy")
+        raise ClipperError("clippa transcribe <stream>, or --deploy")
     sdir = stream_dir(cfg, args.stream)
     scfg = config.for_stream(cfg, sdir)
     if (sdir / "words.jsonl").exists() and not args.force:  # #75: a GPU or Modal job already paid for
@@ -504,7 +504,7 @@ def cmd_speakers(cfg: dict, args: argparse.Namespace) -> None:
     if args.diarize:
         transcribe.diarize(sdir, scfg["transcribe"], cfg["paths"]["modal_runs"])
     elif not (sdir / "diarization.json").exists():
-        raise ClipperError(f"no diarization.json in {sdir}: clipper speakers {args.stream} --diarize")
+        raise ClipperError(f"no diarization.json in {sdir}: clippa speakers {args.stream} --diarize")
     if args.name:
         names = dict(n.split("=", 1) for n in args.name if "=" in n)
         if len(names) != len(args.name):
@@ -527,7 +527,7 @@ def cmd_faces(cfg: dict, args: argparse.Namespace) -> None:
         if args.enroll_photos:
             return faces.enroll_photos(cfg)
         if not args.forget:
-            raise ClipperError("clipper faces <stream>, --enroll-photos or --forget Name")
+            raise ClipperError("clippa faces <stream>, --enroll-photos or --forget Name")
         return None
     sdir = stream_dir(cfg, args.stream)
     scfg = config.for_stream(cfg, sdir)  # its show's [thumbnail] photos and [paths] faces
@@ -554,7 +554,7 @@ def cmd_faces(cfg: dict, args: argparse.Namespace) -> None:
 
 
 def _face_box(sdir: Path, cfg: dict, args: argparse.Namespace) -> None:
-    """clipper faces <stream> --at T --box x,y,w,h [--person Name]."""
+    """clippa faces <stream> --at T --box x,y,w,h [--person Name]."""
     import tempfile
 
     from . import faces
@@ -754,7 +754,7 @@ def cmd_review(cfg: dict, args: argparse.Namespace) -> None:
     if args.action == "invite":
         ids, added = notify.invite(cfg, args.user_id)
         print(f"{args.user_id} {'added' if added else 'was already there'}: [discord] allowed_user_ids = {ids}"
-              + ("; restart the bot (clipper services restart bot) for it to count" if added else ""))
+              + ("; restart the bot (clippa services restart bot) for it to count" if added else ""))
         return
     if args.action == "list":
         if args.json:
@@ -770,7 +770,7 @@ def cmd_review(cfg: dict, args: argparse.Namespace) -> None:
     if getattr(args, "file", None):  # multi-line text, e.g. a description
         text = (sys.stdin.read() if args.file == "-"
                 else Path(args.file).read_text(encoding="utf-8-sig"))
-    who = "clipper CLI"
+    who = "Clippa CLI"
     on = (not args.off) if args.action == "hold" else None
     if args.action == "pin" and args.clear:
         text = ""
@@ -1081,7 +1081,7 @@ def cmd_alert(cfg: dict, args: argparse.Namespace) -> None:
     from . import alerts, digest
 
     if args.what == "test":
-        alerts.send(cfg, "test", "Test from `clipper alert test`: clipper's DMs reach you.")
+        alerts.send(cfg, "test", "Test from `clippa alert test`: Clippa's DMs reach you.")
         print(f"queued in {alerts.outbox(cfg)}; the bot DMs it within a minute "
               f"(not during quiet hours {cfg['notify']['quiet_hours'] or 'none'})")
     elif args.what == "send":
@@ -1249,7 +1249,7 @@ def cmd_audit(cfg: dict, args: argparse.Namespace) -> None:
     if args.keep_deep:
         print(audit.keep_deep(cfg, Path(args.keep_deep)))
     elif args.brief:
-        print(audit.brief(cfg, args.weeks) or "no weekly digests saved yet (clipper audit --save)")
+        print(audit.brief(cfg, args.weeks) or "no weekly digests saved yet (clippa audit --save)")
     else:
         tz = ZoneInfo(cfg["schedule"]["timezone"])
         snap = audit.collect(cfg)
@@ -1299,7 +1299,7 @@ COMMAND_GROUPS = [
 
 
 def command_list() -> str:
-    """`clipper -h`'s list of commands by group (argparse prints one flat list)."""
+    """`clippa -h`'s list of commands by group (argparse prints one flat list)."""
     return "\n\n".join(f"{title}:\n  " + " ".join(names) for title, names in COMMAND_GROUPS)
 
 
@@ -1465,7 +1465,7 @@ def add_pipeline(sub) -> None:
                               "compilations ([worker] fast_lane). --only and --from choose stages, not what\n"
                               "they redo: a stage keeps the paid work it finds (drafts, covers, unchanged\n"
                               "cuts). To redo covers or drafts run the stage itself:\n"
-                              "clipper thumbs STREAM --items IDS --force, clipper meta STREAM.")
+                              "clippa thumbs STREAM --items IDS --force, clippa meta STREAM.")
     add_stream(p)
     p.add_argument("--only", metavar="STAGES", help="just these stages, comma-separated (the list below); "
                                                     "done ones need --force")
@@ -1708,7 +1708,7 @@ def add_services(sub) -> None:
     p.add_argument("--keep-deep", metavar="FILE", help="keep FILE as this month's deep audit (the scheduled run)")
     p.set_defaults(fn=cmd_audit)
 
-    p = sub.add_parser("worker", help="GPU machine: `clipper run` each finished recording")
+    p = sub.add_parser("worker", help="GPU machine: `clippa run` each finished recording")
     p.add_argument("--once", action="store_true", help="one pass, then exit")
     p.add_argument("--status", action="store_true", help="run state of each recording")
     p.set_defaults(fn=cmd_worker)
@@ -1720,7 +1720,7 @@ def add_services(sub) -> None:
     p = sub.add_parser("bot", help="Discord review bot: buttons on review cards, slash commands, DMs")
     p.set_defaults(fn=cmd_bot)
 
-    p = sub.add_parser("warroom", help="the dashboard alone (clipper serve runs it with the jobs)")
+    p = sub.add_parser("warroom", help="the dashboard alone (clippa serve runs it with the jobs)")
     p.add_argument("--port", type=int, help="default [warroom] port (8765)")
     p.add_argument("--open", action="store_true", help="open it in the browser")
     p.add_argument("--tailnet", choices=("on", "off", "status"),
@@ -1902,7 +1902,7 @@ def add_extras(sub) -> None:
     r = rsub.add_parser("show", help="the dossier, re-rendered from dossier.json (keeps hand edits; no model call)")
     add_slug(r)
     r = rsub.add_parser("plan", help="the edit from the moments -> streams/story-<slug>/story.json (~$0.03; "
-                                     "clipper --show <key> story plan ... picks the show)")
+                                     "clippa --show <key> story plan ... picks the show)")
     add_slug(r)
     r.add_argument("--force", action="store_true", help="plan again (the old edit is kept as story.<time>.json)")
     r = rsub.add_parser("cut", help="render story.json, then meta, thumbs and the Kitsu card; "
@@ -1938,7 +1938,7 @@ def add_extras(sub) -> None:
     p.set_defaults(fn=cmd_perform)
     r = rsub.add_parser("prepare", help="find the takes, cut take N at the read's pauses -> DIR/pieceN.mp4")
     r.add_argument("recording", help="the phone/webcam video, the read playing out loud in it")
-    r.add_argument("--read", required=True, help="the read the takes follow (clipper narrate speak)")
+    r.add_argument("--read", required=True, help="the read the takes follow (clippa narrate speak)")
     r.add_argument("--take", type=int, default=1, help="which take (default 1)")
     r.add_argument("--out", help="output folder (default <recording>.perform)")
     r = rsub.add_parser("status", help="which pieces are rendered")
@@ -1962,7 +1962,7 @@ def add_extras(sub) -> None:
     csub = p.add_subparsers(dest="action", required=True, metavar="<action>")
     p.set_defaults(fn=cmd_cast)
     csub.add_parser("list", help="everyone: photos kept and new, who has fewer than [cast] min_photos")
-    r = csub.add_parser("grab", help="the sharpest faces `clipper faces` named in a stream, as new photos")
+    r = csub.add_parser("grab", help="the sharpest faces `clippa faces` named in a stream, as new photos")
     add_stream(r)
     r.add_argument("--person", help="only this person (default: everyone named)")
     r.add_argument("-n", type=int, default=4, help="photos tried per person (default 4)")
@@ -1971,12 +1971,12 @@ def add_extras(sub) -> None:
     r.add_argument("--no-label", action="store_true", help="skip the label call")
     r = csub.add_parser("find", help="new photos from the web: Wikimedia Commons, the person's channels, "
                                      "image search ($BRAVE_API_KEY or [paths] brave_key)")
-    r.add_argument("person", help="the person, by name (`clipper cast list`)")
+    r.add_argument("person", help="the person, by name (`clippa cast list`)")
     r.add_argument("--source", action="append", choices=["commons", "channels", "search"],
                    help="only these (repeatable; default all)")
     r.add_argument("--no-label", action="store_true", help="skip the label call")
     r = csub.add_parser("add", help="one photo from a file or a web address")
-    r.add_argument("person", help="the person, by name (`clipper cast list`)")
+    r.add_argument("person", help="the person, by name (`clippa cast list`)")
     r.add_argument("src", metavar="FILE|URL", help="a photo file, or its web address")
     r.add_argument("--no-label", action="store_true", help="skip the label call")
     r = csub.add_parser("auto", help="a find from every source for everyone with fewer than [cast] target "
@@ -1984,14 +1984,14 @@ def add_extras(sub) -> None:
     r.add_argument("--no-label", action="store_true", help="skip the label call")
     for act, what in (("keep", "keep these new photos"), ("drop", "delete these photos; their sources aren't fetched again")):
         r = csub.add_parser(act, help=what)
-        r.add_argument("person", help="the person, by name (`clipper cast list`)")
+        r.add_argument("person", help="the person, by name (`clippa cast list`)")
         r.add_argument("ids", nargs="+", metavar="ID", help="the photos' ids")
     r = csub.add_parser("label", help="set a photo's label (see [cast] labels)")
-    r.add_argument("person", help="the person, by name (`clipper cast list`)")
+    r.add_argument("person", help="the person, by name (`clippa cast list`)")
     r.add_argument("id", help="the photo's id")
     r.add_argument("label", help="one of [cast] labels")
     r = csub.add_parser("set", help="a person's other names and channels (YouTube, Kick) for find")
-    r.add_argument("person", help="the person, by name (`clipper cast list`)")
+    r.add_argument("person", help="the person, by name (`clippa cast list`)")
     r.add_argument("--alias", action="append", help="another name (repeatable; replaces the list)")
     r.add_argument("--channel", action="append", metavar="URL", help="https://www.youtube.com/@name or "
                                                                      "https://kick.com/name (repeatable; replaces the list)")
@@ -2012,7 +2012,7 @@ def add_extras(sub) -> None:
     r.add_argument("target", metavar="URL|ID|FILE",
                    help="images.nasa.gov/details/..., dvidshub.net/video/..., archive.org/details/..., "
                         "pixabay.com/videos/..., a Commons File: page, "
-                        "an id from `clipper broll list`, or a file (with --credit)")
+                        "an id from `clippa broll list`, or a file (with --credit)")
     r.add_argument("--from", dest="start", type=time_arg, metavar="TIME", help="the part starts here (0:01:20)")
     r.add_argument("--to", dest="end", type=time_arg, metavar="TIME", help="...and ends here (default: the end)")
     r.add_argument("--tag", action="append", help="a tag (repeatable)")
@@ -2026,7 +2026,7 @@ def add_extras(sub) -> None:
     r.add_argument("--json", action="store_true", help="as JSON, with each file's path (for Resolve)")
     for act, what in (("keep", "keep these new clips"), ("drop", "delete these clips; their sources aren't found again")):
         r = bsub.add_parser(act, help=what)
-        r.add_argument("ids", nargs="+", metavar="ID", help="the clips' ids (clipper broll list)")
+        r.add_argument("ids", nargs="+", metavar="ID", help="the clips' ids (clippa broll list)")
 
     p = sub.add_parser("clipart", help="free clip art, engravings, icons and emoji (Wikimedia Commons, The Met, the "
                                        "Cleveland Museum of Art, Iconify, Pixabay), with each file's credit and licence")
@@ -2056,7 +2056,7 @@ def add_extras(sub) -> None:
     for act, what in (("keep", "keep these new pictures"),
                       ("drop", "delete these pictures; their sources aren't found again")):
         r = asub.add_parser(act, help=what)
-        r.add_argument("ids", nargs="+", metavar="ID", help="the pictures' ids (clipper clipart list)")
+        r.add_argument("ids", nargs="+", metavar="ID", help="the pictures' ids (clippa clipart list)")
 
     p = sub.add_parser("doc", help="a narrated mini-documentary: a hand-written plan -> narration -> a Resolve "
                                    "timeline -> a mastered render, a leak check and a publish kit")
@@ -2128,12 +2128,12 @@ def add_extras(sub) -> None:
     nsub.add_parser("feeds", help="each source: last fetch, items, error")
     nsub.add_parser("watch", help="who is watched, under which names, for which shows")
     r = nsub.add_parser("dismiss", help="never post these stories")
-    r.add_argument("ids", nargs="+", type=int, metavar="STORY", help="story numbers, as `clipper news list` shows them")
+    r.add_argument("ids", nargs="+", type=int, metavar="STORY", help="story numbers, as `clippa news list` shows them")
     r = nsub.add_parser("context", help="these stories as the show's next stream_context")
-    r.add_argument("ids", nargs="+", type=int, metavar="STORY", help="story numbers, as `clipper news list` shows them")
+    r.add_argument("ids", nargs="+", type=int, metavar="STORY", help="story numbers, as `clippa news list` shows them")
     r.add_argument("--show", dest="context_show", help="the show (default: the story's)")
 
-    p = sub.add_parser("blinds", help="gossip blind items: you guess who first, then clipper looks into it (#111)")
+    p = sub.add_parser("blinds", help="gossip blind items: you guess who first, then Clippa looks into it (#111)")
     bsub = p.add_subparsers(dest="action", required=True, metavar="<action>")
     p.set_defaults(fn=cmd_blinds)
     r = bsub.add_parser("check", help="fetch each source, store new blinds and reveals, read the clues, pair twins")
@@ -2147,7 +2147,7 @@ def add_extras(sub) -> None:
     r.add_argument("--all", action="store_true", help="hidden, not-ours and reveals too")
     r.add_argument("--json", action="store_true", help="the rows as JSON")
     r = bsub.add_parser("show", help="one blind: its text, clues, tags, twin and your guess")
-    r.add_argument("blind", help="its id, as `clipper blinds list` shows it")
+    r.add_argument("blind", help="its id, as `clippa blinds list` shows it")
     r.add_argument("--json", action="store_true", help="the blind as JSON")
     r = bsub.add_parser("guess", help="a blind from anywhere else, pasted as text; its clues read now")
     r.add_argument("text", help="the blind's text")
@@ -2160,7 +2160,7 @@ def add_extras(sub) -> None:
     r.add_argument("--not-ours", action="store_true", help="not one to look into")
     bsub.add_parser("sources", help="each source: last fetch, error, how many stored")
 
-    p = sub.add_parser("costs", help="what clipper spent this month: models, Modal, fixed costs (#50)")
+    p = sub.add_parser("costs", help="what Clippa spent this month: models, Modal, fixed costs (#50)")
     p.add_argument("--month", help="YYYY-MM (default: this month, UTC)")
     p.add_argument("--json", action="store_true", help="the report as JSON")
     p.add_argument("--backfill", action="store_true",
@@ -2194,7 +2194,7 @@ def add_extras(sub) -> None:
     add_stream(q)
     q.set_defaults(fn=cmd_compare)
 
-    p = sub.add_parser("models", help="can a model do clipper's jobs? built-in checks, no stream needed (#72)")
+    p = sub.add_parser("models", help="can a model do Clippa's jobs? built-in checks, no stream needed (#72)")
     rsub = p.add_subparsers(dest="action", required=True, metavar="<action>")
     q = rsub.add_parser("test", help="Pass A on made-up windows, JSON, vision, text, a long transcript; "
                                      "which stages it could take")
@@ -2317,7 +2317,7 @@ def add_setup(sub) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    ap = Parser(prog="clipper", epilog=command_list(), formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = Parser(prog="clippa", epilog=command_list(), formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--version", action=Version, help="show this copy's version and exit")
     ap.add_argument("--config", help="path to clipper.toml (default: $CLIPPER_CONFIG or ./clipper.toml)")
     ap.add_argument("--show", help="use this [shows.<key>] profile (default: the stream's, by Kick channel)")

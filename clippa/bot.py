@@ -1,9 +1,9 @@
-"""Discord review bot (`clipper bot`): answers the buttons on review cards (clippa/
+"""Discord review bot (`clippa bot`): answers the buttons on review cards (clippa/
 notify.py) and a few slash commands, for [discord] allowed_user_ids only.
 
     buttons   Approve, Reject…, Changes…, Hold / unhold, Reopen, Pin time…, Retitle…,
               Thumbnail text… ("…" opens a form). Each writes to Kitsu through
-              clippa/actions.py, then (with [discord] replan) reruns `clipper schedule`,
+              clippa/actions.py, then (with [discord] replan) reruns `clippa schedule`,
               and updates the card; Thumbnail text also swaps in the re-rendered .jpg.
               Retitle… edits the YouTube title, description, hashtags, tags and
               playlist in one form.
@@ -11,19 +11,19 @@ notify.py) and a few slash commands, for [discord] allowed_user_ids only.
     /pending  items waiting on a decision (all=True: every item), with Kitsu links
     /item     show one item's card with its buttons (preview=True attaches the preview)
     /schedule upcoming releases from schedule.json (replan=True reruns the schedule first)
-    /post     post a stream's review cards (what `clipper review notify` does)
+    /post     post a stream's review cards (what `clippa review notify` does)
 
 Every [discord] refresh_minutes the bot also re-reads Kitsu for streams with posted cards
 and edits cards whose status, hold, pin, title or schedule changed outside Discord
 (clippa/cardsync.py). Every minute it DMs the notifications other processes queued
-(clippa/alerts.py), and every few minutes it posts the stories `clipper news check`
-found and asks you about the gossip blinds `clipper blinds check` stored (#111: a digest a
+(clippa/alerts.py), and every few minutes it posts the stories `clippa news check`
+found and asks you about the gossip blinds `clippa blinds check` stored (#111: a digest a
 day and alerts of their own, each with I think it's…, No idea and Not ours). It logs to
 paths.bot_log as well as the console, only one bot runs per streams folder (a lock file),
 and it writes a heartbeat (clippa/daemon.py) that the war room's
-Health panel and `clipper services status` read. deploy/hub runs it as a container.
+Health panel and `clippa services status` read. deploy/hub runs it as a container.
 
-Everything that isn't Discord is `clipper serve` (clippa/serve.py): the war room, the
+Everything that isn't Discord is `clippa serve` (clippa/serve.py): the war room, the
 hourly replan and upload, pre-show grabs, retakes and the daily jobs. The bot asks it over
 its API ([serve] url) to replan after a decision ([discord] replan) and to start a retake
 after "Changes": when serve isn't up, the decision is still in Kitsu and serve's next
@@ -70,8 +70,8 @@ FORMS = {  # action: (modal title, field label, required, max length, multiline)
     "pin": ("Pin release time", "YYYY-MM-DD HH:MM, or a date; empty unpins", False, 16, False),
     "thumbtext": ("Thumbnail text", "2-4 words on the thumbnail", True, 40, False),
 }
-NEWS_POST_S = 300  # how often the bot posts what `clipper news check` (a serve job) found
-BLINDS_POST_S = 300  # ...and asks about the blinds `clipper blinds check` (a serve job) stored
+NEWS_POST_S = 300  # how often the bot posts what `clippa news check` (a serve job) found
+BLINDS_POST_S = 300  # ...and asks about the blinds `clippa blinds check` (a serve job) stored
 DONE = {"approve": "Approved", "reject": "Rejected", "changes": "Changes requested for",
         "reopen": "Reopened", "hold": "Hold toggled on", "pin": "Pinned",
         "thumbtext": "New thumbnail text for"}
@@ -114,7 +114,7 @@ class CardButton(discord.ui.DynamicItem[discord.ui.Button],
 
 # The Retitle… button's form: (Kitsu column, actions.describe key, label, max length,
 # multiline). Only fields you change are written. A value longer than Discord allows
-# (4000) is left out of the form; edit it in Kitsu or with `clipper review`.
+# (4000) is left out of the form; edit it in Kitsu or with `clippa review`.
 DETAILS = [("YouTube title", "title", "YouTube title", 100, False),
            ("YouTube description", "description", "Description (hashtags go below it)", 4000, True),
            ("Hashtags", "hashtags", "Hashtags (closing the description)", 500, False),
@@ -236,7 +236,7 @@ class Bot(discord.Client):
         self.loop.create_task(self.beat_loop())
 
     async def on_ready(self) -> None:
-        log.info(f"clipper bot ready as {self.user} in guild {self.guild_id}; "
+        log.info(f"clippa bot ready as {self.user} in guild {self.guild_id}; "
                  f"{len(self.allowed)} allowed user(s)")
 
     async def refresh_cards(self) -> None:
@@ -259,7 +259,7 @@ class Bot(discord.Client):
             await asyncio.sleep(every)
 
     async def beat_loop(self) -> None:
-        """The heartbeat `clipper services status` and the war room's Health panel read."""
+        """The heartbeat `clippa services status` and the war room's Health panel read."""
         await self.wait_until_ready()
         while not self.is_closed():
             await asyncio.to_thread(daemon.beat, self.cfg, "bot", self.started_at,
@@ -267,7 +267,7 @@ class Bot(discord.Client):
             await asyncio.sleep(daemon.BEAT_S)
 
     async def news_loop(self) -> None:
-        """Post the stories `clipper news check` (a serve job) found, every few minutes."""
+        """Post the stories `clippa news check` (a serve job) found, every few minutes."""
         await self.wait_until_ready()
         await asyncio.sleep(90)  # after serve's first check
         while not self.is_closed():
@@ -279,7 +279,7 @@ class Bot(discord.Client):
             await asyncio.sleep(NEWS_POST_S)
 
     async def blinds_loop(self) -> None:
-        """Ask about the blinds `clipper blinds check` (a serve job) stored, every few minutes."""
+        """Ask about the blinds `clippa blinds check` (a serve job) stored, every few minutes."""
         await self.wait_until_ready()
         await asyncio.sleep(120)  # after serve's first check
         while not self.is_closed():
@@ -324,8 +324,8 @@ class Bot(discord.Client):
                       **{discord.Object(id=u, type=discord.Member): see for u in self.allowed}}
         try:
             channel = await guild.create_text_channel(
-                name, overwrites=overwrites, reason="clipper blinds",
-                topic="Gossip blind items (clipper blinds): who do you think each one is about? Research for "
+                name, overwrites=overwrites, reason="clippa blinds",
+                topic="Gossip blind items (clippa blinds): who do you think each one is about? Research for "
                       "you alone, never published.")
         except discord.Forbidden:
             raise ClipperError(f"couldn't make #{name}: give the bot Manage Channels, or make a private channel "
@@ -422,7 +422,7 @@ class Bot(discord.Client):
         nc, dc = self.cfg["news"], self.cfg["discord"]
         name = str(nc["channel"]).strip().lstrip("#").lower()
         if not nc["channel_id"] and name:
-            return await self.named_channel(name, "Headlines about the shows' people (clipper news): "
+            return await self.named_channel(name, "Headlines about the shows' people (clippa news): "
                                                   "Dismiss what isn't news, Tonight's context for the next stream")
         cid = int(nc["channel_id"] or dc["review_channel_id"] or 0)
         if not cid:
@@ -436,7 +436,7 @@ class Bot(discord.Client):
             with contextlib.suppress(discord.NotFound):
                 return self.get_channel(int(state["thread_id"])) or await self.fetch_channel(int(state["thread_id"]))
         made = await channel.create_thread(name="News", content="📰 Headlines about the shows' people "
-                                           "(`clipper news`). Dismiss what isn't news; Tonight's context "
+                                           "(`clippa news`). Dismiss what isn't news; Tonight's context "
                                            "adds a story to the show's next stream.")
         await asyncio.to_thread(news.jsonstate.write, path, {"channel_id": str(cid), "thread_id": str(made.thread.id)})
         return made.thread
@@ -448,7 +448,7 @@ class Bot(discord.Client):
         if channel:
             return channel
         try:
-            channel = await guild.create_text_channel(name, topic=topic[:1024], reason="clipper news")
+            channel = await guild.create_text_channel(name, topic=topic[:1024], reason="clippa news")
         except discord.Forbidden:
             raise ClipperError(f"couldn't make #{name}: give the bot Manage Channels, or make the channel "
                                "by hand") from None
@@ -517,7 +517,7 @@ class Bot(discord.Client):
                 add_ref = ref if ref.startswith("s") else f"{show or '-'}.{'-'.join(map(str, used))}"
                 view.add_item(CardButton("newsadd", add_ref, "Add it", discord.ButtonStyle.success))
                 await interaction.response.send_message(
-                    f"For {news.show_names(cfg).get(show, show) or 'which show? (`clipper news context --show`)'}'s "
+                    f"For {news.show_names(cfg).get(show, show) or 'which show? (`clippa news context --show`)'}'s "
                     f"next stream, [scoring] stream_context gets:\n> {text}"[:2000],
                     view=view if show and used else None, ephemeral=True, allowed_mentions=quiet)
             elif action == "newsadd":
@@ -544,7 +544,7 @@ class Bot(discord.Client):
         return False
 
     async def blocking(self, fn, *args, **kwargs):
-        """Run clipper code (sync, may print or raise ClipperError) off the event loop."""
+        """Run Clippa code (sync, may print or raise ClipperError) off the event loop."""
         def run():
             out = io.StringIO()
             try:
@@ -724,7 +724,7 @@ def register_commands(bot: Bot) -> None:  # noqa: C901
                                         files=[discord.File(f) for f in files])
 
     @tree.command(name="schedule", description="Upcoming releases from schedule.json")
-    @app_commands.describe(days="how far ahead", replan="rerun clipper schedule first (syncs Kitsu)")
+    @app_commands.describe(days="how far ahead", replan="rerun clippa schedule first (syncs Kitsu)")
     async def schedule_cmd(interaction: discord.Interaction, days: int = 7, replan: bool = False):
         await interaction.response.defer(thinking=True)
         try:
@@ -767,14 +767,14 @@ def run(cfg: dict) -> None:
     except ClipperError as e:
         log.error(str(e))
         raise
-    log.info(f"clipper bot starting (pid {os.getpid()}); card refresh every "
-             f"{dc['refresh_minutes']} min; clipper serve at {serve.url(cfg)}")
+    log.info(f"clippa bot starting (pid {os.getpid()}); card refresh every "
+             f"{dc['refresh_minutes']} min; clippa serve at {serve.url(cfg)}")
     try:
         Bot(cfg).run(notify.token(cfg), log_handler=None)
     except BaseException as e:
         if not isinstance(e, KeyboardInterrupt):
-            log.exception("clipper bot stopped")
+            log.exception("clippa bot stopped")
         raise
     finally:
         lock.close()
-    log.info("clipper bot stopped")
+    log.info("clippa bot stopped")

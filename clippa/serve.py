@@ -1,29 +1,29 @@
-"""`clipper serve`: the always-on process. It serves the war room (the clippa/warroom package) and
+"""`clippa serve`: the always-on process. It serves the war room (the clippa/warroom package) and
 runs the background jobs that used to ride inside the Discord bot, so the bot is only
 Discord and this can move to the NAS on its own (#12, #64).
 
-    clipper serve [--port 8765]
+    clippa serve [--port 8765]
 
-Jobs (`jobs()`; each runs `clipper ...` as a child process; an interval of 0 turns one off):
-    upload     every [youtube] auto_upload_minutes: `clipper schedule`, then `clipper upload`
-    preshow    every [preshow] poll_minutes: `clipper preshow check --run`, for shows with a
+Jobs (`jobs()`; each runs `clippa ...` as a child process; an interval of 0 turns one off):
+    upload     every [youtube] auto_upload_minutes: `clippa schedule`, then `clippa upload`
+    preshow    every [preshow] poll_minutes: `clippa preshow check --run`, for shows with a
                pre-show channel
     retake     with [retake] auto: every 10 min when review.json (as last synced) has retake
-               notes not acted on, and every 30 min regardless, since `clipper retake` syncs
+               notes not acted on, and every 30 min regardless, since `clippa retake` syncs
                Kitsu itself and finds notes nothing else synced; at once when the war room or
                the bot asks (POST /api/retake, which runs even with auto off)
-    auto       every 10 min while a show has [review] auto_approve: `clipper review auto` (#259), which
+    auto       every 10 min while a show has [review] auto_approve: `clippa review auto` (#259), which
                approves what nobody acted on in the grace window and replans
-    tiktok     every [tiktok] auto_send_minutes: `clipper tiktok --auto` (when signed in)
-    x          every [x] auto_post_minutes: `clipper x --auto` (when signed in)
+    tiktok     every [tiktok] auto_send_minutes: `clippa tiktok --auto` (when signed in)
+    x          every [x] auto_post_minutes: `clippa x --auto` (when signed in)
     analytics  every [analytics] auto_hours, once something is uploaded
-    cast       every [cast] auto_hours: `clipper cast auto` (needs OpenCV and [thumbnail] photos)
-    news       every [news] check_minutes: `clipper news check` (the bot posts what it finds)
-    blinds     every [blinds] check_minutes: `clipper blinds check` (the bot asks you about them)
-    backup     `clipper backup` when the newest zip is [backup] every_days old (looked at hourly)
-    prune      daily with [streams] keep_source_days: `clipper streams prune --yes --older-than N`
+    cast       every [cast] auto_hours: `clippa cast auto` (needs OpenCV and [thumbnail] photos)
+    news       every [news] check_minutes: `clippa news check` (the bot posts what it finds)
+    blinds     every [blinds] check_minutes: `clippa blinds check` (the bot asks you about them)
+    backup     `clippa backup` when the newest zip is [backup] every_days old (looked at hourly)
+    prune      daily with [streams] keep_source_days: `clippa streams prune --yes --older-than N`
                (and `--while-free-below P` with [streams] keep_free_pct)
-    checkup    every [checkup] fix_minutes: `clipper checkup --fix --alert` (#287) over the checks
+    checkup    every [checkup] fix_minutes: `clippa checkup --fix --alert` (#287) over the checks
                that have repairs (the ones [checkup] fix lists act, the others are logged as
                would-fix) and signins: a sign-in that is gone is DMed once, not left for the morning
 A job that exits non-zero is queued as a DM (clippa/alerts.py; the bot sends it). One marked
@@ -31,15 +31,15 @@ retry (analytics, prune: free, and a day apart) that fails runs again in RETRY_F
 with each failure in a row, up to its own interval; the others wait their interval.
 
 Every minute it writes <streams>/.serve/status.json (clippa/daemon.py): what ran last,
-what is running, what is due next. `clipper services status`, the war room's Health panel
-and `clipper doctor` read it from any machine. One serve per streams folder (.serve.lock).
+what is running, what is due next. `clippa services status`, the war room's Health panel
+and `clippa doctor` read it from any machine. One serve per streams folder (.serve.lock).
 It logs to [paths] serve_log; deploy/hub runs it as a container.
 
 The bot reaches it at [serve] url ("" = http://127.0.0.1:<[warroom] port>/) with the war
 room token (the same [warroom] token or secrets file on both machines when they differ):
 `replan` after a decision, `start_retake` after "Changes...", `health` for the tailnet link.
 On different machines the bot still reads schedule.json and the news database that serve
-writes, so [paths] schedule and news must be on the streams share (`clipper doctor --role
+writes, so [paths] schedule and news must be on the streams share (`clippa doctor --role
 bot` checks).
 """
 
@@ -74,7 +74,7 @@ from .errors import ClipperError
 log = logging.getLogger("clippa.serve")
 
 RETAKE_EVERY_S = 600   # with [retake] auto: act on notes review.json already has this often
-RETAKE_SYNC_S = 1800   # ...and run `clipper retake` anyway this often: it syncs Kitsu first
+RETAKE_SYNC_S = 1800   # ...and run `clippa retake` anyway this often: it syncs Kitsu first
 FIRST_PASS_S = 30      # settle (the war room warms up) before the first job
 RETRY_FAILED_S = 1800  # a retry job that failed: again this soon, then 1 h, 2 h, ... up to its interval
 
@@ -204,7 +204,7 @@ class Serve:
         ]
 
     async def run_clipper(self, name: str, args: list[str], streak: bool = True) -> int | None:
-        """Run `clipper <args>` as a child process, its output into the serve log. streak:
+        """Run `clippa <args>` as a child process, its output into the serve log. streak:
         this one call is the job's run, so it counts toward its failures in a row (a job of
         several commands passes False and calls count_run itself, once)."""
         cmd = actions.clipper_cmd(self.cfg)
@@ -231,7 +231,7 @@ class Serve:
                 # Keyed on the last line too, verbatim (item keys carry their digits), so a
                 # different item failing the next hour isn't swallowed by this one's cooldown.
                 alerts.send(self.cfg, "upload" if name in ("upload", "tiktok", "x") else "failure",
-                            f"`clipper {' '.join(args)}` failed (exit {proc.returncode}): {last[:400]}",
+                            f"`clippa {' '.join(args)}` failed (exit {proc.returncode}): {last[:400]}",
                             key=f"bg:{' '.join(args)}:{last[:160]}")
             return proc.returncode
         except Exception as e:
@@ -256,7 +256,7 @@ class Serve:
         self.count_run("upload", ok=replan == 0 and up == 0)  # one run of the job, not two
 
     def start_retake(self) -> None:
-        """`clipper retake` in the background: act on retake notes, republish for review.
+        """`clippa retake` in the background: act on retake notes, republish for review.
         A request while one runs makes it run once more when it ends. The timer and the
         bot check [retake] auto; an explicit POST /api/retake runs either way."""
         if self.running("retake"):
@@ -334,12 +334,12 @@ def run(cfg: dict, port: int | None = None) -> None:
     except ClipperError as e:
         log.error(str(e))
         raise
-    log.info(f"clipper serve starting (pid {os.getpid()})")
+    log.info(f"clippa serve starting (pid {os.getpid()})")
     try:
         srv = warroom.server(cfg, port)
     except OSError as e:
         raise ClipperError(f"war room: port {port or base(cfg)['warroom']['port']} is busy ({e}); is "
-                           "`clipper warroom`, or a `clipper bot` from before the split, still serving it?") from None
+                           "`clippa warroom`, or a `clippa bot` from before the split, still serving it?") from None
     threading.Thread(target=srv.serve_forever, daemon=True, name="warroom").start()
     log.info(f"war room on {warroom.url(cfg, port, with_key=False)}")  # no token in the log
     try:
@@ -347,12 +347,12 @@ def run(cfg: dict, port: int | None = None) -> None:
     except KeyboardInterrupt:
         pass
     except BaseException:
-        log.exception("clipper serve stopped")
+        log.exception("clippa serve stopped")
         raise
     finally:
         srv.shutdown()
         lock.close()
-    log.info("clipper serve stopped")
+    log.info("clippa serve stopped")
 
 
 # ---------- the client: the bot (and doctor) talking to a running serve ----------
@@ -375,14 +375,14 @@ def call(cfg: dict, path: str, body: dict | None = None, timeout: float = 60) ->
         else:
             r = requests.post(u, json=body, headers=headers, timeout=timeout)
     except requests.RequestException as e:
-        raise ClipperError(f"clipper serve isn't answering at {url(cfg)} ({type(e).__name__})") from None
+        raise ClipperError(f"clippa serve isn't answering at {url(cfg)} ({type(e).__name__})") from None
     try:
         data = r.json()
     except ValueError:
         data = {}
     if r.status_code >= 400 or (isinstance(data, dict) and data.get("error")):
         why = data.get("error", "") if isinstance(data, dict) else ""
-        raise ClipperError(f"clipper serve {path}: {why or 'refused'} (HTTP {r.status_code})")
+        raise ClipperError(f"clippa serve {path}: {why or 'refused'} (HTTP {r.status_code})")
     return data
 
 
@@ -399,7 +399,7 @@ def tailnet_link(cfg: dict) -> str:
 
 
 def replan(cfg: dict, sync: bool = False) -> dict:
-    """`clipper schedule` on the serve process (it owns schedule.json); sync: read Kitsu first."""
+    """`clippa schedule` on the serve process (it owns schedule.json); sync: read Kitsu first."""
     return call(cfg, "/api/replan", {"sync": sync}, timeout=600)
 
 

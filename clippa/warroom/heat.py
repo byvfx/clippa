@@ -1,4 +1,4 @@
-"""The heat window: one stream's heat curve (`clipper signals`), the windows picked from it and
+"""The heat window: one stream's heat curve (`clippa signals`), the windows picked from it and
 where each cut item sits in the stream, in its review state."""
 from __future__ import annotations
 
@@ -98,7 +98,7 @@ def curve(cfg: dict, sdir: Path) -> dict:
 
         heat = pq.read_table(signals, columns=["heat"])["heat"].to_numpy(zero_copy_only=False)
     except Exception as e:  # noqa: BLE001 - a file half written or from an older stage: say so, draw nothing
-        return {**out, "error": f"signals.parquet can't be read ({type(e).__name__}): run clipper signals again"}
+        return {**out, "error": f"signals.parquet can't be read ({type(e).__name__}): run clippa signals again"}
     out["bucket_s"], out["heat"] = buckets(heat)
     out["duration_s"] = len(heat)   # the curve's own length: what the page's time axis must cover
     win = jsonstate.read_or(sdir / "windows.json", {}) or {}

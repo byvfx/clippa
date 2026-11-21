@@ -2,12 +2,12 @@
 
 What gets scheduled, across every stream with review decisions:
     clip         approved shot (Pass B pick)
-    short        approved vertical Short of a pick (`clipper shorts`)
+    short        approved vertical Short of a pick (`clippa shorts`)
     segment      approved topic segment
     compilation  a topic compilation whose segments are all approved
 A pre-show (clippa/preshow.py) is a segment too; with [preshow] publish = "asap" it is
 placed at the moment of this run as soon as it is approved, outside the slots and spacing
-rules, and moves along with each rerun until `clipper upload` publishes it.
+rules, and moves along with each rerun until `clippa upload` publishes it.
 Held items (Kitsu "Hold") are skipped. "Publish at" in Kitsu ("2026-10-20 15:00", or a
 date for that day's first slot) pins an item; everything else fills the [schedule]
 slots: clip/short/segment/compilation days and times, at most max_per_day releases,
@@ -317,7 +317,7 @@ def previous(out_path: Path) -> tuple[dict, dict]:
     if out_path.exists():
         prev_sched = jsonstate.load(out_path)
         old = {e["key"]: {**e, "file": stream_file(e)} for e in prev_sched["entries"]}
-        # Other platforms' records (clipper rumble), kept while an item is unscheduled too.
+        # Other platforms' records (clippa rumble), kept while an item is unscheduled too.
         platforms = {e["key"]: e["platforms"] for e in prev_sched["entries"]
                      + prev_sched.get("unscheduled", []) if e.get("platforms")}
     return old, platforms
@@ -352,7 +352,7 @@ def plan(items: list[dict], skipped: list[dict], old: dict, platforms: dict, sc:
          tz: ZoneInfo, now: datetime, start: date, reshuffle: bool,
          lead: timedelta = timedelta(0)) -> tuple[dict, list]:
     """Place items into slots: (entries by key, the ones left out). lead: no new slot sooner
-    than this ([youtube] min_lead_minutes: `clipper upload` would call it missed)."""
+    than this ([youtube] min_lead_minutes: `clippa upload` would call it missed)."""
     p = Placed(old, platforms)
     keep_uploaded(p, items)
     place_pinned(p, items, skipped, sc, tz, now)

@@ -1,12 +1,12 @@
-"""`clipper perform`: a lip-sync take to a script read, cut for the character model (#58).
+"""`clippa perform`: a lip-sync take to a script read, cut for the character model (#58).
 
 Usage:
-    clipper perform prepare <recording> --read <read.wav> [--take N] [--out DIR]
-    clipper perform status <dir>
-    clipper perform stitch <dir>
-    clipper perform lipsync <dir> [--engine latentsync|sync|both]   (--deploy: the Modal app)
+    clippa perform prepare <recording> --read <read.wav> [--take N] [--out DIR]
+    clippa perform status <dir>
+    clippa perform stitch <dir>
+    clippa perform lipsync <dir> [--engine latentsync|sync|both]   (--deploy: the Modal app)
 
-"Perform to playback" (#57): the performer plays the character's read (`clipper narrate
+"Perform to playback" (#57): the performer plays the character's read (`clippa narrate
 speak`) out loud and lip-syncs to it on camera, one or more takes in one recording.
 
 prepare  finds every take in the recording by cross-correlating its audio with the read (the
@@ -14,7 +14,7 @@ prepare  finds every take in the recording by cross-correlating its audio with t
          the take into pieces of at most [perform] max_piece_s (WAN 3 Prime takes 15 s of
          reference video) at those pauses. Writes DIR/pieceN.mp4 (30 fps, under the upload
          size) and DIR/manifest.json.
-render   is not a clipper step: the pieces go through the character model (Runway WAN 3 Prime
+render   is not a Clippa step: the pieces go through the character model (Runway WAN 3 Prime
          with Mother Moo's hero image, via the Runway connection in Claude Code or the Runway
          web app; the Max plan's credits aren't reachable from an API key). Save each result
          as DIR/renderN.mp4.
@@ -119,7 +119,7 @@ def prepare(recording: Path, read: Path, pc: dict, take: int = 1, out: Path | No
                 "take_start": round(t0, 3), "end": round(end, 3), "pieces": pieces}
     jsonstate.write(out / "manifest.json", manifest)
     print(f"{out}: {len(pieces)} pieces; render each with the character model and save it as renderN.mp4,"
-          f" then: clipper perform stitch {out}")
+          f" then: clippa perform stitch {out}")
     return out
 
 

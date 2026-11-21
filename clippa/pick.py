@@ -1,10 +1,10 @@
 """Hand picks: Shorts from a stretch of a stream the user names.
 
 Usage:
-    clipper pick <stream> --from 4:05:00 --to 4:25:00 --about "the Quartering bit"
-    clipper pick <stream> --at 4:50:00 --about "Jer's story"     (--span around it)
-    clipper pick <stream> --about "the video Andy and PPP go on about"   (located first)
-    clipper pick <stream> --find "quartering"       (transcript search, no model calls)
+    clippa pick <stream> --from 4:05:00 --to 4:25:00 --about "the Quartering bit"
+    clippa pick <stream> --at 4:50:00 --about "Jer's story"     (--span around it)
+    clippa pick <stream> --about "the video Andy and PPP go on about"   (located first)
+    clippa pick <stream> --find "quartering"       (transcript search, no model calls)
 
 Times are H:MM:SS, H:MM (hours and minutes) or seconds, on the stream's clock: what the
 Kick VOD shows. A recording that started after the stream went live, or has gaps, is
@@ -12,7 +12,7 @@ shifted to the video's clock (--clock video takes times as they are).
 
 A model reads that stretch of the transcript with the request and returns up to
 [pick] max_clips moments, each with a Short window and a horizontal window, like a
-scoring Pass A record. Without a time, the stream's summary timeline (from `clipper
+scoring Pass A record. Without a time, the stream's summary timeline (from `clippa
 score`) is searched for the request first. New moments are appended to candidates.json
 as Pass A records (source "hand", ids h01, h02, ...) and Pass B picks, so every existing
 key (c03_t12, v03_t12) stays where it was; moments overlapping an existing pick are
@@ -168,7 +168,7 @@ def locate(sdir: Path, cfg: dict, about: str, claude: Claude, prompts: Prompts,
                                        key=lambda p: int(p.stem[9:]) if p.stem[9:].isdigit() else 0,
                                        reverse=True)), None)
     if not summary:
-        raise ClipperError("no stream summary to search (run `clipper score` first); "
+        raise ClipperError("no stream summary to search (run `clippa score` first); "
                          "give --from/--to or --at instead")
     timeline = "\n".join(f"[{b['start_s'] // 60:>3} min] {b['summary']}" for b in summary)
     pc = cfg["pick"]
@@ -317,7 +317,7 @@ def run(stream_dir: Path, cfg: dict, about: str = "", start: str | None = None,
     pc = cfg["pick"]
     cands_path = stream_dir / "candidates.json"
     if not cands_path.exists():
-        raise ClipperError("no candidates.json: run `clipper score` first")
+        raise ClipperError("no candidates.json: run `clippa score` first")
     if not dry_run and (who := worker_busy(stream_dir, cfg)):
         raise ClipperError(f"{stream_dir.name} is being processed by {who}; try again when it's done")
     meta = jsonstate.read(stream_dir / "meta.json", {})
@@ -368,9 +368,9 @@ def run(stream_dir: Path, cfg: dict, about: str = "", start: str | None = None,
     if make:
         make_picks(stream_dir, cfg, ids, notify)
     else:
-        print(f"next: clipper cut {stream_dir.name} picks; clipper meta {stream_dir.name} --missing; "
-              f"clipper thumbs {stream_dir.name} --missing; clipper shorts {stream_dir.name} "
-              f"--items {','.join(ids)}; clipper review publish {stream_dir.name} --only shorts")
+        print(f"next: clippa cut {stream_dir.name} picks; clippa meta {stream_dir.name} --missing; "
+              f"clippa thumbs {stream_dir.name} --missing; clippa shorts {stream_dir.name} "
+              f"--items {','.join(ids)}; clippa review publish {stream_dir.name} --only shorts")
     return ids
 
 
