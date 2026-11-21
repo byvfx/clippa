@@ -7,9 +7,27 @@ logs/, schedule.json; the current directory: the code, origin/main as of this ru
 hub runs once it is deployed), run the read-only commands you are allowed, exactly as written
 here (`clipper status`, `clipper checkup`, `clipper checkup --json`, `clipper doctor --offline`,
 `clipper record status`, `clipper worker --status`, and git as `checkup-git log|show|diff ...`;
-read logs with the Read tool, not tail), and send the DM. Nothing else: no stage,
-no model call, no upload, no schedule or config edit, no Kitsu decision, no deploy, no
-restart, no commit, no PR. If a fix needs one of those, say what the user should run.
+read logs with the Read tool, not tail), send the DM, and at most one PR (below). Nothing
+else: no stage, no model call, no upload, no schedule or config edit, no Kitsu decision, no
+deploy, no restart. If a fix needs one of those, say what the user should run.
+
+A PR, only for a clear code bug the evidence pins down (a traceback into clipper/ with an
+obvious cause, a check that is plainly wrong), small, with a test that fails without it. Not
+for a config value, a flaky network, a judgment call or anything you'd have to guess at: those
+go in the DM. The steps, exactly:
+
+    checkup-pr start <slug>       # a worktree at ~/checkup-fix on its own branch off origin/main
+    (edit only there, with Edit/Write: the fix, its test, a CHANGELOG.md Unreleased bullet if a
+     user would notice it, the wiki page under docs/wiki/ if behaviour changes)
+    checkup-pr check              # ruff and the whole test suite; fix until it passes
+    checkup-pr open "<title>" - <<'EOF'
+    What broke (the finding, the log lines), the cause, the fix, how the test shows it.
+    EOF
+
+If `check` won't pass in a few tries, or `open` refuses (only clipper/, tests/, docs/wiki/ and
+CHANGELOG.md; at most 200 changed lines), give up on the PR and describe the fix in the DM. One
+PR a run. Never merge it or ask for it to be merged: the user reviews, merges and deploys. Put
+the PR's link in the DM under its finding.
 
 How to read it:
 - A finding may carry "repair" (serve's `clipper checkup --fix`, which runs hourly): "due" = on,
@@ -20,7 +38,9 @@ How to read it:
 - A stream whose run.json heartbeat is fresh is the worker's: read it, never touch it.
 - For a stuck or failed stage, the end of streams/<id>/run_<stage>.log usually names
   the cause. For a quiet service, look for its last lines in logs/ (serve.log, bot.log).
-- For a code bug, name the file and line and what looks wrong; don't write the fix.
+- For a code bug, name the file and line and what looks wrong; fix it only as a PR (above).
+- The checks "tools", "signins", "logs" and "approvals" point at the cause in their text and
+  "look"; a sign-in only the user can renew (cookies, a token): say which and how.
 - Don't guess past the evidence: "not clear from the logs" is a fine answer.
 
 The DM: plain text, at most 1800 characters, no Markdown tables. First line

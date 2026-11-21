@@ -698,6 +698,11 @@ queue_hours = 3              # a finished recording waiting this long while noth
 late_hours = 1               # a release not uploaded this close to its slot (or past it)
 gap_hours = 24               # no release at all this far ahead; 0 = no check
 words = ["hosts", "co-host", "co-hosts"]   # never in a title, description or thumbnail text
+ytdlp_days = 60              # "tools": yt-dlp older than this (its version is its date); 0 = off
+signin_days = 7              # "signins": a cookies file's sign-in or a TikTok/X token expiring this soon; 0 = off
+repeat_errors = 5            # "logs": the same error this many times in serve's or the bot's log; 0 = off
+repeat_hours = 24            # ... within this long
+approved_hours = 3           # "approvals": an approved item the plan hasn't seen after this long; 0 = off
 # Self-maintenance (#287, `clipper checkup --fix`, clipper/repairs.py): fixed repairs for some
 # findings, no model. serve runs it every fix_minutes; only the kinds in `fix` act, the others
 # are logged as would-fix (<streams>/.checkup/repairs.json), so turn one on after a week of

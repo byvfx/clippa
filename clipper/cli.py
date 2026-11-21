@@ -1683,7 +1683,8 @@ def add_services(sub) -> None:
     p = sub.add_parser("checkup", help="what the alerts don't catch: stuck streams, quiet services, late uploads, "
                                        "title slips (reads files; exit 1 on findings)")
     p.add_argument("--only", action="append",
-                   choices=("services", "streams", "schedule", "lint", "auto", "housekeeping"),
+                   choices=("services", "streams", "schedule", "lint", "auto", "housekeeping", "tools", "signins",
+                            "logs", "approvals"),
                    help="just this check (repeatable)")
     p.add_argument("--json", action="store_true", help="the report as JSON (the nightly Claude run reads it)")
     p.add_argument("--mark", action="store_true",

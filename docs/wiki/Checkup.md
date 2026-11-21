@@ -26,6 +26,10 @@ clipper checkup --fix            # make the repairs [checkup] fix allows (serve 
 | schedule | nothing at all releases in the next `gap_hours` | `gap_hours` (24; 0 = off) |
 | lint | a title, description or thumbnail text about to go out has one of `words` in it, is over YouTube's limit, or has no description. It checks what `clipper upload` would send (Kitsu's columns, then the draft) | `words` |
 | auto | an item that [approved itself](Review#approval-by-silence) in the last 14 days and that a person then rejected, reopened, held or sent back for changes | `[review] auto_min_*`, `auto_grace_minutes` |
+| tools | yt-dlp is older than `ytdlp_days` (its version is its release date): downloads break as YouTube and Kick change | `ytdlp_days` (60; 0 = off) |
+| signins | a cookies file (YouTube's, Twitch's, HEI's) holds no live sign-in, or its sign-in cookie expires within `signin_days`; the YouTube export hasn't been written for a day; a TikTok or X sign-in expires within `signin_days`. YouTube's own token doesn't expire; a revoked one shows up in the logs | `signin_days` (7; 0 = off) |
+| logs | the same error, give or take ids and numbers, at least `repeat_errors` times in serve's or the bot's log in the last `repeat_hours`: an alert fires once, a loop keeps failing | `repeat_errors` (5; 0 = off), `repeat_hours` (24) |
+| approvals | an item approved at least `approved_hours` ago that the plan neither scheduled nor skipped with a reason (budget, stale, hold): the replan never saw it; or a plan older than that while serve should replan hourly | `approved_hours` (3; 0 = off) |
 | housekeeping | temp files (`<file>.<pid>.<thread>.tmp`) a killed write left beside a state file, a day old or more; and the share's free space under `[streams] keep_free_pct` (off at 0; a warning, bad under half of it; [Backups](Backups#disk-clipper-streams) has what prune then takes) | - |
 
 The settings are `[checkup]` in the config; a show's table or a stream's own `config.toml` can
@@ -84,11 +88,27 @@ The [claude container](Claude-on-the-NAS) runs the checkup every morning at `CHE
   likely cause and the next step. It runs on the Claude subscription, not the API key.
 - **Claude can't run** (signed out, usage limit): the plain findings go out instead.
 
-That run is read-only. It may use the read tools and a fixed list of commands, each exactly as
-written (`clipper checkup`, `checkup --json`, `status`, `doctor --offline`, `record status`,
-`worker --status`), `alert send`, and git through `checkup-git log|show|diff`, which refuses the
-options that write (`--output`). Nothing else: no stage, no model call, no upload, no schedule,
-config or Kitsu change, no commit, no PR. When a fix needs one of those, the DM says what to run.
+That run is read-only but for one PR. It may use the read tools and a fixed list of commands,
+each exactly as written (`clipper checkup`, `checkup --json`, `status`, `doctor --offline`,
+`record status`, `worker --status`), `alert send`, git through `checkup-git log|show|diff`, which
+refuses the options that write (`--output`), and `checkup-pr`. Nothing else: no stage, no model
+call, no upload, no schedule, config or Kitsu change, no deploy. When a fix needs one of those,
+the DM says what to run.
+
+### A PR for a clear code fix
+
+When a finding pins down a code bug (a traceback into `clipper/` with an obvious cause), the
+nightly run may fix it as one PR, through `checkup-pr` (`deploy/claude/checkup-pr.sh`):
+
+- `checkup-pr start <slug>` makes a worktree at `~/checkup-fix` on a branch `checkup/<MMDD>-<slug>`
+  off `origin/main`. Claude's Edit and Write work only there, never in the clone.
+- `checkup-pr check` runs ruff and the tests there, as CI does.
+- `checkup-pr open "<title>" -` commits, pushes and opens the PR (its body on stdin). It refuses
+  a change outside `clipper/`, `tests/`, `docs/wiki/` and `CHANGELOG.md`, one over 200 changed
+  lines (`CHECKUP_PR_MAX_LINES`), a second PR in the same run, and anything in a `--dry-run`.
+
+The DM links the PR under its finding. The PR gets the usual reviews (the `review` workflow
+or Copilot); nothing merges or deploys it: you review, merge and run the hub deploy.
 
 It runs `main`'s code from its own worktree (`~/checkup-src` in the container, updated every
 run), not the clone, which a phone session may have on any branch; `CHECKUP_REF` in
@@ -101,6 +121,3 @@ that has the kind (deployed after 2026-11-09).
 The DM is kind `checkup` in `[notify] kinds`, and `clipper alert send` is how any script queues
 one: `clipper alert send --kind checkup "text"`, or `-` to read stdin.
 
-Planned (#287): more checks (yt-dlp out of date or failing, cookies and tokens about to expire,
-repeated errors in `logs/`, Kitsu approvals that never reached the schedule), and then PRs for
-clear code fixes from the nightly run.
