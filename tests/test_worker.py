@@ -166,7 +166,7 @@ def test_run_from_follows_the_planned_order():
 
 
 def test_run_passes_a_show_pin_to_its_stages(tmp_path, defaults, monkeypatch):
-    """`clipper --show c404 run <stream>`: each stage child gets --show c404 too."""
+    """`clippa --show c404 run <stream>`: each stage child gets --show c404 too."""
     from clippa import config
     cfg = {**defaults, "shows": {"c404": {"channels": ["don"], "overrides": {}}}}
     calls = []

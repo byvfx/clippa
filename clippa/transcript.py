@@ -1,5 +1,5 @@
 """The transcript as the stages read it: words.jsonl (with speaker names once
-`clipper speakers` has named voices) and the "[start_s] [who] text" lines prompts get."""
+`clippa speakers` has named voices) and the "[start_s] [who] text" lines prompts get."""
 from __future__ import annotations
 
 import json
@@ -10,7 +10,7 @@ UNNAMED = re.compile(r"SPEAKER_\d+")
 
 
 def load_words(stream_dir: Path) -> list[dict]:
-    """words.jsonl. When `clipper speakers` named at least one voice (other than music),
+    """words.jsonl. When `clippa speakers` named at least one voice (other than music),
     each word also gets `who`: the name, "?" for a voice nobody matched, None for no turn."""
     lines = (stream_dir / "words.jsonl").read_text(encoding="utf-8").splitlines()
     words = [json.loads(line) for line in lines]

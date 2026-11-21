@@ -15,7 +15,7 @@ screenshots; "default" without a show), with the same tables, e.g.
     [[cover.teasers.boxes]]    # a list replaces the whole list: give every box
     ...
 
-then `clipper thumbs <stream> --compose-only` redraws the covers with no model calls."""
+then `clippa thumbs <stream> --compose-only` redraws the covers with no model calls."""
 
 from __future__ import annotations
 

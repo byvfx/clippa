@@ -1,15 +1,15 @@
-"""Finalize a recording: turn live/ into what `clipper fetch` produces.
+"""Finalize a recording: turn live/ into what `clippa fetch` produces.
 
     source.mkv   the recorded parts joined by stream copy (no re-encode)
     chat.jsonl   same rows as kick.fetch_chat: id, ts (server time), user, type, content, t
     meta.json    same keys as kick.resolve, plus "recording" (parts, gaps, chat coverage)
-    audio.wav    16 kHz mono, as the transcribe stage writes it, so `clipper signals` runs
+    audio.wav    16 kHz mono, as the transcribe stage writes it, so `clippa signals` runs
 
 Video t=0 is the first recorded part's program date-time, so for a recording without gaps
 chat t = ts - started_at exactly, as for a fetched VOD; with gaps the joined source is shorter
 than the wall-clock span and chat t is mapped part by part (source_map, source_time).
 
-Safe to run again (`clipper record finalize <stream>`): the parts that went into the source
+Safe to run again (`clippa record finalize <stream>`): the parts that went into the source
 are noted in the state, and a source joined by an earlier run is reused once its parts have
 been moved or deleted (#77 L17)."""
 
@@ -173,7 +173,7 @@ def make_meta(st: State, mapping: list[dict], src: str, duration: float, live_n:
         "duration_s": round(duration, 3),
         "source": src,
         "recording": {
-            "recorder": "clipper record",
+            "recorder": "clippa record",
             "stream_started_at": st.stream_started_at,
             "ended_at": _iso(wall_end),
             "sessions": st.sessions,

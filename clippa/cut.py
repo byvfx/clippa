@@ -259,7 +259,7 @@ def cut_compilations(stream_dir: Path, cfg: dict, topics: list[str] | None = Non
 
 def unchanged_pick(dst: Path, p: dict, c: dict) -> bool:
     """The clip is there and its sidecar has the same in/out: nothing to redo (a hand
-    `clipper cut` used to re-encode every pick, and `thumbs` then re-paid every cover)."""
+    `clippa cut` used to re-encode every pick, and `thumbs` then re-paid every cover)."""
     side = dst.with_suffix(".json")
     if not dst.exists() or not side.exists():
         return False
@@ -316,7 +316,7 @@ def cut_picks(stream_dir: Path, cfg: dict, ids: list[str] | None = None, force: 
 # the copy, the rest the AAC encode; three at once share the NAS's 6 cores).
 
 def on_nas(stream_dir: Path, cfg: dict, argv: list[str]) -> None:
-    """Run `clipper cut <argv>` in a one-off container of the recorder image on the NAS, with
+    """Run `clippa cut <argv>` in a one-off container of the recorder image on the NAS, with
     this checkout's clippa/ package and config (the image's own copy may be older)."""
     cc = for_stream(cfg, stream_dir)["cut"]
     missing = [k for k in ("nas_host", "nas_data") if not cc[k]]

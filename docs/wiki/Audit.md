@@ -1,12 +1,12 @@
-`clipper audit` tells you how the week went, and once a month a deep audit reads the saved
+`clippa audit` tells you how the week went, and once a month a deep audit reads the saved
 weeks to find what keeps going wrong. Where [Checkup](Checkup) asks "what is wrong right now",
 this one looks for patterns.
 
 ## The weekly digest
 
 ```bash
-clipper audit         # the digest, at most three things to do
-clipper audit --all   # every thing to do, and where to look
+clippa audit         # the digest, at most three things to do
+clippa audit --all   # every thing to do, and where to look
 ```
 
 It reads files and makes no model call, so it costs nothing. It covers:
@@ -34,7 +34,7 @@ The settings are `[audit]` in the config.
 
 ### Backups
 
-`clipper backup` ([Backups](Backups)) writes to `[backup] folder`, and serve makes one every
+`clippa backup` ([Backups](Backups)) writes to `[backup] folder`, and serve makes one every
 `[backup] every_days`. With the folder set to `""`, the digest says every week that nothing is
 backing up your files. Once it is set, the digest warns when the newest file there is older
 than `[backup] max_age_days`. It only looks at the date of the newest file, so restore from a
@@ -53,7 +53,7 @@ It shows from a week before the date until you take the line out.
 
 ## The monthly deep audit
 
-On `AUDIT_MONTHDAY` (default the 1st) the container gives `clipper audit --brief`, the last
+On `AUDIT_MONTHDAY` (default the 1st) the container gives `clippa audit --brief`, the last
 `deep_weeks` weeks side by side with repeat problems first, to a headless `claude -p` run
 (prompt: `deploy/claude/audit-deep.md`). It follows the repeat problems into the stage logs and
 the code, looks for drift in spend, failures, disk and uploads, reads why picks were rejected,

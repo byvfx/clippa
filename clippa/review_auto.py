@@ -1,4 +1,4 @@
-"""Approval by silence (#259 step B): `clipper review auto`, and serve's job that runs it.
+"""Approval by silence (#259 step B): `clippa review auto`, and serve's job that runs it.
 
 An item approves itself when its show has [review] auto_approve on, nobody has acted on it,
 its pre-flight checks (review_check) are clean, its score is at least its kind's floor
@@ -182,8 +182,8 @@ def verdict(cfg: dict, kind_of_stream: str, key: str, st: dict, r: dict, check: 
         return Verdict(key, "person", auto["out"])
     fields = r.get("fields") or {}
     if is_held(fields):
-        # clipper's own hold (other voices) can lift by itself; a person's, or their release of
-        # clipper's, differs from the proposal and also shows as edited: that one lasts
+        # Clippa's own hold (other voices) can lift by itself; a person's, or their release of
+        # Clippa's, differs from the proposal and also shows as edited: that one lasts
         mine = is_held(st.get("fields") or {})
         return Verdict(key, "person", "held for other voices" if mine else "held", lasting=not mine)
     if r.get("edited"):
@@ -242,7 +242,7 @@ def note(v: Verdict | dict | None, tz: str) -> str:
 
 def _remember(sdir: Path, vs: dict[str, Verdict], state: dict, now: datetime) -> None:
     """Stamp what the next pass must remember: when an older publish was first seen, and what a
-    person did outside clipper (a decision, a hold, an edit or a note, in Kitsu say), so undoing
+    person did outside Clippa (a decision, a hold, an edit or a note, in Kitsu say), so undoing
     it later (a reopen, a release) still leaves the item to them."""
     auto = load(sdir, strict=True)
     seen = [k for k, v in vs.items() if v.state in ("due", "waiting") and not state[k].get("published_at")

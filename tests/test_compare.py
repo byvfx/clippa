@@ -1,4 +1,4 @@
-"""`clipper compare`'s report logic (#72): no model calls."""
+"""`clippa compare`'s report logic (#72): no model calls."""
 from __future__ import annotations
 
 from clippa import compare

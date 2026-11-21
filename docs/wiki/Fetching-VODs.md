@@ -1,7 +1,7 @@
 # Fetching VODs
 
-`clipper fetch <url>` turns a finished broadcast into a stream, whatever the platform; the
-rest of the pipeline (`clipper run`) is the same.
+`clippa fetch <url>` turns a finished broadcast into a stream, whatever the platform; the
+rest of the pipeline (`clippa run`) is the same.
 
 | URL | Stream id | Video | Chat |
 |---|---|---|---|
@@ -23,7 +23,7 @@ in a show's `channels` list in `clipper.toml`, or the stream belongs to no show.
 - **Twitch chat** takes about 5 minutes for a 3-hour VOD: Twitch serves a minute or so of
   messages per request. A subscriber-only VOD needs the cookies of a signed-in browser as a
   Netscape `cookies.txt`; save it as `secrets/twitch_cookies.txt` (or set `[paths] twitch_cookies`); no file means
-  none. `clipper doctor` checks it. Never commit it. The chat comes from Twitch's own web
+  none. `clippa doctor` checks it. Never commit it. The chat comes from Twitch's own web
   query, which Twitch can change (a burst of more than one page of messages in a single
   second keeps only its first page); a pull that stops says so and a rerun resumes.
 - **YouTube** age and bot checks retry once signed in, as in [YouTube sign-in](YouTube-sign-in).

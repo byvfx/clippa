@@ -22,8 +22,8 @@ from .state import HOOKS, LOCK, SYNC, SYNC_LOCK, WHO
 
 
 def start_retake(cfg: dict) -> bool:
-    """A retake in the background: on `clipper serve`'s job runner when this page is its
-    (HOOKS), else a detached `clipper retake` (the page run alone)."""
+    """A retake in the background: on `clippa serve`'s job runner when this page is its
+    (HOOKS), else a detached `clippa retake` (the page run alone)."""
     if HOOKS["retake"]:
         HOOKS["retake"]()
         return True
@@ -364,7 +364,7 @@ def _sync(cfg: dict, body: dict) -> dict:
     return {"started": True}
 
 def _replan(cfg: dict, body: dict) -> dict:
-    """`clipper schedule` here (serve owns schedule.json); "sync": true reads Kitsu first."""
+    """`clippa schedule` here (serve owns schedule.json); "sync": true reads Kitsu first."""
     with LOCK:
         schedule.run(cfg, sync_first=bool(body.get("sync")))
     return {"ok": True}

@@ -1,13 +1,13 @@
-"""What predicts views (#258 A): each ranker clipper has for an upload, checked against how
+"""What predicts views (#258 A): each ranker Clippa has for an upload, checked against how
 it did in its first 7 days. No model call.
 
 Usage:
-    clipper analytics --lift [--show KEY] [--kind segment] [--json]
+    clippa analytics --lift [--show KEY] [--kind segment] [--json]
 
 The rankers, one row each per show and kind where there are values:
     score   the Kitsu Score column (Pass B's score on clips and Shorts; segments get one in #258 B)
     heat    mean chat heat over a segment's span (signals.parquet), the mean of its segments'
-            for a compilation: what `clipper schedule` ranks segments by today
+            for a compilation: what `clippa schedule` ranks segments by today
     topic   the median 7-day views of the show's earlier uploads with the same topic, counting
             only those whose 7 days were over when the stream began (the record the scheduler
             or a prompt could have had then)
@@ -22,7 +22,7 @@ budget dropped is never in it: a ranker is checked on what went out, which flatt
 them in particular but is all there is.
 
 `topic_record` is the same track record for a prompt (#258 B). The monthly report
-(`clipper analytics --report`) ends with the lift table.
+(`clippa analytics --report`) ends with the lift table.
 """
 from __future__ import annotations
 
@@ -195,7 +195,7 @@ def table(rows: list[dict], show: str | None = None, kind: str | None = None) ->
 def markdown(groups: list[dict]) -> str:
     """The table for a terminal or the monthly report."""
     if not groups:
-        return ("No uploads with 7-day numbers here (`clipper analytics` fetches them once a video "
+        return ("No uploads with 7-day numbers here (`clippa analytics` fetches them once a video "
                 f"is {D7_DAYS} days old).")
     lines = ["| show | kind | uploads | median | ranker | n | Spearman | views per upload, top half vs bottom (streams, top won) |",
              "|---|---|---:|---:|---|---:|---:|---|"]

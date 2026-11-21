@@ -92,7 +92,7 @@ async function bulk(action) {
     if (t === null) return; extra.text = t;
   }
   if (action === "changes") {
-    const t = ask(`What should change, for all ${n}? clipper re-cuts each from this note:`, true);
+    const t = ask(`What should change, for all ${n}? Clippa re-cuts each from this note:`, true);
     if (!t || !retakeOk(n)) return; extra.text = t;
   }
   if (action === "reject") { const t = ask(`Why reject all ${n}? (kept as a scoring example)`, true); if (!t) return; extra.text = t; }
@@ -198,7 +198,7 @@ document.addEventListener("click", e => {
   if (t.dataset.tab) { TAB = t.dataset.tab; SEL = null; renderQueue(); return; }
   if (t.dataset.act) {
     const ref = t.dataset.ref, a = t.dataset.act;
-    if (a === "changes") { const n = ask(`What should change? clipper will re-cut / re-thumbnail it from this note${retakeCost()}:`, true); if (n) act(ref, "changes", { text: n }); }
+    if (a === "changes") { const n = ask(`What should change? Clippa will re-cut / re-thumbnail it from this note${retakeCost()}:`, true); if (n) act(ref, "changes", { text: n }); }
     else if (a === "reject") { const n = ask("Why reject it? (kept as a scoring example)", true); if (n) act(ref, "reject", { text: n }); }
     else if (a === "approve" && OPEN === ref) keyAct("a", ref);  // in the item window: then the next item
     else act(ref, a);

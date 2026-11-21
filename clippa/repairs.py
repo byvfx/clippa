@@ -1,4 +1,4 @@
-"""`clipper checkup --fix` (#287): fixed repairs for some checkup findings, from a short allowlist.
+"""`clippa checkup --fix` (#287): fixed repairs for some checkup findings, from a short allowlist.
 
 Detection is checkup's (clippa/checkup.py); this closes the loop for the fixes that are safe to
 make without asking. Each repair belongs to findings by their key, and plans before it acts:

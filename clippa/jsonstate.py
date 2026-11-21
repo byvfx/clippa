@@ -2,7 +2,7 @@
 discord.json, ...): written whole or not at all, and changed under a lock that other
 processes respect.
 
-The bot, its hourly `clipper upload` child, the war room, the worker and a CLI run all read
+The bot, its hourly `clippa upload` child, the war room, the worker and a CLI run all read
 and write these files, some over the NAS share. `write` goes through a temp file and
 os.replace, so a reader sees the old file or the new one, never half of one. `update` holds
 `<file>.lock` (an O_EXCL file, so it works across processes and machines) around a re-read,

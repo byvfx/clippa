@@ -6,9 +6,9 @@ Kitsu layout (a TV-show production; everything lives inside the show's productio
                segment preview, status and comments
     shot       one per clip, inside the segment its start falls in (s00_other if none),
                e.g. s10_the-quartering/c01_t20; its Horizontal task holds the preview
-    shot       one per vertical Short too (`clipper shorts`), beside its clip, e.g.
+    shot       one per vertical Short too (`clippa shorts`), beside its clip, e.g.
                s10_the-quartering/v01_t20; its Vertical task holds the 9:16 preview and
-               its "Layout" column names the crop layout (edit it, rerun clipper shorts)
+               its "Layout" column names the crop layout (edit it, rerun clippa shorts)
     sequence   one per compilation too, e.g. comp-the-quartering; its Compilation task
                holds the whole long video (its segments' previews joined), its own status,
                metadata columns and thumbnail
@@ -18,25 +18,25 @@ The production is built from the "Clipping" project template (TEMPLATE below, cr
 or updated on every publish): TV-show type, 30 fps 1280x720 like the previews, Segment
 and Horizontal task types, the review statuses, and custom columns (COLUMNS) on
 sequences and shots. Publish fills a column when it is empty or still shows what publish
-last wrote there (so a re-run of `clipper meta` reaches Kitsu), and never overwrites an
+last wrote there (so a re-run of `clippa meta` reaches Kitsu), and never overwrites an
 edit made in Kitsu or Discord; sync reads them back into review.json and lists which ones
 were edited. The upload metadata lives in the YouTube title / description, Hashtags,
-Tags (comma-separated) and Playlist columns, and `clipper upload` takes it from there,
+Tags (comma-separated) and Playlist columns, and `clippa upload` takes it from there,
 falling back to the metadata JSON. Task types and
 statuses are studio-wide definitions in Kitsu; only the template and this production
 use ours.
 
 Publishing uploads a low-res preview as a new revision with status "wfa" (waiting for
-approval). The comment is the upload metadata draft (metadata/, from `clipper meta`) when
+approval). The comment is the upload metadata draft (metadata/, from `clippa meta`) when
 there is one, else the cut's own title and description. In Kitsu, set "approved" (or
 "done") to approve, "retake" with a comment to ask for changes, or "rejected" to drop it;
-`sync` writes those to review.json. The YouTube thumbnail (`clipper thumbs`, the .jpg
+`sync` writes those to review.json. The YouTube thumbnail (`clippa thumbs`, the .jpg
 beside the video) is added to the same revision as a second preview file, and set as
 the item's Kitsu thumbnail; edit its words in the "Thumbnail text" column and sync
 re-renders the .jpg and attaches the new one. A compilation published as its own item
 ("compilations" in review.include) ships on its own approval; one that isn't ships when all
 its segments are approved. The same decisions can be made from the CLI or
-Discord (clippa/actions.py, `clipper bot`); those write to Kitsu too.
+Discord (clippa/actions.py, `clippa bot`); those write to Kitsu too.
 
 Auth: a Kitsu bot token in $KITSU_TOKEN (Kitsu > Bots); the bot needs a role that can
 create projects, shots and tasks (Admin, or Studio Manager on an existing project).
@@ -73,7 +73,7 @@ DECISIONS = {"approved": Decision.APPROVED, "done": Decision.APPROVED, "retake":
 TEMPLATE = {
     "name": "Clipping",
     "description": "Stream clipping: episodes are streams, sequences are topic segments, "
-                   "shots are clips. Managed by clipper (clippa/review.py).",
+                   "shots are clips. Managed by Clippa (clippa/review.py).",
     "fps": "30", "ratio": "16:9", "resolution": "1280x720",  # matches review previews
     "production_type": "tvshow", "production_style": "motion-design",
 }
@@ -86,7 +86,7 @@ COLUMNS = [
     ("Sequence", "Source audio", "list", ["none", "some", "most"]),
     ("Shot", "YouTube title", "string", None),
     ("Shot", "YouTube description", "textarea", None),
-    # The rest of the upload metadata (metadata/<folder>/<video>.json from `clipper meta`):
+    # The rest of the upload metadata (metadata/<folder>/<video>.json from `clippa meta`):
     # hashtags go at the end of the description, tags are comma-separated.
     ("Sequence", "Hashtags", "string", None),
     ("Sequence", "Tags", "textarea", None),
@@ -100,25 +100,25 @@ COLUMNS = [
     # Segments: the model score (#258, segments.json score; 1-10), what the budget ranks by.
     ("Sequence", "Score", "number", None),
     ("Shot", "Found by", "list", ["chat", "transcript"]),
-    # Shorts: the crop layout (a name from [shorts] layouts); edit it and rerun clipper shorts.
+    # Shorts: the crop layout (a name from [shorts] layouts); edit it and rerun clippa shorts.
     ("Shot", "Layout", "string", None),
     # Shorts: seconds of voices that aren't the show's own people (speaker tags); over
     # [scoring] max_source_audio_s the Short is proposed held ([shorts] hold_source_audio).
     ("Shot", "Other voices", "number", None),
     # Shorts: the pauses [edit] tighten cut out ("4 pauses, 3.2 s"); empty when none were.
     ("Shot", "Tightened", "string", None),
-    # Scheduling (clipper schedule): Publish at and Hold are yours to set; Scheduled is
-    # written by clipper with the slot it assigned.
+    # Scheduling (clippa schedule): Publish at and Hold are yours to set; Scheduled is
+    # written by Clippa with the slot it assigned.
     ("Sequence", "Publish at", "string", None),
     ("Sequence", "Hold", "boolean", None),
     ("Sequence", "Scheduled", "string", None),
     ("Shot", "Publish at", "string", None),
     ("Shot", "Hold", "boolean", None),
     ("Shot", "Scheduled", "string", None),
-    # Written by clipper upload.
+    # Written by clippa upload.
     ("Sequence", "YouTube URL", "url", None),
     ("Shot", "YouTube URL", "url", None),
-    # Written by clipper rumble; set either one here to mark an item uploaded to Rumble.
+    # Written by clippa rumble; set either one here to mark an item uploaded to Rumble.
     ("Sequence", "Rumble", "list", ["ready", "uploaded"]),
     ("Shot", "Rumble", "list", ["ready", "uploaded"]),
     ("Sequence", "Rumble URL", "url", None),
@@ -127,17 +127,17 @@ COLUMNS = [
     # re-renders the .jpg and re-attaches it here.
     ("Sequence", "Thumbnail text", "string", None),
     ("Shot", "Thumbnail text", "string", None),
-    # What `clipper review check` found (#259), one line; empty when the item is clean.
+    # What `clippa review check` found (#259), one line; empty when the item is clean.
     ("Sequence", "Checks", "textarea", None),
     ("Shot", "Checks", "textarea", None),
 ]
 THUMB_COL = "Thumbnail text"
 CHECKS_COL = "Checks"
-# Columns only clipper writes (what the checks found): a value there that differs from the
+# Columns only Clippa writes (what the checks found): a value there that differs from the
 # proposal is never a person's edit, so the window doesn't take it for one.
 ADVISORY = (CHECKS_COL,)
 SEQUENCE_KINDS = ("segment", "compilation")
-# Comments clipper adds to record a column change (Hold, Publish at, title); sync never
+# Comments Clippa adds to record a column change (Hold, Publish at, title); sync never
 # takes one of these as the reason for a decision.
 NOTE_PREFIX = "[clippa]"
 # Every prefix a bot note may start with: [clippa] since #286's pass 2, [clipper] on older notes.
@@ -324,7 +324,7 @@ def source_hold(short: dict, cfg: dict | None) -> dict:
     """A Short's Other voices column and proposed Hold: held while its other voices
     (shorts.json source_audio_s) run over [scoring] max_source_audio_s. A proposal only:
     fill_columns never overwrites a Hold set or released by hand, and a re-cut under the
-    limit releases a hold clipper set."""
+    limit releases a hold Clippa set."""
     s = short.get("source_audio_s")
     if s is None or not cfg:
         return {}
@@ -463,11 +463,11 @@ def write_data(gazu, etype: str, eid: str, data: dict) -> None:
 def set_columns(gazu, fmap: dict, etype: str, eid: str, values: dict[str, str],
                 strict: bool = False) -> dict:
     """Set columns by name ({"YouTube URL": url}). A column the production doesn't have is
-    skipped, or with strict refused (run `clipper review publish` to add it). Returns
+    skipped, or with strict refused (run `clippa review publish` to add it). Returns
     what was written, by field id."""
     missing = [n for n in values if (etype, n) not in fmap]
     if missing and strict:
-        raise ClipperError(f"Kitsu has no {etype} column {missing}; run clipper review publish")
+        raise ClipperError(f"Kitsu has no {etype} column {missing}; run clippa review publish")
     data = {fmap[(etype, n)]: v for n, v in values.items() if (etype, n) in fmap}
     if data:
         write_data(gazu, etype, eid, data)
@@ -614,7 +614,7 @@ def columns_to_fill(values: dict, before: dict, current: dict, tf: str | None,
     """The columns (field id -> value) to write: the empty ones, and those still showing
     what we last proposed (before) when the proposal changed; a value edited in Kitsu or
     Discord is never overwritten. Thumbnail text (field tf) also follows a re-picked
-    thumbnail while the column still shows what clipper last wrote there (last_thumb)."""
+    thumbnail while the column still shows what Clippa last wrote there (last_thumb)."""
     empty = (None, "")
     missing = {k: v for k, v in values.items()  # an empty value onto an empty column is no change
                if (current.get(k) in empty and v not in empty)
@@ -624,7 +624,7 @@ def columns_to_fill(values: dict, before: dict, current: dict, tf: str | None,
     return missing
 
 
-OWNED = ("Hold",)  # columns where only a value clipper wrote counts as its proposal
+OWNED = ("Hold",)  # columns where only a value Clippa wrote counts as its proposal
 
 
 def proposals_to_keep(fields: dict, before: dict, written: set[str]) -> dict:
@@ -890,7 +890,7 @@ def ensure_links(stream_dir: Path, cfg: dict, gazu=None) -> dict:
 
 def decision_comment(gazu, task: dict) -> str:
     """The latest comment made with the task's current status (the reason for a reject
-    or retake), skipping clipper's own notes about column changes."""
+    or retake), skipping Clippa's own notes about column changes."""
     return decision_comment_entry(gazu, task)[1]
 
 
@@ -923,7 +923,7 @@ def apply_thumbnail_text(stream_dir: Path, cfg: dict, gazu, fmap: dict,
         raw = fields[THUMB_COL]
         tkey = thumbs.video_key(stream_dir / st["file"].replace("\\", "/"))
         if tkey not in tstate:
-            print(f"  {key}: no thumbnail to put {raw!r} on yet; run clipper thumbs")
+            print(f"  {key}: no thumbnail to put {raw!r} on yet; run clippa thumbs")
             continue
         try:
             text = thumbs.check_text(cfg, raw)

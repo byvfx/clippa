@@ -1,22 +1,22 @@
-The NAS can run everything that has to stay up: `clipper serve` (the [war room](War-room) and
+The NAS can run everything that has to stay up: `clippa serve` (the [war room](War-room) and
 its jobs), the Discord bot and the worker, beside the [recorder](NAS-recorder), with
 transcription on [Modal](Transcribe-on-Modal). The laptop can then sleep; it is only for
-working on clipper. This has been the setup here since 2026-11-05.
+working on Clippa. This has been the setup here since 2026-11-05.
 
 ## What runs where
 
 | Container (`deploy/hub`) | Runs | Notes |
 |---|---|---|
-| `serve` | `clipper serve` | war room on 127.0.0.1:8765, hourly replan and upload, retakes, daily jobs |
-| `bot` | `clipper bot` | Discord; reaches serve on 127.0.0.1 |
-| `worker` | `clipper worker` | every stage of each finished recording; cuts locally (`CLIPPER_CUT_BACKEND=local`) |
+| `serve` | `clippa serve` | war room on 127.0.0.1:8765, hourly replan and upload, retakes, daily jobs |
+| `bot` | `clippa bot` | Discord; reaches serve on 127.0.0.1 |
+| `worker` | `clippa worker` | every stage of each finished recording; cuts locally (`CLIPPER_CUT_BACKEND=local`) |
 | `tailscale` | tailscaled, userspace | serves the war room on the tailnet from `tailscale-serve.json` ([Phone access](Phone-access)) |
 
 All four use host networking and their own compose project (`clipper-hub`), so a deploy never
 restarts the recorder. The image is Debian 13 (ffmpeg 7.1) with Intel's media driver:
 `/dev/dri` is passed in and `h264_qsv` encodes on the NAS iGPU, as on the laptop.
 
-Claude Code can run beside them too, in its own container, so clipper can be driven and
+Claude Code can run beside them too, in its own container, so Clippa can be driven and
 changed from the Claude app on the phone: [Claude on the NAS](Claude-on-the-NAS).
 
 ## The config and state live on the NAS
@@ -42,7 +42,7 @@ Covers, the weekly issue and Shorts captions want Impact, Bahnschrift, Georgia a
 the `.ttf` files in the NAS folder's `fonts/` (copied from `C:\Windows\Fonts`): the containers
 mount it as `/usr/local/share/fonts/clipper`, where libass finds them by family and clipper
 by file name (a font list's `C:/Windows/Fonts/impact.ttf` finds `impact.ttf` there).
-`clipper doctor` names the font each check found.
+`clippa doctor` names the font each check found.
 
 ## Deploy
 
@@ -63,19 +63,19 @@ At a terminal it asks whether to copy this machine's values in; elsewhere set
 laptop and not here would otherwise ship the old one, and every model call on the hub fails. There is no browser in the containers, so pre-shows use
 a private copy of `secrets/youtube_cookies.txt` (`CLIPPER_YOUTUBE_COOKIES_FROM_BROWSER` is empty
 there), which the laptop's `clipper-cookies` task copies from its Firefox profile every 4 hours
-(`clipper doctor` warns when it's a day old)
+(`clippa doctor` warns when it's a day old)
 ([Archives](Archives#keeping-the-nas-hubs-cookies-fresh)). That one job ties the NAS to the
 laptop: with the laptop off for days, signed-in pre-show grabs stop once the cookies rotate.
 
 ## Day to day
 
-With `[serve] hub = "clipper-hub"`, `clipper services status|stop|restart serve|bot|worker`
+With `[serve] hub = "clipper-hub"`, `clippa services status|stop|restart serve|bot|worker`
 on the laptop runs `docker compose` on the NAS over ssh. Logs: `logs/serve.log` and
 `logs/bot.log` in the NAS folder as before, plus `ssh nas 'cd clipper-hub && docker compose
 logs -f serve'`. Check a container with `ssh nas 'cd clipper-hub && docker compose exec serve
-clipper doctor --role serve'`.
+clippa doctor --role serve'`.
 
-Which code a container runs: `clipper services status` prints each service's version from its
+Which code a container runs: `clippa services status` prints each service's version from its
 heartbeat (`0.2.0+3.g570bb87`: the release, three commits past it, at 570bb87; `.dirty` when
 the deploy came from a checkout with uncommitted changes) and this checkout's below it. A
 service that shows a different commit than main's runs older code than the last merged PR

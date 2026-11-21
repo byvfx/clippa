@@ -1,7 +1,7 @@
-# clipper.toml, a starter: copy this file to clipper.toml and edit it, or run `clipper setup`,
+# clipper.toml, a starter: copy this file to clipper.toml and edit it, or run `clippa setup`,
 # which writes one and asks for the rest. Only what differs from the defaults belongs in
 # clipper.toml; clippa/defaults.toml lists every setting with its default and what it does, and
-# `clipper config get <section>.<key>` shows a value and which file set it. One machine's own
+# `clippa config get <section>.<key>` shows a value and which file set it. One machine's own
 # values go in clipper.local.toml beside it (same sections; setup writes it), and every key can
 # also be set with an env var named CLIPPER_<SECTION>_<KEY>, e.g. CLIPPER_TRANSCRIBE_DEVICE=cpu.
 # Both win over this file and its [shows.*] tables.
@@ -29,7 +29,7 @@ channels = ["kick-channel-slug"]     # the Kick channels the recorder watches (w
 # allowed_user_ids = ["..."]
 
 # Gossip blind items (wiki: Blind items): uncomment the sources you want, then
-# `clipper blinds check --backfill 30 --dry-run` prices the first read.
+# `clippa blinds check --backfill 30 --dry-run` prices the first read.
 # [blinds]
 # check_minutes = 30         # serve checks the sources; the bot asks you in Discord
 # alert = "digest"           # a thread a day at digest_at; "all", "ours" or "off"
@@ -47,12 +47,12 @@ channels = ["kick-channel-slug"]     # the Kick channels the recorder watches (w
 
 # ---------- shows ----------
 # One table per show. A stream belongs to the show whose `channels` include the Kick
-# channel in its meta.json (recordings and `clipper fetch` both write it), and that
+# channel in its meta.json (recordings and `clippa fetch` both write it), and that
 # show's sub-tables override the sections above for it: [shows.<key>.<section>] takes any
 # key of [<section>]. Each show gets its own Kitsu production (named after meta.show_name
 # unless review.project is set) and its own Discord threads; all shows share the YouTube
-# channel and release schedule above. `clipper shows` lists them; `--show <key>` forces
-# one. `clipper worker` skips recordings of channels no show claims.
+# channel and release schedule above. `clippa shows` lists them; `--show <key>` forces
+# one. `clippa worker` skips recordings of channels no show claims.
 
 [shows.myshow]
 channels = ["kick-channel-slug"]

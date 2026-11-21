@@ -3,12 +3,12 @@ lands in Kitsu whichever surface you make it on. Three surfaces; pick what fits 
 
 | | Discord | Kitsu | War room |
 |---|---|---|---|
-| Where | the server's review channel, a thread per stream | `http://<host>:8090`, your login | the page `clipper serve` serves; on a phone through the tailnet |
+| Where | the server's review channel, a thread per stream | `http://<host>:8090`, your login | the page `clippa serve` serves; on a phone through the tailnet |
 | Good for | the phone, one card at a time | the detail: columns, comments, every revision | the queue at once, bulk edits, covers, the schedule |
 
 ## Getting in
 
-- **Discord**: the operator runs `clipper review invite <your user id>` (Discord → Settings →
+- **Discord**: the operator runs `clippa review invite <your user id>` (Discord → Settings →
   Advanced → Developer Mode on, then right-click your name → Copy User ID) and restarts the
   bot. Until then the bot answers "You're not on this bot's allowlist".
 - **Kitsu**: a login from the operator ([Kitsu](Kitsu)); the show is a production you are on.

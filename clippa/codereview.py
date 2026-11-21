@@ -1,4 +1,4 @@
-"""clipper codereview: a second reviewer for a branch, in one model call ([codereview]).
+"""clippa codereview: a second reviewer for a branch, in one model call ([codereview]).
 
 The branch's code diff against the base (origin/main) and the changed files in full go to
 [codereview] reviewer (Grok 4.7 through OpenRouter by default) with the codereview prompt;

@@ -243,7 +243,7 @@ def test_jobs_report_into_the_open_topic_or_wait_while_away(cfg, monkeypatch, no
     card = chat.handle(cfg, "story: something happened to someone")["messages"][-1]["card"]
     assert card["estimate"] == "~$0.30"
     v = chat.tap(cfg, card["id"], True)
-    assert started and "Started `clipper story new`" in v["messages"][-1]["text"]
+    assert started and "Started `clippa story new`" in v["messages"][-1]["text"]
     job = chat.load(cfg)["jobs"][-1]
     assert job["state"] == "running" and job["argv"] == ["story", "new", "a brief"]
     assert chat.state(cfg)["jobs"][0]["tool"] == "story"
@@ -254,7 +254,7 @@ def test_jobs_report_into_the_open_topic_or_wait_while_away(cfg, monkeypatch, no
     chat.finish(cfg, job["id"], 0, ["dossier written"])
     assert not any(m["kind"] == "report" and "is done" in m["text"] for m in chat.load(cfg)["messages"])
     v = chat.handle(cfg, "/back")
-    assert any("`clipper story new` is done." in m["text"] and "dossier written" in m["text"] for m in v["messages"])
+    assert any("`clippa story new` is done." in m["text"] and "dossier written" in m["text"] for m in v["messages"])
     assert chat.load(cfg)["jobs"][-1]["state"] == "done"
 
 

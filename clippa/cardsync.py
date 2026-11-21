@@ -1,4 +1,4 @@
-"""Keep posted Discord review cards current with Kitsu (`clipper bot`, every [discord]
+"""Keep posted Discord review cards current with Kitsu (`clippa bot`, every [discord]
 refresh_minutes).
 
 Decisions made in Kitsu or the CLI don't go through the bot, so its cards would go stale.
@@ -6,11 +6,11 @@ For each stream with a <stream>/discord.json (posted cards) whose stream started
 [discord] refresh_days, refresh() syncs review.json from Kitsu, rebuilds each card with
 notify.card() and edits the messages whose card changed (status, hold, pin, title,
 scheduled time, YouTube link, thumbnail text...); a card posted with the thumbnail .jpg
-also gets the new picture when the .jpg changed. It doesn't rerun `clipper schedule`: a card shows
+also gets the new picture when the .jpg changed. It doesn't rerun `clippa schedule`: a card shows
 "Scheduled" once something has scheduled it.
 
 What each message last showed lives in <stream>/discord_cards.json (message id ->
-signature), kept apart from discord.json so `clipper review notify` running at the same
+signature), kept apart from discord.json so `clippa review notify` running at the same
 time can't lose posted message ids.
 """
 

@@ -1,4 +1,4 @@
-"""#258 A: `clipper analytics --lift`, what predicts 7-day views."""
+"""#258 A: `clippa analytics --lift`, what predicts 7-day views."""
 import json
 from datetime import UTC, datetime, timedelta
 

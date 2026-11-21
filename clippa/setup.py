@@ -1,14 +1,14 @@
-"""`clipper setup`: a guided first run on a new machine (#78).
+"""`clippa setup`: a guided first run on a new machine (#78).
 
 Usage:
-    clipper setup                 # the steps not done yet, in order
-    clipper setup --step keys     # one step again
-    clipper setup --check         # each step's checks, no questions
-    clipper setup --answers a.toml   # no questions: values from the file, defaults for the rest
+    clippa setup                 # the steps not done yet, in order
+    clippa setup --step keys     # one step again
+    clippa setup --check         # each step's checks, no questions
+    clippa setup --answers a.toml   # no questions: values from the file, defaults for the rest
 
 Steps: mode (join an existing install, or a new one), roles (what this machine runs, and
 where it transcribes), machine (streams folder, encoder), keys (API keys and tokens, checked
-as they are entered), check (`clipper doctor` for this machine's roles). Progress is kept in
+as they are entered), check (`clippa doctor` for this machine's roles). Progress is kept in
 setup_state.json beside clipper.toml. A step is done when its checks pass, and this
 machine's own values go in clipper.local.toml, so clipper.toml stays shared.
 
@@ -16,7 +16,7 @@ Keys are never written to the config, the answers file or the log: Windows user 
 variables, the shell profile on macOS/Linux, or secrets/ (the Discord token).
 
 When the roles need packages that aren't installed, setup exits with EXIT_SYNC after saving
-its state; deploy/bootstrap.ps1 (or .sh) then runs `uv sync $(clipper setup --sync-args)` and
+its state; deploy/bootstrap.ps1 (or .sh) then runs `uv sync $(clippa setup --sync-args)` and
 starts setup again. (On Windows uv can't replace clipper.exe while it runs.)
 """
 
@@ -45,11 +45,11 @@ TITLES = {"mode": "Join or start fresh", "roles": "What this machine runs",
           "check": "Check everything"}
 STATE = "setup_state.json"
 EXIT_SYNC = 3                     # packages missing: the bootstrap script syncs and reruns setup
-ROLES = {"worker": "worker: transcribe, score, cut, Shorts, covers (`clipper worker`)",
-         "serve": "serve: the war room, hourly uploads, pre-shows, retakes, daily jobs (`clipper serve`, one machine only)",
-         "bot": "bot: Discord review cards, buttons and DMs (`clipper bot`, one machine only)",
+ROLES = {"worker": "worker: transcribe, score, cut, Shorts, covers (`clippa worker`)",
+         "serve": "serve: the war room, hourly uploads, pre-shows, retakes, daily jobs (`clippa serve`, one machine only)",
+         "bot": "bot: Discord review cards, buttons and DMs (`clippa bot`, one machine only)",
          "recorder": "recorder: records the Kick shows live (Docker on the NAS)",
-         "control": "control: a dev/control station; runs nothing unattended (`clipper services`, deploys, "
+         "control": "control: a dev/control station; runs nothing unattended (`clippa services`, deploys, "
                     "review, one-off commands)"}
 BACKENDS = {"whisperx": "WhisperX on this machine's NVIDIA GPU",
             "mlx": "mlx-whisper on this Mac's Apple GPU",
@@ -213,7 +213,7 @@ def save_state(cfg: dict, st: dict) -> None:
 
 
 def doctor_role(roles: list[str]) -> str:
-    """`clipper doctor --role` for these setup roles."""
+    """`clippa doctor --role` for these setup roles."""
     mapped = {"worker": "gpu", "serve": "serve", "bot": "bot", "recorder": "nas", "control": "control"}
     picked = {mapped[r] for r in roles if r != "recorder"}  # the recorder isn't installed here
     if len(picked) > 1:
@@ -225,14 +225,14 @@ KITSU_NEEDED = "every role but a control station reviews through Kitsu"
 
 
 def kitsu_required(roles: list[str]) -> bool:
-    """`clipper doctor` fails without [review] host and the Kitsu token for these roles (#78)."""
+    """`clippa doctor` fails without [review] host and the Kitsu token for these roles (#78)."""
     return roles != ["recorder"] and not control_only(roles)
 
 
 def kitsu_host_error(v: str, required: bool) -> str | None:
     """Why a typed Kitsu address won't do, or None: empty is a skip unless required."""
     if not v:
-        return f"needed here: {KITSU_NEEDED} (Ctrl+C stops; `clipper setup` resumes here)" if required else None
+        return f"needed here: {KITSU_NEEDED} (Ctrl+C stops; `clippa setup` resumes here)" if required else None
     return None if re.match(r"https?://[^/\s:]+", v) else "a URL, e.g. http://nas.local:8090"
 
 
@@ -305,7 +305,7 @@ def toml_set(path: Path, section: str, key: str, value) -> None:
                 stop = hit + 1
             lines[hit:stop] = [re.match(r"\s*", lines[hit]).group() + new + _comment(lines[hit])]
     text = "\n".join(lines) + "\n"
-    tomllib.loads(text)  # never leave a file clipper can't read
+    tomllib.loads(text)  # never leave a file Clippa can't read
     path.write_text(text, encoding="utf-8")
 
 
@@ -317,7 +317,7 @@ def set_local(cfg: dict, section: str, key: str, value, shared) -> None:
             toml_set(path, section, key, value)  # keep the file honest if it already had one
         return
     if not path.exists():
-        path.write_text("# This machine's own settings (clipper setup writes it). They win over\n"
+        path.write_text("# This machine's own settings (clippa setup writes it). They win over\n"
                         "# clipper.toml and its shows; CLIPPER_<SECTION>_<KEY> env vars win over these.\n",
                         encoding="utf-8")
     toml_set(path, section, key, value)
@@ -350,7 +350,7 @@ def user_env(name: str) -> str:
 
 
 def load_user_env(cfg: dict) -> None:
-    """The keys clipper reads, from the user's saved environment into this process, so the
+    """The keys Clippa reads, from the user's saved environment into this process, so the
     checks see what a new terminal (and the scheduled tasks) will."""
     for name in ("ANTHROPIC_API_KEY", "ANTHROPIC_WORKSPACE_ID", "OPENAI_API_KEY", "GEMINI_API_KEY",
                  "OPENROUTER_API_KEY", "LOCAL_LLM_API_KEY", "MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET", "HF_TOKEN",
@@ -408,7 +408,7 @@ def extras_for(roles: list[str], backend: str) -> list[str]:
     out = []
     if "worker" in roles:
         out.append({"whisperx": "gpu", "mlx": "mac", "modal": "modal"}[backend])
-        out.append("faces")  # the default [worker] stages run `clipper faces` (OpenCV, CPU)
+        out.append("faces")  # the default [worker] stages run `clippa faces` (OpenCV, CPU)
     if "serve" in roles:
         if "faces" not in out:
             out.append("faces")  # the war room's Cast window and the daily `cast auto` check faces (OpenCV)
@@ -438,8 +438,8 @@ def encoders_here(hw: dict) -> list[str]:
 # reached the install) and brought this install's own show and recorded channel with it.
 NEW_CONFIG = """# clipper.toml: this install's settings. Only what differs from the built-in defaults goes
 # here; clippa/defaults.toml lists every setting with its default and what it does, and
-# `clipper config get <section>.<key>` shows a value and which file set it.
-# `clipper setup` adds what its steps decide.
+# `clippa config get <section>.<key>` shows a value and which file set it.
+# `clippa setup` adds what its steps decide.
 
 [bleep]
 mode = "bleep"                      # cover slurs in the audio and mask them in captions
@@ -531,7 +531,7 @@ def step_roles(cfg: dict, st: dict, ask: Ask) -> None:
         if config.getenv("CLIPPER_BOOTSTRAP"):
             say("Installing them, then setup carries on.")
         else:
-            say(f"Run `uv sync {args}`, then `clipper setup` again to carry on.")
+            say(f"Run `uv sync {args}`, then `clippa setup` again to carry on.")
         raise ClipperError(status=EXIT_SYNC)
 
 
@@ -569,7 +569,7 @@ def step_machine(cfg: dict, st: dict, ask: Ask) -> None:  # noqa: C901
         current = "-"
     streams = ask.text("streams", "Streams folder", current, check=streams_ok)
     if streams == "-" and control_only(roles):
-        say("No streams folder here; `clipper setup --step machine` adds one later.")
+        say("No streams folder here; `clippa setup --step machine` adds one later.")
     else:
         p = user_path(streams)
         p = p if p.is_absolute() else base(cfg)["_dir"] / p
@@ -591,7 +591,7 @@ def step_machine(cfg: dict, st: dict, ask: Ask) -> None:  # noqa: C901
 
     if not shutil.which("ffmpeg"):
         raise ClipperError("ffmpeg isn't on PATH: run deploy/bootstrap (or winget install Gyan.FFmpeg / "
-                         "brew install ffmpeg), open a new terminal, then clipper setup --step machine")
+                         "brew install ffmpeg), open a new terminal, then clippa setup --step machine")
     if control_only(roles) and cfg["serve"]["hub"] and not (cfg["serve"]["url"] or "").strip():
         say("serve runs on the hub, so the war room is at its tailnet address (" + wiki.page("Phone-access") + ").")
 
@@ -612,7 +612,7 @@ def step_machine(cfg: dict, st: dict, ask: Ask) -> None:  # noqa: C901
         works = [c for c in encoders_here(hw) if doctor.encoder_works(c)[0]]
         if not works:
             raise ClipperError("no H.264 encoder works in this ffmpeg; install a full build "
-                             "(gyan.dev 'full', or BtbN's gpl build) and run clipper setup --step machine")
+                             "(gyan.dev 'full', or BtbN's gpl build) and run clippa setup --step machine")
         chosen = ask.choice("clip_codec", "Encoder for cuts, Shorts and previews",
                             {c: c + (" (CPU, slowest)" if c == "libx264" else "") for c in works}, works[0])
     set_local(cfg, "cut", "clip_codec", chosen, shared["cut"]["clip_codec"])
@@ -679,14 +679,14 @@ def ensure_env_key(cfg: dict, ask: Ask, name: str, what: str, where: str, check:
         insist = bool(required) and not refused
         value = ask.secret(name, skip=not insist)
         if not value and insist and ask.interactive:
-            say(f"{name} is needed here: {required}. (Ctrl+C stops; `clipper setup` resumes at this step.)")
+            say(f"{name} is needed here: {required}. (Ctrl+C stops; `clippa setup` resumes at this step.)")
             continue
         if not value:
-            say(f"skipped {name}; `clipper doctor` fails until it is set ({required})" if required
+            say(f"skipped {name}; `clippa doctor` fails until it is set ({required})" if required
                 else f"skipped {name}")
             if refused and if_refused:
                 say(if_refused)
-            say("`clipper setup --step keys` asks again")
+            say("`clippa setup --step keys` asks again")
             return
         os.environ[name] = value
         good, msg = check_key(name, cfg) if check else (True, "set")
@@ -708,7 +708,7 @@ def step_keys(cfg: dict, st: dict, ask: Ask) -> None:  # noqa: C901
 
     if control_only(roles):
         say("A control station runs no stages and uses Kitsu in the browser, so these are optional:")
-        say("Enter skips each. Add them later (`clipper setup --step keys`) to run a stage here.")
+        say("Enter skips each. Add them later (`clippa setup --step keys`) to run a stage here.")
     if claude_model(cfg):
         ensure_env_key(cfg, ask, "ANTHROPIC_API_KEY", "the model calls (score, segments, titles, covers)",
                        "console.anthropic.com -> API keys")
@@ -730,8 +730,8 @@ def step_keys(cfg: dict, st: dict, ask: Ask) -> None:  # noqa: C901
             return kitsu_host_error(v, bool(need_kitsu and ask.interactive))
         host = ask.text("kitsu", "Kitsu address (review happens there)", "", url_ok).rstrip("/")
         if not host and need_kitsu:
-            say(f"skipped the Kitsu address; `clipper doctor` fails until [review] host is set ({need_kitsu}); "
-                "`clipper setup --step keys` asks again")
+            say(f"skipped the Kitsu address; `clippa doctor` fails until [review] host is set ({need_kitsu}); "
+                "`clippa setup --step keys` asks again")
         if host:
             host = host if host.endswith("/api") else host + "/api"
             toml_set(base(cfg)["_file"], "review", "host", host)
@@ -750,7 +750,7 @@ def step_keys(cfg: dict, st: dict, ask: Ask) -> None:  # noqa: C901
             for name in ("MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET"):
                 ensure_env_key(cfg, ask, name, "transcription on Modal",
                                "modal.com -> Settings -> API Tokens -> New token", check=False)
-            say("The Modal app is deployed with `clipper transcribe --deploy` (several minutes, once).")
+            say("The Modal app is deployed with `clippa transcribe --deploy` (several minutes, once).")
     if "bot" in roles or (cfg["discord"]["enabled"] and not control_only(roles)):  # the worker posts cards too
         path: Path = cfg["paths"]["discord_token"]
         good, msg = check_key("discord", cfg) if (user_env(cfg["discord"]["token_env"]) or path.exists()) \
@@ -769,25 +769,25 @@ def step_keys(cfg: dict, st: dict, ask: Ask) -> None:  # noqa: C901
 
 def step_check(cfg: dict, st: dict, ask: Ask, offline: bool = False) -> int:
     role = doctor_role(st.get("roles") or ["worker"])
-    say(f"clipper doctor --role {role}{' --offline' if offline else ''}")
+    say(f"clippa doctor --role {role}{' --offline' if offline else ''}")
     say()
     code = doctor.main(cfg, offline=offline, role=role)
     say()
     if code:
-        say("Fix the FAIL lines (each says how), then `clipper setup --check` or the step again.")
+        say("Fix the FAIL lines (each says how), then `clippa setup --check` or the step again.")
     else:
         say("Ready. Next:")
         roles = st.get("roles") or []
         win = sys.platform == "win32"
         if "worker" in roles:
             say("  worker, unattended: " + (r"deploy\worker\worker-task.ps1 -Install" if win
-                                            else "clipper worker (in a terminal or launchd for now)"))
+                                            else "clippa worker (in a terminal or launchd for now)"))
         for role in ("serve", "bot"):
             if role in roles:
                 say(f"  {role}, unattended:{' ' if role == 'serve' else '   '} Docker compose, deploy/hub "
-                    f"(any Docker host; {wiki.page('Roles-and-services', 'services')}); or clipper {role} in a terminal")
+                    f"(any Docker host; {wiki.page('Roles-and-services', 'services')}); or clippa {role} in a terminal")
         if control_only(roles):
-            say("  control: clipper services status (the hub's containers over ssh), "
+            say("  control: clippa services status (the hub's containers over ssh), "
                 "bash deploy/hub/deploy.sh to ship main, the war room in a browser")
         say("  What setup doesn't do: " + ", ".join(f"{what} {wiki.page(page)}" for what, page in (
             ("Kitsu and its accounts", "Kitsu"), ("the Discord app and ids", "Discord-app"),
@@ -807,7 +807,7 @@ def checks_for(cfg: dict, st: dict, step: str) -> list:
     root = base(cfg)
     if step == "mode":
         return [("OK", "config", str(root["_file"]), "") if root["_file"] else
-                ("FAIL", "config", f"no {root['_path'].name}", "clipper setup --step mode")]
+                ("FAIL", "config", f"no {root['_path'].name}", "clippa setup --step mode")]
     if step == "roles":
         return [("OK" if installed(e) else "FAIL", "packages", f"extra {e}"
                  + (" installed" if installed(e) else " not installed"),
@@ -838,7 +838,7 @@ def main(cfg_path: str | None, step: str | None = None, answers: str | None = No
     ask = Ask(tomllib.loads(Path(answers).read_text(encoding="utf-8")) if answers else None)
     todo = [step] if step else [s for s in STEPS if s not in st["done"] or s == "check"]
     if not step and len(todo) == 1:
-        print("Setup is done on this machine; checking it. (`clipper setup --step <name>` redoes one: "
+        print("Setup is done on this machine; checking it. (`clippa setup --step <name>` redoes one: "
               + ", ".join(STEPS) + ")")
     if not ask.interactive and not answers:
         print("(not a terminal: using defaults and the environment, no questions)")
@@ -852,7 +852,7 @@ def main(cfg_path: str | None, step: str | None = None, answers: str | None = No
         except KeyboardInterrupt:
             st["done"].pop(s, None)  # a step done before (or redone with --step) is asked again next run
             save_state(cfg, st)
-            print(f"\nStopped; `clipper setup` carries on from {s}.")
+            print(f"\nStopped; `clippa setup` carries on from {s}.")
             return 130
         cfg = config.load(cfg_path)
         bad = [r for r in checks_for(cfg, st, s) if r[0] == "FAIL"]
@@ -860,7 +860,7 @@ def main(cfg_path: str | None, step: str | None = None, answers: str | None = No
             doctor.report(bad)
             st["done"].pop(s, None)
             save_state(cfg, st)
-            print(f"\nStep {s} isn't done: fix the above, then `clipper setup` carries on from here.")
+            print(f"\nStep {s} isn't done: fix the above, then `clippa setup` carries on from here.")
             return 1
         st["done"][s] = time.time()
         save_state(cfg, st)

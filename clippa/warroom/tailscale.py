@@ -54,7 +54,7 @@ def tailnet_status(cfg: dict) -> dict:
     return out
 
 def tailnet(cfg: dict, action: str) -> None:
-    """`clipper warroom --tailnet on|off|status`: put the war room on this machine's tailnet
+    """`clippa warroom --tailnet on|off|status`: put the war room on this machine's tailnet
     name over HTTPS (tailnet devices only; nothing on the LAN or the internet)."""
     cfg = base(cfg)
     wc, tok_file = cfg["warroom"], Path(cfg["paths"]["warroom_token"])
@@ -88,7 +88,7 @@ def tailnet(cfg: dict, action: str) -> None:
         st = tailnet_status(cfg)
     if not st["served"]:
         print(f"Tailscale is up as {st['name']}; the war room isn't on the tailnet "
-              "(clipper warroom --tailnet on)")
+              "(clippa warroom --tailnet on)")
         return
     key = token(cfg)
     print(f"war room on the tailnet: {st['served']}")
@@ -97,4 +97,4 @@ def tailnet(cfg: dict, action: str) -> None:
     else:
         print("no war room token: any device on the tailnet can open it")
     if not wc["tailnet"]:
-        print("set [warroom] tailnet = true in clipper.toml so `clipper doctor` checks it")
+        print("set [warroom] tailnet = true in clipper.toml so `clippa doctor` checks it")

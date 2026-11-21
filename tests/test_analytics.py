@@ -1,4 +1,4 @@
-"""`clipper analytics`: a passing Google error skips one video instead of failing the run."""
+"""`clippa analytics`: a passing Google error skips one video instead of failing the run."""
 import json
 from datetime import UTC, datetime
 

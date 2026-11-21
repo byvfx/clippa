@@ -1,5 +1,5 @@
-// War room: blind items (#111, `clipper blinds`). Gossip blinds with their clues read, your guess
-// first: a name (matched to clipper people), No idea, or Not ours. Paste one from anywhere
+// War room: blind items (#111, `clippa blinds`). Gossip blinds with their clues read, your guess
+// first: a name (matched to clippa people), No idea, or Not ours. Paste one from anywhere
 // else; "Check now" fetches the sources in the background. Nothing here is ever published.
 
 let BS = null;  // {data, days, view, source, paste, full: Set, jump, win}
@@ -43,7 +43,7 @@ function blindCard(b) {
     ...b.fields.map(f => `<span class="tag">${esc(f)}</span>`)].join("");
   const clues = b.clues.map(c => `<span class="bclue" title="${esc(c.type)}, weight ${c.weight}"><i>${esc(c.type)}</i>${esc(c.text)}</span>`).join("");
   const g = b.guesses[0];
-  const guess = g ? `<div class="bguess">Your guess: <b>${esc(g.name)}</b>${g.person ? "" : ` <span class="by">(not in clipper people)</span>`}${g.why ? ` · because ${esc(g.why)}` : ""} <span class="by">${ago(g.at)}${g.who ? " · " + esc(g.who) : ""}</span>${g.note ? ` <span class="by">[${esc(g.note)}]</span>` : ""}</div>` : "";
+  const guess = g ? `<div class="bguess">Your guess: <b>${esc(g.name)}</b>${g.person ? "" : ` <span class="by">(not in clippa people)</span>`}${g.why ? ` · because ${esc(g.why)}` : ""} <span class="by">${ago(g.at)}${g.who ? " · " + esc(g.who) : ""}</span>${g.note ? ` <span class="by">[${esc(g.note)}]</span>` : ""}</div>` : "";
   const answer = b.kind === "reveal" ? "" : `<div class="nbar ba">
       <input class="search bname" list="blindsPeople" maxlength="120" placeholder="Who do you think it is?" value="${esc(g?.as_written || "")}" aria-label="Your guess">
       <input class="search bwhy" maxlength="500" placeholder="Why (optional)" value="${esc(g?.why || "")}" aria-label="Why">

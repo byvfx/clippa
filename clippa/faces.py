@@ -1,17 +1,17 @@
-"""`clipper faces`: who is on screen, by face (issue #54).
+"""`clippa faces`: who is on screen, by face (issue #54).
 
 Usage:
-    clipper faces <stream>                      scan the keyframes (first time only), group the
+    clippa faces <stream>                      scan the keyframes (first time only), group the
                                                 faces, name the groups against the known faces
-    clipper faces <stream> --rescan             scan again
-    clipper faces <stream> --name F03=Jer [--enroll]
+    clippa faces <stream> --rescan             scan again
+    clippa faces <stream> --name F03=Jer [--enroll]
                                                 name a group by hand ("F03=" clears it); --enroll
                                                 keeps that face for every show
-    clipper faces --enroll-photos               add the [thumbnail] photos portraits to the known faces
-    clipper faces <stream> --at 1:23:45 --box 0.4,0.1,0.2,0.3 [--person Jer]
+    clippa faces --enroll-photos               add the [thumbnail] photos portraits to the known faces
+    clippa faces <stream> --at 1:23:45 --box 0.4,0.1,0.2,0.3 [--person Jer]
                                                 the face in that box of the source frame (x, y, width,
                                                 height, 0-1): who it looks like; --person keeps it
-    clipper faces --forget Jer                  drop someone from the known faces
+    clippa faces --forget Jer                  drop someone from the known faces
 
 Every keyframe of source.* (one every ~4 s on Kick) goes through YuNet (a face detector) and SFace
 (128 numbers per face), two small ONNX models OpenCV runs on the CPU (the `faces` extra); they
@@ -287,7 +287,7 @@ def apply(sdir: Path, cfg: dict) -> dict:
     known = load_known(cfg)
     with jsonstate.update(sdir / "faces.json", indent=None) as data:
         if data is None:
-            raise ClipperError(f"no faces.json in {sdir}: clipper faces {sdir.name}")
+            raise ClipperError(f"no faces.json in {sdir}: clippa faces {sdir.name}")
         name_by_known(data, known, cfg)
         return data["groups"]
 
@@ -457,7 +457,7 @@ def set_names(sdir: Path, names: dict[str, str]) -> None:
     """Hand names ({"F03": "Jer"}; "" clears one) kept in faces.json for apply()."""
     with jsonstate.update(sdir / "faces.json", indent=None) as data:
         if data is None:
-            raise ClipperError(f"no faces.json in {sdir}: clipper faces {sdir.name}")
+            raise ClipperError(f"no faces.json in {sdir}: clippa faces {sdir.name}")
         for key, name in names.items():
             if key not in data["groups"]:
                 raise ClipperError(f"no group {key} in {sdir.name} (F01-F{len(data['groups']):02d})")
@@ -486,7 +486,7 @@ def enroll(sdir: Path, cfg: dict, keys: list[str]) -> None:
     """Add these groups' faces to the known faces under their names."""
     data = jsonstate.load(sdir / "faces.json")
     if data["model"] != MODEL:
-        raise ClipperError(f"{sdir.name} was scanned with {data['model']}: clipper faces {sdir.name} --rescan")
+        raise ClipperError(f"{sdir.name} was scanned with {data['model']}: clippa faces {sdir.name} --rescan")
     for key in keys:
         g = data["groups"][key]
         if not g.get("name"):

@@ -81,7 +81,7 @@ def test_completion_knows_commands_actions_flags_and_shortcuts():
     assert "list" in t["review"] and "--json" in t["review list"]
     assert "latest:kino" in t["run"] and "latest" not in t["review approve"]
     bash = completion.script("bash", cli.build_parser(), ["kino"])
-    assert 'complete -o default -F _clipper clipper' in bash and '"review list")' in bash
+    assert 'complete -o default -F _clipper clippa clippa.exe clipper clipper.exe' in bash and '"review list")' in bash
     ps = completion.script("powershell", cli.build_parser(), ["kino"])
     assert "Register-ArgumentCompleter" in ps and "'review list' = " in ps
     assert "'" not in "".join(w for words in t.values() for w in words)  # would break the PS quoting

@@ -1,4 +1,4 @@
-"""`clipper audit`: the weekly digest and the brief the monthly deep audit reads."""
+"""`clippa audit`: the weekly digest and the brief the monthly deep audit reads."""
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -146,7 +146,7 @@ def test_the_digest_shows_three_and_says_how_many_more(cfg):
         stream(cfg, f"kick-{n}", failed(error=f"cut exited 1: x | problem {'abcde'[n]}"))
     snap = audit.collect(cfg, NOW)
     short = audit.text(snap, TZ)
-    assert "\n3. " in short and "\n4. " not in short and "more: clipper audit --all" in short
+    assert "\n3. " in short and "\n4. " not in short and "more: clippa audit --all" in short
     assert len(short) <= audit.DM_MAX
     assert "\n4. " in audit.text(snap, TZ, limit=0) and "look: " in audit.text(snap, TZ, limit=0)
     assert "Repo: 1 open PRs, 2 branches" in short

@@ -1,6 +1,6 @@
 """Twitch ingest: resolve a VOD, download it, and pull its chat replay.
 
-`clipper fetch https://www.twitch.tv/videos/<id>` leaves streams/twitch-<id>/ with the same
+`clippa fetch https://www.twitch.tv/videos/<id>` leaves streams/twitch-<id>/ with the same
 files a Kick VOD does (meta.json, source.mp4, chat.jsonl). yt-dlp reads the VOD's details and
 downloads the video; chat comes from Twitch's own web API (the comments of a video, paged by
 cursor), since yt-dlp has no Twitch chat. A subscriber-only VOD needs [paths] twitch_cookies.

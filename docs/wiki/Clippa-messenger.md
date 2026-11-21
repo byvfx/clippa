@@ -1,5 +1,5 @@
 A small chat page where you tell Clippa what you want done, in your own words, and Clippa
-answers like a buddy in an old instant messenger. `clipper serve` serves it at `/chat`
+answers like a buddy in an old instant messenger. `clippa serve` serves it at `/chat`
 (`http://localhost:8765/chat`, same token as the war room), and the [War room](War-room) shows
 the same page at its side ([the chat at the side](War-room#the-chat-at-the-side)), so it is one
 chat either way. It works on a phone: the buddy list folds away.
@@ -19,7 +19,7 @@ the record), signed "Clippa chat", and is undoable from the war room's undo list
 shows as "(chat)". A pin or hold replans `schedule.json` straight away. A job posts its result
 into the open chat when it ends.
 
-It has no tool for uploads or publishing, config, code, deploys, `clipper services` or the
+It has no tool for uploads or publishing, config, code, deploys, `clippa services` or the
 recorder; asked for any of those, it says it can't do that from here.
 
 ## Several at once
@@ -45,7 +45,7 @@ and everything else stay as they are on YouTube. Each rename is 51 of the day's 
 units, taken only from what the day's uploads don't need ([Scheduling and uploads](Scheduling-and-uploads#quota));
 with none spare, Clippa says so instead of making a card. The war room's undo renames it back.
 Asking for the title Kitsu has already still makes a card on a video that's up, in case it was
-renamed in Studio. The war room, the bot and `clipper review retitle` rename the same way
+renamed in Studio. The war room, the bot and `clippa review retitle` rename the same way
 ([Scheduling and uploads](Scheduling-and-uploads#renaming-a-video-thats-up)).
 
 Anything else about a video that's up (its cover, slot, privacy) is still done in YouTube Studio.

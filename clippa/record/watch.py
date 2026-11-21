@@ -86,7 +86,7 @@ class Watcher:
                 finalize(d, self.cfg, self.alert)
             except Exception as e:
                 log.exception("finalize %s", d.name)
-                self.alert(f"{d.name}: finalize failed: {e!r} (retry: clipper record "
+                self.alert(f"{d.name}: finalize failed: {e!r} (retry: clippa record "
                            f"finalize {d.name})", logging.ERROR)
                 try:
                     st = State.load(d / STATE)
@@ -102,7 +102,7 @@ class Watcher:
     def _taken(d: Path) -> bool:
         if (d / STATE).exists():
             return State.load(d / STATE).status in ("done", "failed", "finalizing")
-        return (d / "meta.json").exists()   # e.g. a `clipper fetch` of the same stream
+        return (d / "meta.json").exists()   # e.g. a `clippa fetch` of the same stream
 
     def _new(self, c: dict, info: dict) -> Recording:
         ls = info["livestream"]

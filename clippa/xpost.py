@@ -1,15 +1,15 @@
 """X posts: scheduled Shorts -> the Lolcow Cinema X account as native video posts.
 
-  clipper x --sign-in          one-time sign-in in your browser (OAuth 2.0 with PKCE); token
+  clippa x --sign-in          one-time sign-in in your browser (OAuth 2.0 with PKCE); token
                                saved in paths.x_token and refreshed automatically
-  clipper x --items s02,t20    post these now (a failed one is tried again)
-  clipper x --auto             post approved, scheduled Shorts from streams that aired in
+  clippa x --items s02,t20    post these now (a failed one is tried again)
+  clippa x --auto             post approved, scheduled Shorts from streams that aired in
                                the last max_age_hours and aren't on X yet, newest stream
                                first, up to max_per_24h (the bot runs this every
                                [x] auto_post_minutes; 0, the default, means only by hand)
-  clipper x --issue [DAY]      post a weekly issue's ten pages as a thread of 4 + 4 + 2
+  clippa x --issue [DAY]      post a weekly issue's ten pages as a thread of 4 + 4 + 2
                                images (the newest issue, or the week holding DAY)
-  clipper x [stream]           what was posted, with links
+  clippa x [stream]           what was posted, with links
 
 The video goes up through the v2 chunked media upload (initialize / append / finalize, then
 STATUS until X has processed it) and the post is POST /2/tweets with its media id. The text
@@ -17,19 +17,19 @@ is the Short's title, hook first (no "KINO CASINO | " prefix, [x] hook_first), t
 [x] max_hashtags hashtags ending with the show's own (#KinoCasino, [x] show_hashtag), then
 a credit line tagging whose footage it is ([x] credit with the show's [x] mentions), banned
 words masked as everywhere else. No link goes in the text: X bills a post with a URL at $0.20 against $0.015 (pay-per-use
-pricing, 2026). Each post's cost is logged to paths.costs like a model call (`clipper costs`).
+pricing, 2026). Each post's cost is logged to paths.costs like a model call (`clippa costs`).
 
 X's recommended portrait size is 720x1280 and its docs cap dimensions near that, so a Short
 taller than [x] max_height is re-encoded to fit first (into streams/<id>/x/, deleted after).
 
-Each post is recorded in schedule.json under "platforms": {"x": {...}} (as `clipper tiktok`
+Each post is recorded in schedule.json under "platforms": {"x": {...}} (as `clippa tiktok`
 does), so nothing goes twice. A run first claims the entry there under the schedule's lock
 (status "posting"), so the bot's --auto and a hand --items can't both post it or go past
 max_per_24h. X doesn't wait for YouTube (a clip is worth most on X while the topic is
 hot); with [x] after_youtube it does, and asks YouTube that each Short is really public
 (an upload can stay private). --auto tries a failed post again up to MAX_TRIES times, and skips titles that say
 "host(s)". A post call that times out is recorded "unknown" and never retried: X may have
-created it, so check x.com by hand, then `clipper x --mark <key> posted[:url]|failed`.
+created it, so check x.com by hand, then `clippa x --mark <key> posted[:url]|failed`.
 Settings are the Short's show's ([shows.<key>.x]); the allowance is the account's.
 A failed post makes the command exit non-zero, so the bot DMs it.
 
@@ -117,7 +117,7 @@ def sign_in(cfg: dict) -> dict:
         "response_type": "code", "client_id": c["client_id"], "redirect_uri": redirect,
         "scope": SCOPES, "state": state, "code_challenge": challenge,
         "code_challenge_method": "S256"})
-    code = oauth.browser_code(url, port, state, "X", "clipper x --sign-in")
+    code = oauth.browser_code(url, port, state, "X", "clippa x --sign-in")
     tok = save_token(token_request(c, code=code, grant_type="authorization_code",
                                    redirect_uri=redirect, code_verifier=verifier))
     jsonstate.write(paths["x_token"], tok)
@@ -132,16 +132,16 @@ def access_token(paths: dict) -> str:
     single-use refresh token and sign the second one out."""
     p: Path = paths["x_token"]
     if not p.exists():
-        raise ClipperError("not signed in to X; run: clipper x --sign-in")
+        raise ClipperError("not signed in to X; run: clippa x --sign-in")
     with jsonstate.update(p) as tok:
         if time.time() >= tok.get("expires_at", 0):
             if not tok.get("refresh_token"):
-                raise ClipperError("X sign-in expired; run: clipper x --sign-in")
+                raise ClipperError("X sign-in expired; run: clippa x --sign-in")
             try:
                 new = save_token(token_request(client(paths), grant_type="refresh_token",
                                                refresh_token=tok["refresh_token"]), tok)
             except ClipperError as e:
-                raise ClipperError(f"{e}; run: clipper x --sign-in") from e
+                raise ClipperError(f"{e}; run: clippa x --sign-in") from e
             tok.clear()
             tok.update(new)
         return tok["access_token"]
@@ -383,7 +383,7 @@ def mark(cfg: dict, key: str, status: str) -> None:
     has it; `posted:<url>` keeps the link) or `failed` (it isn't there; --auto may try again)."""
     status, _, url = status.partition(":")
     if status not in ("posted", "failed"):
-        raise ClipperError("clipper x --mark KEY posted[:URL] or failed")
+        raise ClipperError("clippa x --mark KEY posted[:URL] or failed")
     sched = jsonstate.load(cfg["paths"]["schedule"])
     if not any(e["key"] == key for e in sched["entries"] + sched.get("unscheduled", [])):
         raise ClipperError(f"{key}: not in schedule.json (a full key, e.g. kick-1/v01_t20)")
@@ -407,7 +407,7 @@ def claim(cfg: dict, key: str) -> str:
         if x.get("status") == "posted":
             return f"already on X ({x['url']})"
         if x.get("status") == "unknown":
-            return "a post call timed out: check x.com by hand, then clipper x --mark <key> posted|failed"
+            return "a post call timed out: check x.com by hand, then clippa x --mark <key> posted|failed"
         if active(x, now):
             return "being posted by another run"
         if used_last_24h(cfg, sched, now) >= cfg["x"]["max_per_24h"]:
@@ -436,7 +436,7 @@ def post(cfg: dict, items: list[str], stream: str | None = None, dry_run: bool =
             continue
         video = schedule.video(cfg, e)
         if not video.exists():
-            print(f"  {e['key']}: video missing ({video}); rerun clipper shorts")
+            print(f"  {e['key']}: video missing ({video}); rerun clippa shorts")
             continue
         text = text_for(e, cfg)
         if re.search(r"\bhosts?\b", text, re.IGNORECASE):
@@ -457,7 +457,7 @@ def post(cfg: dict, items: list[str], stream: str | None = None, dry_run: bool =
                 pid = call(paths, "POST", "/tweets", json={"text": text, "media": {"media_ids": [mid]}})["data"]["id"]
             except requests.Timeout as ex:
                 # X may well have created the post before the answer was lost: never retried
-                # (that posted and billed a Short twice); `clipper x` lists it for a hand check.
+                # (that posted and billed a Short twice); `clippa x` lists it for a hand check.
                 rumble.save_platform(cfg, {e["key"]: {"status": "unknown", "error": f"timed out: {ex}"[:300],
                                                       "text": text, "media_id": mid, "failed_at": costs.now_iso()}}, "x")
                 print(f"  {e['key']}: UNKNOWN: the post call timed out; check x.com by hand (not retried)")
@@ -668,5 +668,5 @@ def status(cfg: dict, stream: str | None = None) -> None:
     print(f"{len(rows)} on X; {used_last_24h(cfg, sched)} posted in the last 24 h (max {cfg['x']['max_per_24h']})")
     if not stream:
         n = len(due(sched, xc_of(cfg), aired=aired_of(cfg), approved=approved_of(cfg)))
-        print(f"{n} Shorts due and not posted; post with: clipper x --items <key>,... "
-              "or clipper x --auto")
+        print(f"{n} Shorts due and not posted; post with: clippa x --items <key>,... "
+              "or clippa x --auto")

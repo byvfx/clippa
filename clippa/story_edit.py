@@ -1,8 +1,8 @@
-"""`clipper story plan|cut` (#84, phase 2): a story's moments -> one video, through review.
+"""`clippa story plan|cut` (#84, phase 2): a story's moments -> one video, through review.
 
 Usage:
-    clipper [--show <key>] story plan <slug> [--force]   the edit -> streams/story-<slug>/story.json
-    clipper story cut <slug> [--force] [--no-review]     the video, meta, thumbs, the Kitsu card
+    clippa [--show <key>] story plan <slug> [--force]   the edit -> streams/story-<slug>/story.json
+    clippa story cut <slug> [--force] [--no-review]     the video, meta, thumbs, the Kitsu card
 
 `plan` ([story] edit_model, Sonnet; ~$0.03) reads the dossier's summary, timeline, conflicts and
 angles and the moments (phase 1), and writes the edit: title, topic, summary, description, and
@@ -88,7 +88,7 @@ def pick_show(cfg: dict, before: str = "") -> str:
     if not key and len(cfg["shows"]) == 1:
         key = next(iter(cfg["shows"]))
     if not key:
-        raise ClipperError(f"which show does the story go out under? clipper --show <key> story plan ..., "
+        raise ClipperError(f"which show does the story go out under? clippa --show <key> story plan ..., "
                            f"or [story] show ({', '.join(cfg['shows'])})")
     if key not in cfg["shows"]:
         raise ClipperError(f"no [shows.{key}]; shows: {', '.join(cfg['shows'])}")
@@ -161,7 +161,7 @@ def plan(cfg: dict, slug: str, force: bool = False, claude=None) -> dict:
     sc = shc["story"]
     moments = (jsonstate.read(d / "moments.json", {}) or {}).get("moments", [])
     if not moments:
-        raise ClipperError(f"story {slug}: no moments yet (clipper story run {slug})")
+        raise ClipperError(f"story {slug}: no moments yet (clippa story run {slug})")
     dj = jsonstate.read(d / "dossier.json", {}) or {}
     dossier = dj.get("dossier") or {}
     cats: dict[str, dict] = {}
@@ -240,7 +240,7 @@ def plan(cfg: dict, slug: str, force: bool = False, claude=None) -> dict:
     jsonstate.write(sdir / "story.json", data)
     write_meta(sdir, shc, key, data)
     print_plan(data)
-    print(f"{sdir / 'story.json'}; ${claude.cost:.3f}. Edit it, then: clipper story cut {slug}")
+    print(f"{sdir / 'story.json'}; ${claude.cost:.3f}. Edit it, then: clippa story cut {slug}")
     return data
 
 
@@ -295,7 +295,7 @@ def load_plan(cfg: dict, slug: str) -> tuple[Path, dict]:
     sdir = stream_dir(cfg, slug)
     data = jsonstate.read(sdir / "story.json", None)
     if not data:
-        raise ClipperError(f"story {slug}: no edit yet (clipper story plan {slug})")
+        raise ClipperError(f"story {slug}: no edit yet (clippa story plan {slug})")
     return sdir, data
 
 
@@ -596,7 +596,7 @@ def cut(cfg: dict, slug: str, force: bool = False, review: bool = True) -> Path:
           + (f", {cards} narration cards{'' if nc else ' (silent: no [story] voice_id)'}" if cards else "")
           + f", {seg['bleeps']} bleeped)")
     if not review:
-        print(f"--no-review: meta, thumbs and Kitsu not run (clipper story cut {slug} again to do them)")
+        print(f"--no-review: meta, thumbs and Kitsu not run (clippa story cut {slug} again to do them)")
         return final
     # each stage is marked done for this edit only once it has run, so --no-review or a failure
     # leaves it to do next time; thumbs are picked again whenever the video changed

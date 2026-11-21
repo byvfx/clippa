@@ -16,7 +16,7 @@ def commands() -> dict[str, argparse.ArgumentParser]:
 
 
 def test_every_command_is_in_one_group():
-    """`clipper -h` lists commands by COMMAND_GROUPS: a new command goes in one."""
+    """`clippa -h` lists commands by COMMAND_GROUPS: a new command goes in one."""
     grouped = [n for _, names in cli.COMMAND_GROUPS for n in names]
     assert sorted(grouped) == sorted(commands())
     assert len(grouped) == len(set(grouped))
@@ -96,18 +96,18 @@ def test_mode_flags_that_dont_combine():
 
 
 def test_version_is_one_number(capsys):
-    """`clipper --version` prints this copy's version (buildinfo: the release, plus the commit past
+    """`clippa --version` prints this copy's version (buildinfo: the release, plus the commit past
     it); __init__.py and pyproject.toml, the release number, agree."""
     with pytest.raises(SystemExit) as e:
         parse("--version")
     assert e.value.code == 0
-    assert capsys.readouterr().out.strip() == f"clipper {buildinfo.version()}"
+    assert capsys.readouterr().out.strip() == f"clippa {buildinfo.version()}"
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
     assert project["version"] == __version__
 
 
 def test_every_argument_and_command_has_help():
-    """`clipper <command> -h` explains every flag and positional (audit item 17); --version's
+    """`clippa <command> -h` explains every flag and positional (audit item 17); --version's
     help is argparse's own."""
     import ast
 

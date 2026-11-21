@@ -1,13 +1,13 @@
-"""`clipper news` (#110): headlines about our people from news feeds, Google News and Reddit.
+"""`clippa news` (#110): headlines about our people from news feeds, Google News and Reddit.
 
-    clipper news check [--no-judge]       fetch what's due, match the watchlist, judge the matches
+    clippa news check [--no-judge]       fetch what's due, match the watchlist, judge the matches
                                           (the bot runs it every [news] check_minutes)
-    clipper news list [--days 3] [--person X] [--all]
-    clipper news search "<query>"         Google News now, and what's stored
-    clipper news feeds                    each source: last fetch, items, error
-    clipper news watch                    the watchlist: who, under which names, which shows
-    clipper news dismiss <story> ...
-    clipper news context <story> [--show KEY]   the story as the show's next stream_context
+    clippa news list [--days 3] [--person X] [--all]
+    clippa news search "<query>"         Google News now, and what's stored
+    clippa news feeds                    each source: last fetch, items, error
+    clippa news watch                    the watchlist: who, under which names, which shows
+    clippa news dismiss <story> ...
+    clippa news context <story> [--show KEY]   the story as the show's next stream_context
 
 Sources ([news]): `feeds` (RSS or Atom: TMZ, Dexerto), `reddit` subreddits (their RSS), and
 with `google_news` one Google News search per watched person whose name can't be taken for

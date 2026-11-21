@@ -1,5 +1,5 @@
-A web page for running the review and the schedule. `clipper serve` serves it together
-with the background jobs (`http://localhost:8765`, `[warroom] port`); `clipper warroom
+A web page for running the review and the schedule. `clippa serve` serves it together
+with the background jobs (`http://localhost:8765`, `[warroom] port`); `clippa warroom
 --open` runs the page on its own. It
 shows what is live, where each stream is in the pipeline, the review queue and the upload
 schedule. Press <kbd>?</kbd> on the page for every keyboard shortcut.
@@ -181,20 +181,20 @@ Kitsu.
 Who is who on screen (#54), kept in `[paths] faces/known.json` for every show.
 
 - **A stream's groups:** "Faces" in an item's window, or "faces" on a scanned stream in
-  the pipeline panel. Each group of faces `clipper faces` found has its contact sheet (first
+  the pipeline panel. Each group of faces `clippa faces` found has its contact sheet (first
   row its clearest faces, second a spread over the stream), its name, and whether that came by
   hand or by face (with the match, 0.7+ names a group). Type a name and press Name (this stream
   only) or Name + enroll (every stream; the stream's look-alike groups are named at once).
   "✓ Right" keeps a by-face name as a hand one; Clear removes a name. Filter by named/unnamed.
 - **Who's this? (B):** pause the video on a face, press B or the button, and drag a box round
-  one face. clipper takes that frame at full size, finds the face in the box (small ones too)
+  one face. Clippa takes that frame at full size, finds the face in the box (small ones too)
   and says who it looks like; Keep this face adds it to the known faces and names the stream's
   look-alike groups. For a face too rare or small to make a group: a guest, a costume, a
   picture-in-picture. Not on a phone (no inline video there).
 - The × on a known face forgets that person (every sample). Hand names stay.
 
-The command line does the same: `clipper faces <stream> --name F03=Jer --enroll`,
-`clipper faces <stream> --at 1:23:45 --box x,y,w,h --person Jer`, `clipper faces --forget Jer`.
+The command line does the same: `clippa faces <stream> --name F03=Jer --enroll`,
+`clippa faces <stream> --at 1:23:45 --box x,y,w,h --person Jer`, `clippa faces --forget Jer`.
 
 ## Heat
 
@@ -202,7 +202,7 @@ The command line does the same: `clipper faces <stream> --name F03=Jer --enroll`
 opens that stream's heat graph: the curve the [signals stage](Pipeline) makes from chat and
 loudness, over the whole stream. The picker at the top changes the stream.
 
-- The shaded bands are the windows clipper looked at (`windows.json`), each with a dot at its
+- The shaded bands are the windows Clippa looked at (`windows.json`), each with a dot at its
   peak; the dashed line is the least heat a window needs (`[signals] min_heat`). A grey stretch
   had no chat recorded.
 - Under the curve, each cut segment, Short and clip sits where it came from, coloured by where
@@ -219,11 +219,11 @@ Nothing here costs anything or changes anything.
 
 ## News
 
-Headlines about the shows' people (`clipper news`, #110). **News** on the Research page opens it.
+Headlines about the shows' people (`clippa news`, #110). **News** on the Research page opens it.
 
 - **Stories** from the last 1, 3, 7 or 30 days, newest first: the headline the judge wrote, strong
   or maybe, who and which show, why it matters, and the outlets' links. "posted" means the bot
-  put it in Discord (`clipper serve` finds them, the bot posts them); "in context" that it was
+  put it in Discord (`clippa serve` finds them, the bot posts them); "in context" that it was
   added to a show's next stream.
 - **Tonight's context…** shows the text the stream would get and the show it goes to (change it
   in the menu); **Add to its next stream** queues it. **Dismiss** hides a story and the bot never
@@ -233,9 +233,9 @@ Headlines about the shows' people (`clipper news`, #110). **News** on the Resear
 
 ## Blinds
 
-Gossip blind items with their clues read (`clipper blinds`, #111). **Blinds** on the Research page
+Gossip blind items with their clues read (`clippa blinds`, #111). **Blinds** on the Research page
 opens it: each blind's text, its typed clues, the claim, and a box for your guess, which you give before
-clipper looks into anything. The whole of it is on [Blind items](Blind-items#the-war-room).
+Clippa looks into anything. The whole of it is on [Blind items](Blind-items#the-war-room).
 
 ## Keys
 
@@ -249,7 +249,7 @@ answers are kept in `streams/.serve/keys.json`. Streams the worker holds for a r
 ([How the processes talk](How-the-processes-talk#child-processes)) are listed at the top.
 No key's value ever reaches the page. To change one, edit `deploy/hub/env.local` (or its file in
 `secrets/`), then run `deploy.sh`, which checks it against the laptop's own first
-([NAS-hub](NAS-hub#deploy)). `clipper keys` prints the same table for the machine it runs on
+([NAS-hub](NAS-hub#deploy)). `clippa keys` prints the same table for the machine it runs on
 (`--check` asks, `--check Anthropic` asks one; exit 1 on a rejected key).
 
 ## Cast
@@ -279,7 +279,7 @@ the sure ones are already kept (not from image search, an enrolled face matched 
 with no doubt), so
 look over Kept too and drop what's wrong.
 
-The command line: `clipper cast list|grab|find|add|keep|drop|label|set|auto` ([Cast library](Cast-library)).
+The command line: `clippa cast list|grab|find|add|keep|drop|label|set|auto` ([Cast library](Cast-library)).
 
 ## Schedule and uploads
 
@@ -314,7 +314,7 @@ Or tap an item in Ready to slot, then an open slot or a day's head: a bar at the
 which item you picked up (the open slots show while you do, even when they are hidden), and
 **Cancel**, <kbd>Esc</kbd>, another page or a second tap on the item puts it down.
 
-Or let clipper pick the slot: the arrow-to-a-line button beside an item (or **Next open slot** in its window) finds
+Or let clippa pick the slot: the arrow-to-a-line button beside an item (or **Next open slot** in its window) finds
 the first open slot of its kind that the scheduler's rules allow: the slot times, `max_per_day`,
 `min_gap_minutes`, `kick_first_hours` after the stream and `[youtube] min_lead_minutes` from
 now. **Segments to open slots…** does that for every approved segment without a slot, but
@@ -341,18 +341,18 @@ to `""` (console only) says to use `docker compose logs` instead.
 The Money page has the first three, the Stats page the analytics.
 
 - **Modal**: the month's Modal bill, the spend rate, GPUs up, transcriptions
-  running and failed, and each archive's progress. `clipper modal` prints the same.
+  running and failed, and each archive's progress. `clippa modal` prints the same.
 - **Costs**: the month added up (the Spend widget shows its total). Every model call (logged as it is made, with its
   stage and stream), Modal runs, and `[costs] monthly` fixed costs, by stage and show.
-  `clipper costs` prints the same; revenue joins it once the channel is monetized.
+  `clippa costs` prints the same; revenue joins it once the channel is monetized.
 - **API usage**: the month by the Claude API's and OpenRouter's own count,
   today, by model, OpenRouter's week, limit and balance, each next to what our log recorded.
   Claude's needs an Admin API key ([Costs](Costs#the-providers-own-numbers));
-  `clipper costs --providers` prints the same.
+  `clippa costs --providers` prints the same.
 - **Analytics**: a month of YouTube. Views, watch time and
   subscribers against the month before, views per day, where views came from (Shorts feed,
   search, ...), and the first-7-day numbers of that month's uploads by show, kind, weekday and
-  hour, with the best and weakest. `clipper analytics --report` writes the same as
+  hour, with the best and weakest. `clippa analytics --report` writes the same as
   `reports/analytics/<month>.md` plus a .csv of every upload, and ends with
   [what predicts views](Scheduling-and-uploads#what-predicts-views), which the panel leaves out.
   serve refreshes the numbers every `[analytics] auto_hours`. A passing Google error (a 500, a
@@ -368,7 +368,7 @@ are in there, never the first thing to tap). The Review queue is one column, the
 the first screen; **Filters** opens as a sheet from the bottom (**Done**, or a tap above it, puts
 it away). Items open full screen with the decisions at the bottom and swipe to the next one, and videos
 play from a 360p copy (`lowres/` beside each preview, about a quarter of the data). It can be
-added to the home screen. Away from home it goes through Tailscale: `clipper warroom --tailnet
+added to the home screen. Away from home it goes through Tailscale: `clippa warroom --tailnet
 on` ([Phone access](Phone-access)).
 
 The Schedule is an agenda: Next up, then what is still to come by day. What already went out or

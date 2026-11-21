@@ -1,7 +1,7 @@
-"""`clipper backup` (#204): one dated zip of the taste layer, the files months of editorial
+"""`clippa backup` (#204): one dated zip of the taste layer, the files months of editorial
 judgement live in and the code can't rebuild (HANDOFF "Back up the taste layer").
 
-    clipper backup [--to DIR] [--with-secrets] [--dry-run]
+    clippa backup [--to DIR] [--with-secrets] [--dry-run]
 
 What goes in, each relative to the config file's folder (the NAS share's /data):
     clipper.toml and clipper.local.toml, backups/ (the hand-edit copies; not this folder),
@@ -15,7 +15,7 @@ transcripts (Modal can redo them), the Kitsu database (its Docker volumes on the
 Backups), and deploy/*/env.local on the machine you deploy from. The zip lands in [backup]
 folder as taste-<date>-<time>.zip; the newest [backup] keep stay. Copy them off the NAS now and
 then: a backup on the same disk doesn't survive the disk. serve runs it every [backup]
-every_days (0 = only by hand); `clipper audit` and doctor say when the newest is old."""
+every_days (0 = only by hand); `clippa audit` and doctor say when the newest is old."""
 from __future__ import annotations
 
 import os
@@ -30,12 +30,12 @@ from .errors import ClipperError
 STREAM_FILES = ("config.toml", "meta.json", "review.json", "review_state.json", "thumbnails.json",
                 "retakes.json")
 PREFIX = "taste-"
-SKIP_DIRS = {"models", "__pycache__"}   # faces/models: downloaded again by `clipper faces`
+SKIP_DIRS = {"models", "__pycache__"}   # faces/models: downloaded again by `clippa faces`
 
 
 def folder(cfg: dict, to: str | Path | None = None) -> Path:
     """Where backups land: --to, else [backup] folder, relative to the config file's folder."""
-    cfg = base(cfg)   # `clipper --show kino backup`: the install's, not a show's (no _dir there)
+    cfg = base(cfg)   # `clippa --show kino backup`: the install's, not a show's (no _dir there)
     name = to or cfg["backup"]["folder"]
     if not name:
         raise ClipperError("no backup folder: set [backup] folder or pass --to")

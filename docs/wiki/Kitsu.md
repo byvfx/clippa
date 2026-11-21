@@ -1,7 +1,7 @@
 Kitsu (CGWire's review tool) is the record of every decision: one production per show, an
-episode per stream, a sequence per topic segment, a shot per clip and per Short. clipper
+episode per stream, a sequence per topic segment, a shot per clip and per Short. Clippa
 creates and fills all of it ([Review](Review)); you provide a running Kitsu, a bot account for
-clipper and a login per reviewer.
+Clippa and a login per reviewer.
 
 ## Running Kitsu
 
@@ -23,12 +23,12 @@ Open `http://<host>:8090`. Sign in as the stack's default admin (`admin@example.
 `mysecretpassword`, from the docker-cgwire README), change that password straight away (your
 avatar → Profile) or make your own admin account and remove the default one.
 
-## clipper's account
+## Clippa's account
 
-clipper signs in as a bot. In Kitsu: Settings (the cog) → People → **Bots** → New bot, named
-`clipper`, role Admin (it creates productions, task types and statuses); copy the token it
+Clippa signs in as a bot. In Kitsu: Settings (the cog) → People → **Bots** → New bot, named
+`clippa`, role Admin (it creates productions, task types and statuses); copy the token it
 shows. Save it as the `KITSU_TOKEN` environment variable (`[review] token_env`) on every
-machine that publishes or syncs; `clipper setup` asks for the address and the token and
+machine that publishes or syncs; `clippa setup` asks for the address and the token and
 checks them. In clipper.toml:
 
 ```toml
@@ -36,9 +36,9 @@ checks them. In clipper.toml:
 host = "http://<host>:8090/api"   # the API URL, with /api
 ```
 
-`clipper doctor` (online) signs in and reports the bot's name. The first `clipper review
+`clippa doctor` (online) signs in and reports the bot's name. The first `clippa review
 publish` creates the "Clipping" project template and the show's production (named after
-`[meta] show_name`, or `[review] project`) with the task types, statuses and columns clipper
+`[meta] show_name`, or `[review] project`) with the task types, statuses and columns Clippa
 uses; later publishes keep them up to date.
 
 ## Reviewers
@@ -47,16 +47,16 @@ Each reviewer is a Kitsu person (People → New person) with their own login, ad
 production (the production's Team). A Manager can set statuses and edit the columns; an Artist
 can comment. What they see and do is on [Reviewing](Reviewing).
 
-## What clipper writes and reads
+## What Clippa writes and reads
 
 Statuses: **approved** (or **done**) approves, **retake** with a comment asks for a change (the
 item is re-cut or re-covered and comes back), **rejected** drops it; anything else stays
 pending. Columns on a segment (sequence) or clip (shot): YouTube title, YouTube description,
-Hashtags, Tags and Playlist (what `clipper upload` sends), Hook, Category, Score and Found by
+Hashtags, Tags and Playlist (what `clippa upload` sends), Hook, Category, Score and Found by
 (how the clip was chosen; on a segment, Score is its [segment score](Pipeline#segment-scores),
 shown only), Layout (a Short's crop), Other voices (seconds of voices that aren't
 the show's own), Tightened (the pauses cut out of a Short, [Pipeline](Pipeline#tightening)),
-Publish at (your pin), Hold, Scheduled (the slot clipper gave it) and
-Thumbnail text (the cover's words; a sync re-renders the cover). clipper fills a column when it
-is empty or still shows what clipper wrote last, never over an edit of yours, and `clipper
+Publish at (your pin), Hold, Scheduled (the slot Clippa gave it) and
+Thumbnail text (the cover's words; a sync re-renders the cover). Clippa fills a column when it
+is empty or still shows what Clippa wrote last, never over an edit of yours, and `clippa
 review sync` reads them back.

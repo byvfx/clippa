@@ -157,7 +157,7 @@ def load(cfg: dict) -> Style:
 def masthead(wc: dict) -> tuple[str, str] | None:
     """The cover's two words ([weekly] masthead: the red one, then the chrome one), stripped, or
     None when the setting isn't two non-blank strings: the weekly then refuses to draft and
-    `clipper doctor` warns (Copilot on #178: a blank word must not reach the paid draft)."""
+    `clippa doctor` warns (Copilot on #178: a blank word must not reach the paid draft)."""
     words = wc.get("masthead") or []
     if (not isinstance(words, list | tuple) or len(words) != 2
             or not all(isinstance(w, str) and w.strip() for w in words)):

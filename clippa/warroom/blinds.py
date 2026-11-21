@@ -1,4 +1,4 @@
-"""The blinds window (#111): gossip blind items, your guess first (`clipper blinds`).
+"""The blinds window (#111): gossip blind items, your guess first (`clippa blinds`).
 
 It shows the blinds and writes only through blinds.answer / blinds.add_by_hand, like the CLI;
 "Check now" runs `blinds.check` in the background, one at a time."""

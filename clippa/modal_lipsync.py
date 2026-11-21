@@ -1,6 +1,6 @@
-"""LatentSync on Modal: lip-sync a video to an audio track (`clipper perform lipsync`, #58).
+"""LatentSync on Modal: lip-sync a video to an audio track (`clippa perform lipsync`, #58).
 
-Deploy once per change to this file: clipper perform lipsync --deploy
+Deploy once per change to this file: clippa perform lipsync --deploy
 
 LatentSync 1.6 (ByteDance, open source) redraws only the mouth region so it matches the audio;
 the rest of the frame is the input's. It needs ~18 GB of VRAM (an L40S). The image clones the
@@ -8,7 +8,7 @@ repo, installs its pinned requirements, downloads the checkpoints from Hugging F
 the repo's own demo once on a GPU, so every model the pipeline fetches on first use (VAE, face
 detection) is baked in. Output frame rate is the pipeline's (25 fps).
 
-Self-contained (no clipper imports): `modal deploy` loads it as a top-level module.
+Self-contained (no Clippa imports): `modal deploy` loads it as a top-level module.
 """
 
 from __future__ import annotations

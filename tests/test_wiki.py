@@ -53,8 +53,8 @@ def test_sidebar_lists_every_page():
 
 
 def test_anchor_slugs():
-    text = "## Cut on the NAS (#51)\n## The walkthrough: `clipper setup`\n```bash\n# a comment\n```\n"
-    assert _anchors(text) == {"cut-on-the-nas-51", "the-walkthrough-clipper-setup"}
+    text = "## Cut on the NAS (#51)\n## The walkthrough: `clippa setup`\n```bash\n# a comment\n```\n"
+    assert _anchors(text) == {"cut-on-the-nas-51", "the-walkthrough-clippa-setup"}
 
 
 def test_code_links_resolve():

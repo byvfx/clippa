@@ -1,4 +1,4 @@
-"""The DaVinci Resolve half of `clipper doc`: a build (clippa/doc.py's layout) becomes a new
+"""The DaVinci Resolve half of `clippa doc`: a build (clippa/doc.py's layout) becomes a new
 timeline in the open project, and a timeline becomes a render.
 
 Resolve Studio must be running on this machine with external scripting on (Preferences >

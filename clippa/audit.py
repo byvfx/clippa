@@ -1,15 +1,15 @@
-"""`clipper audit`: the weekly digest, and the brief the monthly deep audit starts from.
+"""`clippa audit`: the weekly digest, and the brief the monthly deep audit starts from.
 
-The nightly `clipper checkup` asks "what is wrong right now". This asks "how did the week
+The nightly `clippa checkup` asks "what is wrong right now". This asks "how did the week
 go": what ran and failed, what went out, what it cost, whether backups are current, what is
 parked, what did best. No model and nothing written unless --save; a section that can't be
 read says so and the rest still run.
 
-    clipper audit                 the digest, at most three things to do
-    clipper audit --all           every thing to do, with where to look
-    clipper audit --save          also keep it as <streams>/.audit/weekly-<date>.json
-    clipper audit --brief         the saved weeks side by side, repeat problems first
-    clipper audit --keep-deep F   keep F as this month's deep audit (deep-<YYYY-MM>.md)
+    clippa audit                 the digest, at most three things to do
+    clippa audit --all           every thing to do, with where to look
+    clippa audit --save          also keep it as <streams>/.audit/weekly-<date>.json
+    clippa audit --brief         the saved weeks side by side, repeat problems first
+    clippa audit --keep-deep F   keep F as this month's deep audit (deep-<YYYY-MM>.md)
 
 Each thing to do has a `pattern`: its key with the stream taken out, so the same trouble on
 two streams counts as one problem. The monthly run (deploy/claude/audit.sh) gives the brief
@@ -123,7 +123,7 @@ def check_disk(cfg: dict, now: datetime, days: int) -> dict:
 
 
 def check_backups(cfg: dict, now: datetime, days: int) -> dict:
-    """The newest file in [backup] folder (`clipper backup` writes there; relative: the config
+    """The newest file in [backup] folder (`clippa backup` writes there; relative: the config
     file's folder)."""
     from . import backup
 
@@ -203,7 +203,7 @@ def issues(snap: dict, max_days: int) -> list[dict]:
                          look=wiki.page("Audit", "backups")))
     elif b and (b["age_days"] is None or b["age_days"] > max_days):
         age = "it is empty" if b["age_days"] is None else f"the newest is {b['age_days']:.0f} days old"
-        out.append(issue("backups:old", BAD, f"backups have stopped: {age}", look="clipper backup; [backup] every_days (serve)"))
+        out.append(issue("backups:old", BAD, f"backups have stopped: {age}", look="clippa backup; [backup] every_days (serve)"))
     out += [issue(f"section:{name}", WARN, f"the {name} section couldn't be read: {err}")
             for name, err in snap["errors"].items()]
     out += [issue(f["key"], WARN, f["text"], f["look"], f["stream"]) for f in found if f["level"] != BAD]
@@ -245,7 +245,7 @@ def text(snap: dict, tz: ZoneInfo, limit: int = TOP) -> str:
         if it["look"] and not limit:
             lines.append(f"   look: {it['look']}")
     if limit and len(todo) > limit:
-        lines.append(f"+{len(todo) - limit} more: clipper audit --all")
+        lines.append(f"+{len(todo) - limit} more: clippa audit --all")
     lines.append("")
     if (r := snap.get("runs")) is not None:
         lines.append(f"Ran: {r['done']} done, {r['partial']} partial, {len(r['failed'])} failed")

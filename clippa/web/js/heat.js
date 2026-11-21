@@ -1,4 +1,4 @@
-// War room: a stream's heat graph. The curve `clipper signals` makes from chat and loudness,
+// War room: a stream's heat graph. The curve `clippa signals` makes from chat and loudness,
 // the windows picked from it, and where each cut item sits in the stream, in its review colour.
 
 let HEAT = null;  // {focus, data, geo}: the open window
@@ -71,12 +71,12 @@ function heatItemBtn(i) {
 }
 function heatBody(r) {
   if (r.error) return `<div class="empty">${esc(r.error)}</div>`;
-  if (!r.heat.length) return `<div class="empty">No heat for this stream yet: it is made by <code>clipper signals ${esc(r.stream)}</code>.</div>`;
+  if (!r.heat.length) return `<div class="empty">No heat for this stream yet: it is made by <code>clippa signals ${esc(r.stream)}</code>.</div>`;
   const hot = r.windows.reduce((m, w) => !m || w.heat > m.heat ? w : m, null);
   const kinds = HEAT_LANES.map(([k, label]) => [r.items.filter(i => i.kind === k).length, label.toLowerCase()]).filter(c => c[0]);
   const used = Object.keys(HEAT_STATE).map(s => [s, r.items.filter(i => i.state === s).length]).filter(c => c[1]);
   const legend = used.map(([s, c]) => `<span><span class="sw" style="background:${HEAT_STATE[s][1]}"></span>${HEAT_STATE[s][0]} ${c}</span>`).join("")
-    + `<span><span class="sw win"></span>a window clipper looked at</span>${r.min_heat != null ? `<span><span class="sw thr"></span>the least heat a window needs (${esc(r.min_heat)})</span>` : ""}`
+    + `<span><span class="sw win"></span>a window Clippa looked at</span>${r.min_heat != null ? `<span><span class="sw thr"></span>the least heat a window needs (${esc(r.min_heat)})</span>` : ""}`
     + (r.heat.includes(null) ? `<span><span class="sw gap"></span>no chat recorded</span>` : "");
   const said = r.windows.some(w => w.said);  // signals ran before the transcript: no words to show
   const table = r.windows.slice().sort((a, z) => a.rank - z.rank).slice(0, 12).map(w => {

@@ -1,4 +1,4 @@
-"""#111 step 1: `clipper blinds`: sources, storage, the clue pass, pairing, the user's answer."""
+"""#111 step 1: `clippa blinds`: sources, storage, the clue pass, pairing, the user's answer."""
 import json
 import re
 import sys

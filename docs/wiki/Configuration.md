@@ -1,5 +1,5 @@
 Settings come in layers: built-in defaults, then `clipper.toml`, then this machine's own
-`clipper.local.toml` (written by `clipper setup`: streams path, encoder, transcribe backend),
+`clipper.local.toml` (written by `clippa setup`: streams path, encoder, transcribe backend),
 then environment variables named `CLIPPER_<SECTION>_<KEY>` (for example
 `CLIPPER_CUT_CLIP_CODEC=libx264`). That lets one shared `clipper.toml` serve every machine.
 `clipper.local.toml` and env vars win over show and stream overrides too.
@@ -8,10 +8,10 @@ then environment variables named `CLIPPER_<SECTION>_<KEY>` (for example
 `clippa.local.toml` beside it (when both spellings of a file are there, the new one is read),
 `CLIPPA_CONFIG`, `CLIPPA_LOCAL_CONFIG`, `CLIPPA_<SECTION>_<KEY>` and every other `CLIPPER_*`
 variable clipper itself reads (when both spellings are set, `CLIPPA_*` wins), and a `clippa`
-command in the venv beside `clipper`. Not yet: the deploy scripts and compose files under
+command in the venv beside `clippa`. Not yet: the deploy scripts and compose files under
 `deploy/` (`CLIPPER_DATA`, `CLIPPER_REPO`, `CLIPPER_TOML`, their `env.local` files) keep the
 old names until the rename's deploy step. The bootstrap puts both `clippa` and `clipper` on PATH. The old
-names keep working for now; `clipper doctor` lists the old-spelling variables still set, so you
+names keep working for now; `clippa doctor` lists the old-spelling variables still set, so you
 can see what is left to move.
 
 Each Kick channel is a show: a `[shows.<key>]` table with its channels, show name, scoring
@@ -23,19 +23,19 @@ priority = true` so its items go out ahead of the backlog. Unknown keys there ar
 night's compilation. A `[schedule] stream_budget` kind at 0 goes only when pinned, so
 `compilation = 0` there keeps compilations for big-story nights.
 `clippa/defaults.toml` documents every key with its default; `clipper.toml` holds only what
-differs (`clipper setup` starts a new one that way, and `clipper.example.toml` is a starter to
+differs (`clippa setup` starts a new one that way, and `clipper.example.toml` is a starter to
 copy). `clipper.toml` itself is gitignored because it holds your
 Discord ids and Kitsu address.
 
-`clipper config get meta.model` prints a setting's value and every layer that sets it
+`clippa config get meta.model` prints a setting's value and every layer that sets it
 (add `--stream <id>` for one stream, or `--show <key>`). Settings with a fixed set of choices
 (`[bleep] mode`, the backends, `[thumbnail] style`, ...) refuse anything else when the config
 loads; an unknown setting or `CLIPPER_*` variable is a warning on every command, and
-`clipper doctor` fails on it. `clipper --show <key>` applies that show to any stream.
+`clippa doctor` fails on it. `clippa --show <key>` applies that show to any stream.
 
-`clipper config diff` lists every setting this install changes from `clippa/defaults.toml`,
+`clippa config diff` lists every setting this install changes from `clippa/defaults.toml`,
 by layer: `clipper.toml`, each show's table, `clipper.local.toml`, then `CLIPPER_*` variables
-(`clipper config diff kino` keeps one show's table; `--json` for a script). It answers "what
+(`clippa config diff kino` keeps one show's table; `--json` for a script). It answers "what
 did I change" without opening the file on the share.
 
 Secrets never go in the config: API keys and tokens are environment variables, and the

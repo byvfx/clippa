@@ -1,19 +1,19 @@
 """YouTube upload: schedule.json entries -> private videos with publishAt.
 
-  clipper upload --sign-in   one-time OAuth in your browser; token saved beside the
+  clippa upload --sign-in   one-time OAuth in your browser; token saved beside the
                              client secret and refreshed automatically after that
-  clipper upload             upload every scheduled entry due within upload_ahead_hours
+  clippa upload             upload every scheduled entry due within upload_ahead_hours
 
 Per video: title, description, hashtags, tags and playlist from Kitsu's columns (read
 fresh from Kitsu just before uploading; your edits, or what publish put there), else the
 metadata draft; the title gets the show name ([meta] title_format). Captions from the
-.srt beside the video, the thumbnail from the .jpg beside it (`clipper thumbs`); the
+.srt beside the video, the thumbnail from the .jpg beside it (`clippa thumbs`); the
 playlist is created on first use.
 Custom thumbnails need a phone-verified channel (youtube.com/verify); until then the
-video uploads without one, and `clipper upload --thumbnails` sets them afterwards. Each upload is private with publishAt = its slot, so
+video uploads without one, and `clippa upload --thumbnails` sets them afterwards. Each upload is private with publishAt = its slot, so
 YouTube releases it on time; the entry is then marked uploaded with its video id, and
 the link goes into the Kitsu "YouTube URL" column. A pre-show placed "asap" by
-`clipper schedule` is always due and goes up public at once (no publishAt).
+`clippa schedule` is always due and goes up public at once (no publishAt).
 With [youtube] manual_publish = true every upload stays private (no publishAt) and you
 make it public in YouTube Studio; the slot is then only the suggested time.
 
@@ -23,17 +23,17 @@ this one is. The line is added here, not in Kitsu, since the longer video's link
 at review time; each run then adds, fixes or drops it on videos already up (`--links` alone).
 
 Uploaded by hand in Studio instead (e.g. past the channel's daily upload limit, which the
-API hits first): `clipper upload --next 5` lists what's next with its file; upload the
-file in Studio (private, no details), then `clipper upload --attach <item> <link>` sets
+API hits first): `clippa upload --next 5` lists what's next with its file; upload the
+file in Studio (private, no details), then `clippa upload --attach <item> <link>` sets
 the title, description and tags, adds thumbnail, captions, playlist and Kitsu link, and
 records it as uploaded so it never goes up twice.
 
-A video that's up can be renamed with `clipper review retitle <item> <title>` (or Clippa's
+A video that's up can be renamed with `clippa review retitle <item> <title>` (or Clippa's
 retitle card): retitle() reads its snippet, swaps the title (show name and bleeps as an upload
 does) and writes it back, 51 quota units, only from the day's spare (ytquota.spare).
 
 A Short's "related video" (the link under it to the longer video) can only be set in Studio:
-`clipper upload --related` lists uploaded Shorts whose segment is out, with the Studio link
+`clippa upload --related` lists uploaded Shorts whose segment is out, with the Studio link
 and the segment's id to search for; `--related ITEM ...` records them as done (the daily
 digest lists the same).
 
@@ -87,12 +87,12 @@ def credentials(paths: dict, sign_in: bool = False, force_refresh: bool = False)
             creds.refresh(Request())
         except Exception as e:  # revoked, or a 7-day Testing-mode token that expired
             why = e.args[0] if e.args else e
-            raise ClipperError(f"YouTube sign-in no longer works ({why}); run: clipper upload --sign-in. "
+            raise ClipperError(f"YouTube sign-in no longer works ({why}); run: clippa upload --sign-in. "
                                "If it lapses every 7 days, the Google OAuth app is still in Testing: "
                                "publish it (Google Cloud > Google Auth Platform > Audience)") from e
     if not creds or not creds.valid:
         if not sign_in:
-            raise ClipperError("not signed in to YouTube; run: clipper upload --sign-in")
+            raise ClipperError("not signed in to YouTube; run: clippa upload --sign-in")
         flow = InstalledAppFlow.from_client_secrets_file(str(paths["youtube_client_secret"]), want)
         # select_account: always show the account chooser, which is also where a Brand
         # Account channel is picked; plain "consent" silently reuses the browser's account.
@@ -317,7 +317,7 @@ def source_links(cfg: dict, e: dict, parents: list[tuple[str, dict, int]], statu
 
 
 def with_links(description: str, old: str, new: str) -> str:
-    """The description with the links clipper added last time (`old`) swapped for `new`,
+    """The description with the links Clippa added last time (`old`) swapped for `new`,
     which goes above a closing hashtag line."""
     import re
 
@@ -545,7 +545,7 @@ def set_thumbnail(yt, video_id: str, path: Path) -> None:
         if e.resp.status == 403:
             raise ThumbnailsNotAllowed(
                 "YouTube refused the custom thumbnail: the channel must be phone-verified "
-                "(https://www.youtube.com/verify). After verifying, run: clipper upload "
+                "(https://www.youtube.com/verify). After verifying, run: clippa upload "
                 f"--thumbnails ({e.reason or e})") from None
         raise
 
@@ -682,7 +682,7 @@ def run(cfg: dict, sign_in: bool = False, dry_run: bool = False, limit: int | No
         return
     sched_path: Path = paths["schedule"]
     if not sched_path.exists():
-        raise ClipperError("no schedule.json; run: clipper schedule")
+        raise ClipperError("no schedule.json; run: clippa schedule")
     sched = jsonstate.load(sched_path)
     if thumbnails_only:
         backfill_thumbnails(cfg, sched, sched_path, dry_run)
@@ -741,7 +741,7 @@ def upload_due(cfg: dict, sched: dict, sched_path: Path, dry_run: bool, limit: i
     if not dry_run:  # a sync writes review.json (and can post Kitsu comments)
         refresh_review(cfg, due)
     for e in missed:
-        print(f"  missed slot {e['publish_at']}: {e['title'][:60]} (rerun clipper schedule)")
+        print(f"  missed slot {e['publish_at']}: {e['title'][:60]} (rerun clippa schedule)")
     print(f"{len(due)} due within {yc['upload_ahead_hours']} h" + (" (dry run)" if dry_run else "")
           + ("; uploads stay private ([youtube] manual_publish)" if yc["manual_publish"] else ""))
     if not due:
@@ -833,7 +833,7 @@ def upload_one(cfg: dict, yt, e: dict, sched: dict, sched_path: Path, sources: d
             "uploaded_at": datetime.now(UTC).isoformat(timespec="seconds"),
             "source_links": links, "publish_at": e["publish_at"], "source": e.get("source")}
     e.update(done)
-    # Re-read under the lock: a replan or `clipper rumble` may have written meanwhile.
+    # Re-read under the lock: a replan or `clippa rumble` may have written meanwhile.
     with jsonstate.update(sched_path) as fresh:
         mine = next((x for x in fresh["entries"] if x["key"] == e["key"]), None)
         if mine:
@@ -917,7 +917,7 @@ def video_id(url: str) -> str:
 
 def queue(cfg: dict) -> list[dict]:
     """Approved items not on YouTube yet, in the order they would go out: scheduled ones by
-    slot, then the unslotted ones as `clipper schedule` would place them next."""
+    slot, then the unslotted ones as `clippa schedule` would place them next."""
     sched = jsonstate.load(cfg["paths"]["schedule"])
     by_key = {e["key"]: e for e in sched["entries"]}
     out = sorted((e for e in sched["entries"] if e.get("status") == "scheduled"),
@@ -945,7 +945,7 @@ def next_up(cfg: dict, n: int) -> None:
 def attach(cfg: dict, ref: str, url: str, dry_run: bool = False) -> None:
     """A video you uploaded yourself in YouTube Studio becomes item `ref`: title,
     description and tags set, thumbnail, captions, playlist and Kitsu link added, and the
-    item recorded as uploaded so `clipper upload` never sends it again. The video's
+    item recorded as uploaded so `clippa upload` never sends it again. The video's
     privacy is left as you set it in Studio."""
     from . import actions
 
@@ -997,7 +997,7 @@ def attach(cfg: dict, ref: str, url: str, dry_run: bool = False) -> None:
               "source": "studio", "status": "uploaded", "video_id": vid,
               "url": f"https://youtu.be/{vid}", "uploaded_at": now.isoformat(timespec="seconds"),
               "source_links": links})
-    with jsonstate.update(sched_path) as fresh:  # a replan or clipper rumble may have written
+    with jsonstate.update(sched_path) as fresh:  # a replan or clippa rumble may have written
         fresh["entries"] = [x for x in fresh["entries"] if x["key"] != key] + [e]
         fresh["unscheduled"] = [x for x in fresh.get("unscheduled", []) if x["key"] != key]
     print("  details set; recorded as uploaded")

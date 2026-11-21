@@ -1,18 +1,18 @@
-"""The command catalog (#158): everything a chat window may ask clipper to do, each with a risk tag.
+"""The command catalog (#158): everything a chat window may ask Clippa to do, each with a risk tag.
 
     read    answers at once: the schedule, items, retakes, health, costs
     write   a review decision through actions.decide (who "Clippa chat", so Kitsu stays the
             record), after a tap on a confirm card; the tap checks the item again first.
             A retitle of a video that's up renames it on YouTube too: the one YouTube write
             here, and its card says so
-    spend   a `clipper` command that costs money, run in the background after a tap; the
+    spend   a `clippa` command that costs money, run in the background after a tap; the
             card shows its estimate (llm.estimate and the ledger) before anything is spent
 
-The writes and the story spend are built from cli.py's own parsers (`clipper review <verb>`,
-`clipper story new`): their help is the tool's description and their arguments its inputs,
+The writes and the story spend are built from cli.py's own parsers (`clippa review <verb>`,
+`clippa story new`): their help is the tool's description and their arguments its inputs,
 through an allowlist (CLI_TOOLS) that names the arguments a chat may fill. The reads, the slot
 and the cover redo are wrapped by hand. Never in it, by design and by test: uploads and
-publishing (serve's timer does those), config and code, deploys, `clipper services`, the
+publishing (serve's timer does those), config and code, deploys, `clippa services`, the
 recorder (FORBIDDEN).
 
 A tool's `prepare(cfg, args)` turns a request into a Plan: an answer (a read), a card (a write
@@ -36,11 +36,11 @@ READ, WRITE, SPEND = "read", "write", "spend"
 RISKS = (READ, WRITE, SPEND)
 WHO = "Clippa chat"
 
-# `clipper <first word>` commands no chat may ever run or reach (tests/test_catalog.py checks).
+# `clippa <first word>` commands no chat may ever run or reach (tests/test_catalog.py checks).
 FORBIDDEN = ("upload", "schedule", "config", "setup", "services", "record", "serve", "bot", "worker",
              "warroom", "doctor", "codereview", "cookies", "streams", "backup", "completion", "alert",
              "tiktok", "x", "rumble")
-FORBIDDEN_VERBS = ("publish", "invite", "auto", "sync")  # `clipper review <verb>` a chat never runs
+FORBIDDEN_VERBS = ("publish", "invite", "auto", "sync")  # `clippa review <verb>` a chat never runs
 
 # Fields a card snapshots when it is made; a tap refuses when any of them changed meanwhile.
 SNAPSHOT = ("decision", "hold", "publish_at", "title", "thumb_text", "uploaded")
@@ -59,7 +59,7 @@ class Plan:
     snapshot: dict = field(default_factory=dict)
     lines: list[str] = field(default_factory=list)   # the card's details
     estimate: str = ""            # a spend card: what it will cost
-    argv: list[str] = field(default_factory=list)    # a spend card: the clipper command
+    argv: list[str] = field(default_factory=list)    # a spend card: the Clippa command
     options: list[dict] = field(default_factory=list)  # "ask": [{ref, title, where}]
 
     def as_dict(self) -> dict:
@@ -83,7 +83,7 @@ class Tool:
 # ---------- argparse -> a tool's input schema ----------
 
 def _subparser(parser: argparse.ArgumentParser, argv: tuple[str, ...]) -> tuple[argparse.ArgumentParser, str]:
-    """The parser for `clipper <argv...>` and its help line."""
+    """The parser for `clippa <argv...>` and its help line."""
     p, help_ = parser, ""
     for word in argv:
         sub = next(a for a in p._actions if isinstance(a, argparse._SubParsersAction))
@@ -93,7 +93,7 @@ def _subparser(parser: argparse.ArgumentParser, argv: tuple[str, ...]) -> tuple[
 
 
 def schema_from_parser(argv: tuple[str, ...], params: dict[str, tuple[str, bool, str]]) -> tuple[dict, str]:
-    """(input schema, description) for `clipper <argv>`, its arguments limited to `params`:
+    """(input schema, description) for `clippa <argv>`, its arguments limited to `params`:
     {argparse dest: (input name, required, a description in place of the help, or "")}."""
     from .cli import build_parser
 
@@ -123,7 +123,7 @@ def schema_from_parser(argv: tuple[str, ...], params: dict[str, tuple[str, bool,
             required.append(name)
     missing = set(n for n, *_ in params.values()) - set(props)
     if missing:  # a renamed CLI argument must not silently drop a tool's input
-        raise ClipperError(f"clipper {' '.join(argv)} has no arguments for {sorted(missing)}")
+        raise ClipperError(f"clippa {' '.join(argv)} has no arguments for {sorted(missing)}")
     return {"type": "object", "properties": props, "required": required}, help_
 
 
@@ -372,7 +372,7 @@ def when_text(iso: str, tz: ZoneInfo) -> str:
         return iso
 
 
-# ---------- writes: `clipper review <verb>`, through actions.decide ----------
+# ---------- writes: `clippa review <verb>`, through actions.decide ----------
 
 # tool name -> (review verb, {argparse dest: (input, required, description)}, what decide gets)
 CLI_WRITES: dict[str, tuple[str, dict]] = {
@@ -787,7 +787,7 @@ def _undo_apply(cfg: dict, card: dict) -> tuple[str, bool]:
     return text + (f"; {out['note']}" if out.get("note") else "") + ".", bool(out["undone"])
 
 
-# ---------- spends: `clipper <command>` in the background ----------
+# ---------- spends: `clippa <command>` in the background ----------
 
 def _story_estimate(cfg: dict) -> str:
     """What a story has cost before (the ledger, model spend per story-* stream), and the caps."""

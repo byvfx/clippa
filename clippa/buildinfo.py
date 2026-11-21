@@ -1,4 +1,4 @@
-"""Which copy of clipper this is, for `clipper --version`, `clipper doctor` and the heartbeats.
+"""Which copy of Clippa this is, for `clippa --version`, `clippa doctor` and the heartbeats.
 
 `__version__` (clippa/__init__.py, equal to pyproject.toml) is the number of the last release,
 bumped by the release PR and made real by the tag: until `v<number>` exists a copy reports the

@@ -61,7 +61,7 @@ def test_pick_numbers_survive_a_rescore():
 
 
 def test_a_rescore_keeps_hand_picks(tmp_path):
-    """#77 L13: `clipper score` again doesn't drop what `clipper pick` added."""
+    """#77 L13: `clippa score` again doesn't drop what `clippa pick` added."""
     import json
     from types import SimpleNamespace
 

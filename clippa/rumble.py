@@ -3,21 +3,21 @@
 Rumble has no upload API (Oct 2026) and its terms forbid automating the site, so this
 prepares everything for the web form instead (rumble.com/upload.php):
 
-  clipper rumble <stream>            one folder per scheduled item under paths.rumble:
-                                     the video (hard link), thumbnail.jpg if `clipper
+  clippa rumble <stream>            one folder per scheduled item under paths.rumble:
+                                     the video (hard link), thumbnail.jpg if `clippa
                                      thumbs` made one, upload.txt to copy from
-  clipper rumble <stream> --open     ...then open the folder and the upload page, so the
+  clippa rumble <stream> --open     ...then open the folder and the upload page, so the
                                      upload is a drag and drop plus pasting upload.txt
-  clipper rumble --done s02 --url https://rumble.com/v...
+  clippa rumble --done s02 --url https://rumble.com/v...
                                      mark an item uploaded (schedule.json + Kitsu)
-  clipper rumble --status [stream]   what's ready, uploaded, or not prepared yet
+  clippa rumble --status [stream]   what's ready, uploaded, or not prepared yet
 
 Title and description come from the same place as YouTube's (Kitsu's columns, else the
 metadata draft), with the credit line guaranteed. Each schedule.json entry records the
-platform under "platforms": {"rumble": {"status": "ready" | "uploaded", ...}}; `clipper
+platform under "platforms": {"rumble": {"status": "ready" | "uploaded", ...}}; `clippa
 schedule` keeps it across replans. In Kitsu the "Rumble" column shows ready/uploaded and
-"Rumble URL" the link; setting either there and running `clipper review sync` (or
-`clipper schedule`) counts as marking it done.
+"Rumble URL" the link; setting either there and running `clippa review sync` (or
+`clippa schedule`) counts as marking it done.
 
 Licensing: keep [rumble] license = "Rumble Only". It is non-exclusive and removable; the
 Video Management options are exclusive (and option A Content-ID-claims the YouTube copy).
@@ -50,13 +50,13 @@ LICENSE_NOTES = {
 def load_schedule(cfg: dict) -> dict:
     path: Path = cfg["paths"]["schedule"]
     if not path.exists():
-        raise ClipperError("no schedule.json; run: clipper schedule")
+        raise ClipperError("no schedule.json; run: clippa schedule")
     return jsonstate.load(path)
 
 
 def save_platform(cfg: dict, updates: dict[str, dict | None], platform: str = "rumble") -> None:
     """Write entries' records for a platform (rumble, tiktok) into schedule.json, re-read just
-    before writing so a concurrent `clipper schedule` or `clipper upload` isn't overwritten.
+    before writing so a concurrent `clippa schedule` or `clippa upload` isn't overwritten.
     None clears."""
     path: Path = cfg["paths"]["schedule"]
     with jsonstate.update(path) as sched:
@@ -177,14 +177,14 @@ def upload_txt(e: dict, t: dict, cfg: dict, thumb: bool, video_name: str) -> str
         f"RUMBLE UPLOAD  {e['key']}  ({e['kind']})",
         f"1. Open {rc['upload_url']} and drag {video_name} onto it.",
         "2. Paste each field below, then submit.",
-        f"3. When it's live: clipper rumble --done {e['key']} --url <the video's Rumble link>",
+        f"3. When it's live: clippa rumble --done {e['key']} --url <the video's Rumble link>",
         "=" * 60,
         f"TITLE\n{t['title']}",
         f"DESCRIPTION\n{t['description']}",
         f"TAGS\n{', '.join(t['tags'])}",
         f"CATEGORY\n{rc['category']}",
         "THUMBNAIL\n" + ("thumbnail.jpg (1280x720)" if thumb
-                          else "none made; pick a frame on the form (or run clipper thumbs)"),
+                          else "none made; pick a frame on the form (or run clippa thumbs)"),
         f"LICENSING\n{rc['license']}" + (f"  ({license_note})" if license_note else ""),
         f"VISIBILITY\n{rc['visibility']}; {release_time(e, cfg)}",
     ]
@@ -294,7 +294,7 @@ def run(cfg: dict, stream: str | None = None, items: list[str] | None = None,
                 and e["kind"] in rc["kinds"]]
     if not todo:
         raise ClipperError(f"nothing scheduled{' for ' + stream if stream else ''}; "
-                         "approve items in Kitsu and run: clipper schedule")
+                         "approve items in Kitsu and run: clippa schedule")
     updates, kitsu, made = {}, [], []
     for e in todo:
         r = rumble_of(e)
@@ -316,7 +316,7 @@ def run(cfg: dict, stream: str | None = None, items: list[str] | None = None,
         try:
             updates[e["key"]] = {**r, **prepare(cfg, e, kitsu)}
         except FileNotFoundError as ex:
-            print(f"  {e['key']}: video missing ({ex}); rerun clipper cut")
+            print(f"  {e['key']}: video missing ({ex}); rerun clippa cut")
             continue
         made.append(Path(updates[e["key"]]["folder"]))
         print(f"  ready {made[-1]}")

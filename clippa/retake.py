@@ -1,20 +1,20 @@
 """Retakes: act on "retake" notes by itself, then send the item back for review.
 
 Usage:
-    clipper retake                     every item set to retake with a note not handled yet
-    clipper retake <stream> [--items c03] [--dry-run]
-    clipper retake <stream> --items c03 --comment "start 5 s earlier" --dry-run   (try a note)
+    clippa retake                     every item set to retake with a note not handled yet
+    clippa retake <stream> [--items c03] [--dry-run]
+    clippa retake <stream> --items c03 --comment "start 5 s earlier" --dry-run   (try a note)
 
 When an item is set to "retake" with a comment (in Kitsu, or with Discord's Changes
 button), a model reads the note with the item's transcript, cut points and thumbnail and
 returns edits from a fixed list: trim the start/end, a Short's layout, the title /
 description / hashtags, a new thumbnail (picked again with the note as guidance) or new
-thumbnail words. clipper applies them (re-cuts only that video, re-renders its captions
+thumbnail words. Clippa applies them (re-cuts only that video, re-renders its captions
 and thumbnail), publishes a new Kitsu revision waiting for approval with a "[clippa]
 Retake applied: ..." note, and posts a fresh Discord card. What it can't do (cutting out
 a middle part, effects) it says in a note on the task, and the item stays in retake.
 
-Each note is handled once (retakes.json per stream records what was done). `clipper bot`
+Each note is handled once (retakes.json per stream records what was done). `clippa bot`
 runs this after every card refresh and right after a Changes button ([retake] auto).
 """
 
@@ -291,7 +291,7 @@ def trim_segments(cfg: dict, sdir: Path, wins: dict[str, tuple[float, float]]) -
     if (jsonstate.read(sdir / "meta.json", {}) or {}).get("kind") == "story":
         story = sdir.name.removeprefix("story-")
         raise ClipperError(f"a story's video is an edit of other videos: trim its parts in {sdir.name}/story.json, "
-                           f"then clipper story cut {story}")
+                           f"then clippa story cut {story}")
     deltas = {}
     with jsonstate.update(sdir / "segments.json", {}) as data:
         for seg in data["segments"]:
@@ -448,7 +448,7 @@ def process(cfg: dict, sdir: Path, key: str, note: str, comment_id: str,
              "plan": p, "cost_usd": round(cost, 4)}
     if dry_run:
         return entry
-    who = "clipper retake"
+    who = "clippa retake"
     try:
         done, videos = apply(cfg, sdir, key, st, p, who)
     except Exception as e:
@@ -463,7 +463,7 @@ def process(cfg: dict, sdir: Path, key: str, note: str, comment_id: str,
     gazu = review.connect(cfg["review"])
     item = actions.Item(sdir, key, st)
     if not done:
-        msg = unsupported or "Nothing in the note maps to an edit clipper can make."
+        msg = unsupported or "Nothing in the note maps to an edit Clippa can make."
         actions._comment(gazu, item, None, f"{review.NOTE_PREFIX} Retake not applied: {msg}")
         discord_message(cfg, sdir, f"🔁 Retake for `{short}` not applied: {msg}\n> {note[:300]}")
         entry.update(result="unsupported", applied=[])
@@ -547,7 +547,7 @@ class Lock:
             fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         except FileExistsError:
             if time.time() - self.path.stat().st_mtime < LOCK_STALE_S:
-                raise ClipperError("another clipper retake is running") from None
+                raise ClipperError("another clippa retake is running") from None
             self.path.unlink(missing_ok=True)
             fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         os.write(fd, self.token.encode())

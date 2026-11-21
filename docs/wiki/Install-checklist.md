@@ -27,7 +27,7 @@ The [walkthrough](Install) explains each step. This page is the list to tick.
 
 Run it with no answers file, so every question is asked. On a machine that's already set up,
 setup skips the steps it has done: pass `--step <name>` to the bootstrap (or
-`clipper setup --step <name>`) to go through one again (`mode`, `roles`, `machine`, `keys`,
+`clippa setup --step <name>`) to go through one again (`mode`, `roles`, `machine`, `keys`,
 `check`).
 
 - [ ] Each question makes sense, and its default is the answer you'd give.
@@ -47,11 +47,11 @@ setup skips the steps it has done: pass `--step <name>` to the bootstrap (or
 
 ## After it
 
-- [ ] In a new terminal, `clipper --help` works from any folder.
-- [ ] `clipper doctor --role <role>` with no `--offline` shows 0 failures. The online checks
+- [ ] In a new terminal, `clippa --help` works from any folder.
+- [ ] `clippa doctor --role <role>` with no `--offline` shows 0 failures. The online checks
       reach Kitsu, Modal (a worker on Modal), and for a control station the [hub](NAS-hub)
       over ssh and the war room.
-- [ ] `clipper setup --check` shows every step done.
+- [ ] `clippa setup --check` shows every step done.
 - [ ] **Join:** no `clipper.toml` in the checkout, and `clipper.local.toml` holds only this
       machine's values.
 - [ ] **New:** `[paths]` streams, schedule and youtube_token in its `clipper.toml` point at this
@@ -61,19 +61,19 @@ setup skips the steps it has done: pass `--step <name>` to the bootstrap (or
 
 ## First real work
 
-**Join:** don't start `clipper worker`, `clipper serve` or `clipper bot` unattended here. The
+**Join:** don't start `clippa worker`, `clippa serve` or `clippa bot` unattended here. The
 [hub's](NAS-hub) containers already run them, and their single-instance locks don't see
 another machine. Try things by hand instead. A new install runs its own serve, bot and worker,
 once the steps below and the ones in the next section are done.
 
 - [ ] **Worker:** re-render one Short on the test stream:
-      `clipper shorts kick-131151926 --items v01 --force`. A new install needs a copy of that
+      `clippa shorts kick-131151926 --items v01 --force`. A new install needs a copy of that
       stream folder in its own streams folder first. That one command exercises the encoder,
       the caption font and libass, and it reuses the saved layout, so no model call is
       expected. Watch the result.
 - [ ] **Worker on Modal:** if doctor says the Modal app isn't deployed, run
-      `clipper transcribe --deploy` (several minutes, once per Modal account).
-- [ ] **Control:** `clipper services status` lists serve, the bot, the worker and the recorder.
+      `clippa transcribe --deploy` (several minutes, once per Modal account).
+- [ ] **Control:** `clippa services status` lists serve, the bot, the worker and the recorder.
 - [ ] The war room opens in a browser.
 
 ## Not part of setup
@@ -81,9 +81,9 @@ once the steps below and the ones in the next section are done.
 **Join:** these already live in the shared config, so there's nothing to redo.
 
 **New:** each needs doing by hand:
-- [ ] Kitsu and clipper's account on it ([Kitsu](Kitsu)).
+- [ ] Kitsu and Clippa's account on it ([Kitsu](Kitsu)).
 - [ ] The Discord bot app and its ids ([Discord app](Discord-app)).
-- [ ] The YouTube sign-in to the new channel, `clipper upload --sign-in`
+- [ ] The YouTube sign-in to the new channel, `clippa upload --sign-in`
       ([YouTube sign-in](YouTube-sign-in)).
 - [ ] The shows, each with its own Kitsu production ([Adding a show](Adding-a-show)).
 

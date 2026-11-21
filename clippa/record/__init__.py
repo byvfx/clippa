@@ -1,9 +1,9 @@
 """Live recorder: watch Kick channels, record each live stream with real-time chat.
 
-`clipper record watch` is the long-lived service (Docker on the NAS): it polls each
+`clippa record watch` is the long-lived service (Docker on the NAS): it polls each
 channel in [record] channels; when one goes live it records the HLS stream and the chat
 into streams/kick-<livestream id>/, and when the stream ends (after end_grace_s with no
-restart) it finalizes the directory into what `clipper fetch` produces (source, chat.jsonl,
+restart) it finalizes the directory into what `clippa fetch` produces (source, chat.jsonl,
 meta.json, audio.wav).
 
     watch.py       the watcher: live status per channel, start / pause / finish, heartbeat

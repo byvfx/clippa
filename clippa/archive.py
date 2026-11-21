@@ -1,12 +1,12 @@
-"""`clipper archive`: other people's back catalogs, listed and transcribed on Modal.
+"""`clippa archive`: other people's back catalogs, listed and transcribed on Modal.
 
 Usage:
-    clipper archive add <subject> <url>...     list a source's long-form videos into the catalog
-    clipper archive transcribe <subject> [--limit N] [--oldest] [--gpu L4] [--parallel N]
+    clippa archive add <subject> <url>...     list a source's long-form videos into the catalog
+    clippa archive transcribe <subject> [--limit N] [--oldest] [--gpu L4] [--parallel N]
                                          [--dry-run]
-    clipper archive status [<subject>]
-    clipper archive check <subject> [--items ID...] [--all] [--limit N]
-    clipper archive links <subject> [--status dead|restricted|alive|all]
+    clippa archive status [<subject>]
+    clippa archive check <subject> [--items ID...] [--all] [--limit N]
+    clippa archive links <subject> [--status dead|restricted|alive|all]
 
 A subject (e.g. "jer", issue #48) is paths.archive/<subject>/: catalog.json (every item
 found: source, url, title, duration) and one folder per item with meta.json and the same
@@ -20,7 +20,7 @@ Sources:
         Modal untouched (YouTube blocks downloads from datacenter IPs).
     Odysee channels (https://odysee.com/@name): listed with the Odysee API; Modal fetches the
         media itself (WhisperX.transcribe_url), so nothing passes through this machine.
-    Kick VODs (a `clipper story` item, #84, with its HLS `m3u8`): the smallest variant
+    Kick VODs (a `clippa story` item, #84, with its HLS `m3u8`): the smallest variant
         ([archive] kick_format) is downloaded here, its audio sent as flac.
 Items shorter than [archive] min_duration_s are skipped. Catalog order is newest first.
 `transcribe` logs progress and failures to <subject>/transcribe.log as well as the console,
@@ -85,7 +85,7 @@ def save_catalog(d: Path, cat: dict[str, dict]) -> None:
 
 def item_dir(d: Path, it: dict) -> Path:
     """Where an item's transcript is: its own folder, or `dir` for one transcribed elsewhere
-    (a `clipper story` item that is one of our own streams)."""
+    (a `clippa story` item that is one of our own streams)."""
     return Path(it["dir"]) if it.get("dir") else d / it["id"]
 
 
@@ -304,7 +304,7 @@ def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[s
     worker = transcribe.modal_worker(tc, gpu)
     signed_in = False
 
-    def call(fn, *args) -> tuple[dict, dict]:  # logged for `clipper modal` and the war room
+    def call(fn, *args) -> tuple[dict, dict]:  # logged for `clippa modal` and the war room
         with tracked(cfg["paths"]["modal_runs"], "archive", f"{idir.parent.name}/{it['id']}", gpu,
                      meta.get("duration_s") or 0) as rec:
             t1 = time.time()
@@ -405,14 +405,14 @@ def run_transcribe(cfg: dict, subject: str, limit: int | None, oldest: bool, gpu
     d = subject_dir(cfg, subject)
     cat = load_catalog(d)
     if not cat:
-        raise ClipperError(f"no catalog for {subject!r}: clipper archive add {subject} <url>")
-    # An item with a `dir` is one of our own streams (a `clipper story` item): the pipeline
+        raise ClipperError(f"no catalog for {subject!r}: clippa archive add {subject} <url>")
+    # An item with a `dir` is one of our own streams (a `clippa story` item): the pipeline
     # transcribes it there (item_dir), so it is never paid for again here.
     todo = [it for it in cat.values() if not it.get("dir") and not (d / it["id"] / "words.jsonl").exists()]
     links = load_links(d)
     dead = {i for i, lk in links.items() if lk["status"] == "dead"}
     if skipped := sum(1 for it in todo if it["id"] in dead):
-        print(f"{subject}: {skipped} skipped, source link dead (clipper archive links {subject})")
+        print(f"{subject}: {skipped} skipped, source link dead (clippa archive links {subject})")
         todo = [it for it in todo if it["id"] not in dead]
     if oldest:
         todo.reverse()
@@ -523,7 +523,7 @@ def run_videos(cfg: dict, subject: str, ids: list[str] | None, limit: int | None
     d = subject_dir(cfg, subject)
     cat = load_catalog(d)
     if not cat:
-        raise ClipperError(f"no catalog for {subject!r}: clipper archive add {subject} <url>")
+        raise ClipperError(f"no catalog for {subject!r}: clippa archive add {subject} <url>")
     todo = videos_todo(d, cat, ids)  # catalog order: newest first (`add` puts new items ahead)
     if oldest:
         todo.reverse()
@@ -562,11 +562,11 @@ def run_videos(cfg: dict, subject: str, ids: list[str] | None, limit: int | None
 
 def relabel(cfg: dict, subject: str) -> None:
     """Name every diarized item's speakers again against the subject's enrolled voices (after
-    `clipper speakers <item folder> --name SPEAKER_00=Name --enroll`), and say who talks how much."""
+    `clippa speakers <item folder> --name SPEAKER_00=Name --enroll`), and say who talks how much."""
     d = subject_dir(cfg, subject)
     items = sorted(p.parent for p in d.glob("*/diarization.json"))
     if not items:
-        raise ClipperError(f"no diarized items in {subject}: clipper archive transcribe {subject} --diarize")
+        raise ClipperError(f"no diarized items in {subject}: clippa archive transcribe {subject} --diarize")
     talk: dict[str, float] = {}
     seen: dict[str, set] = {}  # the items each name speaks in (one item can split a voice in two)
     unnamed = 0.0
@@ -692,7 +692,7 @@ def check_links(cfg: dict, subject: str, ids: list[str] | None, everything: bool
     d = subject_dir(cfg, subject)
     cat = load_catalog(d)
     if not cat:
-        raise ClipperError(f"no catalog for {subject!r}: clipper archive add {subject} <url>")
+        raise ClipperError(f"no catalog for {subject!r}: clippa archive add {subject} <url>")
     ac = cfg["archive"]
     links = load_links(d)
     if ids:
@@ -771,7 +771,7 @@ def check_links(cfg: dict, subject: str, ids: list[str] | None, everything: bool
             lk = links.get(it["id"], {"status": "unknown", "reason": "could not be checked"})
             print(f"  {lk['status']:<10} {it['id']} {it['title'][:60]!r} {it['url']} {lk['reason']}")
     elif counts["dead"] + counts["restricted"]:
-        print(f"list them: clipper archive links {subject}")
+        print(f"list them: clippa archive links {subject}")
 
 
 def list_links(cfg: dict, subject: str, status: str | None) -> None:
@@ -779,7 +779,7 @@ def list_links(cfg: dict, subject: str, status: str | None) -> None:
     d = subject_dir(cfg, subject)
     cat, links = load_catalog(d), load_links(d)
     if not links:
-        raise ClipperError(f"no link checks for {subject!r} yet: clipper archive check {subject}")
+        raise ClipperError(f"no link checks for {subject!r} yet: clippa archive check {subject}")
     rows = [(i, lk) for i, lk in links.items()
             if (lk["status"] != "alive" if status is None else status in ("all", lk["status"]))]
     for i, lk in sorted(rows, key=lambda r: r[1]["since"], reverse=True):

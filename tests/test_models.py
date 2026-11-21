@@ -1,4 +1,4 @@
-"""`clipper models test` (#72): the fixtures, the checks and the report, with a fake model."""
+"""`clippa models test` (#72): the fixtures, the checks and the report, with a fake model."""
 from __future__ import annotations
 
 import itertools

@@ -1,4 +1,4 @@
-Working on clipper itself. `CLAUDE.md` in the repo has the full set of rules for code sessions;
+Working on Clippa itself. `CLAUDE.md` in the repo has the full set of rules for code sessions;
 this page is the short version.
 
 ## Layout
@@ -18,9 +18,9 @@ reports/              the monthly analytics reports (the old audits are in docs/
 
 ## Shape
 
-- Every pipeline stage is a `clipper <stage>` subcommand, wired in `clippa/cli.py`, one module
+- Every pipeline stage is a `clippa <stage>` subcommand, wired in `clippa/cli.py`, one module
   per stage. A new pipeline stage is also a row in `clippa/stages.py`, which the worker and
-  `clipper run` read.
+  `clippa run` read.
 - Stages read and write files in `streams/<id>/` and are idempotent. JSON state goes through
   `clippa/jsonstate.py`.
 - Config: defaults in `clippa/config.py` < `clipper.toml` < `clipper.local.toml` < `CLIPPER_*`
@@ -36,7 +36,7 @@ reports/              the monthly analytics reports (the old audits are in docs/
   reviewed output.
 - Kitsu is the record for review decisions; the bot and the war room act through
   `clippa/actions.py`.
-- Stages print, services log. A `clipper <stage>` prints its progress (the worker and serve copy
+- Stages print, services log. A `clippa <stage>` prints its progress (the worker and serve copy
   a child's output into `run_<stage>.log` and `serve.log`); serve, the bot, the worker and the
   recorder log through `logging`, never `print`. The processes share state through the streams
   folder: [How the processes talk](How-the-processes-talk) lists the locks, heartbeats, the DM
@@ -52,7 +52,7 @@ Each step is checked by a test where it can be, so a missing one fails `pytest`,
    `config.DEFAULTS` is it loaded; a None default is a commented line there plus
    `config.NONE_DEFAULTS`). Nothing machine- or show-specific in a default (test).
 3. A pipeline stage is also a row in `clippa/stages.py` (test).
-4. A `clipper doctor` check when it needs a key, a service or a file, with the fix in the message.
+4. A `clippa doctor` check when it needs a key, a service or a file, with the fix in the message.
 5. A wiki page or section, in the sidebar (test), and `wiki.page(...)` links in its messages (test).
 6. Tests for its pure logic in `tests/`, and the cost printed before any model call it makes. A
    new module needs a test that names it (`tests/test_modules_have_tests.py` fails otherwise).
@@ -88,7 +88,7 @@ one adds its bullet in that same PR (with the wiki pages it changes), under `## 
 
 Not for refactors, tests, dependency bumps or notes: a PR that only does those has no bullet. The
 dated diary of a session is `docs/log/<YYYY-MM>.md` and the current state is `HANDOFF.md`; the
-changelog is what a person updating clipper would want to read. When a release is made, Unreleased
+changelog is what a person updating Clippa would want to read. When a release is made, Unreleased
 becomes the release's section ([Releases](#releases)). `tests/test_changelog.py` keeps its shape.
 
 ## Releases
@@ -98,13 +98,13 @@ A release is a git tag `vX.Y.Z` on main. Pushing the tag makes the GitHub Releas
 section of `CHANGELOG.md` (its lines before the first `###`: a sentence on what the release is
 and a short list of highlights) as the notes, and a link to the whole file for the detail by date.
 The number is the last release's, in `clippa/__init__.py`,
-`pyproject.toml` and the `clipper` entry of `uv.lock`; a test keeps the first two equal and
+`pyproject.toml` and the `clippa` entry of `uv.lock`; a test keeps the first two equal and
 `uv lock --check` the third. Between releases a copy says which commit it is
 (`clippa/buildinfo.py`): `0.2.0` on the tag, `0.2.0+3.g570bb87` three commits past it, `.dirty`
 with uncommitted changes. The NAS containers have no `.git`, so `deploy/hub/deploy.sh` and
 `deploy/record/deploy.sh` write the checkout's `git describe` into the image
 (`deploy/stamp.sh`); serve, the bot and the recorder put the result in their heartbeats and
-`clipper services status` prints it next to this checkout's.
+`clippa services status` prints it next to this checkout's.
 
 1. In a PR: bump `__version__` and `version`, `uv lock`, rename the changelog's "Unreleased"
    to "X.Y.Z (date)", open a new empty one above it, and write the new section's lead: what
@@ -114,7 +114,7 @@ with uncommitted changes. The NAS containers have no `.git`, so `deploy/hub/depl
 2. After it merges, from a clean checkout of main:
 
    ```bash
-   git tag -a v0.3.0 -m "clipper 0.3.0" && git push origin v0.3.0
+   git tag -a v0.3.0 -m "Clippa 0.3.0" && git push origin v0.3.0
    ```
 
    Tag right after the merge, before the deploy that should carry the number: until the tag
@@ -144,19 +144,19 @@ for a big one, ask Copilot again with `gh pr edit N --add-reviewer @copilot`.
 
 When Copilot's review doesn't come (out of credits; a request by hand then leaves none either),
 Grok is the backup: Claude says so once CI is green and offers
-[`clipper codereview --pr N`](#clipper-codereview-by-hand) (about $0.80-1 and 25 minutes), and
+[`clippa codereview --pr N`](#clippa-codereview-by-hand) (about $0.80-1 and 25 minutes), and
 runs it on your yes. Merge once Copilot's or Grok's review is in, each finding is fixed or
 answered, and CI is green on both systems.
 
 **While Copilot is out of credits (since 2026-11-20, "for a few more days"), Grok is the default
 on GitHub:** the `review` workflow (`.github/workflows/review.yml`) runs on every push to a PR that
-changes code. It waits up to 10 minutes for Copilot, then runs [`clipper codereview
---pr N`](#clipper-codereview-by-hand) with the repo secret `OPENROUTER_API_KEY` and posts what it
+changes code. It waits up to 10 minutes for Copilot, then runs [`clippa codereview
+--pr N`](#clippa-codereview-by-hand) with the repo secret `OPENROUTER_API_KEY` and posts what it
 finds; a commit Copilot reviewed is skipped, so it stands aside by itself once Copilot is back. A
 failed review never fails the PR's checks. It ran this way until 2026-11-13 too, removed then as
 too slow (about 25 minutes a PR); delete the file again once Copilot is reliable.
 
-### `clipper codereview`, by hand
+### `clippa codereview`, by hand
 
 A second opinion from another model when you want one. It sends the diff against main and the changed files in full to
 `[codereview] reviewer` in one model call at high effort: Grok 4.7 through OpenRouter, about $1
@@ -174,8 +174,8 @@ bugs found", a 30-minute timeout, a dropped
 connection or a gateway's 408/502/504, never retried since each try may be paid for) says so in the comment and keeps the last good review below
 it. The review is printed before it is posted, so a failed post loses nothing.
 
-It needs `OPENROUTER_API_KEY` in the environment. `clipper codereview` prints the review and posts
-nothing; `clipper codereview --dry-run` shows what would be sent and its cost; `--pr N` posts it
+It needs `OPENROUTER_API_KEY` in the environment. `clippa codereview` prints the review and posts
+nothing; `clippa codereview --dry-run` shows what would be sent and its cost; `--pr N` posts it
 (with `GITHUB_TOKEN` set). To try another model, set `CLIPPER_CODEREVIEW_REVIEWER` (e.g.
 `openrouter:openai/gpt-5.6-sol-pro`). Check each finding against the code.
 

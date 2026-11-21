@@ -1,12 +1,12 @@
-"""`clipper broll` (#229): a library of free b-roll for story cuts, explainers and the weekly,
+"""`clippa broll` (#229): a library of free b-roll for story cuts, explainers and the weekly,
 from archives whose footage is free to use: work of the US government has no copyright
 (17 U.S.C. 105), the Internet Archive and Wikimedia Commons say each item's licence, and
 Pixabay's own licence allows commercial use without credit.
 
-    clipper broll find "<query>" [--source nasa|dvids|prelinger|commons|pixabay] [-n N]
-    clipper broll add <url|id|file> [--from TIME] [--to TIME] [--tag X] [--credit TEXT]
-    clipper broll list [--tag X] [--source X] [--status new|kept|long] [--json]
-    clipper broll keep|drop <id> ...
+    clippa broll find "<query>" [--source nasa|dvids|prelinger|commons|pixabay] [-n N]
+    clippa broll add <url|id|file> [--from TIME] [--to TIME] [--tag X] [--credit TEXT]
+    clippa broll list [--tag X] [--source X] [--status new|kept|long] [--json]
+    clippa broll keep|drop <id> ...
 
 Sources: nasa (the NASA Image and Video Library), dvids (the Defense Visual Information
 Distribution Service: the armed forces' own video, its public key from $DVIDS_API_KEY or the
@@ -574,14 +574,14 @@ def find(cfg: dict, query: str, sources: list[str], n: int | None = None, say=pr
                     c["duration"] = length_of(c["url"])
                 if c["duration"] is None:
                     skipped += 1
-                    say(f"  skip {c['title'][:60]!r}: its length is unknown (clipper broll add {c['page']} "
+                    say(f"  skip {c['title'][:60]!r}: its length is unknown (clippa broll add {c['page']} "
                         "--from/--to takes a part)")
                     continue
                 if c["duration"] > bc["max_s"]:
                     old = lib["clips"].get(cid) or {}
                     _save(cfg, _entry(c, cid, "long", [*old.get("tags", []), query]))
                     say(f"  {cid}: {c['title'][:70]} ({c['duration'] / 60:.0f} min, long: "
-                        f"clipper broll add {cid} --from 0:01:20 --to 0:01:45)")
+                        f"clippa broll add {cid} --from 0:01:20 --to 0:01:45)")
                 else:
                     take(cfg, c, [query], say=say)
             except ClipperError as e:
@@ -673,7 +673,7 @@ def _candidate(cfg: dict, target: str, credit: str, licence: str) -> dict:
         c = resolve(target, cfg)
         media(c, cfg)
     else:
-        raise ClipperError(f"{target}: not a clip id (clipper broll list), a web address or a video file")
+        raise ClipperError(f"{target}: not a clip id (clippa broll list), a web address or a video file")
     if why := refused(c, cfg):
         raise ClipperError(f"{c['title'][:60]!r}: {why}")
     if c.get("duration") is None:
@@ -703,7 +703,7 @@ def set_status(cfg: dict, ids: list[str], status: str) -> None:
         clips = idx.setdefault("clips", {})
         missing = [i for i in ids if i not in clips]
         if missing:  # before any file is deleted
-            raise ClipperError(f"no clip {', '.join(missing)} (clipper broll list)")
+            raise ClipperError(f"no clip {', '.join(missing)} (clippa broll list)")
         for i in ids:
             if status == "drop":
                 e = clips.pop(i)
@@ -735,7 +735,7 @@ def show_list(cfg: dict, tag: str = "", source: str = "", status: str = "", as_j
         print(json.dumps([{**e, "path": str(d / e["file"]) if e.get("file") else ""} for e in clips], indent=1))
         return
     if not clips:
-        print("no clips" + (" like that" if tag or source or status else ": clipper broll find \"<search>\""))
+        print("no clips" + (" like that" if tag or source or status else ": clippa broll find \"<search>\""))
         return
     for e in clips:
         part = f" {e['start']:.0f}-{e['end']:.0f} s of it" if e.get("start") is not None and e.get("end") else ""

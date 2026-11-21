@@ -54,7 +54,7 @@ def test_every_tool_has_a_risk_and_nothing_forbidden():
 
 
 def test_writes_are_built_from_the_review_parsers():
-    """Descriptions are the `clipper review <verb>` help; the inputs come from its arguments."""
+    """Descriptions are the `clippa review <verb>` help; the inputs come from its arguments."""
     tools = catalog.catalog()
     assert tools["approve"].description == "approve an item"
     assert tools["approve"].risk == catalog.WRITE
@@ -265,7 +265,7 @@ def test_spend_cards_carry_an_estimate(cfg, monkeypatch):
 
 
 def test_story_argv_parses_as_meant():
-    """A value that looks like an option stays a value for `clipper story new`."""
+    """A value that looks like an option stays a value for `clippa story new`."""
     from clippa.cli import build_parser
 
     a = build_parser().parse_args(["story", "new", "--days=3", "--person=-x", "--", "--url=https://a b"])

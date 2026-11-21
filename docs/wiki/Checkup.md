@@ -1,16 +1,16 @@
-`clipper checkup` looks for the problems the [alerts](Review#alerts) can't see, because nothing
+`clippa checkup` looks for the problems the [alerts](Review#alerts) can't see, because nothing
 ever raised an error: a stage that hangs instead of failing, a service that stops beating, a
 recording the worker never starts, a release that misses its upload, a title that breaks the
-house rules. It reads the files the services write, the same ones `clipper status` reads. It
+house rules. It reads the files the services write, the same ones `clippa status` reads. It
 makes no model call, touches no network and runs nothing. It prints what it found and exits 1
 when it finds anything.
 
 ```bash
-clipper checkup                  # every check
-clipper checkup --only streams   # one check (repeatable)
-clipper checkup --json           # the report as JSON, for a script or Claude
-clipper checkup --fix            # make the repairs [checkup] fix allows (serve does, hourly)
-clipper checkup --alert          # DM a sign-in that is gone, once (serve does, hourly)
+clippa checkup                  # every check
+clippa checkup --only streams   # one check (repeatable)
+clippa checkup --json           # the report as JSON, for a script or Claude
+clippa checkup --fix            # make the repairs [checkup] fix allows (serve does, hourly)
+clippa checkup --alert          # DM a sign-in that is gone, once (serve does, hourly)
 ```
 
 ## What it checks
@@ -25,13 +25,13 @@ clipper checkup --alert          # DM a sign-in that is gone, once (serve does, 
 | streams | a run held because a provider rejected an API key (DM'd at once; retried when a key changes) | - |
 | schedule | a release isn't uploaded `late_hours` before its slot, or its slot has passed | `late_hours` (1) |
 | schedule | nothing at all releases in the next `gap_hours` | `gap_hours` (24; 0 = off) |
-| lint | a title, description or thumbnail text about to go out has one of `words` in it, is over YouTube's limit, or has no description. It checks what `clipper upload` would send (Kitsu's columns, then the draft) | `words` |
+| lint | a title, description or thumbnail text about to go out has one of `words` in it, is over YouTube's limit, or has no description. It checks what `clippa upload` would send (Kitsu's columns, then the draft) | `words` |
 | auto | an item that [approved itself](Review#approval-by-silence) in the last 14 days and that a person then rejected, reopened, held or sent back for changes | `[review] auto_min_*`, `auto_grace_minutes` |
 | tools | yt-dlp is older than `ytdlp_days` (its version is its release date): downloads break as YouTube and Kick change | `ytdlp_days` (60; 0 = off) |
 | signins | a cookies file (YouTube's, Twitch's, HEI's) holds no live sign-in, or its sign-in cookie expires within `signin_days`; the YouTube export hasn't been written for a day; a TikTok or X sign-in expires within `signin_days`. YouTube's own token doesn't expire; a revoked one shows up in the logs | `signin_days` (7; 0 = off) |
 | logs | the same error, give or take ids and numbers, at least `repeat_errors` times in serve's or the bot's log in the last `repeat_hours`: an alert fires once, a loop keeps failing | `repeat_errors` (5; 0 = off), `repeat_hours` (24) |
 | approvals | an item approved at least `approved_hours` ago that the plan neither scheduled nor skipped with a reason (budget, stale, hold): the replan never saw it; or a plan older than that while serve should replan hourly | `approved_hours` (3; 0 = off) |
-| housekeeping | temp files (`<file>.<pid>.<thread>.tmp`) a killed write left beside a state file, a day old or more; and the share's free space under `[streams] keep_free_pct` (off at 0; a warning, bad under half of it; [Backups](Backups#disk-clipper-streams) has what prune then takes) | - |
+| housekeeping | temp files (`<file>.<pid>.<thread>.tmp`) a killed write left beside a state file, a day old or more; and the share's free space under `[streams] keep_free_pct` (off at 0; a warning, bad under half of it; [Backups](Backups#disk-clippa-streams) has what prune then takes) | - |
 
 The settings are `[checkup]` in the config; a show's table or a stream's own `config.toml` can
 override them for its streams and items. A check that crashes is reported as a finding of
@@ -51,7 +51,7 @@ expired) is DMed once, when it first shows, as kind `checkup`, during quiet hour
 DM. It isn't repeated while it lasts (`streams/.checkup/alerted.json` remembers it; the nightly
 report still lists it), and one that clears and comes back is DMed again. The warnings (a
 sign-in expiring within `signin_days`, a stale YouTube export) stay in the nightly report.
-`clipper status` lists every signins finding under **needs you**, warnings too.
+`clippa status` lists every signins finding under **needs you**, warnings too.
 
 ## Repairs
 
@@ -66,7 +66,7 @@ run (a checkup without `--fix`, like the nightly one, changes nothing).
 | `retry` | a run that failed with no retries left, when its error is a passing one: a rate limit, a dropped connection, a remote server's 5xx (`passing`, whole words) | `retry_after_hours` (3) after the run failed, gives back one attempt in `run.json`; the worker runs it again on its next pass. Never while a worker holds the stream, nor for a run held on a rejected key |
 | `tmp` | the housekeeping finding | deletes those temp files |
 
-serve runs `clipper checkup --fix --alert` every `fix_minutes` (60), over the checks that have
+serve runs `clippa checkup --fix --alert` every `fix_minutes` (60), over the checks that have
 repairs (streams and housekeeping) and signins ([above](Checkup#a-sign-in-that-is-gone)). Only
 the kinds listed in `fix` act; the
 others are **would-fix**: what they would have done goes in the ledger
@@ -102,7 +102,7 @@ The [claude container](Claude-on-the-NAS) runs the checkup every morning at `CHE
 - **Claude can't run** (signed out, usage limit): the plain findings go out instead.
 
 That run is read-only but for one PR. It may use the read tools and a fixed list of commands,
-each exactly as written (`clipper checkup`, `checkup --json`, `status`, `doctor --offline`,
+each exactly as written (`clippa checkup`, `checkup --json`, `status`, `doctor --offline`,
 `record status`, `worker --status`), `alert send`, git through `checkup-git log|show|diff`, which
 refuses the options that write (`--output`), and `checkup-pr`. Nothing else: no stage, no model
 call, no upload, no schedule, config or Kitsu change, no deploy. When a fix needs one of those,
@@ -135,6 +135,6 @@ run), not the clone, which a phone session may have on any branch; `CHECKUP_REF`
 `/tmp/checkup.log` in the container. The bot sends `checkup` DMs only once the hub runs code
 that has the kind (deployed after 2026-11-09).
 
-The DM is kind `checkup` in `[notify] kinds`, and `clipper alert send` is how any script queues
-one: `clipper alert send --kind checkup "text"`, or `-` to read stdin.
+The DM is kind `checkup` in `[notify] kinds`, and `clippa alert send` is how any script queues
+one: `clippa alert send --kind checkup "text"`, or `-` to read stdin.
 

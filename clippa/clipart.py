@@ -1,11 +1,11 @@
-"""`clipper clipart`: a library of free clip art, engravings, icons and emoji for covers, the
+"""`clippa clipart`: a library of free clip art, engravings, icons and emoji for covers, the
 weekly issue, story cuts and explainers, each file with where it came from, its credit and its
-licence. The b-roll library's still-picture sibling (`clipper broll`).
+licence. The b-roll library's still-picture sibling (`clippa broll`).
 
-    clipper clipart find "<query>" [--source commons|met|cleveland|iconify|pixabay] [-n N]
-    clipper clipart add <url|set:icon|file|folder> [--tag X] [--credit TEXT] [--licence TEXT]
-    clipper clipart list [--tag X] [--source X] [--status new|kept] [--json]
-    clipper clipart keep|drop <id> ...
+    clippa clipart find "<query>" [--source commons|met|cleveland|iconify|pixabay] [-n N]
+    clippa clipart add <url|set:icon|file|folder> [--tag X] [--credit TEXT] [--licence TEXT]
+    clippa clipart list [--tag X] [--source X] [--status new|kept] [--json]
+    clippa clipart keep|drop <id> ...
 
 Sources: commons (Wikimedia Commons drawings and pictures; SVGs come as PNG renders), met (The
 Met's open access: public-domain works, CC0), cleveland (the Cleveland Museum of Art's open
@@ -550,7 +550,7 @@ def set_status(cfg: dict, ids: list[str], status: str) -> None:
         art = idx.setdefault("art", {})
         missing = [i for i in ids if i not in art]
         if missing:  # before any file is deleted
-            raise ClipperError(f"no art {', '.join(missing)} (clipper clipart list)")
+            raise ClipperError(f"no art {', '.join(missing)} (clippa clipart list)")
         for i in ids:
             if status == "drop":
                 e = art.pop(i)
@@ -579,7 +579,7 @@ def show_list(cfg: dict, tag: str = "", source: str = "", status: str = "", as_j
         print(json.dumps([{**e, "path": str(d / e["file"])} for e in art], indent=1))
         return
     if not art:
-        print("no art" + (" like that" if tag or source or status else ": clipper clipart find \"<search>\""))
+        print("no art" + (" like that" if tag or source or status else ": clippa clipart find \"<search>\""))
         return
     for e in art:
         size = f"{e['width']}x{e['height']}" if e.get("width") else Path(e["file"]).suffix[1:]

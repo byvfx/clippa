@@ -1,16 +1,16 @@
 """YouTube performance of uploaded videos, fed back into scoring.
 
 Usage:
-    clipper analytics             refresh analytics.json for every uploaded schedule entry
-    clipper analytics --sign-in   once: grant read-only YouTube Analytics (adds 7-day views,
+    clippa analytics             refresh analytics.json for every uploaded schedule entry
+    clippa analytics --sign-in   once: grant read-only YouTube Analytics (adds 7-day views,
                                   average view percentage, watch time, subscribers gained)
-    clipper analytics --list      print what's in analytics.json, best first
-    clipper analytics --report [--month 2026-10] [--refresh]
+    clippa analytics --list      print what's in analytics.json, best first
+    clippa analytics --report [--month 2026-10] [--refresh]
                                   the month: channel totals, where views came from, 7-day
                                   numbers of its uploads by show/kind/category/day/hour, best
                                   and weakest, and what predicts views (lift.py) ->
                                   reports/analytics/<month>.md + .csv (#42)
-    clipper analytics --lift [--show KEY] [--kind segment] [--json]
+    clippa analytics --lift [--show KEY] [--kind segment] [--json]
                                   what predicts views, every upload so far (lift.py, #258)
 
 Views, likes and comments come from the YouTube Data API with the upload sign-in. Once a
@@ -20,7 +20,7 @@ video is 7 days old, its first-7-days numbers come from the YouTube Analytics AP
 Scoring (Pass B) gets a short "how past uploads did" block per show once at least
 [analytics] min_videos of that show's uploads have 7-day numbers: the best and worst by
 7-day views, with their category and score, as a hint about what this audience watches.
-`clipper serve` refreshes it every [analytics] auto_hours.
+`clippa serve` refreshes it every [analytics] auto_hours.
 """
 
 from __future__ import annotations
@@ -133,7 +133,7 @@ def run(cfg: dict, sign_in: bool = False) -> dict:
         jsonstate.write(p, data)
     d7 = sum(1 for r in data.values() if r.get("d7"))
     print(f"{len(data)} videos in {p.name} ({d7} with 7-day numbers"
-          + ("" if has_analytics else "; run `clipper analytics --sign-in` for those") + ")")
+          + ("" if has_analytics else "; run `clippa analytics --sign-in` for those") + ")")
     if skipped:
         print(f"  7-day numbers of {len(skipped)} video(s) skipped after retries "
               f"({next(iter(skipped.values()))}); next run tries again")
@@ -220,7 +220,7 @@ def show(cfg: dict) -> None:
               f"  {d7.get('averageViewPercentage', 0):5.1f}%  {r['kind']:<11} {r.get('show', ''):<6} "
               f"{r['title'][:70]}")
     if not rows:
-        print("analytics.json is empty; run clipper analytics")
+        print("analytics.json is empty; run clippa analytics")
 
 
 def feedback_block(cfg: dict, show_key: str) -> str:
@@ -427,8 +427,8 @@ def report_markdown(rep: dict) -> str:
         from . import lift
 
         lines += ["## What predicts views (every upload so far)", "",
-                  "Each ranker against 7-day views: the Score column, the chat heat `clipper schedule` "
-                  "ranks segments by, and the topic's earlier uploads (`clipper analytics --lift`).", "",
+                  "Each ranker against 7-day views: the Score column, the chat heat `clippa schedule` "
+                  "ranks segments by, and the topic's earlier uploads (`clippa analytics --lift`).", "",
                   lift.markdown(rep["lift"]), ""]
     lines += ["Medians of fewer than 3 videos are anecdotes, not trends. Every upload is in the .csv beside this file.", ""]
     return "\n".join(lines)

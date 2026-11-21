@@ -1,22 +1,22 @@
 """TikTok drafts: scheduled Shorts -> the TikTok app's inbox, posted by hand from the phone.
 
-  clipper tiktok --sign-in            one-time sign-in in your browser (TikTok Login Kit,
+  clippa tiktok --sign-in            one-time sign-in in your browser (TikTok Login Kit,
                                       desktop PKCE); token saved in paths.tiktok_token and
                                       refreshed automatically (access 24 h, refresh 365 days)
-  clipper tiktok --items s02,t20      send these as drafts; each caption goes to Discord
-  clipper tiktok --items ... --resend send again drafts that expired unposted in the app
+  clippa tiktok --items s02,t20      send these as drafts; each caption goes to Discord
+  clippa tiktok --items ... --resend send again drafts that expired unposted in the app
                                       (TikTok's status still says SEND_TO_USER_INBOX; the
                                       old send is kept under "previous" as "expired")
-  clipper tiktok --auto               send the next unsent Shorts, in YouTube-schedule order,
+  clippa tiktok --auto               send the next unsent Shorts, in YouTube-schedule order,
                                       as far as max_per_24h allows (the bot runs this every
                                       [tiktok] auto_send_minutes)
-  clipper tiktok --caption t20        post a sent draft's caption to Discord again
-  clipper tiktok [stream]             sent / posted / failed per Short; asks TikTok about
+  clippa tiktok --caption t20        post a sent draft's caption to Discord again
+  clippa tiktok [stream]             sent / posted / failed per Short; asks TikTok about
                                       drafts still waiting, so posted ones are marked posted
 
 Uses the Content Posting API's Upload route (scope video.upload): the video lands in the
 app's inbox and you open the notification, add a sound if you like, paste the caption and
-post. The API takes no caption for drafts, so clipper posts it to Discord ([tiktok]
+post. The API takes no caption for drafts, so Clippa posts it to Discord ([tiktok]
 caption_channel_id, else the [record] alert webhook/channel) and prints it.
 
 Parked (user, 2026-11-01): auto-send has been off since 2026-10-28 (TikTok flagged the drafts
@@ -27,7 +27,7 @@ This module still works for hand sends; picking it up again starts from the wiki
 TikTok allows at most 5 pending drafts in any 24 hours; [tiktok] max_per_24h (default 3)
 keeps under that. --auto (user, 2026-10-22) sends every scheduled Short in the order YouTube
 gets them, skipping captions that say "host(s)"; --items picks by hand. Each send is recorded in schedule.json under
-"platforms": {"tiktok": {...}} (as `clipper rumble` does), so nothing goes twice.
+"platforms": {"tiktok": {...}} (as `clippa rumble` does), so nothing goes twice.
 
 Client key and secret: paths.tiktok_client, JSON {"client_key": ..., "client_secret": ...}
 from the app at developers.tiktok.com (Login Kit desktop redirect URI
@@ -102,7 +102,7 @@ def sign_in(cfg: dict) -> dict:
         "client_key": c["client_key"], "scope": SCOPES, "redirect_uri": redirect,
         "state": state, "response_type": "code", "code_challenge_method": "S256",
         "code_challenge": hashlib.sha256(verifier.encode()).hexdigest()})
-    code = oauth.browser_code(url, port, state, "TikTok", "clipper tiktok --sign-in")
+    code = oauth.browser_code(url, port, state, "TikTok", "clippa tiktok --sign-in")
     tok = save_token(paths, token_request(c, code=code, grant_type="authorization_code",
                                           redirect_uri=redirect, code_verifier=verifier))
     if "video.upload" not in tok.get("scope", ""):
@@ -113,17 +113,17 @@ def sign_in(cfg: dict) -> dict:
 def access_token(paths: dict) -> str:
     p: Path = paths["tiktok_token"]
     if not p.exists():
-        raise ClipperError("not signed in to TikTok; run: clipper tiktok --sign-in")
+        raise ClipperError("not signed in to TikTok; run: clippa tiktok --sign-in")
     tok = jsonstate.load(p)
     if time.time() < tok.get("expires_at", 0):
         return tok["access_token"]
     if time.time() >= tok.get("refresh_expires_at", 0):
-        raise ClipperError("TikTok sign-in expired; run: clipper tiktok --sign-in")
+        raise ClipperError("TikTok sign-in expired; run: clippa tiktok --sign-in")
     try:
         tok = save_token(paths, token_request(client(paths), grant_type="refresh_token",
                                               refresh_token=tok["refresh_token"]))
     except ClipperError as e:
-        raise ClipperError(f"{e}; run: clipper tiktok --sign-in") from e
+        raise ClipperError(f"{e}; run: clippa tiktok --sign-in") from e
     return tok["access_token"]
 
 
@@ -242,7 +242,7 @@ def send(cfg: dict, items: list[str], stream: str | None = None, dry_run: bool =
             continue
         video = schedule.video(cfg, e)
         if not video.exists():
-            print(f"  {e['key']}: video missing ({video}); rerun clipper shorts")
+            print(f"  {e['key']}: video missing ({video}); rerun clippa shorts")
             continue
         text = caption(e, cfg)
         secs = media.duration(video)
@@ -338,4 +338,4 @@ def status(cfg: dict, stream: str | None = None, check: bool = True, quiet: bool
           f"(max {cfg['tiktok']['max_per_24h']})")
     if not stream:
         left = [e for e in sched["entries"] if e["kind"] in cfg["tiktok"]["kinds"] and not tiktok_of(e)]
-        print(f"{len(left)} scheduled Shorts not sent yet; send with: clipper tiktok --items <key>,...")
+        print(f"{len(left)} scheduled Shorts not sent yet; send with: clippa tiktok --items <key>,...")

@@ -1,6 +1,6 @@
 """YouTube ingest: a video (usually a past live stream) as a stream, with its chat replay.
 
-`clipper fetch https://www.youtube.com/watch?v=<id>` leaves streams/youtube-<id>/ with
+`clippa fetch https://www.youtube.com/watch?v=<id>` leaves streams/youtube-<id>/ with
 meta.json, source.mp4 and, when the video has a live-chat replay, chat.jsonl in the rows Kick
 and Twitch chat use. A video without a replay (a normal upload) just has no chat. Age and bot
 checks retry once signed in, as pre-shows do (ytdl.run_retrying).

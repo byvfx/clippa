@@ -1,4 +1,4 @@
-"""`clipper models gold` (#72): verdicts, proposals, labels and the score; no model calls."""
+"""`clippa models gold` (#72): verdicts, proposals, labels and the score; no model calls."""
 from __future__ import annotations
 
 import pytest

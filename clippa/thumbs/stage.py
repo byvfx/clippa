@@ -1,4 +1,4 @@
-"""`clipper thumbs`: candidate frames -> the model's pick -> a cover per cut video, and a
+"""`clippa thumbs`: candidate frames -> the model's pick -> a cover per cut video, and a
 9:16 one per Short; the reviewers' text and photo changes, re-rendered without model calls."""
 
 from __future__ import annotations
@@ -71,8 +71,8 @@ def short_covers(stream_dir: Path, state: dict, tc_enq: dict, date: str, own_ban
 
 def shorts_only(stream_dir: Path, cfg: dict, short_keys: set[str] | None = None,
                 kitsu: bool = False) -> int:
-    """Vertical covers for these Shorts (all if None), no model calls: `clipper shorts`
-    right after it renders them, `clipper thumbs --shorts` for a stream's existing ones
+    """Vertical covers for these Shorts (all if None), no model calls: `clippa shorts`
+    right after it renders them, `clippa thumbs --shorts` for a stream's existing ones
     (kitsu: attach just those). 0 if the stream has no enquirer thumbnails yet."""
     cfg = for_stream(cfg, stream_dir)
     from ..bleep import Bleeper
@@ -136,7 +136,7 @@ def set_texts(stream_dir: Path, cfg: dict, texts: dict[str, str]) -> dict[str, s
     state = jsonstate.read(state_path, {})
     missing = [k for k in texts if k not in state]
     if missing:
-        raise ClipperError(f"no thumbnail yet for {missing}; run clipper thumbs first")
+        raise ClipperError(f"no thumbnail yet for {missing}; run clippa thumbs first")
     norm = lambda w: re.sub(r"\W", "", w.upper())  # as compose() matches the highlight
     changed = {}
     for key, text in texts.items():
@@ -165,7 +165,7 @@ def set_photos(stream_dir: Path, cfg: dict, ids: list[str], photo: str | None = 
     state = jsonstate.read(state_path, {})
     keys = [k for k, e in state.items() if e["id"] in ids]
     if missing := sorted(set(ids) - {state[k]["id"] for k in keys}):
-        raise ClipperError(f"no thumbnail yet for {missing}; run clipper thumbs first")
+        raise ClipperError(f"no thumbnail yet for {missing}; run clippa thumbs first")
     changed = []
     for field, name in (("photo", photo), ("teaser_photo", teaser_photo)):
         if name is None:
@@ -230,7 +230,7 @@ def run(stream_dir: Path, cfg: dict, ids: list[str] | None = None, force: bool =
     tc["_photo_labels"] = photo_labels(tc)
     assets = [x for x in load_assets(stream_dir) if not ids or x["id"] in ids]
     if not assets:
-        raise ClipperError("no cut assets" + (f" matching {ids}" if ids else "; run `clipper cut` first"))
+        raise ClipperError("no cut assets" + (f" matching {ids}" if ids else "; run `clippa cut` first"))
     state_path = stream_dir / "thumbnails.json"
     state = jsonstate.read(state_path, {})
     if missing:
@@ -306,7 +306,7 @@ def run(stream_dir: Path, cfg: dict, ids: list[str] | None = None, force: bool =
                 state = jsonstate.merge(state_path, state, [key])
         if failed:
             raise ClipperError(f"thumbnails failed for {', '.join(failed)}; the other picks are saved, "
-                             "rerun clipper thumbs for these")
+                             "rerun clippa thumbs for these")
 
     tc_enq, date, own_band = enquirer_setup(stream_dir, cfg, tc)
     results = []

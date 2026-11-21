@@ -1,11 +1,11 @@
-"""`clipper receipts`: the night's stories about an archive subject -> his own old clips (#48).
+"""`clippa receipts`: the night's stories about an archive subject -> his own old clips (#48).
 
 Usage:
-    clipper receipts find <stream> [--items s02,s05]   stories + archive picks -> receipts.json
-    clipper receipts list <stream>                        what receipts.json holds
-    clipper receipts script <stream>                      Mother Moo's voice-over -> receipts.json
-    clipper receipts cut <stream>                         render receipts/receipts.mp4
-    clipper receipts upload <stream>                      upload it private (never scheduled)
+    clippa receipts find <stream> [--items s02,s05]   stories + archive picks -> receipts.json
+    clippa receipts list <stream>                        what receipts.json holds
+    clippa receipts script <stream>                      Mother Moo's voice-over -> receipts.json
+    clippa receipts cut <stream>                         render receipts/receipts.mp4
+    clippa receipts upload <stream>                      upload it private (never scheduled)
 
 `find` takes the stream's segments about [receipts] subject (by topic or figure), has
 [receipts] model write the stories the show went after, each with a search request for
@@ -75,7 +75,7 @@ def out_dir(sdir: Path) -> Path:
 def load(sdir: Path) -> dict:
     p = out_dir(sdir) / "receipts.json"
     if not p.exists():
-        raise ClipperError(f"no receipts for {sdir.name} yet: clipper receipts find {sdir.name}")
+        raise ClipperError(f"no receipts for {sdir.name} yet: clippa receipts find {sdir.name}")
     return jsonstate.load(p)
 
 
@@ -543,7 +543,7 @@ def upload(sdir: Path, cfg: dict, again: bool = False) -> None:
     data = load(sdir)
     final = out_dir(sdir) / "receipts.mp4"
     if not final.exists() or not data.get("cut_at"):
-        raise ClipperError(f"cut it first: clipper receipts cut {sdir.name}")
+        raise ClipperError(f"cut it first: clippa receipts cut {sdir.name}")
     if data.get("youtube") and not again:
         raise ClipperError(f"already uploaded: {data['youtube']['url']} (--again for a second copy)")
     if final.stat().st_mtime < datetime.fromisoformat(data["cut_at"]).timestamp() - 5:

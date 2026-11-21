@@ -27,7 +27,7 @@ def browser_code(url: str, port: int, state: str, service: str, again: str) -> s
             self.send_response(200)
             self.send_header("Content-Type", "text/plain; charset=utf-8")
             self.end_headers()
-            self.wfile.write((f"{service} approved; clipper is finishing the sign-in. You can close this tab." if ok else
+            self.wfile.write((f"{service} approved; Clippa is finishing the sign-in. You can close this tab." if ok else
                               f"{service} sign-in failed: {q.get('error_description') or q.get('error') or 'no code'}"
                               ).encode())
 

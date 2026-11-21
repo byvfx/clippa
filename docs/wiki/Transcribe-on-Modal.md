@@ -9,7 +9,7 @@ plan includes $30 of compute a month. Measured on that 8 h stream: L40S (default
    `.venv/Scripts/python.exe -m modal token new`, which writes `~/.modal.toml`).
 2. `uv sync --extra modal` (add it to the other extras you use; `--extra gpu` isn't needed for
    this backend).
-3. `clipper transcribe --deploy` builds and deploys the app in `clippa/modal_app.py`. The
+3. `clippa transcribe --deploy` builds and deploys the app in `clippa/modal_app.py`. The
    first build takes several minutes (it bakes the models into the image); re-run it after
    changing that file.
 4. In clipper.toml (or `CLIPPER_TRANSCRIBE_BACKEND=modal` on one machine):
@@ -19,7 +19,7 @@ plan includes $30 of compute a month. Measured on that 8 h stream: L40S (default
    modal_gpu = "L40S"      # T4 | L4 | A10 | L40S | A100 | H100
    modal_audio = "flac"    # lossless upload, ~60 MB per hour of audio; "opus" is smaller
    ```
-5. `clipper doctor --role gpu` checks the package, the token and that the app is deployed.
+5. `clippa doctor --role gpu` checks the package, the token and that the app is deployed.
 
 Each run prints the GPU, the call time and an estimated cost, and keeps them under `"modal"` in
 transcript.json. The estimate is an upper bound (it counts upload and cold start).
@@ -27,12 +27,12 @@ transcript.json. The estimate is an upper bound (it counts upload and cold start
 ## Watching Modal
 
 Every Modal call also writes a start and an end line to `[paths]
-modal_runs` (`logs/modal_runs.jsonl`). `clipper modal` (and the war room's Modal panel) shows
+modal_runs` (`logs/modal_runs.jsonl`). `clippa modal` (and the war room's Modal panel) shows
 GPUs up, runs going now, failures, recent runs, each archive's progress and ETA, and the
 month's spend from Modal's own billing: metered, credit, billed, the last 24 h and the rate
 over the last 3 hours. The per-run estimates are only a guide; billing is the real number.
 The bot DMs (`[notify]` kind `spend`) each time the month passes a multiple of `[modal]
 alert_every_usd` (25); set `monthly_budget_usd` to show the month against your own ceiling.
-The process that serves the war room (`clipper serve`) needs the Modal token, as the worker does.
+The process that serves the war room (`clippa serve`) needs the Modal token, as the worker does.
 
-On a new install, `clipper modal --backfill` adds the runs from before the log, once.
+On a new install, `clippa modal --backfill` adds the runs from before the log, once.

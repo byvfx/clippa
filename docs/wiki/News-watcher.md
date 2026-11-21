@@ -1,4 +1,4 @@
-`clipper news` (#110) watches the headlines for the terms you give it (`[news] watch`,
+`clippa news` (#110) watches the headlines for the terms you give it (`[news] watch`,
 or per show): TMZ, Dexerto, r/LivestreamFail and a Google News search for each term. With no
 terms it fetches nothing; `[news] auto_watch` also watches each show's cast, known figures and
 name and the cast library. A cheap
@@ -21,13 +21,13 @@ to Discord. Only headlines, a short snippet and the link are stored (`[paths] ne
    searched at all. `[news] auto_watch = true` also watches each show's `[meta] cast`, `[scoring]
    known_figures` ("Jer (The Quartering)" adds an alias) and show name, and the cast library; there
    one-word names ("Jer", "Don") only match as written, and a name that's a common word goes in
-   `[news] ignore`. `clipper news watch` lists what's watched.
+   `[news] ignore`. `clippa news watch` lists what's watched.
 2. **Where**: the bot posts to the text channel `[news] channel` ("news"), and makes it if the server
    has none (it needs Manage Channels for that; otherwise make #news by hand). `channel_id` picks a
    channel by id instead; with both empty, news goes to the review channel (in a forum, one "News" post).
-3. **Try it**: `clipper news check --no-judge` fetches and matches with no model call;
-   `clipper news check` also rates the matches (`[news] judge_model`, Haiku: about $0.004 for
-   30 headlines) and `clipper news list` shows the stories. `clipper news feeds` shows each
+3. **Try it**: `clippa news check --no-judge` fetches and matches with no model call;
+   `clippa news check` also rates the matches (`[news] judge_model`, Haiku: about $0.004 for
+   30 headlines) and `clippa news list` shows the stories. `clippa news feeds` shows each
    source's last fetch and error.
 4. **Automatic**: set `[news] check_minutes = 30` and restart serve (it checks; the bot posts). It posts at most
    `max_posts` (5) new stories a check, the shows' own people first; "maybe" ones too while
@@ -40,9 +40,9 @@ to Discord. Only headlines, a short snippet and the link are stored (`[paths] ne
    why. `[news] preshow_minutes` (60) before a show's usual start (learned from the last three
    weeks of streams; once a day per show) the bot lists that day's stories for it with a
    Context button that previews and adds them.
-5. **Command line**: `clipper news search "Ethan Klein"`, `clipper news dismiss 12`,
-   `clipper news context 12 --show kino`.
+5. **Command line**: `clippa news search "Ethan Klein"`, `clippa news dismiss 12`,
+   `clippa news context 12 --show kino`.
 
 The bot and the worker must see the same `[paths] news` folder; on two machines, put it on the
-streams share. `clipper doctor` (bot role) fails when news is on with nowhere to post and, online,
+streams share. `clippa doctor` (bot role) fails when news is on with nowhere to post and, online,
 checks the feeds answer.

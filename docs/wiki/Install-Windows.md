@@ -12,7 +12,7 @@
    ```
    The `gpu` extra pulls torch 2.8 with CUDA 12.8 from the PyTorch index (pinned in
    pyproject.toml). The CUDA toolkit is not needed; the wheels bring the runtime and cuDNN.
-   If `clipper doctor` says torch sees no CUDA GPU, the CPU wheel slipped in:
+   If `clippa doctor` says torch sees no CUDA GPU, the CPU wheel slipped in:
    ```powershell
    uv pip install --reinstall torch==2.8.0 torchaudio==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cu128
    ```
@@ -21,9 +21,9 @@
    - `[paths] streams`: the NAS share, e.g. `"//nas/clipper/streams"` or a
      mapped drive. Every machine must see the same streams folder.
    - `[cut] clip_codec`: `h264_qsv` needs an Intel GPU; on an NVIDIA-only desktop use
-     `h264_nvenc` (driver 610+ for ffmpeg 8.1) or `libx264`. `clipper doctor` test-encodes it.
+     `h264_nvenc` (driver 610+ for ffmpeg 8.1) or `libx264`. `clippa doctor` test-encodes it.
    - `[transcribe] compute_type = "int8_float16"` and `batch_size = 4` on cards under 8 GB.
-   Anything can also be set per machine in `clipper.local.toml` (what `clipper setup` writes)
+   Anything can also be set per machine in `clipper.local.toml` (what `clippa setup` writes)
    or with an env var `CLIPPER_<SECTION>_<KEY>`, e.g. `CLIPPER_CUT_CLIP_CODEC=libx264`, so one
    shared clipper.toml can stay identical.
 
@@ -45,7 +45,7 @@
 
    Optional: [cover layouts and photos](Covers), the [cast library](Cast-library), [faces](Faces).
 
-7. **Check**: `clipper doctor --role gpu` (or `--role serve`, `--role bot`).
+7. **Check**: `clippa doctor --role gpu` (or `--role serve`, `--role bot`).
 
 8. **Run unattended.** Serve and the bot run as containers (Docker compose, `deploy/hub`, on
    the NAS or any Docker host: [Roles and services](Roles-and-services#services)). On Windows
@@ -55,11 +55,11 @@
    ```powershell
    deploy\worker\worker-task.ps1 -Install     # GPU worker
    ```
-   `-Status`, `-Restart`, `-Stop`, `-Uninstall` work. Logs go to `logs\`. `clipper services`
+   `-Status`, `-Restart`, `-Stop`, `-Uninstall` work. Logs go to `logs\`. `clippa services`
    shows the task plus the recorder and any NAS cuts, with serve's and the bot's heartbeats
-   from the share; `clipper services restart worker` runs the same script, and `serve` or `bot`
+   from the share; `clippa services restart worker` runs the same script, and `serve` or `bot`
    over ssh once `[serve] hub` names the compose folder. The bot reaches serve at `[serve] url` (empty = this
    machine); on different machines set it, give both the same `[warroom] token` (or
    `secrets/warroom_token.txt`), and put `[paths] schedule` and `[paths] news` under the
-   streams share on both (the bot reads what serve writes there; `clipper doctor --role
+   streams share on both (the bot reads what serve writes there; `clippa doctor --role
    bot` checks).

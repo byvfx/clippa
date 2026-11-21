@@ -14,20 +14,20 @@ the same PR as the change.
 
 ## Shape
 
-- Every pipeline stage is a `clipper <stage>` subcommand, wired in `clippa/cli.py`,
+- Every pipeline stage is a `clippa <stage>` subcommand, wired in `clippa/cli.py`,
   one module per stage in `clippa/`. New functionality is a subcommand or a flag on one,
   never a loose script. A new command's parser goes in its group's `add_<group>` in cli.py
   and its name in `COMMAND_GROUPS` (a test checks); a new pipeline stage is also a row in
-  `clippa/stages.py`, which the worker and `clipper run` read.
+  `clippa/stages.py`, which the worker and `clippa run` read.
 - A stream is `streams/<id>/`; stages read and write files there and are idempotent, so
-  `clipper run` can skip what is done. Review state is `review.json`, retakes `retakes.json`.
+  `clippa run` can skip what is done. Review state is `review.json`, retakes `retakes.json`.
   JSON files go through `clippa/jsonstate.py`: `load`/`read` (retry a file mid-replace), `read_or`
   (a default for a missing or broken file: services and the page only),
   `write` (tmp + replace), `update`/`merge` (under a lock). A test fails on a raw
   `json.loads(path.read_text())`.
 - Config: defaults in `clippa/defaults.toml` (commented; `config.py` loads it as `DEFAULTS`, the
   None defaults listed in `config.NONE_DEFAULTS`) < `clipper.toml` < `clipper.local.toml` (this machine's
-  own values, written by `clipper setup`) < `CLIPPER_<SECTION>_<KEY>` env; the last two also win
+  own values, written by `clippa setup`) < `CLIPPER_<SECTION>_<KEY>` env; the last two also win
   over show and stream overrides.
   `config.for_stream(cfg, sdir)` resolves the show from the stream's `meta.json` channel,
   then the stream's own `streams/<id>/config.toml` if any; use it rather than the base config
@@ -54,25 +54,25 @@ the same PR as the change.
 - No machine-specific values in `clippa/defaults.toml`: no IPs, hostnames, user ids, local
   paths, nothing of this install's (a test checks for its names). They go in `clipper.toml`
   (gitignored) or env vars, with a placeholder in `clipper.example.toml` (the starter).
-  `clipper doctor` should fail with a fix when a required one is unset.
+  `clippa doctor` should fail with a fix when a required one is unset.
 - Secrets are env vars (`ANTHROPIC_API_KEY`, `KITSU_TOKEN`, `DISCORD_BOT_TOKEN`,
   `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET`, `ELEVENLABS_API_KEY`, `BRAVE_API_KEY` for cast image
   search, `DVIDS_API_KEY` for b-roll (or `secrets/dvids_secret.txt`, public key first), `PIXABAY_API_KEY` for clip art and b-roll (or `secrets/pixabay_secret.txt`), and `OPENAI_API_KEY` / `GEMINI_API_KEY` / `OPENROUTER_API_KEY` if a stage uses those providers) or files
   under `secrets/`. Never write them into tracked files, logs, or messages.
-- Anything a new check or install step needs belongs in `clipper doctor` and its wiki page, not
-  only in a chat answer (and in `clipper setup`, `clippa/setup.py`, when a new user would
+- Anything a new check or install step needs belongs in `clippa doctor` and its wiki page, not
+  only in a chat answer (and in `clippa setup`, `clippa/setup.py`, when a new user would
   have to do it).
 - Kitsu is the record for review decisions. Bot buttons and the war room act through
   `clippa/actions.py`; do not write decisions anywhere else.
-- Uploads are automatic since 2026-10-20: `clipper serve` replans and runs `clipper upload` every
+- Uploads are automatic since 2026-10-20: `clippa serve` replans and runs `clippa upload` every
   `[youtube] auto_upload_minutes` (60 here; the default 0 means only by hand), private with publishAt, at most `max_per_24h`. Do not run
-  `clipper upload` or `clipper review publish` by hand without being asked.
+  `clippa upload` or `clippa review publish` by hand without being asked.
 - Generated titles, descriptions and thumbnail text should avoid the word "hosts"; the
   user finds it reads as machine-written.
 
 ## Running things here
 
-- Windows dev machine: the venv is `.venv` (uv). `clipper ...` works where the bootstrap's command
+- Windows dev machine: the venv is `.venv` (uv). `clippa ...` works where the bootstrap's command
   in `~/.local/bin` is on PATH (a shell started before it may not have it); `.venv/Scripts/clipper.exe ...`
   always does. There is no `python` on PATH outside the venv.
 - Keys are Windows *user* environment variables, which agent shells do not inherit. Load
@@ -83,9 +83,9 @@ the same PR as the change.
   (`/data` in the containers), not in the repo. The user variable `CLIPPER_CONFIG` points there,
   and clipper reads it from the registry when a shell didn't inherit it; a `./clipper.toml` in
   the checkout would win, so don't make one.
-- `clipper serve` (the war room and every background job), the Discord bot and the worker run
+- `clippa serve` (the war room and every background job), the Discord bot and the worker run
   as containers on the NAS (`deploy/hub`, compose project `clipper-hub`), not on the laptop.
-  `clipper services status|stop|restart serve|bot|worker|all` runs `docker compose` there over
+  `clippa services status|stop|restart serve|bot|worker|all` runs `docker compose` there over
   ssh (`[serve] hub`). Code changes reach them with `bash deploy/hub/deploy.sh` from a checkout
   of main (Git Bash): that replaces restarting serve or the bot, and never touches the recorder.
   The laptop's worker task (`deploy/worker`) is disabled; never run serve, the bot or the worker
@@ -93,10 +93,10 @@ the same PR as the change.
   serve and bot task scripts are gone (2026-11-08): compose (`deploy/hub`) is the one way to run
   them unattended, on any Docker host.
 - The NAS recorder is deployed with `bash deploy/record/deploy.sh`, only when no show is live:
-  the restart starts a new recording part. The script refuses while `clipper record status`
+  the restart starts a new recording part. The script refuses while `clippa record status`
   shows a recording (exit 3); `--force` overrides it.
 - Model calls cost money. Say what a rerun of `score`, `segments`, `meta` or `thumbs` will
-  cost before doing it on a long stream. `score` refuses a rerun without `--force` (`clipper run
+  cost before doing it on a long stream. `score` refuses a rerun without `--force` (`clippa run
   --from` passes it), `cut` keeps picks whose in/out points are unchanged, `thumbs` keeps a cover
   whose cut is unchanged, and `weekly --render` never drafts.
 - Before a hand edit of `schedule.json` or `clipper.toml` (both on the NAS share), copy it to
@@ -108,25 +108,25 @@ When the working directory is `/app` on Linux you are the `claude` container on 
 (`deploy/claude`, wiki Claude-on-the-NAS), usually driven from the user's phone; the
 Windows notes above don't apply.
 
-- `clipper` is on PATH (the clone's venv, `/app/.venv`); no `.venv/Scripts`, no `uv run`. The
+- `clippa` is on PATH (the clone's venv, `/app/.venv`); no `.venv/Scripts`, no `uv run`. The
   keys are already in the environment; the config is `/data/clipper.toml` and the streams
   `/data/streams`, the same files serve, the bot and the worker use.
 - `/app` is your own clone: work on a branch, commit, push and open PRs with `gh` as on the
   laptop. After pulling a change to `pyproject.toml` or `uv.lock`, run
   `uv sync --frozen --extra modal --extra faces --extra discord` (it is safe here).
-- You can't reach Docker or ssh: no `clipper services`, no deploys. serve, the bot and the
+- You can't reach Docker or ssh: no `clippa services`, no deploys. serve, the bot and the
   worker run the code of the last hub deploy, not your clone's; a merged change reaches them
   when the user runs `bash deploy/hub/deploy.sh` from the laptop. Say so when it matters.
 - The worker is processing streams at the same time: leave a stream whose `.run.lock`
   heartbeat is fresh (`run.json`) alone. The NAS has 6 CPU threads shared with the recorder:
   transcription goes to Modal, encodes use QSV (`/dev/dri`), and nothing heavy runs while a
-  show is live (`clipper record status`).
+  show is live (`clippa record status`).
 - The user reads on a phone: keep replies short, give the cost before any model rerun and
   wait for a yes, and never deploy or restart the recorder from here.
 
 ## Checks
 
-- `clipper doctor --role gpu --offline` after changing config, ffmpeg, fonts or dependencies.
+- `clippa doctor --role gpu --offline` after changing config, ffmpeg, fonts or dependencies.
 - Try risky changes on the test stream `kick-131151926` before a real one.
 - Before committing: `uvx ruff@0.17.3 check clippa tests` and `.venv/Scripts/python.exe -m pytest -q`.
   The rules are ruff's defaults plus the few in pyproject's `[tool.ruff.lint]` (import order,
@@ -144,10 +144,10 @@ Windows notes above don't apply.
   (or ask Copilot with `gh pr edit N --add-reviewer @copilot` for a big one). **While Copilot is
   out of credits (user, 2026-11-20: Grok the default "for a few more days"), the `review` workflow
   is back** (`.github/workflows/review.yml`): on each push it waits up to 600 s for Copilot, then
-  runs Grok (`clipper codereview --pr N`, ~$0.80-1, ~25 min, the repo secret `OPENROUTER_API_KEY`)
+  runs Grok (`clippa codereview --pr N`, ~$0.80-1, ~25 min, the repo secret `OPENROUTER_API_KEY`)
   and posts on the PR; it skips a commit Copilot reviewed, so it steps aside when the credits are
   back. Wait for its comment instead of offering Grok by hand; delete the workflow once Copilot is
-  reliable again. By hand (`clipper codereview --pr N`) only when the workflow's review failed or
+  reliable again. By hand (`clippa codereview --pr N`) only when the workflow's review failed or
   didn't run. Merge once Copilot's or Grok's review is in,
   each finding checked against the code, handled and shown to the user, and CI is green. Green CI
   alone isn't enough. A PR that touches none of those (the wiki, `uv.lock` alone,

@@ -429,7 +429,7 @@ def run(stream_dir: Path, cfg: dict, dry_run: bool = False, force: bool = False)
     sc = cfg["scoring"]
     if not dry_run and not force and (stream_dir / "candidates.json").exists():
         raise ClipperError(f"{stream_dir.name} is scored (candidates.json); scoring again pays every Pass A "
-                           "window again: clipper score <stream> --force (or clipper run <stream> --from score)")
+                           "window again: clippa score <stream> --force (or clippa run <stream> --from score)")
     prompts = Prompts(cfg)
     meta = jsonstate.load(stream_dir / "meta.json")
     windows = jsonstate.load(stream_dir / "windows.json")["windows"]
@@ -498,7 +498,7 @@ def _finish(stream_dir: Path, cfg: dict, meta: dict, prompts: Prompts, claude: C
 
     pass_b = run_pass_b(kept, summary, words, cfg, claude, prompts) if kept else {
         "pass": "B", "status": "skipped", "picks": [], "rejected": []}
-    # A re-score keeps hand picks (`clipper pick`) and the numbers in existing keys (#77 L13).
+    # A re-score keeps hand picks (`clippa pick`) and the numbers in existing keys (#77 L13).
     old = jsonstate.read(stream_dir / "candidates.json", {})
     old_b = old.get("pass_b") or {}
     scored = {r["id"] for r in results}
@@ -516,7 +516,7 @@ def _finish(stream_dir: Path, cfg: dict, meta: dict, prompts: Prompts, claude: C
         print(f"{why} since the last score: picks get new numbers (old keys keep theirs)")
         # Retired ids stay in the history under RETIRED, so their numbers stay reserved for
         # good and a later re-score can't hand v02_t02 to yet another moment; hand picks
-        # (`clipper pick`, not positional) keep their ids, numbers and places in the list.
+        # (`clippa pick`, not positional) keep their ids, numbers and places in the list.
         old_b = retire_numbers(old_b, hand_ids)
     pass_b["picks"], pass_b["numbers"] = carry_numbers(
         old_b, pass_b.get("picks", []) + [p for p in old_b.get("picks", []) if p["id"] in hand_ids])

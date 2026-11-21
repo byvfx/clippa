@@ -5,7 +5,7 @@ a default: Pass A is still Haiku, Pass B still Sonnet.
 ## How the trials are scored
 
 Every trial reuses a scored, reviewed stream's own windows, summary and prompt, so only the
-model differs (`clipper compare score`). The columns below are `clipper compare list`'s:
+model differs (`clippa compare score`). The columns below are `clippa compare list`'s:
 
 | Column | Meaning |
 |---|---|
@@ -175,8 +175,8 @@ the one thing worth checking before upload.
 ## Trying the next one
 
 ```
-clipper compare score <stream> --model openrouter:<vendor>/<model> --prompt-version v6 --effort none --dry-run
+clippa compare score <stream> --model openrouter:<vendor>/<model> --prompt-version v6 --effort none --dry-run
 ```
 
-Use the three streams above so the tables line up, pin a dated slug, and run `clipper models
+Use the three streams above so the tables line up, pin a dated slug, and run `clippa models
 test` first: it catches a model that can't follow the format for a few cents.

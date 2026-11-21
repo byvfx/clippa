@@ -43,7 +43,7 @@ def test_no_heartbeat(tmp_path):
 def test_single_instance_refuses_a_second(tmp_path):
     cfg = cfg_at(tmp_path)
     first = daemon.single_instance(cfg, "serve")
-    with pytest.raises(ClipperError, match="another clipper serve"):
+    with pytest.raises(ClipperError, match="another clippa serve"):
         daemon.single_instance(cfg, "serve")
     first.close()
     daemon.single_instance(cfg, "serve").close()  # free again once the holder is gone
@@ -51,7 +51,7 @@ def test_single_instance_refuses_a_second(tmp_path):
 
 def test_a_heartbeat_missed_for_one_read_is_read_again(tmp_path, monkeypatch):
     """The writer replaces the file every few seconds; a read over the share can land in the gap
-    (2026-11-08: `clipper record status` said "no heartbeat" mid-show once)."""
+    (2026-11-08: `clippa record status` said "no heartbeat" mid-show once)."""
     (tmp_path / ".serve").mkdir()
     path = tmp_path / ".serve" / "status.json"
     jsonstate.write(path, {"at": "x"})

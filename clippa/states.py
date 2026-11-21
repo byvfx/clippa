@@ -8,7 +8,7 @@ from pathlib import Path
 
 from . import jsonstate
 
-PRESHOW_PREFIX = "yt-"   # streams/yt-<video id>: a pre-show or one-off from YouTube (clipper preshow)
+PRESHOW_PREFIX = "yt-"   # streams/yt-<video id>: a pre-show or one-off from YouTube (clippa preshow)
 
 
 class Decision(StrEnum):

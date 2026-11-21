@@ -10,6 +10,10 @@ Developing#releases.
 
 ## Unreleased
 
+- Messages, `--help`, the war room, the Discord bot's texts and the wiki say `clippa <command>` and
+  Clippa now (#286, pass 2c-2); `clippa --version` prints `clippa 0.2.0`. The `clipper` command still
+  works, and tab completion answers to both. File, setting and container names (`clipper.toml`,
+  `CLIPPER_*`, `clipper-hub`, the `firefox:clipper` profile) are unchanged until the rename's deploy step.
 - The services log as `clippa.serve`, `clippa.bot`, `clippa.worker`, `clippa.record` and so on
   (#286, pass 2c): grep for `clipp` to catch lines from before and after. The war room's last-upload
   box and checkup's repeated-error count read both. The bootstrap now adds a `clippa` command to

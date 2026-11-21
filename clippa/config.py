@@ -9,7 +9,7 @@ on the NAS share since 2026-11-05. Relative paths in [paths] resolve against the
 file's directory; [paths] prompts is optional, a folder of your own read before the package's.
 
 clipper.local.toml (beside clipper.toml, or $CLIPPER_LOCAL_CONFIG) holds this machine's own
-values (streams path, codec, transcribe backend; `clipper setup` writes it), so clipper.toml
+values (streams path, codec, transcribe backend; `clippa setup` writes it), so clipper.toml
 can stay identical on every machine. Like env vars, it wins over show and stream overrides.
 """
 
@@ -85,7 +85,7 @@ def stream_dir(cfg: dict, ref: str) -> Path:
         return d
     hint = did_you_mean(ref, _stream_ids(root))
     raise ClipperError(f"no stream {ref!r} in {root}"
-                       + (f"; {hint}" if hint else " (clipper worker --status lists them)"))
+                       + (f"; {hint}" if hint else " (clippa worker --status lists them)"))
 
 
 def find_stream(cfg: dict, ref: str) -> Path:
@@ -159,7 +159,7 @@ SPECIAL_ENV = {"CLIPPER_CONFIG", "CLIPPER_LOCAL_CONFIG", "CLIPPER_BOOTSTRAP", "C
                "CLIPPER_REPO"}  # the claude container's clone URL (deploy/claude)
 # The rename to Clippa (#286), pass 1: every CLIPPER_* variable also answers to CLIPPA_*
 # (the new spelling wins when both are set), and the config files may be clippa.toml and
-# clippa.local.toml. Clipper still writes the old names; `clipper doctor` lists the old ones set.
+# clippa.local.toml. Clipper still writes the old names; `clippa doctor` lists the old ones set.
 ENV_PREFIXES = ("CLIPPA_", "CLIPPER_")
 CONFIG_NAMES = ("clippa.toml", "clipper.toml")
 
@@ -198,7 +198,7 @@ def spelling_in_use(name: str) -> str:
 
 
 def old_env_in_use() -> list[str]:
-    """CLIPPER_* variables set here, or saved for the Windows user where clipper still reads them
+    """CLIPPER_* variables set here, or saved for the Windows user where Clippa still reads them
     (the old spelling, still read until #286 drops it)."""
     saved = {n for n in ("CLIPPER_CONFIG", "CLIPPER_LOCAL_CONFIG") if _registry(n)}
     return sorted({n for n in os.environ if n.startswith("CLIPPER_")} | saved)
@@ -223,7 +223,7 @@ def check_choices(cfg: dict, where: str = "") -> None:
 
 
 def problems(cfg: dict) -> list[str]:
-    """What load() warns about: settings clipper.toml or [shows.*] name that clipper doesn't
+    """What load() warns about: settings clipper.toml or [shows.*] name that Clippa doesn't
     have (a typo, or a key since renamed), and CLIPPER_* variables that match no setting."""
     root = _root(cfg)
     out = list(root.get("_unknown", []))
@@ -413,12 +413,12 @@ def load(path: str | Path | None = None, use_local: bool = True) -> dict[str, di
     cfg["show"] = {"key": "", "channel": cfg["kick"]["channel"]}
     cfg["_dir"] = base
     cfg["_file"] = path.resolve() if path.exists() else None
-    cfg["_path"] = path.resolve()  # where it is, or would be (`clipper setup` writes it)
+    cfg["_path"] = path.resolve()  # where it is, or would be (`clippa setup` writes it)
     cfg["_local"] = local
     cfg["_local_file"] = lpath if local else None
     cfg["_resolved"] = {}
     cfg["_unknown"] = unknown
-    for msg in problems(cfg):  # a typo shouldn't stop the bot; `clipper doctor` fails on these
+    for msg in problems(cfg):  # a typo shouldn't stop the bot; `clippa doctor` fails on these
         print(f"warning: {msg}", file=sys.stderr)
     check_choices(cfg, f"{path.name}: ")
     return cfg
@@ -509,7 +509,7 @@ def for_stream(cfg: dict, sdir: Path) -> dict:
     """The config for this stream's show, picked by the Kick channel in its meta.json, then
     the stream's own streams/<id>/config.toml if it has one (a one-off night: more picks, a
     big story in stream_context, schedule priority). Env vars still win. A config from
-    pin_show (`clipper --show <key>`) keeps that show instead of the channel's (B4)."""
+    pin_show (`clippa --show <key>`) keeps that show instead of the channel's (B4)."""
     res = _for_stream(cfg, Path(sdir))
     return {**res, "_pinned": True} if cfg.get("_pinned") else res
 
@@ -547,7 +547,7 @@ def diff(cfg: dict, show: str = "") -> list[tuple[str, str, Any, Any]]:
     """What this install changes from defaults.toml (#205), as (layer, "section.key", default,
     value) in the order the layers apply: clipper.toml, each show's table (only `show`'s when
     one is named), clipper.local.toml, then CLIPPER_* env vars. A key set to its default isn't
-    listed; nor are a show's channels or the [shows] tables themselves (`clipper shows` lists those)."""
+    listed; nor are a show's channels or the [shows] tables themselves (`clippa shows` lists those)."""
     root = _root(cfg)
     if show and show not in root["shows"]:
         raise ClipperError(f"no [shows.{show}] (shows: {', '.join(root['shows']) or 'none'})")
@@ -574,12 +574,12 @@ def diff(cfg: dict, show: str = "") -> list[tuple[str, str, Any, Any]]:
 
 
 def show_args(cfg: dict) -> list[str]:
-    """`--show <key>` for a clipper child process when this config is pinned to a show."""
+    """`--show <key>` for a Clippa child process when this config is pinned to a show."""
     return ["--show", cfg["show"]["key"]] if cfg.get("_pinned") else []
 
 
 def pin_show(cfg: dict, key: str) -> dict:
-    """Show `key`'s config, kept by for_stream for any stream (`clipper --show <key>`)."""
+    """Show `key`'s config, kept by for_stream for any stream (`clippa --show <key>`)."""
     return {**for_show(cfg, key), "_pinned": True}
 
 

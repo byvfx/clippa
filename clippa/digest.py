@@ -1,4 +1,4 @@
-"""The daily digest DM (`clipper alert digest`; the bot queues it once a day at [notify]
+"""The daily digest DM (`clippa alert digest`; the bot queues it once a day at [notify]
 digest_time): what went out today, what is scheduled for tomorrow, what waits for review,
 which streams are stuck on a failed stage, and the Shorts still to link to their segment in
 Studio. Built from the war room's overview so it reads like the page. alerts.py only carries
@@ -64,5 +64,5 @@ def related_lines(cfg: dict, now: datetime, show: int = 5) -> list[str]:
     lines += [f"  <https://studio.youtube.com/video/{e['video_id']}/edit> → search {p['video_id']}"
               for e, p in todo[:show]]
     if len(todo) > show:
-        lines.append(f"  +{len(todo) - show} more: clipper upload --related")
-    return lines + ["  Then: clipper upload --related <keys or links>"]
+        lines.append(f"  +{len(todo) - show} more: clippa upload --related")
+    return lines + ["  Then: clippa upload --related <keys or links>"]

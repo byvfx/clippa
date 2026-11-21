@@ -1,5 +1,5 @@
-clipper runs as several processes that almost never call each other: `clipper serve`, the
-Discord bot, the worker and the recorder as [NAS containers](NAS-hub), `clipper <command>` by
+Clippa runs as several processes that almost never call each other: `clippa serve`, the
+Discord bot, the worker and the recorder as [NAS containers](NAS-hub), `clippa <command>` by
 hand, and sometimes [Claude's container](Claude-on-the-NAS). They share one **streams folder**
 (`[paths] streams`, the NAS share) and talk through five mechanisms. When something didn't
 happen, this page says which file or log answers why.
@@ -46,15 +46,15 @@ again once the file is over 120 s old; delete it by hand only when nothing is ru
 
 - **serve and the bot** hold `streams/.serve.lock` and `.bot.lock` open with an OS lock
   (`msvcrt` / `fcntl`) for their whole life (`daemon.single_instance`). A second copy refuses to
-  start: "another clipper serve is already running". The file stays behind after a crash, the
+  start: "another clippa serve is already running". The file stays behind after a crash, the
   lock does not, so a leftover file means nothing; Health reads heartbeats, never this file.
 - **retake** takes `streams/.retake.lock` (exclusive create, its token inside) and touches it
-  while it works; another `clipper retake` says "another clipper retake is running". A lock
+  while it works; another `clippa retake` says "another clippa retake is running". A lock
   untouched for **an hour** is taken over.
 - **the worker, per stream,** takes `streams/<id>/.run.lock` with its name inside and writes a
   heartbeat into `run.json` every 60 s. Another worker takes the stream over only when that
   heartbeat is older than `[worker] stale_minutes` (10); the takeover itself runs under a
-  `jsonstate` lock so two takers can't both win. A hand `clipper run` on a stream the worker
+  `jsonstate` lock so two takers can't both win. A hand `clippa run` on a stream the worker
   holds says "`<stream>: running on <host>`".
 - **the recorder** keeps each live recording's state in `streams/<id>/live/state.json` (parts,
   gaps, chat coverage) and finalizes from it.
@@ -67,14 +67,14 @@ also carries the war room address (`warroom`, `tailnet`) and each background job
 exit code, last line and next due time. The recorder writes `streams/.record/status.json` on
 every pass (a few seconds) with each channel's state and who is live.
 
-Readers: `clipper status`, `clipper services status`, `clipper record status`, the
-[war room](War-room)'s Health panel and `clipper doctor`, from any machine that sees the share.
+Readers: `clippa status`, `clippa services status`, `clippa record status`, the
+[war room](War-room)'s Health panel and `clippa doctor`, from any machine that sees the share.
 "Down" therefore means one of two things: the process died, or it can't reach the share any more.
 A read can land while the writer is replacing the file and find none, so a reader tries a
 missing or unreadable heartbeat again (three reads, 0.3 s apart) before calling it absent; only a
 service that never ran here, with no folder for its file, is answered at once. A file that is
 there but still can't be read is reported as unreadable, not as absent: Health shows it bad with
-the reason, `clipper record status` exits 1, and the recorder's stop, restart and deploy refuse
+the reason, `clippa record status` exits 1, and the recorder's stop, restart and deploy refuse
 without `--force`, since nothing says whether a show is live.
 
 ## 4. The DM outbox (`clippa/alerts.py`)
@@ -98,8 +98,8 @@ queued (the sender logs "notification not queued").
 ## 5. HTTP to serve, and one in-process hook
 
 `schedule.json` has three writers, kept apart by its jsonstate lock rather than by one owning
-process: serve's hourly `clipper schedule` child, the replan that `POST /api/replan` runs inside
-serve (the bot's and the page's button presses), and a `clipper schedule` run by hand. The bot
+process: serve's hourly `clippa schedule` child, the replan that `POST /api/replan` runs inside
+serve (the bot's and the page's button presses), and a `clippa schedule` run by hand. The bot
 (and doctor) reach serve over HTTP at `[serve] url` (empty = `http://127.0.0.1:<[warroom]
 port>/`) with the war room token in an `X-Key` header (`[warroom] token` or
 `secrets/warroom_token.txt`, the same on both machines): `POST /api/replan` after a decision,
@@ -110,19 +110,19 @@ the next hourly run places the item. A wrong or missing token is an HTTP **401**
 host without a token, a cross-site request or a non-JSON POST.
 
 Inside serve, the war room page starts a retake through `warroom.HOOKS["retake"]`, a callback
-serve installs, not HTTP. The page run on its own (`clipper warroom`) detaches a `clipper retake`
+serve installs, not HTTP. The page run on its own (`clippa warroom`) detaches a `clippa retake`
 process instead and logs it to `logs/retake.log`.
 
 ## Child processes
 
-- **serve** runs each background job as a `clipper <args>` child (upload, preshow check, retake,
+- **serve** runs each background job as a `clippa <args>` child (upload, preshow check, retake,
   review auto, tiktok, x, analytics, cast auto, news check, blinds check, checkup --fix) and copies its output into `logs/serve.log`
   (`[paths] serve_log`). A non-zero exit queues a DM (kind `upload` or `failure`) keyed on the
   command and its last line, so a different item failing the next hour isn't swallowed by the
   cooldown. A failed job waits its own interval before it runs again, except analytics and
   streams prune (daily, free, safe to repeat): those come back in 30 min, then 1 h, 2 h, 4 h, ...
   for each failure in a row, never later than their interval, and back to it after a run that works.
-  `clipper services status` shows the streak ("3 failed in a row"). cast auto isn't one of them: each
+  `clippa services status` shows the streak ("3 failed in a row"). cast auto isn't one of them: each
   run can spend on labels and image search.
 - **the worker** runs each stage as `python -m clippa.cli <stage> <stream>`, output to
   `streams/<id>/run_<stage>.log`, status in `run.json` (`stages.<name>.status`, and on a failure
@@ -143,7 +143,7 @@ process instead and logs it to `logs/retake.log`.
 
 | Symptom | Look at |
 |---|---|
-| No upload this hour | `clipper services status` (serve's `upload` job: last exit, next due), `logs/serve.log`, `clipper upload --next 5` |
+| No upload this hour | `clippa services status` (serve's `upload` job: last exit, next due), `logs/serve.log`, `clippa upload --next 5` |
 | A stream is stuck | `streams/<id>/run.json` (`status`, `error`, the stage), `run_<stage>.log`, who holds `.run.lock` |
 | The bot's reply says it wasn't replanned | serve down or unreachable (`.serve/status.json`, `[serve] url`), or the token: a 401 in the reply means the key differs between the machines |
 | No DM | the outbox: files waiting means quiet hours or a bot that isn't draining (`.bot/status.json`, `bot.log`); empty means sent, filtered by kind or cooldown, or never queued |
@@ -154,7 +154,7 @@ process instead and logs it to `logs/retake.log`.
 
 ## Print or log?
 
-A **stage** (`clipper <stage>`, `clipper run`) prints its progress to stdout: when the worker or
+A **stage** (`clippa <stage>`, `clippa run`) prints its progress to stdout: when the worker or
 serve runs it as a child, that output is what lands in `run_<stage>.log` or `serve.log`. A
 **service** (serve, bot, worker, recorder) logs through `logging`, never `print`, so every line
 carries a time and a level. Where the lines go differs: serve and the bot write rotating files

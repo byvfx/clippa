@@ -26,7 +26,7 @@ function renderUploads() {
     <div class="cap"><b style="color:var(--text)">Uploads</b> ${u.last_24h} / ${u.max_per_24h} in 24 h
       <span class="meter"><i class="${u.room ? "" : "full"}" style="width:${pct}%"></i></span>
       ${u.room ? `${u.room} more now` : u.frees_at ? `next room ${hm(u.frees_at)}` : "at the cap"}</div>
-    <div>${u.auto_minutes ? `Automatic every ${u.auto_minutes} min` : "By hand (clipper upload)"}${r.running_since
+    <div>${u.auto_minutes ? `Automatic every ${u.auto_minutes} min` : "By hand (clippa upload)"}${r.running_since
       ? ` · <span style="color:var(--accent)">uploading now (since ${esc(r.running_since.slice(11, 16))})</span>` : ""}${runAt
       ? ` · last run ${ago(runAt.toISOString())}, ${r.exit === "0" ? `<span style="color:var(--green)">ok</span>` : `<span style="color:var(--red)">exit ${esc(r.exit)}</span>`}` : ""}</div>
     ${r.lines?.length ? `<div class="log">${r.lines.map(logLine).join("")}</div>` : ""}
@@ -286,7 +286,7 @@ document.addEventListener("click", e => {
 });
 $("#tool").addEventListener("close", () => { $("#tool").classList.remove("cover"); CV = null; });
 
-// ---------- Analytics (#42): the same numbers as `clipper analytics --report` ----------
+// ---------- Analytics (#42): the same numbers as `clippa analytics --report` ----------
 
 let STATS_MONTH = "";
 const kindName = k => KIND[k] || (k === "clip" ? "Clip" : k);  // schedule/analytics say "clip", review "pick"
@@ -337,7 +337,7 @@ function renderStats(a) {
     <div class="two"><div><h3>Best (7-day views)</h3><div class="vids">${vids(a.best)}</div></div>
       <div><h3>Weakest</h3><div class="vids">${vids(a.worst) || `<div class="note">Needs more than 8 videos with 7-day numbers.</div>`}</div></div></div>`
       : `<div class="note">None of this month's uploads is 8 days old yet, so there are no 7-day numbers to compare.</div>`}
-    <div class="note">Report as a file: <code>clipper analytics --report${a.month ? " --month " + esc(a.month) : ""}</code> → reports/analytics/${esc(a.month)}.md + .csv</div>
+    <div class="note">Report as a file: <code>clippa analytics --report${a.month ? " --month " + esc(a.month) : ""}</code> → reports/analytics/${esc(a.month)}.md + .csv</div>
     <div class="tip" id="statTip" hidden></div>`;
 }
 function dailyChart(days) {
@@ -402,7 +402,7 @@ async function refreshUsage() {
   try { u = await api("/api/usage"); } catch (e) { u = { error: e.message }; }
   if (u.error) { el.innerHTML = `<div class="bad">${esc(u.error)}</div>`; $("#usageSub").textContent = ""; return; }
   const usd = v => "$" + (+v || 0).toFixed(2);
-  const ours = p => `<span class="f" title="What clipper's own cost log recorded for this provider this month">our log ${usd(p.logged_usd)}</span>`;
+  const ours = p => `<span class="f" title="What Clippa's own cost log recorded for this provider this month">our log ${usd(p.logged_usd)}</span>`;
   const one = (title, p, extra) => {
     if (p.missing) return `<div class="sub">${title}</div><div>${ours(p)}</div><div class="f">${esc(p.missing)}</div>`;
     if (p.error) return `<div class="sub">${title}</div><div class="bad">${esc(p.error)}</div><div>${ours(p)}</div>`;

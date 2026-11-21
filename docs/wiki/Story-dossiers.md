@@ -1,15 +1,15 @@
 ```bash
-clipper story new "Jer banned from Kick after the FDA call" --days 7 --dry-run   # swarm + triage, the cost
-clipper story run jer-banned-kick-fda-call     # transcribe, find the moments, write the dossier
-clipper story show jer-banned-kick-fda-call    # dossier.md again (keeps hand edits)
-clipper story add <slug> <video url>...        # then: clipper story run <slug> --from triage
-clipper story status | trail <slug>
-clipper --show kino story plan <slug>          # the edit: streams/story-<slug>/story.json (~$0.03)
-clipper story cut <slug>                       # render it, meta, thumbs, the Kitsu card
+clippa story new "Jer banned from Kick after the FDA call" --days 7 --dry-run   # swarm + triage, the cost
+clippa story run jer-banned-kick-fda-call     # transcribe, find the moments, write the dossier
+clippa story show jer-banned-kick-fda-call    # dossier.md again (keeps hand edits)
+clippa story add <slug> <video url>...        # then: clippa story run <slug> --from triage
+clippa story status | trail <slug>
+clippa --show kino story plan <slug>          # the edit: streams/story-<slug>/story.json (~$0.03)
+clippa story cut <slug>                       # render it, meta, thumbs, the Kitsu card
 ```
 
 A brief in, a research dossier out, then a video of it for review. The people
-the brief names (by name, nickname, alias or id, from [`clipper people`](People); `--person`
+the brief names (by name, nickname, alias or id, from [`clippa people`](People); `--person`
 adds one) seed the swarm with their YouTube, Kick and Odysee channels. Triage
 (Haiku) picks the videos worth transcribing within `--max-videos` / `--max-hours`, the people's own
 uploads first, and prints the Modal estimate; our own recorded streams are linked, not transcribed
@@ -38,7 +38,7 @@ Kitsu card, in an episode of its own. A segment retake can't trim a story: edit 
 cut again (unchanged parts aren't re-rendered). Approved, it goes out as soon as possible
 (`[story] publish = "asap"`), with the hourly uploads.
 
-`clipper story cut <slug> --no-review` renders the video alone (no meta, thumbs or Kitsu card), for
+`clippa story cut <slug> --no-review` renders the video alone (no meta, thumbs or Kitsu card), for
 watching it yourself. It skips sending the story to review; it doesn't block uploads. A story
 that was never sent to review has no card to approve, so it never uploads, but re-cutting one that
 was already approved replaces the video that approval covers, and the hourly uploads can pick it up.
@@ -58,7 +58,7 @@ what it marks reported, never a speculation line as fact):
 - `close`: where it stands and what is still unknown.
 
 `story cut` makes each one a card (the `[receipts]` look: a yellow header, the line, the bug)
-read by the story's narrator, `[story] voice_id` (an ElevenLabs voice from `clipper narrate
+read by the story's narrator, `[story] voice_id` (an ElevenLabs voice from `clippa narrate
 voices`; not `[narrate] voice_id`, which is the character's), with `[story] tts_settings` and
 `[narrate]`'s key, `tts_model` and format. Each read is cached in `streams/story-<slug>/vo/` by its
 words and voice, so a re-cut pays only for lines that changed: a story's narration is a few hundred
@@ -76,11 +76,11 @@ again, and its cover picked again, the next time it is cut.
 
 ## Setup
 
-Story dossiers need the swarm's keys plus Modal (as for `clipper
+Story dossiers need the swarm's keys plus Modal (as for `clippa
 archive`): the videos it picks are transcribed there, on `[story] gpu` (L4). Kick VODs are
 downloaded here at their smallest variant (`[archive] kick_format`) for their audio; YouTube audio
-uses the archive's cookies retry. People and their channels come from [`clipper people`](People) (`people.json`, with
+uses the archive's cookies retry. People and their channels come from [`clippa people`](People) (`people.json`, with
 `studio/research_notes/streamers.json`, `[story] people` and the cast library folded in). `story cut` renders
 with `[receipts]`'s fonts (Impact and Arial Bold, as receipts need) and reads our own streams'
 source videos from `paths.streams`, so it runs on a machine that sees the share; with several
-shows, set `[story] show` or pass `clipper --show <key>` to `story plan`.
+shows, set `[story] show` or pass `clippa --show <key>` to `story plan`.

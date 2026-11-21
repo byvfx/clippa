@@ -173,7 +173,7 @@ def faces_of(sdir: Path) -> list[dict]:
 
 
 def found_faces(sdir: Path, here: Path, n: int) -> list[dict]:
-    """faces.json (`clipper faces`): each named person's n best faces in the stream, the frame
+    """faces.json (`clippa faces`): each named person's n best faces in the stream, the frame
     grabbed from the source into <issue>/faces/ once. Marked "found": the face model named
     them, so the pages take them before the thumbnail stage's guesses."""
     from ..faces import best_faces, grab, head_box

@@ -11,8 +11,9 @@
 
 **Clippa** turns long Kick streams into YouTube uploads: full-length segments, topic compilations,
 Shorts, titles, descriptions, chapters and thumbnails, with a human review step before
-anything goes out. The app was called clipper; the `clipper` command, package, config files
-and containers keep that name.
+anything goes out. The app was called clipper, and the rename is under way (#286): the command
+and package are `clippa` now (`clipper` still works), while the config files (`clipper.toml`),
+`CLIPPER_*` settings and containers keep the old name until the rename's deploy step.
 
 **[How it works, what it costs and why it's built this way](https://byvfx.github.io/clippa/)**:
 the full breakdown (the figures above are as of 14 November 2026).
@@ -34,15 +35,15 @@ From the clipper folder on a new machine (keep the folder path short on Windows,
 powershell -ExecutionPolicy Bypass -File deploy\bootstrap.ps1   # macOS/Linux: bash deploy/bootstrap.sh
 ```
 
-It installs uv, Python 3.12 and ffmpeg if they're missing, puts a `clipper` command on PATH,
-then runs `clipper setup` and `clipper doctor`. Then, in a new terminal:
+It installs uv, Python 3.12 and ffmpeg if they're missing, puts a `clippa` command on PATH,
+then runs `clippa setup` and `clippa doctor`. Then, in a new terminal:
 
 ```bash
-clipper fetch <kick vod url>
-clipper run <stream id>
+clippa fetch <kick vod url>
+clippa run <stream id>
 ```
 
-`clipper -h` lists the commands by group; `clipper <command> -h` gives each one's flags.
+`clippa -h` lists the commands by group; `clippa <command> -h` gives each one's flags.
 
 ## In the repo
 

@@ -1,4 +1,4 @@
-"""`clipper completion bash|powershell` (#205): a tab-completion script for the shell, made
+"""`clippa completion bash|powershell` (#205): a tab-completion script for the shell, made
 from the argument parser itself, so it knows every command, action and flag of this
 version. Stream arguments complete to the shortcuts `latest` and `latest:<show>` (the shows
 of this config); ids themselves are left to the shell's own path completion, since listing
@@ -55,7 +55,7 @@ def table(parser: argparse.ArgumentParser, shows: list[str]) -> dict[str, list[s
 def bash(t: dict[str, list[str]]) -> str:
     cases = "\n".join(f'        "{k}") echo "{" ".join(v)}" ;;' for k, v in t.items() if k)
     skip = "|".join(GLOBAL_VALUE_OPTS)
-    return f"""# clipper tab completion for bash: made by `clipper completion bash`
+    return f"""# clippa tab completion for bash: made by `clippa completion bash`
 _clipper_words() {{
     case "$1" in
 {cases}
@@ -85,15 +85,15 @@ _clipper() {{
         COMPREPLY=("${{COMPREPLY[@]#"$done"}}")
     fi
 }}
-complete -o default -F _clipper clipper clipper.exe
+complete -o default -F _clipper clippa clippa.exe clipper clipper.exe
 """
 
 
 def powershell(t: dict[str, list[str]]) -> str:
     rows = "\n".join(f"        '{k}' = '{' '.join(v)}'" for k, v in t.items())
     skip = ", ".join(f"'{o}'" for o in GLOBAL_VALUE_OPTS)
-    return f"""# clipper tab completion for PowerShell: made by `clipper completion powershell`
-Register-ArgumentCompleter -Native -CommandName clipper, clipper.exe -ScriptBlock {{
+    return f"""# clippa tab completion for PowerShell: made by `clippa completion powershell`
+Register-ArgumentCompleter -Native -CommandName clippa, clippa.exe, clipper, clipper.exe -ScriptBlock {{
     param($wordToComplete, $commandAst, $cursorPosition)
     $table = @{{
 {rows}

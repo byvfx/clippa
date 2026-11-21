@@ -1,5 +1,5 @@
-Installing clipper on a machine for one or more of its [roles](Roles-and-services). After any
-setup, run `clipper doctor` (add `--role gpu`, `--role serve`, `--role bot`, `--role nas` or `--role control`): it
+Installing Clippa on a machine for one or more of its [roles](Roles-and-services). After any
+setup, run `clippa doctor` (add `--role gpu`, `--role serve`, `--role bot`, `--role nas` or `--role control`): it
 checks everything on these pages and prints a fix for each problem.
 
 Per platform: [Windows](Install-Windows) (GPU worker, serve, bot), [macOS](Install-macOS)
@@ -29,17 +29,17 @@ bash deploy/bootstrap.sh
 ```
 
 `describe` names the newest release; to pin one instead, `git checkout v0.2.0`. If it prints
-`No names found`, nothing has been tagged yet: stay on main. `clipper --version` says what the
+`No names found`, nothing has been tagged yet: stay on main. `clippa --version` says what the
 machine has (`0.2.0` on a release, `0.2.0+3.g570bb87` past one). The bootstrap carries on from
-[the walkthrough below](#the-walkthrough-clipper-setup-78).
+[the walkthrough below](#the-walkthrough-clippa-setup-78).
 
 To move a machine to a newer release: stop what runs from the folder (the bot, a worker task),
 `git fetch --tags`, `git checkout <tag>`, then `uv sync` with the extras its roles need, the
-list `clipper setup --sync-args` prints (the bootstrap leaves an existing `.venv` as it is).
+list `clippa setup --sync-args` prints (the bootstrap leaves an existing `.venv` as it is).
 The NAS containers aren't updated this way: they get the code with `bash deploy/hub/deploy.sh`,
-which stamps the image with the commit, and `clipper services status` shows each one's version.
+which stamps the image with the commit, and `clippa services status` shows each one's version.
 
-## The walkthrough: `clipper setup` (#78)
+## The walkthrough: `clippa setup` (#78)
 
 Get the code onto the machine into a short path ([a release](#a-release-on-a-new-machine), a
 clone, or a copy of the folder without `streams/`, `.venv/`, `logs/`), then from that folder:
@@ -52,8 +52,8 @@ bash deploy/bootstrap.sh                                         # macOS / Linux
 The bootstrap installs uv (which brings Python 3.12) and ffmpeg if they're missing (winget,
 else uv's installer and BtbN's ffmpeg build; Homebrew or apt on macOS/Linux), syncs the
 packages, adds `clippa` and `clipper` commands to `~/.local/bin` (on PATH; they run this folder's
-`.venv`, so either works in any folder and new terminal; `clipper` is the old name, #286), then
-runs `clipper setup`:
+`.venv`, so either works in any folder and new terminal; `clippa` is the old name, #286), then
+runs `clippa setup`:
 
 1. **Join or start fresh.** Join takes the main machine's `clipper.toml` from the share or a path
    (`~/Downloads/clipper.toml`, the folder that holds it, or the file dragged into the terminal).
@@ -76,7 +76,7 @@ runs `clipper setup`:
    service, saved as Windows user env vars / in your shell profile / in `secrets/`. Enter skips
    one, except the Kitsu address and token on every role but a control station: review happens
    in Kitsu and doctor fails without them, so setup asks again (Ctrl+C stops; it resumes there).
-5. **Check.** `clipper doctor` for the chosen roles, then what to run next.
+5. **Check.** `clippa doctor` for the chosen roles, then what to run next.
 
 On Linux the bootstrap also installs the fonts covers and captions use, which Windows and macOS
 come with: Impact, Georgia and Arial (`ttf-mscorefonts-installer`, which asks you to accept
@@ -86,9 +86,9 @@ again) and Roboto Condensed.
 Values that only this machine needs go in **`clipper.local.toml`** beside clipper.toml
 (gitignored), written only where they differ from the shared file, so clipper.toml can stay
 identical everywhere. It wins over clipper.toml and its shows; `CLIPPER_*` env vars still win
-over it. Progress is in `setup_state.json`; `clipper setup --step <name>` redoes a step,
-`clipper setup --check` shows each step's checks without asking anything, and
-`clipper setup --answers answers.toml` runs it without questions (keys never go in that file:
+over it. Progress is in `setup_state.json`; `clippa setup --step <name>` redoes a step,
+`clippa setup --check` shows each step's checks without asking anything, and
+`clippa setup --answers answers.toml` runs it without questions (keys never go in that file:
 they come from the environment):
 
 ```toml
@@ -101,7 +101,7 @@ kitsu = "http://<nas>:8090"
 ```
 
 > [!IMPORTANT]
-> **Windows path length.** With Windows long paths off (the default), keep the clipper folder
+> **Windows path length.** With Windows long paths off (the default), keep the checkout folder
 > under ~80 characters (`C:\clipper` is fine): the anthropic package has files ~160 characters
 > deep inside `.venv`, and past 260 in total Python can't import them. The bootstrap refuses a
 > longer folder and doctor warns.

@@ -1,4 +1,4 @@
-// War room: investigations (#108). Each archive subject's leads dossier (`clipper investigate`),
+// War room: investigations (#108). Each archive subject's leads dossier (`clippa investigate`),
 // the same markdown as leads.md, rendered to read. Discord's lead posts link here:
 // #inv=jer&run=<made_at digits>&lead=L03 (lead ids repeat across runs; the run says which).
 
@@ -59,7 +59,7 @@ async function showInvestigations(subject, lead, run) {
     d.innerHTML = `<div class="m-head"><b>Investigations</b>${r.subjects.length ? `<select id="invSubject" title="Research only, never uploaded: leads.md">${opts}</select>` : ""}<button class="x" aria-label="Close" title="Close (Esc)" data-close>${ic("close")}</button></div>
       <div class="md">${r.missing_run ? `<p class="old">That run of ${esc(r.subject)}'s leads isn't on file any more. <button class="btn" data-invnow>Open the current one</button></p>`
         : r.markdown ? (r.run !== r.current ? `<p class="old">An earlier run of these leads (the link's). <button class="btn" data-invnow>Open the current one</button></p>` : "") + mdRender(r.markdown)
-        : `<div class="empty">No investigations yet: clipper investigate run &lt;subject&gt;.</div>`}</div>`;
+        : `<div class="empty">No investigations yet: clippa investigate run &lt;subject&gt;.</div>`}</div>`;
     if (lead) d.querySelector("#inv-" + CSS.escape(lead))?.scrollIntoView({ block: "start" });
   } catch (e) {
     const box = d.querySelector(".tbody");

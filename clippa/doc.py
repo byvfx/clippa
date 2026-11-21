@@ -1,15 +1,15 @@
-"""`clipper doc`: a narrated mini-documentary, from a hand-written plan to a Resolve timeline,
+"""`clippa doc`: a narrated mini-documentary, from a hand-written plan to a Resolve timeline,
 a mastered render, a leak check and a publish kit.
 
 Usage:
-    clipper doc new <slug> [--title T]       the piece's folder, a starter plan.toml and banned.txt
-    clipper doc voice <slug> [--dry-run]     the narration: your own read of a take (vo/read/), else bought
+    clippa doc new <slug> [--title T]       the piece's folder, a starter plan.toml and banned.txt
+    clippa doc voice <slug> [--dry-run]     the narration: your own read of a take (vo/read/), else bought
                                              once per take; compressed, word-timed
-    clipper doc build <slug> [--dry-run]     the plan in frames (work/build.json), then a new timeline in Resolve
-    clipper doc master <slug> [--file F] [--timeline NAME] [--no-leak]
+    clippa doc build <slug> [--dry-run]     the plan in frames (work/build.json), then a new timeline in Resolve
+    clippa doc master <slug> [--file F] [--timeline NAME] [--no-leak]
                                              render, bring it to [doc] lufs, then the leak check
-    clipper doc leak <slug> [--file F] [--dry-run]   the leak check alone, on any video
-    clipper doc kit <slug>                   chapters, description, credits, disclosures -> kit.md
+    clippa doc leak <slug> [--file F] [--dry-run]   the leak check alone, on any video
+    clippa doc kit <slug>                   chapters, description, credits, disclosures -> kit.md
 
 A piece is [paths] documentaries/<slug>/, outside the repo: plan.toml (the script and the edit),
 banned.txt (what must never be heard or written), and its media in reels/ (the subject's own
@@ -62,8 +62,8 @@ READ_DIR = "vo/read"      # your own recordings of takes, one file a take, named
 READ_EXTS = (".wav", ".flac", ".aif", ".aiff", ".mp3", ".m4a", ".aac", ".ogg", ".opus")
 
 STARTER = '''\
-# The plan of one piece: the script and the edit. `clipper doc` reads it; nothing here is
-# sent anywhere but the narration lines (to ElevenLabs, by `clipper doc voice`), and not
+# The plan of one piece: the script and the edit. `clippa doc` reads it; nothing here is
+# sent anywhere but the narration lines (to ElevenLabs, by `clippa doc voice`), and not
 # those of a take you recorded yourself (vo/read/<take>.wav).
 title = "{title}"
 # project = "{title}"       # the Resolve project that must be open for `build`
@@ -237,7 +237,7 @@ def parse_plan(text: str) -> dict:
 def load_plan(cfg: dict, slug: str) -> tuple[Path, dict]:
     d = piece_dir(cfg, slug)
     if not (d / PLAN).exists():
-        raise ClipperError(f"no piece {slug!r} in {d.parent} (clipper doc new {slug})")
+        raise ClipperError(f"no piece {slug!r} in {d.parent} (clippa doc new {slug})")
     plan = parse_plan((d / PLAN).read_text(encoding="utf-8-sig"))
     fps = plan["fps"] or cfg["doc"]["fps"]
     if isinstance(fps, bool) or not isinstance(fps, (int, float)) or fps != int(fps) or fps <= 0:
@@ -522,7 +522,7 @@ def voice(cfg: dict, slug: str, dry_run: bool = False) -> None:
                 print(f"  {t['id']}: {len(t['text'])} characters, {len(t['says'])} line(s)")
         return
     if todo and not nc["voice_id"]:
-        raise ClipperError("no narrator: set voice_id in plan.toml or [doc] voice_id (clipper narrate voices), or "
+        raise ClipperError("no narrator: set voice_id in plan.toml or [doc] voice_id (clippa narrate voices), or "
                            f"record the takes yourself into {READ_DIR} ({wiki.page('Documentaries', 'your-own-voice')})")
     for t in ts:
         raw, done, words = take_files(d, t, nc, dc)
@@ -541,7 +541,7 @@ def voice(cfg: dict, slug: str, dry_run: bool = False) -> None:
         elif not mine:
             continue                    # a bought read was checked against its words when it was timed
         check_read(t, heard, raw, done, mine)
-    print(f"narration ready in {d / 'vo'}: listen to each take before `clipper doc build {slug}`")
+    print(f"narration ready in {d / 'vo'}: listen to each take before `clippa doc build {slug}`")
 
 
 def check_read(t: dict, heard: list[list], raw: Path, done: Path, mine: bool) -> None:
@@ -564,7 +564,7 @@ def narration(d: Path, plan: dict, nc: dict, dc: dict) -> dict[int, dict]:
         _, done, words = take_files(d, t, nc, dc)
         heard = jsonstate.read(words, None)
         if not done.exists() or heard is None:
-            raise ClipperError(f"take {t['id']} isn't voiced yet (clipper doc voice {d.name})")
+            raise ClipperError(f"take {t['id']} isn't voiced yet (clippa doc voice {d.name})")
         times, _ = align(tokens(t["text"]), heard)
         counts = [len(tokens(x)) for x in t["texts"]]
         at = 0
@@ -1010,7 +1010,7 @@ def build(cfg: dict, slug: str, dry_run: bool = False) -> dict:
 
     name = doc_resolve.build(doc_resolve.connect(dc), b, plan["project"])
     jsonstate.merge(d / "work" / "state.json", {"timeline": name}, ["timeline"])
-    print(f"timeline {name!r} built and saved: watch it, then `clipper doc master {slug}`")
+    print(f"timeline {name!r} built and saved: watch it, then `clippa doc master {slug}`")
     return b
 
 
@@ -1052,7 +1052,7 @@ def master(cfg: dict, slug: str, file: Path | None = None, timeline: str = "", l
 
         name = timeline or (jsonstate.read(d / "work" / "state.json", {}) or {}).get("timeline")
         if not name:
-            raise ClipperError(f"no timeline built yet (clipper doc build {slug}), or pass --timeline / --file")
+            raise ClipperError(f"no timeline built yet (clippa doc build {slug}), or pass --timeline / --file")
         (d / "renders").mkdir(exist_ok=True)
         file = doc_resolve.render(doc_resolve.connect(dc), name, d / "renders", dc, plan["project"])
     out = master_file(Path(file), dc)
@@ -1159,7 +1159,7 @@ def leak(cfg: dict, slug: str, file: Path | None = None, dry_run: bool = False) 
     if file is None:
         done = sorted((d / "renders").glob("*.master.mp4"), key=lambda p: p.stat().st_mtime)
         if not done:
-            raise ClipperError(f"no mastered render in {d / 'renders'} (clipper doc master {slug}), or pass --file")
+            raise ClipperError(f"no mastered render in {d / 'renders'} (clippa doc master {slug}), or pass --file")
         file = done[-1]
     words = heard_words(cfg, d, Path(file), dry_run)
     if words is None:
@@ -1224,7 +1224,7 @@ def kit_text(plan: dict, b: dict, disclosures: list[str]) -> str:
         out += ["No chapters: YouTube needs three or more sections, each ten seconds or longer.", ""]
     out += ["## Pinned comment", "", plan["pinned"] or "(none written: `pinned` in plan.toml)", "",
             "## Before publishing", "",
-            "- `clipper doc leak` passed on the file you upload, and you watched it for on-screen text.",
+            "- `clippa doc leak` passed on the file you upload, and you watched it for on-screen text.",
             "- The channel's older uploads, titles and replies don't carry anything on the banned list.",
             "- Studio: the altered or synthetic content box, when the narration is an AI voice.",
             "- You listened to the whole master on speakers and on a phone.", ""]
@@ -1244,7 +1244,7 @@ def kit(cfg: dict, slug: str) -> Path:
     d, plan = load_plan(cfg, slug)
     b = jsonstate.read(d / "work" / "build.json", None)
     if not b:
-        raise ClipperError(f"no build yet: the chapters come from it (clipper doc build {slug} --dry-run)")
+        raise ClipperError(f"no build yet: the chapters come from it (clippa doc build {slug} --dry-run)")
     dc = cfg["doc"]
     # what the last build put on the timeline. A build from before it kept that was all bought reads,
     # whatever is in vo/read now: a recording counts once a build has used it.

@@ -1,4 +1,4 @@
-// War room: news (#110). Stories about the shows' people from `clipper news`: dismiss what isn't
+// War room: news (#110). Stories about the shows' people from `clippa news`: dismiss what isn't
 // news, add a story to a show's next stream as context, or search Google News by hand.
 
 let NS = null;  // {data, days, hits, q, ctx: {ids, show, text}}
