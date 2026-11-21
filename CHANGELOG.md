@@ -10,6 +10,9 @@ Developing#releases.
 
 ## Unreleased
 
+- War room: the live-show chips no longer wrap inside the top bar and spill over it on a laptop-wide
+  window (four shows need about 1,500 px). They move to a row of their own when they don't fit, so
+  the buttons stop jumping when a show goes live or the Health age ticks over.
 - A sign-in that is gone (a cookies file with no live sign-in, an expired TikTok or X sign-in) is
   DMed within the hour, once, not only in the morning checkup: serve's hourly checkup reads the
   `signins` check too (`clipper checkup --alert`). `clipper status` lists sign-in findings under

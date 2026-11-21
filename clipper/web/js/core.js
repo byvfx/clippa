@@ -64,6 +64,7 @@ function tick() {
   const title = [DOWN ? (DOWN.signedOut ? "Signed out: open the war room's ?key= link again." : `serve isn't answering: ${DOWN.msg}\nTrying again every 15 s.`) : "",
     ...why, age === null ? "No data yet" : `Updated ${ago(STATE.generated_at)}`, "Opens the Pipeline page (Health)"].filter(Boolean).join("\n");
   if (w.title !== title) w.title = title;  // not every second while it is hovered: the age in it is to the minute
+  fitHeader();  // "OK" to "Offline" can tip the live shows onto their own row
 }
 setInterval(tick, 1000);
 
@@ -131,6 +132,22 @@ function renderLive() {
   }).join("");
   if (ticked && $("#liveRemember")) $("#liveRemember").checked = true;
   if (had != null) $(`#lives .live[data-live="${had}"] ${LIVEMENU === +had ? inMenu : ".chipb"}`)?.focus();
+  fitHeader();
+}
+// The live shows sit in the header's row while they fit beside the rest, else on a row of their own
+// (header.stack). Measured from the chips' own widths, which don't depend on the row, so it can't flip
+// back and forth; 24 px of slack before they come back up, for the widgets' text changing. With no chips
+// (before /api/live answers) a narrow window still stacks, so the rest can wrap rather than run off the edge.
+function fitHeader() {
+  const h = $("header"), chips = [...$("#lives").children];
+  if (PHONE.matches) { h.classList.remove("stack"); return; }  // phones: a row of their own anyway
+  const gap = parseFloat(getComputedStyle(h).columnGap) || 0;
+  const sum = els => els.reduce((s, e) => s + e.getBoundingClientRect().width, 0);  // unrounded, unlike offsetWidth
+  const rest = [...h.children].filter(e => e.id !== "lives" && e.offsetWidth && !["absolute", "fixed"].includes(getComputedStyle(e).position));  // not an open ⋯ menu
+  const need = sum(rest) + gap * rest.length + (chips.length ? sum(chips) + 8 * (chips.length - 1) : 0);  // 8: the gap between chips
+  const room = h.clientWidth - parseFloat(getComputedStyle(h).paddingLeft) - parseFloat(getComputedStyle(h).paddingRight);
+  if (need > room) h.classList.add("stack");
+  else if (need + 24 <= room) h.classList.remove("stack");
 }
 function liveMenu(l, rec) {
   return `<div class="livemenu" data-menu>
