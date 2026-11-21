@@ -6,7 +6,7 @@ chat either way. It works on a phone: the buddy list folds away.
 
 ## What it can do
 
-Clippa can only use the tools in its catalog (`clipper/catalog.py`), each with a risk:
+Clippa can only use the tools in its catalog (`clippa/catalog.py`), each with a risk:
 
 | Risk | Tools | What happens |
 |---|---|---|
@@ -109,7 +109,7 @@ war room and the chat together: the browser remembers it and its other tabs foll
 room starts as `warroom`. A look picked here before the war room had looks stays this page's
 until you pick again.
 
-A look is one file in `clipper/web/themes/`: the custom properties that `chat.css` and the war
+A look is one file in `clippa/web/themes/`: the custom properties that `chat.css` and the war
 room's `warroom.css` read (colours, fonts, borders, radii, the title bars and buttons, the window
 titles as `--label-buddies` and `--label-chat`, `--scheme` for the chat's native controls) plus
 any rules of its own, which name one page's own classes. `theme.js` loads it on both pages. Add
@@ -119,7 +119,7 @@ property, and that the war room's colours live in `themes/warroom.css` only.
 ## Settings
 
 `[chat]` in the config: `model` (`""` for local matching only), `effort`, `prompt_version`
-(`clipper/prompts/chat_<v>.md`; v3 knows bulk and undo, and says so when it can't do a thing
+(`clippa/prompts/chat_<v>.md`; v3 knows bulk and undo, and says so when it can't do a thing
 rather than answering with a list), `quiet_hours`, `history` (how many of the topic's messages the
 model sees), `daily_usd` and `theme`. The chat is stored in `[paths] chats` (`chats/current.json` beside
 the streams, on the share), written by serve only.

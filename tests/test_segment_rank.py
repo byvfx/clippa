@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from clipper import jsonstate, review, schedule
+from clippa import jsonstate, review, schedule
 
 
 def seg(i, score=None, cut=True):

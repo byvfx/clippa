@@ -4,7 +4,7 @@ from __future__ import annotations
 import itertools
 import re
 
-from clipper import models
+from clippa import models
 
 
 class FakeModel:
@@ -113,7 +113,7 @@ def test_thumbnails_need_vision(defaults):
 
 
 def test_list_skips_the_gold_files(defaults, tmp_path, capsys):
-    from clipper import jsonstate
+    from clippa import jsonstate
 
     defaults["paths"]["model_tests"] = tmp_path
     jsonstate.write(tmp_path / "gold.json", {"items": []})

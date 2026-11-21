@@ -1,9 +1,9 @@
-"""clipper/doc_resolve.py against a stand-in for Resolve's scripting objects: what it asks
+"""clippa/doc_resolve.py against a stand-in for Resolve's scripting objects: what it asks
 Resolve to do, not whether Resolve does it (that needs Resolve open; wiki Documentaries)."""
 import pytest
 
-from clipper import doc, doc_resolve
-from clipper.errors import ClipperError
+from clippa import doc, doc_resolve
+from clippa.errors import ClipperError
 
 
 class Item:

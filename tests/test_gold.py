@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import pytest
 
-from clipper import gold, jsonstate
-from clipper.errors import ClipperError
+from clippa import gold, jsonstate
+from clippa.errors import ClipperError
 
 
 def rec(status: str, **kw) -> dict:

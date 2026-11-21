@@ -1,6 +1,6 @@
 # clipper.toml, a starter: copy this file to clipper.toml and edit it, or run `clipper setup`,
 # which writes one and asks for the rest. Only what differs from the defaults belongs in
-# clipper.toml; clipper/defaults.toml lists every setting with its default and what it does, and
+# clipper.toml; clippa/defaults.toml lists every setting with its default and what it does, and
 # `clipper config get <section>.<key>` shows a value and which file set it. One machine's own
 # values go in clipper.local.toml beside it (same sections; setup writes it), and every key can
 # also be set with an env var named CLIPPER_<SECTION>_<KEY>, e.g. CLIPPER_TRANSCRIBE_DEVICE=cpu.

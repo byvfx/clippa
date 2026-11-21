@@ -2,8 +2,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from clipper import review
-from clipper.errors import ClipperError
+from clippa import review
+from clippa.errors import ClipperError
 
 
 def fake_gazu():

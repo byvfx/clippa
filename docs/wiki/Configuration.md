@@ -22,7 +22,7 @@ priority = true` so its items go out ahead of the backlog. Unknown keys there ar
 [`docs/big-story.toml`](https://github.com/byvfx/clipper/blob/main/docs/big-story.toml) is the ready-made one to copy: more picks and Shorts, priority, and the
 night's compilation. A `[schedule] stream_budget` kind at 0 goes only when pinned, so
 `compilation = 0` there keeps compilations for big-story nights.
-`clipper/defaults.toml` documents every key with its default; `clipper.toml` holds only what
+`clippa/defaults.toml` documents every key with its default; `clipper.toml` holds only what
 differs (`clipper setup` starts a new one that way, and `clipper.example.toml` is a starter to
 copy). `clipper.toml` itself is gitignored because it holds your
 Discord ids and Kitsu address.
@@ -33,7 +33,7 @@ Discord ids and Kitsu address.
 loads; an unknown setting or `CLIPPER_*` variable is a warning on every command, and
 `clipper doctor` fails on it. `clipper --show <key>` applies that show to any stream.
 
-`clipper config diff` lists every setting this install changes from `clipper/defaults.toml`,
+`clipper config diff` lists every setting this install changes from `clippa/defaults.toml`,
 by layer: `clipper.toml`, each show's table, `clipper.local.toml`, then `CLIPPER_*` variables
 (`clipper config diff kino` keeps one show's table; `--json` for a script). It answers "what
 did I change" without opening the file on the share.

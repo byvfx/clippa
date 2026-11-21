@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from clipper import daemon, jsonstate, services
-from clipper.errors import ClipperError
+from clippa import daemon, jsonstate, services
+from clippa.errors import ClipperError
 
 NOW = datetime(2026, 10, 30, 20, 0, tzinfo=UTC)
 
@@ -70,7 +70,7 @@ def test_all_never_touches_the_recorder(tmp_path, monkeypatch):
 
 def test_status_shows_serve_and_bot_heartbeats(tmp_path, monkeypatch, capsys):
     """From the share, so it's right whichever machine they run on."""
-    from clipper import daemon
+    from clippa import daemon
 
     monkeypatch.setattr(services, "run_task", lambda name, action, cfg=None: 0)
     cfg = cfg_with(tmp_path, None)

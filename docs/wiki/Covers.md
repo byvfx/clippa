@@ -7,7 +7,7 @@ The [war room](War-room)'s cover editor changes any of it by hand.
 ## Layout
 
 Every position, size, color and fixed word of the tabloid covers is data, `LAYOUT` in
-`clipper/thumbs/enquirer.py`; a show changes any of it in `layouts/<show>/enquirer.toml`
+`clippa/thumbs/enquirer.py`; a show changes any of it in `layouts/<show>/enquirer.toml`
 (`[paths] layouts`, beside its Shorts screenshots), e.g. `[colors] green = "#0b3d91"` or
 `[cover.inset] size = [200, 180]`, and `clipper thumbs <stream> --compose-only` redraws with
 no model calls. An unknown key is an error. Leave the file out for the default covers.

@@ -3,7 +3,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from clipper import schedule
+from clippa import schedule
 
 TZ = ZoneInfo("America/Los_Angeles")
 NOW = datetime(2026, 11, 2, 9, 0, tzinfo=TZ)        # a Monday
@@ -110,7 +110,7 @@ def test_needs_push():
 def test_push_to_kitsu_writes_only_changed_slots(defaults, tmp_path, monkeypatch):
     from types import SimpleNamespace
 
-    from clipper import jsonstate, review
+    from clippa import jsonstate, review
 
     data = {"e1": {"f_sched": ""}, "e2": {"f_sched": "2026-11-03 16:00"}, "e3": {"f_sched": "x"}}
     calls = []
@@ -228,7 +228,7 @@ def test_entry_files_are_stream_relative(tmp_path):
 
 
 def test_previous_rewrites_old_paths(tmp_path):
-    from clipper import jsonstate
+    from clippa import jsonstate
     path = tmp_path / "schedule.json"
     jsonstate.write(path, {"entries": [{"key": "kick-1/v01", "stream": "kick-1", "status": "uploaded",
                                         "file": "//nas/streams/kick-1/shorts/v01.mp4"}]})

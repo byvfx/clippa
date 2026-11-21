@@ -1,10 +1,10 @@
-"""Discord cards (clipper/notify.py): publishing to Kitsu and posting the cards are two steps,
+"""Discord cards (clippa/notify.py): publishing to Kitsu and posting the cards are two steps,
 joined here and nowhere else, so review.py never imports Discord."""
 from pathlib import Path
 
 import pytest
 
-from clipper import notify, review
+from clippa import notify, review
 
 
 def test_publish_and_post_posts_cards_only_for_what_was_published(monkeypatch, tmp_path):
@@ -54,8 +54,8 @@ def test_publish_and_post_reads_the_streams_own_discord_setting(monkeypatch, tmp
 def test_invite_adds_a_discord_id_to_the_allowlist_once(tmp_path):
     """`clipper review invite`: the id lands in clipper.toml's [discord] allowed_user_ids, once; a
     non-id is refused with the recipe."""
-    from clipper import config
-    from clipper.errors import ClipperError
+    from clippa import config
+    from clippa.errors import ClipperError
 
     path = tmp_path / "clipper.toml"
     path.write_text('[discord]\nallowed_user_ids = [   # a multi-line array (Copilot on #181)\n'
@@ -74,8 +74,8 @@ def test_invite_adds_a_discord_id_to_the_allowlist_once(tmp_path):
 def test_invite_refuses_when_another_layer_sets_the_allowlist(tmp_path):
     """clipper.local.toml (or a show, or an env var) setting allowed_user_ids would win over the
     shared file: the invite says where the id has to go instead of writing a list nobody reads."""
-    from clipper import config
-    from clipper.errors import ClipperError
+    from clippa import config
+    from clippa.errors import ClipperError
 
     path = tmp_path / "clipper.toml"
     path.write_text('[discord]\nallowed_user_ids = ["111111111111111111"]\n', encoding="utf-8")

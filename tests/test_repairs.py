@@ -5,8 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from clipper import checkup, cli, jsonstate, repairs
-from clipper.errors import ClipperError
+from clippa import checkup, cli, jsonstate, repairs
+from clippa.errors import ClipperError
 
 NOW = datetime(2026, 11, 20, 12, 0, tzinfo=UTC)
 
@@ -63,7 +63,7 @@ def test_a_run_out_of_retries_on_a_passing_error_is_would_fix_until_enabled(defa
 
 
 def test_retry_gives_one_attempt_back_and_the_worker_takes_it(defaults, tmp_path):
-    from clipper import worker
+    from clippa import worker
 
     cfg = in_tmp(defaults, tmp_path)
     cfg["checkup"]["fix"] = ["retry"]
@@ -234,7 +234,7 @@ def test_a_ledger_entry_without_a_time_is_skipped(defaults, tmp_path):
 
 
 def test_serve_runs_only_the_checks_with_repairs_and_the_sign_ins(defaults, tmp_path):
-    from clipper import serve
+    from clippa import serve
 
     assert repairs.checks() == ["streams", "housekeeping"]
     assert set(repairs.checks()) | set(checkup.ALERT_CHECKS) <= set(checkup.CHECKS)

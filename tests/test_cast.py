@@ -4,9 +4,9 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from clipper import cast, jsonstate, warroom
-from clipper.errors import ClipperError
-from clipper.thumbs import photos
+from clippa import cast, jsonstate, warroom
+from clippa.errors import ClipperError
+from clippa.thumbs import photos
 
 
 def unit(v):
@@ -250,8 +250,8 @@ def test_one_failing_channel_doesnt_stop_the_rest(cfg, monkeypatch):
 
 
 def test_labelled_photos_for_covers_and_known_figures(cfg, monkeypatch):
-    from clipper.prompts import figures
-    from clipper.thumbs.frames import photo_file, photo_labels
+    from clippa.prompts import figures
+    from clippa.thumbs.frames import photo_file, photo_labels
 
     monkeypatch.setattr(cast, "faces_in", lambda img, cfg: [face(unit(RNG.normal(size=128)), px=150)])
     kinds = ("web", "stream", "commons")                               # "web": image search, a pasted URL
@@ -270,7 +270,7 @@ def test_labelled_photos_for_covers_and_known_figures(cfg, monkeypatch):
     assert photo_file(tc, "Jer", "sad") == tc["_photos"]["Jer"]          # no such label: their best
     assert photo_file(tc, "Hasan Piker", "angry").name == "Hasan Piker.jpg"
     assert photo_file(tc, "Nobody", "angry") is None
-    from clipper.thumbs.editor import _clean_changes  # the war room's cover editor
+    from clippa.thumbs.editor import _clean_changes  # the war room's cover editor
     e = {"frames": [{}], "photo": "Jer", "photo_label": "angry"}
     assert _clean_changes(cfg, e, {"photo_label": "laughing"}) == {"photo_label": "laughing"}
     assert _clean_changes(cfg, e, {"photo": "hasan piker"}) == {"photo": "Hasan Piker", "photo_label": ""}

@@ -1,4 +1,4 @@
-from clipper import draw
+from clippa import draw
 
 
 def test_first_font_falls_back_to_the_file_name(tmp_path, monkeypatch):

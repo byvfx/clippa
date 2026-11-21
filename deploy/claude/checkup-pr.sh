@@ -8,7 +8,7 @@
 #   checkup-pr open <title> -   commit, push and open the PR; its body is stdin
 #
 # Claude may Edit/Write only inside that worktree (checkup.sh's rules). open refuses a change
-# outside clipper/, tests/, docs/wiki/ and CHANGELOG.md, or over MAX_LINES changed lines, and
+# outside clippa/, tests/, docs/wiki/ and CHANGELOG.md, or over MAX_LINES changed lines, and
 # anything in a dry run.
 set -eu
 WT=${CHECKUP_PR_DIR:-$HOME/checkup-fix}
@@ -38,7 +38,7 @@ check)
     trap 'rm -rf "$jail"' EXIT
     clean() { env -i PATH="/app/.venv/bin:/usr/local/bin:/usr/bin:/bin" HOME="$jail" LANG=C.UTF-8 \
         UV_CACHE_DIR="$jail/uv" "$@"; }
-    clean uv tool run ruff@0.17.3 check clipper tests   # the image has uv, not uvx
+    clean uv tool run ruff@0.17.3 check clippa tests   # the image has uv, not uvx
     clean /app/.venv/bin/python -m pytest -q -p no:cacheprovider
     ;;
 open)
@@ -52,8 +52,8 @@ open)
     # Against origin/main, index included: a retry after a commit (a failed push or gh) checks
     # the same change and goes on to push and open it.
     git diff --cached --quiet origin/main && die "nothing changed in $WT"
-    bad=$(git diff --cached --name-only origin/main | grep -Ev '^(clipper/|tests/|docs/wiki/|CHANGELOG\.md$)' || true)
-    [ -z "$bad" ] || die "only clipper/, tests/, docs/wiki/ and CHANGELOG.md: not $bad"
+    bad=$(git diff --cached --name-only origin/main | grep -Ev '^(clippa/|tests/|docs/wiki/|CHANGELOG\.md$)' || true)
+    [ -z "$bad" ] || die "only clippa/, tests/, docs/wiki/ and CHANGELOG.md: not $bad"
     n=$(git diff --cached --numstat origin/main | awk '{s += $1 + $2} END {print s + 0}')
     [ "$n" -le "$MAX_LINES" ] || die "$n changed lines, over $MAX_LINES: describe it in the DM instead"
     body=$(cat)

@@ -1,7 +1,7 @@
 import pytest
 
-from clipper.errors import ClipperError
-from clipper.media import source_file
+from clippa.errors import ClipperError
+from clippa.media import source_file
 
 
 def test_source_file_skips_downloads_in_progress(tmp_path):

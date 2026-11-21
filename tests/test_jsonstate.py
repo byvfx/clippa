@@ -1,6 +1,6 @@
 import pytest
 
-from clipper import jsonstate
+from clippa import jsonstate
 
 
 def test_load_and_read(tmp_path):

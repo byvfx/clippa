@@ -30,7 +30,7 @@ to it: `streams/`, `schedule.json`, `secrets/`, `logs/`, `faces/`, `voices/`, `n
 On the laptop, the user environment variable `CLIPPER_CONFIG` points at it
 (`//192.168.0.155/docker/clipper/clipper.toml`); clipper also reads it from the registry when a
 shell didn't inherit it, and `./clipper.toml` still wins if there is one. Prompts come with the
-code (`clipper/prompts/`, inside the package), the same on every machine.
+code (`clippa/prompts/`, inside the package), the same on every machine.
 
 `schedule.json` stores each video as `<stream>/<folder>/<name>.mp4`, relative to `[paths]
 streams`, so it means the same file on every machine. Older entries with a full path are mapped by

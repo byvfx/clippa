@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from clipper import preshow
+from clippa import preshow
 
 
 def run_check(monkeypatch, error, browser=""):
@@ -69,7 +69,7 @@ def test_dated_entries_below_a_grabbed_preshow_still_count(monkeypatch):
 
 def test_fetch_asks_for_an_mp4_even_from_a_single_file_format(defaults, tmp_path, monkeypatch):
     # the format's last fallback (b) can be one webm: remuxed, it still lands as source.mp4
-    from clipper import preshow
+    from clippa import preshow
 
     defaults["paths"]["streams"] = tmp_path
     defaults["show"]["channel"] = "kino"

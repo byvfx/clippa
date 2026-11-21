@@ -118,7 +118,7 @@ clips or Shorts.
 
 Which of a stream's segments go out is decided by its budget, and the budget ranks segments by
 chat heat, which barely tracks views ([what predicts views](Scheduling-and-uploads#what-predicts-views)).
-A segment score is a model's guess instead (`clipper/segscore.py`, prompt `segment_score_v1`):
+A segment score is a model's guess instead (`clippa/segscore.py`, prompt `segment_score_v1`):
 one call per stream sees every cut segment (title, summary, topic, kind, how much is someone
 else's video) and the show's track record, the median and best 7-day views of its earlier
 uploads on each topic, and scores each 1-10 against the show's typical upload, with one

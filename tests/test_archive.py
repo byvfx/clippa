@@ -2,7 +2,7 @@
 is a stand-in."""
 import json
 
-from clipper import archive
+from clippa import archive
 
 
 def test_youtube_listing_carries_approximate_dates(monkeypatch):

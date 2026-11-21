@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from clipper import twitch, ytvod
-from clipper.errors import ClipperError
+from clippa import twitch, ytvod
+from clippa.errors import ClipperError
 
 
 def test_twitch_parse_url():
@@ -46,7 +46,7 @@ def test_youtube_chat_rows():
 def test_fetch_picks_the_source(defaults, monkeypatch):
     from types import SimpleNamespace
 
-    from clipper import cli, kick
+    from clippa import cli, kick
 
     seen = []
     monkeypatch.setattr(twitch, "fetch", lambda *a: seen.append(("twitch", a[1])))
@@ -62,7 +62,7 @@ def test_fetch_picks_the_source(defaults, monkeypatch):
 def test_twitch_ytdlp_gets_a_private_netscape_copy(tmp_path, monkeypatch):
     from pathlib import Path
 
-    from clipper import ytdl
+    from clippa import ytdl
 
     jar = tmp_path / "twitch_cookies.txt"
     jar.write_text(json.dumps([{"domain": ".twitch.tv", "path": "/", "secure": True, "name": "auth-token",

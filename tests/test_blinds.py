@@ -8,8 +8,8 @@ from xml.sax.saxutils import escape
 
 import pytest
 
-from clipper import blinds, cli, config, news, people
-from clipper.errors import ClipperError
+from clippa import blinds, cli, config, news, people
+from clippa.errors import ClipperError
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -291,7 +291,7 @@ def test_a_backfill_reads_past_max_clues(cfg, monkeypatch):
 
 
 def test_the_clue_prompt_never_asks_for_a_name(cfg):
-    from clipper.prompts import Prompts
+    from clippa.prompts import Prompts
 
     text = Prompts(cfg).get("blinds_clues")
     assert "never name" in text.lower()
@@ -540,7 +540,7 @@ def test_blinds_never_reach_anything_published():
     allowed = {"blinds.py", "cli.py", "doctor.py",  # doctor reads the source settings only
                "warroom/blinds.py", "warroom/__init__.py", "warroom/httpd.py",  # the window and its routes
                "bot.py"}  # asks you in Discord
-    src = ROOT / "clipper"
+    src = ROOT / "clippa"
     readers = sorted(p.relative_to(src).as_posix() for p in src.rglob("*.py")
                      if p.relative_to(src).as_posix() not in allowed
                      and re.search(r"\bblinds\b\s*(import|\.)|import blinds|blinds\.sqlite", p.read_text(encoding="utf-8")))
@@ -555,7 +555,7 @@ def test_blinds_never_reach_anything_published():
 
 
 def test_doctor_checks_the_sources(cfg, monkeypatch):
-    from clipper import doctor
+    from clippa import doctor
 
     seen = []
     monkeypatch.setattr(doctor, "ok", lambda area, what, hint="": seen.append(("ok", area, what)))
@@ -580,7 +580,7 @@ def test_doctor_checks_the_sources(cfg, monkeypatch):
 def test_the_war_room_window(cfg, monkeypatch):
     import threading
 
-    from clipper import warroom
+    from clippa import warroom
 
     assert "/api/blinds" in warroom.GET_API
     assert {"/api/blinds/answer", "/api/blinds/paste", "/api/blinds/check"} <= set(warroom.POST_API)
@@ -597,7 +597,7 @@ def test_the_war_room_window(cfg, monkeypatch):
     assert hid["blinds"] == [] and hid["counts"]["waiting"] == 0 and hid["hidden"] == 2
     assert hid["counts"]["all"] == 3 and len(warroom.blinds_get(cfg, view="all")["blinds"]) == 3
     cfg["blinds"]["hide"] = []
-    window = sys.modules["clipper.warroom.blinds"]
+    window = sys.modules["clippa.warroom.blinds"]
     monkeypatch.setattr(window, "SHOWN", 1)
     capped = warroom.blinds_get(cfg)
     assert len(capped["blinds"]) == 1 and capped["more"] == 1
@@ -770,7 +770,7 @@ def test_the_alert_shows_the_blind_never_a_guess_of_clippers(cfg):
 
 
 def test_serve_runs_the_check_and_the_bot_asks(cfg):
-    from clipper import serve
+    from clippa import serve
 
     jobs = {j.name: j for j in serve.Serve(cfg).jobs()}
     assert jobs["blinds"].every_s == 0                                  # off by default
@@ -782,7 +782,7 @@ def test_serve_runs_the_check_and_the_bot_asks(cfg):
 
 
 def test_doctor_checks_the_alert_settings(cfg, monkeypatch):
-    from clipper import doctor
+    from clippa import doctor
 
     seen = []
     for kind in ("ok", "fail", "warn"):

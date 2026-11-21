@@ -6,9 +6,9 @@ from types import SimpleNamespace
 
 import pytest
 
-import clipper.record.recording as recording_mod
-from clipper import media
-from clipper.record import (
+import clippa.record.recording as recording_mod
+from clippa import media
+from clippa.record import (
     LIVE_CHAT,
     STATE,
     Part,
@@ -24,7 +24,7 @@ from clipper.record import (
     source_map,
     source_time,
 )
-from clipper.record.finalize import (
+from clippa.record.finalize import (
     _uncovered,
     join,
     make_meta,
@@ -32,7 +32,7 @@ from clipper.record.finalize import (
     run_on_finish,
 )
 
-finalize_mod = importlib.import_module("clipper.record.finalize")  # the name is the function
+finalize_mod = importlib.import_module("clippa.record.finalize")  # the name is the function
 
 T = datetime(2026, 10, 28, 20, 0, tzinfo=UTC).timestamp()
 

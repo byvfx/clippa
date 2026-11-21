@@ -15,7 +15,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.13.1 /uv /usr/local/bin/uv
 COPY --from=docker.io/tailscale/tailscale:v1.104.4 /usr/local/bin/tailscale /usr/local/bin/tailscale
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
-COPY clipper ./clipper
+COPY clippa ./clippa
 RUN uv sync --frozen --no-dev --no-editable --no-cache --extra modal --extra faces --extra discord
 
 # The config and every relative [paths] entry live in /data (the NAS's clipper folder);

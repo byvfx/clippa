@@ -6,8 +6,8 @@ import httplib2
 import pytest
 from googleapiclient.errors import HttpError
 
-from clipper import analytics, config, jsonstate, youtube
-from clipper.errors import ClipperError
+from clippa import analytics, config, jsonstate, youtube
+from clippa.errors import ClipperError
 
 NOW = datetime(2026, 11, 20, 8, tzinfo=UTC)
 

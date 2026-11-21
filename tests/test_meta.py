@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from clipper.meta import compilation_chapters, draft, make_srt
+from clippa.meta import compilation_chapters, draft, make_srt
 
 MC = {"srt_line_chars": 42, "srt_max_s": 6}
 

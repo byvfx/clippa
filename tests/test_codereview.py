@@ -2,8 +2,8 @@ import subprocess
 
 import pytest
 
-from clipper import codereview, llm
-from clipper.errors import ClipperError
+from clippa import codereview, llm
+from clippa.errors import ClipperError
 
 INFO = {"model": "openrouter:x-ai/grok-4.7", "files": 3, "cost": 0.0123, "left_out": ["big.py"],
         "sha": "abcdef1234", "digest": "0123456789abcdef"}
@@ -118,8 +118,8 @@ def repo(tmp_path):
                        check=True, capture_output=True)
 
     git("init", "-q", "-b", "main")
-    (tmp_path / "clipper").mkdir()
-    (tmp_path / "clipper" / "a.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "clippa").mkdir()
+    (tmp_path / "clippa" / "a.py").write_text("x = 1\n", encoding="utf-8")
     (tmp_path / "notes.md").write_text("old\n", encoding="utf-8")
     git("add", ".")
     git("commit", "-qm", "base")
@@ -133,20 +133,20 @@ def test_gather_sends_only_code_and_the_changed_files(repo, defaults):
     (root / "notes.md").write_text("new\n", encoding="utf-8")
     git("commit", "-qam", "notes only")
     assert codereview.gather(defaults, "main", "HEAD", root) == {}      # no code changed
-    (root / "clipper" / "a.py").write_text("x = 2\n", encoding="utf-8")
-    (root / "clipper" / "café.py").write_text("y = 1\n", encoding="utf-8")
+    (root / "clippa" / "a.py").write_text("x = 2\n", encoding="utf-8")
+    (root / "clippa" / "café.py").write_text("y = 1\n", encoding="utf-8")
     git("add", ".")
     git("commit", "-qm", "code")
     g = codereview.gather(defaults, "main", "HEAD", root)
-    assert g["names"] == ["clipper/a.py", "clipper/café.py"] and not g["left_out"]   # not quoted
-    assert "+x = 2" in g["user"] and "## clipper/café.py (whole file" in g["user"]
+    assert g["names"] == ["clippa/a.py", "clippa/café.py"] and not g["left_out"]   # not quoted
+    assert "+x = 2" in g["user"] and "## clippa/café.py (whole file" in g["user"]
     assert "notes.md" not in g["user"]
     head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=root, capture_output=True, text=True).stdout.strip()
     assert g["sha"] == head
-    (root / "clipper" / "a.py").write_text("x = 3\n", encoding="utf-8")   # not committed
+    (root / "clippa" / "a.py").write_text("x = 3\n", encoding="utf-8")   # not committed
     g2 = codereview.gather(defaults, "main", "HEAD", root)
     assert "x = 3" not in g2["user"] and g2["digest"] == g["digest"]     # the file as head has it
-    git("checkout", "--", "clipper/a.py")
+    git("checkout", "--", "clippa/a.py")
     (root / "notes.md").write_text("newer\n", encoding="utf-8")
     git("commit", "-qam", "more notes")
     assert codereview.gather(defaults, "main", "HEAD", root)["digest"] == g["digest"]   # docs: same diff
@@ -154,7 +154,7 @@ def test_gather_sends_only_code_and_the_changed_files(repo, defaults):
 
 def test_merging_main_in_keeps_the_digest_a_real_change_doesnt(repo, defaults):
     root, git = repo
-    a = root / "clipper" / "a.py"
+    a = root / "clippa" / "a.py"
     a.write_text("".join(f"line{i} = {i}\n" for i in range(30)), encoding="utf-8")
     git("commit", "-qam", "longer a.py")
     git("checkout", "-q", "main")
@@ -165,7 +165,7 @@ def test_merging_main_in_keeps_the_digest_a_real_change_doesnt(repo, defaults):
     before = codereview.gather(defaults, "main", "HEAD", root)
     git("checkout", "-q", "main")                    # main moves: lines above, in the same file
     a.write_text("import os\nimport re\n" + a.read_text(encoding="utf-8"), encoding="utf-8")
-    (root / "clipper" / "b.py").write_text("z = 1\n", encoding="utf-8")
+    (root / "clippa" / "b.py").write_text("z = 1\n", encoding="utf-8")
     git("add", ".")
     git("commit", "-qm", "main moves")
     git("checkout", "-q", "work")
@@ -180,7 +180,7 @@ def test_merging_main_in_keeps_the_digest_a_real_change_doesnt(repo, defaults):
 
 def test_a_binary_or_mode_change_has_a_digest_of_its_own(repo, defaults):
     root, git = repo
-    logo = root / "clipper" / "logo.png"
+    logo = root / "clippa" / "logo.png"
     logo.write_bytes(b"\x89PNG\0one")
     git("add", ".")
     git("commit", "-qm", "a logo")
@@ -188,10 +188,10 @@ def test_a_binary_or_mode_change_has_a_digest_of_its_own(repo, defaults):
     logo.write_bytes(b"\x89PNG\0two")
     git("commit", "-qam", "another logo")
     second = codereview.gather(defaults, "main", "HEAD", root)["digest"]
-    git("update-index", "--chmod=+x", "clipper/a.py")
+    git("update-index", "--chmod=+x", "clippa/a.py")
     git("commit", "-qm", "a.py runs")
     third = codereview.gather(defaults, "main", "HEAD", root)["digest"]
-    git("update-index", "--chmod=+x", "clipper/logo.png")   # added on the branch: "new file mode"
+    git("update-index", "--chmod=+x", "clippa/logo.png")   # added on the branch: "new file mode"
     git("commit", "-qm", "the logo runs")
     fourth = codereview.gather(defaults, "main", "HEAD", root)["digest"]
     assert len({first, second, third, fourth}) == 4
@@ -274,7 +274,7 @@ def run_with(monkeypatch, defaults, hub, g, review_text="### 1. a bug"):
     return calls
 
 
-G = {"user": "u", "names": ["clipper/a.py"], "left_out": [], "sha": "a" * 40, "digest": "d1"}
+G = {"user": "u", "names": ["clippa/a.py"], "left_out": [], "sha": "a" * 40, "digest": "d1"}
 
 
 def test_run_reviews_once_then_only_fills_issues_missing_it(monkeypatch, defaults):

@@ -8,7 +8,7 @@
 # (tests/test_changelog.py). paths-ignore can't make those exceptions.
 # Never excluded, because a test reads them: docs/wiki/ (tests/test_wiki.py checks the links
 # and the sidebar), docs/big-story.toml and clipper.example.toml (tests/test_config.py), and
-# clipper/prompts/*.md. "*.md" is the repo root only: `*` doesn't cross a `/`.
+# clippa/prompts/*.md. "*.md" is the repo root only: `*` doesn't cross a `/`.
 name: check
 
 on:
@@ -49,6 +49,6 @@ jobs:
       - name: Install (base dependencies + dev group + the discord extra for the bot's tests; no GPU extras)
         run: uv sync --locked --extra discord
       - name: Ruff
-        run: uv run ruff check clipper tests
+        run: uv run ruff check clippa tests
       - name: Tests
         run: uv run pytest -q

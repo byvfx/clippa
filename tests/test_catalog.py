@@ -7,8 +7,8 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from clipper import actions, catalog
-from clipper.errors import ClipperError
+from clippa import actions, catalog
+from clippa.errors import ClipperError
 
 TZ = "America/Los_Angeles"
 
@@ -158,7 +158,7 @@ def test_recheck_and_apply(cfg, one, monkeypatch):
     done = []
     monkeypatch.setattr(actions, "decide", lambda cfg, it, verb, who, text="", on=None: done.append((verb, who)) or row(decision="approved"))
     monkeypatch.setattr(actions, "replan", lambda cfg, it, verb, r: (r, "scheduled 2026-11-20 15:00"))
-    from clipper.warroom import review as wr
+    from clippa.warroom import review as wr
     monkeypatch.setattr(wr, "_before", lambda cfg, it: {})
     monkeypatch.setattr(wr, "remember", lambda *a: "u1")
     fresh["row"] = row(decision="approved")     # approved from Discord meanwhile
@@ -178,7 +178,7 @@ def test_a_retitle_undoes_as_a_title_edit(cfg, one, monkeypatch):
     monkeypatch.setattr(actions, "refresh", lambda cfg, it: row())
     monkeypatch.setattr(actions, "decide", lambda *a, **k: row(title="Blade Goes Bust"))
     monkeypatch.setattr(actions, "replan", lambda cfg, it, verb, r: (r, ""))
-    from clipper.warroom import review as wr
+    from clippa.warroom import review as wr
     monkeypatch.setattr(wr, "_before", lambda cfg, it: {"title": "Blade in Vegas"})
     kept = []
     monkeypatch.setattr(wr, "remember", lambda cfg, action, label, done: kept.append((action, label, done)) or "u1")
@@ -192,7 +192,7 @@ def test_a_slot_is_signed_by_the_chat(cfg, one, monkeypatch):
     item = actions.Item(cfg["paths"]["streams"] / "kick-1", "s02_blade", {})
     monkeypatch.setattr(actions, "resolve", lambda cfg, ref: item)
     monkeypatch.setattr(actions, "refresh", lambda cfg, it: row())
-    from clipper.warroom import review as wr
+    from clippa.warroom import review as wr
     seen = {}
     monkeypatch.setattr(wr, "do_slot", lambda cfg, body, who="", tag="": seen.update(who=who, tag=tag)
                         or {"plan": [], "failed": [], "done": 1})
@@ -266,7 +266,7 @@ def test_spend_cards_carry_an_estimate(cfg, monkeypatch):
 
 def test_story_argv_parses_as_meant():
     """A value that looks like an option stays a value for `clipper story new`."""
-    from clipper.cli import build_parser
+    from clippa.cli import build_parser
 
     a = build_parser().parse_args(["story", "new", "--days=3", "--person=-x", "--", "--url=https://a b"])
     assert (a.brief, a.days, a.person, a.url) == ("--url=https://a b", 3, ["-x"], [])
@@ -282,7 +282,7 @@ def test_spend_today_and_buddies(cfg, monkeypatch):
         {"ts": "2020-01-01T00:00:00+00:00", "kind": "llm", "stage": "chat", "usd": 9}]))
     assert catalog.spend_today(cfg, "chat") == {"chat": pytest.approx(0.01)}
     assert sum(catalog.spend_today(cfg).values()) == pytest.approx(0.51)
-    from clipper import services
+    from clippa import services
 
     monkeypatch.setattr(services, "recorder", lambda cfg: {"up": True, "age_s": 5, "live": ["kinocasinogaming"],
                                                            "channels": {}, "error": ""})
@@ -344,7 +344,7 @@ def test_bulk_by_name_needs_each_one_pinned_down(cfg, many, monkeypatch):
 
 
 def test_bulk_tap_rechecks_each_and_keeps_one_undo(cfg, many, monkeypatch):
-    from clipper.warroom import review as wr
+    from clippa.warroom import review as wr
 
     card = catalog.prepare(cfg, "bulk", {"verb": "approve", "stream": "kick-1"}).as_dict()
     decided, remembered = [], []
@@ -412,7 +412,7 @@ def test_stream_named_by_show_and_day(cfg):
 
 
 def test_undo_is_a_card_for_the_last_action(cfg, monkeypatch):
-    from clipper.warroom import review as wr
+    from clippa.warroom import review as wr
 
     acts = [{"id": "b", "at": "2026-11-17T23:00:00+00:00", "label": "approve 2 items (chat)", "undone": False,
              "uploaded": 0, "n": 2, "action": "approve"}]

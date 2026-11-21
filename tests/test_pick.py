@@ -1,7 +1,7 @@
 import pytest
 
-from clipper import pick
-from clipper.errors import ClipperError
+from clippa import pick
+from clippa.errors import ClipperError
 
 PC = {"span_s": 600, "max_span_s": 2700, "max_overlap": 0.5}
 CLOCK = pick.Clock({})   # no recording parts: the video's clock
@@ -47,7 +47,7 @@ def test_keep_new_skips_moments_already_picked(capsys):
 
 def test_pick_numbers_survive_a_rescore():
     """#77 L13: a re-score that drops or adds picks doesn't shift the vNN of the others."""
-    from clipper.states import carry_numbers, numbered_picks
+    from clippa.states import carry_numbers, numbered_picks
     old = [{"id": "w01"}, {"id": "t04"}, {"id": "w07"}, {"id": "h01", "n": 4}]  # file from before "n"
     assert [n for n, _ in numbered_picks(old)] == [1, 2, 3, 4]
     new, hist = carry_numbers({"picks": old},
@@ -65,7 +65,7 @@ def test_a_rescore_keeps_hand_picks(tmp_path):
     import json
     from types import SimpleNamespace
 
-    from clipper import scoring
+    from clippa import scoring
     old = {"pass_a": [{"id": "w01", "status": "kept"}, {"id": "h01", "source": "hand", "status": "kept"}],
            "pass_b": {"picks": [{"id": "w01", "title": "a"}, {"id": "h01", "title": "b", "n": 2}]}}
     (tmp_path / "candidates.json").write_text(json.dumps(old), encoding="utf-8")

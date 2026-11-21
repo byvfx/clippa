@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from clipper import faces, jsonstate
-from clipper.errors import ClipperError
+from clippa import faces, jsonstate
+from clippa.errors import ClipperError
 
 FC = {"cluster": 0.4, "min_faces": 3}
 

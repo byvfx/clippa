@@ -4,11 +4,11 @@ import pytest
 from conftest import ROOT
 from PIL import Image
 
-from clipper import jsonstate
-from clipper.errors import ClipperError
-from clipper.prompts import Prompts
-from clipper.thumbs import enquirer, pick
-from clipper.thumbs import stage as thumbs_stage
+from clippa import jsonstate
+from clippa.errors import ClipperError
+from clippa.prompts import Prompts
+from clippa.thumbs import enquirer, pick
+from clippa.thumbs import stage as thumbs_stage
 
 
 class Words:

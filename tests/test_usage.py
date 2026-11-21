@@ -1,9 +1,9 @@
-"""The providers' own numbers for the war room's API usage panel (clipper/usage.py, #72)."""
+"""The providers' own numbers for the war room's API usage panel (clippa/usage.py, #72)."""
 from __future__ import annotations
 
 import json
 
-from clipper import usage
+from clippa import usage
 
 
 def test_cost_rows_adds_cents_by_day_model_and_type():

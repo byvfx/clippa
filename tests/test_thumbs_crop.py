@@ -1,6 +1,6 @@
 from PIL import Image
 
-from clipper import draw
+from clippa import draw
 
 FACE = {"x": 0.55, "y": 0.35, "width": 0.12, "height": 0.2}  # a face right of center
 SIZE = (470, 594)

@@ -1,11 +1,11 @@
-"""clipper/keys.py and the war room's Keys window: where each key comes from, the provider's
+"""clippa/keys.py and the war room's Keys window: where each key comes from, the provider's
 answer, the streams held for a rejected key, and never a value in what comes back."""
 import json
 
 import pytest
 
-from clipper import jsonstate, keys, warroom
-from clipper.errors import ClipperError
+from clippa import jsonstate, keys, warroom
+from clippa.errors import ClipperError
 
 SECRET = "sk-test-do-not-show-0123456789"
 

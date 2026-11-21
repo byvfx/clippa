@@ -1,4 +1,4 @@
-from clipper import setup
+from clippa import setup
 
 
 def test_control_station_roles():
@@ -13,7 +13,7 @@ def test_control_station_roles():
 
 
 def test_control_station_keys_only_warn(defaults, monkeypatch):
-    from clipper import doctor
+    from clippa import doctor
 
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv(defaults["review"]["token_env"], raising=False)

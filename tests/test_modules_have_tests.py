@@ -1,9 +1,9 @@
-"""Every module in clipper/ is named by some test, so a new module arrives with at least one
+"""Every module in clippa/ is named by some test, so a new module arrives with at least one
 test of its own, and the list of modules without one can only shrink. The audit of 2026-11-08
 found 21 such modules; STILL_UNTESTED is what is left.
 
-A test names a module by importing it (`from clipper import x`, `from clipper.pkg import x`,
-`import clipper.pkg.x`) or, for a package such as warroom, by using something the package
+A test names a module by importing it (`from clippa import x`, `from clippa.pkg import x`,
+`import clippa.pkg.x`) or, for a package such as warroom, by using something the package
 re-exports (`warroom.faces_get(...)`, `warroom.CAST_JOB`): the name is traced back to the
 submodule that defines it. A package import alone names nothing inside the package, so a new
 panel module no test touches fails here (Copilot on #177)."""
@@ -15,23 +15,23 @@ import re
 from conftest import ROOT
 
 # Modal images: they run on Modal without the package and can't be imported here.
-RUNS_ELSEWHERE = {"clipper.modal_app", "clipper.modal_lipsync"}
+RUNS_ELSEWHERE = {"clippa.modal_app", "clippa.modal_lipsync"}
 # Take a name off this set when you give the module a test. Never add one.
 STILL_UNTESTED = {
-    "clipper.cardsync", "clipper.modalmon", "clipper.oauth", "clipper.perform", "clipper.rumble",
-    "clipper.speakers", "clipper.tiktok", "clipper.record.client", "clipper.record.watch",
-    "clipper.thumbs.classic", "clipper.warroom.covers", "clipper.warroom.lowres", "clipper.warroom.search",
+    "clippa.cardsync", "clippa.modalmon", "clippa.oauth", "clippa.perform", "clippa.rumble",
+    "clippa.speakers", "clippa.tiktok", "clippa.record.client", "clippa.record.watch",
+    "clippa.thumbs.classic", "clippa.warroom.covers", "clippa.warroom.lowres", "clippa.warroom.search",
 }
 
 
 def modules() -> set[str]:
     out = set()
-    for p in (ROOT / "clipper").rglob("*.py"):
+    for p in (ROOT / "clippa").rglob("*.py"):
         parts = list(p.relative_to(ROOT).with_suffix("").parts)
         if parts[-1] == "__init__":
             parts = parts[:-1]
         out.add(".".join(parts))
-    out.discard("clipper")
+    out.discard("clippa")
     return out
 
 
@@ -52,19 +52,19 @@ def imports_in(tree: ast.AST, all_modules: set[str], packages: set[str]) -> tupl
     """The clipper modules one test file imports, and the packages it binds to a local name."""
     named, aliases = set(), {}
     for n in ast.walk(tree):
-        if isinstance(n, ast.ImportFrom) and n.module and n.module.split(".")[0] == "clipper":
+        if isinstance(n, ast.ImportFrom) and n.module and n.module.split(".")[0] == "clippa":
             named.add(n.module)
             for a in n.names:
                 full = f"{n.module}.{a.name}"
                 if full in all_modules:
                     named.add(full)
-                elif n.module in packages:   # from clipper.warroom import faces_get
+                elif n.module in packages:   # from clippa.warroom import faces_get
                     named.add(reexports(n.module).get(a.name, n.module))
                 if full in packages:
                     aliases[a.asname or a.name] = full
         elif isinstance(n, ast.Import):
             for a in n.names:
-                if a.name.split(".")[0] == "clipper":
+                if a.name.split(".")[0] == "clippa":
                     named.add(a.name)
                     if a.name in packages:
                         aliases[a.asname or a.name.split(".")[-1]] = a.name

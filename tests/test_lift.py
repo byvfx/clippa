@@ -4,8 +4,8 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from clipper import analytics, cli, config, jsonstate, lift
-from clipper.errors import ClipperError
+from clippa import analytics, cli, config, jsonstate, lift
+from clippa.errors import ClipperError
 
 T0 = datetime(2026, 10, 1, tzinfo=UTC)
 

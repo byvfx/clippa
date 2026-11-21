@@ -1,8 +1,8 @@
-"""The daily digest DM (clipper/digest.py), built from the war room's overview."""
+"""The daily digest DM (clippa/digest.py), built from the war room's overview."""
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from clipper import digest, warroom
+from clippa import digest, warroom
 
 
 def test_digest_counts_today_tomorrow_the_queue_and_stuck_streams(defaults, monkeypatch):

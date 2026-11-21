@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from clipper import alerts, config, review
+from clippa import alerts, config, review
 
 
 def test_env_names_and_the_new_spelling_wins(monkeypatch):
@@ -98,7 +98,7 @@ def test_bot_notes_in_either_prefix_are_not_reviewer_comments():
 
 def test_card_buttons_in_either_prefix():
     pytest.importorskip("discord")
-    from clipper import bot
+    from clippa import bot
 
     pat = bot.CardButton.__discord_ui_compiled_template__
     for cid in ("clipper:approve:kick-1/c01", "clippa:approve:kick-1/c01"):
@@ -153,7 +153,7 @@ def test_an_empty_new_spelling_gives_way_for_settings_too(tmp_path, monkeypatch,
 
 
 def test_the_news_block_names_the_layer_that_is_set(tmp_path, monkeypatch):
-    from clipper import news
+    from clippa import news
 
     monkeypatch.setattr(config, "user_env", lambda name: "")
     (tmp_path / "clippa.toml").write_text("", encoding="utf-8")
@@ -170,7 +170,7 @@ def test_the_news_block_names_the_layer_that_is_set(tmp_path, monkeypatch):
 
 def test_every_review_card_button_is_one_the_bot_answers():
     pytest.importorskip("discord")
-    from clipper import bot, notify
+    from clippa import bot, notify
 
     class Row(dict):
         def __missing__(self, key):

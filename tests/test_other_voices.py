@@ -1,5 +1,5 @@
-from clipper import actions, notify, review
-from clipper.transcript import outside_voice_s
+from clippa import actions, notify, review
+from clippa.transcript import outside_voice_s
 
 CAST = ["Andy", "PPP"]
 

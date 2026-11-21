@@ -9,7 +9,7 @@ plan includes $30 of compute a month. Measured on that 8 h stream: L40S (default
    `.venv/Scripts/python.exe -m modal token new`, which writes `~/.modal.toml`).
 2. `uv sync --extra modal` (add it to the other extras you use; `--extra gpu` isn't needed for
    this backend).
-3. `clipper transcribe --deploy` builds and deploys the app in `clipper/modal_app.py`. The
+3. `clipper transcribe --deploy` builds and deploys the app in `clippa/modal_app.py`. The
    first build takes several minutes (it bakes the models into the image); re-run it after
    changing that file.
 4. In clipper.toml (or `CLIPPER_TRANSCRIBE_BACKEND=modal` on one machine):

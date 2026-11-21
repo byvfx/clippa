@@ -1,11 +1,11 @@
-"""#258 B: the segment score (clipper/segscore.py) and its backtest."""
+"""#258 B: the segment score (clippa/segscore.py) and its backtest."""
 import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from clipper import cli, config, jsonstate, lift, segments, segscore
-from clipper.errors import ClipperError
+from clippa import cli, config, jsonstate, lift, segments, segscore
+from clippa.errors import ClipperError
 
 T0 = datetime(2026, 10, 1, tzinfo=UTC)
 
@@ -287,7 +287,7 @@ def test_cli_flags(share, monkeypatch):
 
 
 def test_the_prompt_fills(share):
-    from clipper.prompts import Prompts
+    from clippa.prompts import Prompts
 
     text = Prompts(config.for_show(share, "kino")).get("segment_score")
     assert "Score every segment" in text and "{" not in text

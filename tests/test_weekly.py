@@ -7,10 +7,10 @@ from pathlib import Path
 
 import pytest
 
-from clipper import jsonstate, prompts, weekly
-from clipper.errors import ClipperError
-from clipper.weekly import draft, gather, style
-from clipper.weekly.render import Fonts, Renderer
+from clippa import jsonstate, prompts, weekly
+from clippa.errors import ClipperError
+from clippa.weekly import draft, gather, style
+from clippa.weekly.render import Fonts, Renderer
 
 PROMPTS = prompts.PACKAGED
 
@@ -129,10 +129,10 @@ def test_square_canvas_is_passed_not_global(renderer):
 
 
 def test_found_faces_come_from_faces_json_and_go_first(cfg, tmp_path, monkeypatch):
-    from clipper import faces as face_mod
-    from clipper import jsonstate
-    from clipper.weekly import gather
-    from clipper.weekly.faces import Faces
+    from clippa import faces as face_mod
+    from clippa import jsonstate
+    from clippa.weekly import gather
+    from clippa.weekly.faces import Faces
 
     sdir = tmp_path / "kick-1"
     sdir.mkdir()
@@ -160,7 +160,7 @@ def test_found_faces_come_from_faces_json_and_go_first(cfg, tmp_path, monkeypatc
 
 
 def test_a_new_worker_gets_the_faces_extra():
-    from clipper import setup
+    from clippa import setup
     assert "faces" in setup.extras_for(["worker"], "modal") and "faces" in setup.extras_for(["serve"], "modal")  # Cast window
     assert setup.extras_for(["bot"], "modal") == ["discord"]  # the bot is only Discord now
     assert setup.EXTRA_MODULE["faces"] == "cv2"
@@ -169,8 +169,8 @@ def test_a_new_worker_gets_the_faces_extra():
 def test_photos_by_label_for_people_only_talked_about(cfg, tmp_path):
     from PIL import Image
 
-    from clipper import jsonstate
-    from clipper.weekly.faces import Faces
+    from clippa import jsonstate
+    from clippa.weekly.faces import Faces
 
     jer = tmp_path / "photos" / "Jer"
     jer.mkdir(parents=True)
@@ -193,7 +193,7 @@ def test_photos_by_label_for_people_only_talked_about(cfg, tmp_path):
 
 
 def test_a_photo_covers_fallback_frame_is_not_a_face(cfg):
-    from clipper.weekly.faces import Faces
+    from clippa.weekly.faces import Faces
 
     real = {"person": "Jer", "key": "s01", "frame": "a.jpg", "face": {}, "size": 0.3, "photo": ""}
     fallback = {"person": "Bakker", "key": "s02", "frame": "b.jpg", "face": {}, "size": 0.5, "photo": "Bakker"}

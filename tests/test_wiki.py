@@ -58,11 +58,11 @@ def test_anchor_slugs():
 
 
 def test_code_links_resolve():
-    """Every `wiki.page("Name", "heading")` in clipper/ names a page and heading that exist."""
+    """Every `wiki.page("Name", "heading")` in clippa/ names a page and heading that exist."""
     pages = _pages()
     call = re.compile(r"""wiki\.page\(\s*["']([^"']+)["'](?:\s*,\s*["']([^"']*)["'])?\s*\)""")
     bad, seen = [], 0
-    for path in (ROOT / "clipper").rglob("*.py"):
+    for path in (ROOT / "clippa").rglob("*.py"):
         for name, section in call.findall(path.read_text(encoding="utf-8")):
             seen += 1
             if name not in pages:
@@ -73,7 +73,7 @@ def test_code_links_resolve():
 
 
 def test_page_addresses_name_the_wiki():
-    from clipper import wiki
+    from clippa import wiki
 
     assert wiki.page("Speakers") == "https://github.com/byvfx/clipper/wiki/Speakers"
     assert wiki.page("War-room", "faces") == "https://github.com/byvfx/clipper/wiki/War-room#faces"

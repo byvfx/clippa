@@ -1,7 +1,7 @@
 """review.sync: Kitsu decisions and columns into review.json (a fake gazu; offline)."""
 import pytest
 
-from clipper import jsonstate, review
+from clippa import jsonstate, review
 
 STATUSES = [{"id": "st-done", "short_name": "done"}, {"id": "st-retake", "short_name": "retake"},
             {"id": "st-todo", "short_name": "todo"}]

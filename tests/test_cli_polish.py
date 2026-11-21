@@ -3,8 +3,8 @@ import json
 
 import pytest
 
-from clipper import cli, completion, config, jsonstate
-from clipper.errors import ClipperError
+from clippa import cli, completion, config, jsonstate
+from clippa.errors import ClipperError
 
 TOML = """
 [meta]
@@ -144,7 +144,7 @@ def test_completion_has_positional_choices_and_every_depth():
 
 
 def test_review_list_json_keeps_stdout_for_the_document(cfg, monkeypatch, capsys):
-    from clipper import actions
+    from clippa import actions
 
     def noisy(*a, **k):
         print("thumbnail text: 2 updated")   # what a sync can print

@@ -3,8 +3,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from clipper import actions, schedule
-from clipper.errors import ClipperError
+from clippa import actions, schedule
+from clippa.errors import ClipperError
 
 ITEM = SimpleNamespace(stream_dir="s", key="k")
 

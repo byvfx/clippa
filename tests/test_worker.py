@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from clipper import jsonstate, stages, worker
+from clippa import jsonstate, stages, worker
 
 SLOW = ["signals", "transcribe", "score", "segments", "cut", "meta", "thumbs", "shorts", "review"]
 
@@ -146,7 +146,7 @@ def test_snapshot_retries_a_dict_changing_size(monkeypatch):
 
 
 def test_every_stage_has_a_cli_command():
-    from clipper import stages
+    from clippa import stages
     for st in stages.STAGES:
         for wc in ({"fast_lane": True, "notify": True}, {"fast_lane": False, "notify": False}):
             args = stages.argv(st.name, "S", wc)
@@ -157,7 +157,7 @@ def test_every_stage_has_a_cli_command():
 def test_run_from_follows_the_planned_order():
     """`run --from cut` without the fast lane redoes Shorts (cut from cut's clips);
     `--from shorts` doesn't recut."""
-    from clipper import stages
+    from clippa import stages
     off, on = cfg(fast_lane=False)["worker"], cfg()["worker"]
     assert stages.from_stage("cut", off)[:2] == ["cut", "shorts"]
     assert "cut" not in stages.from_stage("shorts", off)
@@ -167,7 +167,7 @@ def test_run_from_follows_the_planned_order():
 
 def test_run_passes_a_show_pin_to_its_stages(tmp_path, defaults, monkeypatch):
     """`clipper --show c404 run <stream>`: each stage child gets --show c404 too."""
-    from clipper import config
+    from clippa import config
     cfg = {**defaults, "shows": {"c404": {"channels": ["don"], "overrides": {}}}}
     calls = []
     monkeypatch.setattr(worker.subprocess, "call", lambda cmd, **kw: calls.append(cmd) or 0)
@@ -210,7 +210,7 @@ def test_a_forced_run_passes_force_to_the_stages_that_refuse_reruns(defaults):
 
 def test_a_pre_show_is_known_by_its_meta_kind(tmp_path):
     """states.is_preshow: the worker and segments ask it, preshow.py no longer owns it."""
-    from clipper.states import PRESHOW_PREFIX, is_preshow
+    from clippa.states import PRESHOW_PREFIX, is_preshow
 
     d = tmp_path / f"{PRESHOW_PREFIX}abc123"
     d.mkdir()
@@ -241,7 +241,7 @@ def test_a_rejected_key_holds_the_stream_until_a_key_changes(tmp_path, defaults,
     """A stage that exits KEY_REJECTED (a provider's 401): the attempt is given back, and
     pending() leaves the stream alone until the keys' fingerprint changes, then takes it at
     once instead of waiting out retry_minutes."""
-    from clipper.errors import KEY_REJECTED
+    from clippa.errors import KEY_REJECTED
 
     for env in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "OPENROUTER_API_KEY", "LOCAL_LLM_API_KEY"):
         monkeypatch.delenv(env, raising=False)
@@ -271,7 +271,7 @@ def test_a_rejected_key_holds_the_stream_until_a_key_changes(tmp_path, defaults,
 def test_the_held_fingerprint_is_the_one_the_stage_started_with(tmp_path, defaults, monkeypatch):
     """Copilot on #281: a key replaced while the stage ran is a change, so the stream is taken
     again at once instead of held on the new key's fingerprint."""
-    from clipper.errors import KEY_REJECTED
+    from clippa.errors import KEY_REJECTED
 
     for env in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "OPENROUTER_API_KEY", "LOCAL_LLM_API_KEY"):
         monkeypatch.delenv(env, raising=False)
@@ -291,7 +291,7 @@ def test_the_held_fingerprint_is_the_one_the_stage_started_with(tmp_path, defaul
 
 
 def test_a_rejected_key_passes_through_the_handlers_that_swallow_errors():
-    from clipper.errors import KeyRejected, key_rejected
+    from clippa.errors import KeyRejected, key_rejected
 
     auth = type("AuthenticationError", (Exception,), {"__module__": "anthropic._exceptions"})
     assert key_rejected(KeyRejected("x")) and key_rejected(auth("y"))

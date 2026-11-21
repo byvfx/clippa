@@ -1,5 +1,5 @@
-"""The segments stage (clipper/segments.py): the pure parts around the model call."""
-from clipper import segments
+"""The segments stage (clippa/segments.py): the pure parts around the model call."""
+from clippa import segments
 
 
 def test_slug_is_a_safe_file_name():

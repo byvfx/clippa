@@ -4,10 +4,10 @@ from pathlib import Path
 import pytest
 from conftest import ROOT
 
-from clipper import prompts
-from clipper.errors import ClipperError
+from clippa import prompts
+from clippa.errors import ClipperError
 
-PROMPTS = prompts.PACKAGED      # clipper/prompts/, inside the package
+PROMPTS = prompts.PACKAGED      # clippa/prompts/, inside the package
 
 
 def test_cast_names():
@@ -53,7 +53,7 @@ def test_the_gambling_rule_is_a_show_setting_from_v7(defaults):
 
 
 def test_a_scan_made_with_other_settings_is_scanned_again(defaults, tmp_path):
-    from clipper import jsonstate, scoring
+    from clippa import jsonstate, scoring
 
     class Fake:
         calls = 0
@@ -79,11 +79,11 @@ def test_a_scan_made_with_other_settings_is_scanned_again(defaults, tmp_path):
 
 
 def test_every_prompt_is_registered_and_its_default_version_is_on_file(defaults):
-    """prompts.VERSIONS is the one list: every prompt family in clipper/prompts/ (the rule files aside)
+    """prompts.VERSIONS is the one list: every prompt family in clippa/prompts/ (the rule files aside)
     is in it, every name the code asks for is in it, and each one's default version exists."""
     families = {f for f in latest() if not f.startswith(prompts.RULE_FILES)}
     assert families == set(prompts.VERSIONS), families ^ set(prompts.VERSIONS)
-    code = "\n".join(p.read_text(encoding="utf-8") for p in (ROOT / "clipper").rglob("*.py"))
+    code = "\n".join(p.read_text(encoding="utf-8") for p in (ROOT / "clippa").rglob("*.py"))
     asked = set(re.findall(r'\b(?:prompts|retry|layout_prompts)\.get\("([a-z_]+)"', code))
     assert asked <= set(prompts.VERSIONS), asked - set(prompts.VERSIONS)
     for name in prompts.VERSIONS:

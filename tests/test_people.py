@@ -3,8 +3,8 @@ from collections import Counter
 
 import pytest
 
-from clipper import investigate, jsonstate, people, story
-from clipper.errors import ClipperError
+from clippa import investigate, jsonstate, people, story
+from clippa.errors import ClipperError
 
 
 @pytest.fixture

@@ -1,4 +1,4 @@
-`clipper/swarm.py` is the search `clipper story` (#84) and `investigate check` use: many
+`clippa/swarm.py` is the search `clipper story` (#84) and `investigate check` use: many
 small searches at once, each free to follow up on what it finds. It is library code, not a command.
 A planner (Sonnet) turns the goal (a story brief, a lead) into up to 16 first tasks; workers (Haiku,
 8 at a time) each run one tool in code and read its numbered results: YouTube search (bounded to

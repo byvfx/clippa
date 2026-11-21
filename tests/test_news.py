@@ -6,8 +6,8 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from clipper import config, jsonstate, news, warroom
-from clipper.errors import ClipperError
+from clippa import config, jsonstate, news, warroom
+from clippa.errors import ClipperError
 
 TOML = '''
 [paths]

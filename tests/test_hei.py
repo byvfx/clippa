@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from clipper import archive, hei
-from clipper.errors import ClipperError
+from clippa import archive, hei
+from clippa.errors import ClipperError
 
 M3U8 = "https://stream.mux.com/AbCdEfGhIjKlMnOpQrStUv012.m3u8"
 

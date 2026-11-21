@@ -1,10 +1,10 @@
-"""clipper/daemon.py: the heartbeat serve and the bot write, read from any machine."""
+"""clippa/daemon.py: the heartbeat serve and the bot write, read from any machine."""
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from clipper import daemon, jsonstate
-from clipper.errors import ClipperError
+from clippa import daemon, jsonstate
+from clippa.errors import ClipperError
 
 
 def cfg_at(tmp_path) -> dict:

@@ -4,7 +4,7 @@ import pytest
 from conftest import ROOT
 from test_story import transcribed
 
-from clipper import (
+from clippa import (
     config,
     jsonstate,
     media,
@@ -15,8 +15,8 @@ from clipper import (
     story,
     story_edit,
 )
-from clipper.archive import save_catalog
-from clipper.errors import ClipperError
+from clippa.archive import save_catalog
+from clippa.errors import ClipperError
 
 TOML = """
 [shows.kino]
@@ -181,7 +181,7 @@ def test_cut_writes_one_segment_with_its_words_chapters_and_sources(cfg, planned
     assert made == []
     calls = []
     monkeypatch.setattr(meta, "run", lambda sdir, cfg, missing=False: calls.append(("meta", missing)))
-    from clipper import thumbs
+    from clippa import thumbs
     monkeypatch.setattr(thumbs, "run", lambda sdir, cfg, force=False, missing=False:
                         calls.append(("thumbs", force, missing)))
     monkeypatch.setattr(review, "publish", lambda sdir, cfg, force=False, only=None: calls.append(("review",)))
@@ -247,7 +247,7 @@ def test_a_storys_credit_episode_and_retake(cfg, tmp_path):
 
 
 def test_a_storys_video_is_never_one_of_our_streams(cfg, tmp_path):
-    from clipper import investigate
+    from clippa import investigate
 
     for sid in ("kick-1", "story-dsp"):
         transcribed(tmp_path / "streams" / sid, "dsp credit score", channel="kinocasinogaming")
@@ -283,7 +283,7 @@ def test_plan_writes_the_narration_from_the_dossier(cfg, planned):
 
 
 def test_cut_reads_the_narration_as_cards(cfg, planned, monkeypatch):
-    from clipper import narrate
+    from clippa import narrate
 
     cfg["story"].update(show="kino", voice_id="narrator1", tts_settings={"speed": 1.0})
     cfg["narrate"]["voice_id"] = "mother-moo"
