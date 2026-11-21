@@ -30,5 +30,12 @@
     { "action": "shell", "resource": "clipper segments*", "effect": "ask" },
     { "action": "shell", "resource": "clipper meta*", "effect": "ask" },
     { "action": "shell", "resource": "clipper thumbs*", "effect": "ask" }
-  ]
+  ],
+  "agents": {
+    "oss-reviewer": {
+      "description": "DeepSeek code reviewer (free tier)",
+      "model": "openrouter/deepseek/deepseek-v4.1-flash-1017",
+      "permissions": []
+    }
+  }
 }
