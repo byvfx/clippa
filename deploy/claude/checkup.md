@@ -24,6 +24,12 @@ go in the DM. The steps, exactly:
     What broke (the finding, the log lines), the cause, the fix, how the test shows it.
     EOF
 
+The repository (byvfx/clipper) and its PRs are public. Nothing of this install goes in the
+code, the tests or the PR body: no secrets or tokens, no IPs or hostnames, no Discord or Kitsu
+ids, no paths under /data. Describe a log line rather than paste it, and use placeholders in tests.
+Never write a test or script that runs git, gh or the network: `check` runs them with no
+credentials and they would fail.
+
 If `check` won't pass in a few tries, or `open` refuses (only clipper/, tests/, docs/wiki/ and
 CHANGELOG.md; at most 200 changed lines), give up on the PR and describe the fix in the DM. One
 PR a run. Never merge it or ask for it to be merged: the user reviews, merges and deploys. Put

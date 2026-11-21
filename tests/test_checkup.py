@@ -262,27 +262,31 @@ def test_signins_from_cookies_files_and_tokens(defaults, tmp_path):
     _netscape(yt, [(".youtube.com", "SID", ts + 200 * 86400)])
     os.utime(yt, (ts - 30 * 3600, ts - 30 * 3600))
     assert "signin:youtube-export" in keys(checkup.check_signins(cfg, NOW))
+    cfg["youtube"]["cookies_from_browser"] = "firefox:clipper"   # doctor checks the profile instead
+    assert "signin:youtube-export" not in keys(checkup.check_signins(cfg, NOW))
     cfg["checkup"]["signin_days"] = 0
     assert checkup.check_signins(cfg, NOW) == []
 
 
 def test_repeated_errors_group_lines_that_differ_only_in_ids():
-    since = datetime(2026, 11, 9, 0, 0).astimezone()
+    tz = checkup.ZoneInfo("America/Los_Angeles")
+    since = datetime(2026, 11, 9, 0, 0, tzinfo=tz)
     text = "\n".join([
         *(f"2026-11-09 1{i}:00:00 ERROR   clipper.serve: upload kick-13{i}/v0{i}_t1 failed: 'quota {i}'"
           for i in range(5)),
         "2026-11-08 10:00:00 ERROR   clipper.serve: upload kick-1/v01 failed: 'old'",
         "2026-11-09 12:00:00 WARNING clipper.serve: upload kick-1/v01 failed: 'a warning'",
         "2026-11-09T12:00:00 ERROR worker: once"])
-    (row,) = checkup.repeated_errors(text, since, 5)
+    (row,) = checkup.repeated_errors(text, since, 5, tz)
     assert row[1] == 5 and row[2].endswith("'quota 4'")
-    assert checkup.repeated_errors(text, since, 6) == []
+    assert checkup.repeated_errors(text, since, 6, tz) == []
+    assert checkup.repeated_errors(text, since + timedelta(hours=11), 1, tz)[0][1] == 4   # 11:00 is before
 
 
 def test_logs_check_reads_serves_and_the_bots_log(defaults, tmp_path):
     cfg = in_tmp(defaults, tmp_path)
     now = datetime.now(UTC)
-    t = now.astimezone().replace(tzinfo=None) - timedelta(minutes=5)
+    t = now.astimezone(checkup.ZoneInfo(cfg["schedule"]["timezone"])).replace(tzinfo=None) - timedelta(minutes=5)
     cfg["paths"]["serve_log"] = tmp_path / "serve.log"
     cfg["paths"]["bot_log"] = tmp_path / "missing.log"
     (tmp_path / "serve.log").write_text("".join(
@@ -303,7 +307,7 @@ def test_approvals_finds_an_item_the_plan_never_saw(defaults, tmp_path):
     stream(cfg, "kick-1", files={"review.json": {
         "v01": {"status": "approved", "updated_at": old}, "s02": {"status": "approved", "updated_at": old},
         "v03": {"status": "approved", "updated_at": old}, "v04": {"status": "approved", "updated_at": new},
-        "v05": {"status": "wfa", "updated_at": old}}})
+        "v05": {"status": "wfa", "updated_at": old}, "v06": {"status": "approved"}}})
     (f,) = checkup.check_approvals(cfg, NOW)
     assert f["key"] == "approvals:unplanned" and f["text"].endswith("kick-1/v03")
     jsonstate.write(cfg["paths"]["schedule"], {"generated_at": iso(-timedelta(hours=4)), "entries": []})

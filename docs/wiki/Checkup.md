@@ -102,12 +102,14 @@ nightly run may fix it as one PR, through `checkup-pr` (`deploy/claude/checkup-p
 
 - `checkup-pr start <slug>` makes a worktree at `~/checkup-fix` on a branch `checkup/<MMDD>-<slug>`
   off `origin/main`. Claude's Edit and Write work only there, never in the clone.
-- `checkup-pr check` runs ruff and the tests there, as CI does.
+- `checkup-pr check` runs ruff and the tests there, as CI does, with no token, key or login in
+  their environment (the tests are code the run just wrote: none of them can push, merge or spend).
 - `checkup-pr open "<title>" -` commits, pushes and opens the PR (its body on stdin). It refuses
   a change outside `clipper/`, `tests/`, `docs/wiki/` and `CHANGELOG.md`, one over 200 changed
   lines (`CHECKUP_PR_MAX_LINES`), a second PR in the same run, and anything in a `--dry-run`.
 
-The DM links the PR under its finding. The PR gets the usual reviews (the `review` workflow
+The repository is public, so the prompt keeps this install's values (secrets, IPs, ids, `/data`
+paths) out of the code, the tests and the PR body. The DM links the PR under its finding. The PR gets the usual reviews (the `review` workflow
 or Copilot); nothing merges or deploys it: you review, merge and run the hub deploy.
 
 It runs `main`'s code from its own worktree (`~/checkup-src` in the container, updated every

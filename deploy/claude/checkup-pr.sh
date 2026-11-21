@@ -32,8 +32,14 @@ start)
 check)
     [ -s "$MARK" ] || die "no fix started: checkup-pr start <slug>"
     cd "$WT"
-    uv tool run ruff@0.17.3 check clipper tests   # the image has uv, not uvx
-    /app/.venv/bin/python -m pytest -q -p no:cacheprovider
+    # The tests are code this run wrote: they run with no token, key or credential (no GH_TOKEN,
+    # no gh or git login in a throwaway HOME), so a test can't push, merge or spend.
+    jail=$(mktemp -d)
+    trap 'rm -rf "$jail"' EXIT
+    clean() { env -i PATH="/app/.venv/bin:/usr/local/bin:/usr/bin:/bin" HOME="$jail" LANG=C.UTF-8 \
+        UV_CACHE_DIR="$jail/uv" "$@"; }
+    clean uv tool run ruff@0.17.3 check clipper tests   # the image has uv, not uvx
+    clean /app/.venv/bin/python -m pytest -q -p no:cacheprovider
     ;;
 open)
     title=${2:-}

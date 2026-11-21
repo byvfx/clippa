@@ -285,7 +285,8 @@ def ytdlp_version() -> str:
 
 def check_tools(cfg: dict, now: datetime, version: str | None = None) -> list[dict]:
     """yt-dlp older than [checkup] ytdlp_days (0 = off): its version is its release date, and an
-    old one is how fetch, pre-shows and archives break when YouTube changes."""
+    old one is how fetch, pre-shows and archives break when YouTube changes. It is this install's
+    yt-dlp (the nightly run's: the claude container's venv; serve's: the hub image)."""
     days = cfg["checkup"]["ytdlp_days"]
     v = ytdlp_version() if version is None else version
     m = re.match(r"(\d{4})\.(\d{1,2})\.(\d{1,2})", v)
@@ -296,8 +297,8 @@ def check_tools(cfg: dict, now: datetime, version: str | None = None) -> list[di
     if age <= days:
         return []
     return [finding("tools:yt-dlp", "tools", WARN,
-                    f"yt-dlp {v} is {age} days old (ytdlp_days {days}): YouTube and Kick downloads break "
-                    "as the sites change", look="`uv lock --upgrade-package yt-dlp` in a PR, then deploy the hub")]
+                    f"yt-dlp {v} in the install this checkup ran in is {age} days old (ytdlp_days {days}): "
+                    "YouTube and Kick downloads break as the sites change", look="`uv lock --upgrade-package yt-dlp` in a PR, then deploy the hub")]
 
 
 # Each cookies file with a sign-in: (label, its [paths] key; "youtube" = ytdl.cookies_file).
@@ -319,6 +320,8 @@ def _cookie_findings(cfg: dict, now: datetime, warn_s: float) -> list[dict]:
 
     out, ts = [], now.timestamp()
     for label, key in SIGNINS:
+        if key == "youtube" and ytdl.browser(cfg):
+            continue   # signed in through a browser profile instead: doctor checks that one
         f = ytdl.cookies_file(cfg) if key == "youtube" else cfg["paths"][key]
         if not f.is_file():
             continue   # optional: no file, no signed-in source to check
@@ -380,13 +383,16 @@ def error_shape(msg: str) -> str:
     return s[:160]
 
 
-def repeated_errors(text: str, since: datetime, least: int) -> list[tuple[str, int, str]]:
+def repeated_errors(text: str, since: datetime, least: int, tz: ZoneInfo) -> list[tuple[str, int, str]]:
     """[(shape, count, last line)] of the ERROR and CRITICAL lines after `since` that came at least
-    `least` times, most first."""
+    `least` times, most first. A log's times have no zone: they are tz's (the services' TZ)."""
     seen: dict[str, list] = {}
     for line in text.splitlines():
         m = LOG_LINE.match(line)
-        if not m or (t := _when(m.group(1).replace("T", " "))) is None or t < since:
+        if not m:
+            continue
+        t = datetime.fromisoformat(m.group(1).replace("T", " ")).replace(tzinfo=tz)
+        if t < since:
             continue
         shape = error_shape(m.group(3))
         seen.setdefault(shape, [0, ""])
@@ -403,8 +409,10 @@ def _tail(path: Path) -> str:
 
 def check_logs(cfg: dict, now: datetime) -> list[dict]:
     """The same error, give or take its ids, at least [checkup] repeat_errors times in serve's or
-    the bot's log in the last repeat_hours (0 = off): an alert fires once, a loop keeps failing."""
+    the bot's log in the last repeat_hours (0 = off): an alert fires once, a loop keeps failing.
+    The logs' times are read in [schedule] timezone, the services' TZ in the hub's compose."""
     ck = cfg["checkup"]
+    tz = ZoneInfo(cfg["schedule"]["timezone"])
     if not ck["repeat_errors"]:
         return []
     since = now - timedelta(hours=ck["repeat_hours"])
@@ -413,7 +421,7 @@ def check_logs(cfg: dict, now: datetime) -> list[dict]:
         path = cfg["paths"].get(f"{name}_log")
         if not path or not Path(path).is_file():
             continue
-        for shape, n, last in repeated_errors(_tail(Path(path)), since, ck["repeat_errors"])[:3]:
+        for shape, n, last in repeated_errors(_tail(Path(path)), since, ck["repeat_errors"], tz)[:3]:
             key = re.sub(r"\W+", "-", shape.lower())[:60].strip("-")
             out.append(finding(f"logs:{name}:{key}", "logs", WARN,
                                f"{name}.log: the same error {n} times in {ck['repeat_hours']} h: {last[:200]}",
@@ -443,8 +451,9 @@ def check_approvals(cfg: dict, now: datetime) -> list[dict]:
     lost = []
     for f in sorted(root.glob("*/review.json")) if root.is_dir() else []:
         for key, it in jsonstate.read_or(f, {}).items():
-            if (isinstance(it, dict) and it.get("status") == "approved"
-                    and f"{f.parent.name}/{key}" not in known and _age_s(it.get("updated_at"), now) > hours * 3600):
+            age = _age_s(it.get("updated_at"), now) if isinstance(it, dict) else 0
+            if (isinstance(it, dict) and it.get("status") == "approved" and age != float("inf")
+                    and f"{f.parent.name}/{key}" not in known and age > hours * 3600):
                 lost.append(f"{f.parent.name}/{key}")
     if lost:
         out.append(finding("approvals:unplanned", "approvals", BAD,
