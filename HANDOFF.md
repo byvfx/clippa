@@ -48,7 +48,7 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
 - Titles/descriptions/cut points approved as-is; fun descriptions are liked. Long video per recurring topic
   (compilations) plus segments plus short picks. `third_party_audio = "allow_reactions"`,
   `audience_knowledge = "fans"`, Victor/blackjack segments stay; Kino's gambling is commentary, not play
-  (`[scoring] gambling = "commentary"` for kino and c404; prompt v7 from 11-05, v8 on kino from 11-09 and on c404 from 11-18 after v8 found 21 approved clips to v7's 9 on three Kino streams, wiki Model-trials).
+  (`[scoring] gambling = "commentary"` for kino and c404; prompt v7 from 11-05, v8 on kino from 11-09 and on c404 from 11-18; v9 tried 11-20 and no better, v8 kept on both (#192 closed): a plain v8 rerun picks 10 of the 21 approved clips, so v7's and v9's 9 were rerun noise and review bias, wiki Model-trials).
 - Never use the word "hosts" in viewer-facing text → `[scoring] house_style` rules, appended to every
   viewer-facing prompt; put future style notes there. The cast is **Andy (Warski)** and **PPP** (never any other
   name for PPP; old drafts that say "Ashton" stay). Channel 404 = Don, a solo show. Cast per show in `[meta] cast`.
@@ -199,12 +199,12 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
 - `clipper setup` (#78) phase 1 passed in Windows Sandbox (2026-10-28). Next: the real install on the desktop
   (#46; clone into a short folder like `C:\clipper`, run `deploy\bootstrap.ps1`), then the MacBook as #78's join-mode test (#7 closed into #78, 11-13).
   PR #352 (11-20): setup no longer lets a worker, serve or bot machine skip the Kitsu address and token (doctor failed
-  without them); merge once Grok's review of 068588d is clean and CI is green (the user's word, 11-20).
+  without them); merged 11-20, reaches the hub with the next deploy.
 - `ANTHROPIC_ADMIN_KEY` for Claude's own usage count on Costs, if wanted.
 
 ## Open work
 **Priority labels (user, 2026-11-13):** every open issue carries one: `p1-now` (the queue, `gh issue list --label p1-now`),
-`p2-dated` (#192 after 11-16, #258, #259, #158), `p3-track` (one big track at a time, the user picks: desktop install #46 →
+`p2-dated` (#258, #259, #158), `p3-track` (one big track at a time, the user picks: desktop install #46 →
 #44/#47/#45/#78; Udder Truth #58-#60; archive tooling #221-#227 before the next mini-doc; b-roll #229), `waiting` (#80, #48,
 #45), `parked` (the rest). **Milestones (user, 11-16):** "Runs itself" (#259, #258, #287; due 12-06, a first guess), "Second
 channel (Sloth Beat)" (#46, #78, #44, #47, #45), "The Udder Truth: episode 1" (#58-#60), "Next mini-doc toolkit" (#221-#227,
