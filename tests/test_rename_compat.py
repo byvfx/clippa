@@ -137,3 +137,32 @@ def test_layers_name_the_local_file_that_was_read(tmp_path, monkeypatch):
     cfg = config.load(tmp_path / "clippa.toml")
     assert config.explain(cfg, "cut.crf")["layers"][-1] == ("clippa.local.toml", 23)
     assert ("clippa.local.toml", "cut.crf", config.DEFAULTS["cut"]["crf"], 23) in config.diff(cfg)
+
+
+def test_an_empty_new_spelling_gives_way_for_settings_too(tmp_path, monkeypatch, defaults):
+    path = tmp_path / "clipper.toml"
+    path.write_text("", encoding="utf-8")
+    monkeypatch.setenv("CLIPPA_CUT_CRF", "")
+    monkeypatch.setenv("CLIPPER_CUT_CRF", "22")
+    assert config.load(path, use_local=False)["cut"]["crf"] == 22
+    monkeypatch.setenv("CLIPPA_ALERT_WEBHOOK", "")
+    monkeypatch.setenv("CLIPPER_ALERT_WEBHOOK", "https://old.invalid/hook")
+    assert alerts.Alerts(defaults).webhook == "https://old.invalid/hook"
+    monkeypatch.delenv("CLIPPER_ALERT_WEBHOOK")
+    assert config.env_lookup("CLIPPER_ALERT_WEBHOOK") == ("CLIPPA_ALERT_WEBHOOK", "")   # only empty: "" it is
+
+
+def test_the_news_block_names_the_layer_that_is_set(tmp_path, monkeypatch):
+    from clipper import news
+
+    monkeypatch.setattr(config, "user_env", lambda name: "")
+    (tmp_path / "clippa.toml").write_text("", encoding="utf-8")
+    (tmp_path / "clippa.local.toml").write_text('[scoring]\nstream_context = "guest"\n', encoding="utf-8")
+    cfg = config.load(tmp_path / "clippa.toml")
+    with pytest.raises(config.ClipperError, match=r"set in clippa\.local\.toml, which"):
+        news.add_stream_context(cfg, tmp_path, "x")
+    (tmp_path / "clippa.local.toml").unlink()
+    monkeypatch.setenv("CLIPPA_SCORING_STREAM_CONTEXT", "guest")
+    cfg = config.load(tmp_path / "clippa.toml")
+    with pytest.raises(config.ClipperError, match=r"set in \$CLIPPA_SCORING_STREAM_CONTEXT, which"):
+        news.add_stream_context(cfg, tmp_path, "x")

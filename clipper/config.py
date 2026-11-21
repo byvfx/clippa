@@ -173,8 +173,11 @@ def env_names(name: str) -> list[str]:
 
 
 def env_lookup(name: str) -> tuple[str, str] | None:
-    """(the spelling that is set, its value) of a variable in either spelling; None if unset."""
-    return next(((n, os.environ[n]) for n in env_names(name) if n in os.environ), None)
+    """(the spelling that is set, its value) of a variable in either spelling; None if unset.
+    An empty spelling gives way to a non-empty one (a blank `CLIPPA_X=` line in an env file
+    mustn't hide a real CLIPPER_X); "" is the value only when every spelling set is empty."""
+    found = [(n, os.environ[n]) for n in env_names(name) if n in os.environ]
+    return next((f for f in found if f[1]), found[0] if found else None)
 
 
 def getenv(name: str, default: str | None = None) -> str | None:
@@ -184,9 +187,8 @@ def getenv(name: str, default: str | None = None) -> str | None:
 
 
 def _first_set(name: str) -> str:
-    """The first non-empty spelling of a path variable: an empty CLIPPA_CONFIG doesn't hide a
-    CLIPPER_CONFIG (an empty one never meant "this file" before either)."""
-    return next((os.environ[n] for n in env_names(name) if os.environ.get(n)), "")
+    """A path variable's value, "" when unset or empty (an empty one never meant "this file")."""
+    return getenv(name) or ""
 
 
 def spelling_in_use(name: str) -> str:
