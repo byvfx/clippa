@@ -365,7 +365,9 @@ def profile_file() -> Path:
 
 def set_user_env(name: str, value: str) -> str:
     """Save the variable for this user (new terminals and scheduled tasks get it) and set it
-    here. Returns where it went. The value never goes on a command line."""
+    here. Returns where it went. The value never goes on a command line. A CLIPPER_* name is
+    saved as CLIPPA_* when that spelling is already set, since it is the one read (#286)."""
+    name = config.spelling_in_use(name)
     os.environ[name] = value
     if sys.platform == "win32":
         import ctypes

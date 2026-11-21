@@ -19,6 +19,7 @@ def clean_env(monkeypatch):
         if name.startswith(("CLIPPER_", "CLIPPA_")):
             monkeypatch.delenv(name)
     config._CHANNELS.clear()
+    monkeypatch.setattr(config, "_registry", lambda name: "")   # nor this user's saved Windows variables
     # OpenRouter's public model list stays unfetched: tests are offline.
     from clipper import llm
 

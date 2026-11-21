@@ -105,3 +105,35 @@ def test_card_buttons_in_either_prefix():
         m = pat.fullmatch(cid)
         assert m and (m["action"], m["ref"]) == ("approve", "kick-1/c01")
     assert pat.fullmatch("clippy:approve:x") is None
+
+
+def test_an_empty_new_spelling_does_not_hide_the_old_path(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CLIPPA_CONFIG", "")
+    monkeypatch.setenv("CLIPPER_CONFIG", "old.toml")
+    assert config.find() == Path("old.toml")
+    saved = {"CLIPPA_LOCAL_CONFIG": "", "CLIPPER_LOCAL_CONFIG": "//nas/l.toml"}
+    monkeypatch.setattr(config, "_registry", lambda name: saved.get(name, ""))
+    assert config.user_env("CLIPPER_LOCAL_CONFIG") == "//nas/l.toml"
+
+
+def test_saving_a_variable_uses_the_spelling_that_is_read(monkeypatch):
+    assert config.spelling_in_use("CLIPPER_CONFIG") == "CLIPPER_CONFIG"
+    assert config.spelling_in_use("ANTHROPIC_API_KEY") == "ANTHROPIC_API_KEY"
+    monkeypatch.setattr(config, "_registry", lambda name: "x" if name == "CLIPPA_CONFIG" else "")
+    assert config.spelling_in_use("CLIPPER_CONFIG") == "CLIPPA_CONFIG"
+    monkeypatch.setenv("CLIPPA_LOCAL_CONFIG", "y")
+    assert config.spelling_in_use("CLIPPER_LOCAL_CONFIG") == "CLIPPA_LOCAL_CONFIG"
+
+
+def test_doctor_sees_old_names_saved_only_for_the_user(monkeypatch):
+    monkeypatch.setattr(config, "_registry", lambda name: "//nas/c.toml" if name == "CLIPPER_CONFIG" else "")
+    assert config.old_env_in_use() == ["CLIPPER_CONFIG"]
+
+
+def test_layers_name_the_local_file_that_was_read(tmp_path, monkeypatch):
+    (tmp_path / "clippa.toml").write_text("", encoding="utf-8")
+    (tmp_path / "clippa.local.toml").write_text("[cut]\ncrf = 23\n", encoding="utf-8")
+    cfg = config.load(tmp_path / "clippa.toml")
+    assert config.explain(cfg, "cut.crf")["layers"][-1] == ("clippa.local.toml", 23)
+    assert ("clippa.local.toml", "cut.crf", config.DEFAULTS["cut"]["crf"], 23) in config.diff(cfg)
