@@ -122,6 +122,16 @@ DETAILS = [("YouTube title", "title", "YouTube title", 100, False),
            ("Playlist", "playlist", "Playlist", 150, False)]
 
 
+def same_text(a: str, b: str) -> bool:
+    """A form field left as it was: the same words, and the same blank lines between them.
+    Discord may re-wrap text (so line breaks and spaces inside a paragraph don't count), but a
+    blank line added or taken out is an edit, a second one too."""
+    def words(t: str) -> list[str]:  # "" for each blank line: split() never yields one
+        lines = (t or "").replace("\r\n", "\n").strip().split("\n")
+        return [w for line in lines for w in (line.split() or [""])]
+    return words(a) == words(b)
+
+
 class Details(discord.ui.Modal):
     def __init__(self, bot: Bot, ref: str, row: dict):
         super().__init__(title="YouTube title and details", timeout=900)
@@ -140,8 +150,7 @@ class Details(discord.ui.Modal):
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         await interaction.response.defer()
-        same = lambda a, b: a.split() == b.split()
-        changes = {col: f.value for col, f, shown in self.fields if not same(f.value, shown)}
+        changes = {col: f.value for col, f, shown in self.fields if not same_text(f.value, shown)}
         await self.bot.apply(interaction, "details", self.ref, changes)
 
 

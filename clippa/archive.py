@@ -119,6 +119,8 @@ def list_youtube(url: str) -> list[dict]:
             raise ClipperError(f"yt-dlp {tab}: {ytdl.last_error(r)}")
         data = json.loads(r.stdout)
         for e in data.get("entries") or []:
+            if not (e and e.get("id")):
+                continue  # yt-dlp lists a deleted or unavailable video as None
             items.append({"id": f"yt-{e['id']}", "source": "youtube",
                           "url": f"https://www.youtube.com/watch?v={e['id']}",
                           "title": e.get("title") or "", "duration_s": float(e.get("duration") or 0),
@@ -312,23 +314,29 @@ def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[s
         return out, cost
 
     if it["source"] == "youtube":
-        args = ["-f", cfg["archive"]["youtube_format"], "--write-info-json", "--no-playlist",
+        args = ["-f", cfg["archive"]["youtube_format"], "--write-info-json", "--no-playlist", "--no-mtime",
                 "-o", str(idir / "audio.%(ext)s"), it["url"]]
         r, signed_in = ytdl.run_retrying(cfg, *args, retry_on=retry_on)  # see ytdl's docstring
-        audio = [p for p in idir.glob("audio.*") if p.suffix not in (".json", ".part")]
+        # A finished download left by a run that died later is kept (yt-dlp calls it downloaded).
+        # This run's file is the one its info names; beside a leftover in another format and
+        # with no ext in the info, the newest (--no-mtime: written now, not the upload's date).
+        audio = [p for p in idir.glob("audio.*") if p.suffix not in (".json", ".part", ".ytdl")]
         if r.returncode or not audio:
             raise RuntimeError(f"yt-dlp: {ytdl.last_error(r)}")
         info_path = idir / "audio.info.json"
         info = jsonstate.load(info_path)
         info_path.unlink()
+        named = idir / f"audio.{info['ext']}" if info.get("ext") else None
+        mine = named if named in audio else max(audio, key=lambda p: p.stat().st_mtime)
         ts = info.get("timestamp") or info.get("release_timestamp")
         meta.update(title=info.get("title") or it["title"], description=info.get("description") or "",
                     channel=info.get("channel") or info.get("uploader") or it.get("channel") or "",
                     duration_s=float(info.get("duration") or it["duration_s"]),
                     date=datetime.fromtimestamp(ts, UTC).date().isoformat() if ts else None)
-        data = audio[0].read_bytes()
-        out, cost = call(worker.transcribe, data, audio[0].suffix, settings)
-        audio[0].unlink()
+        data = mine.read_bytes()
+        out, cost = call(worker.transcribe, data, mine.suffix, settings)
+        for p in idir.glob("audio.*"):  # transcribed: this one and every leftover (other formats, resume notes) go
+            p.unlink()
     elif it["source"] in ("kick", "hei"):
         # The video `archive video` kept, else the stream's smallest download: Kick's HLS
         # variants carry video and audio together (no audio-only format), HEI's has an audio
@@ -398,7 +406,9 @@ def run_transcribe(cfg: dict, subject: str, limit: int | None, oldest: bool, gpu
     cat = load_catalog(d)
     if not cat:
         raise ClipperError(f"no catalog for {subject!r}: clipper archive add {subject} <url>")
-    todo = [it for it in cat.values() if not (d / it["id"] / "words.jsonl").exists()]
+    # An item with a `dir` is one of our own streams (a `clipper story` item): the pipeline
+    # transcribes it there (item_dir), so it is never paid for again here.
+    todo = [it for it in cat.values() if not it.get("dir") and not (d / it["id"] / "words.jsonl").exists()]
     links = load_links(d)
     dead = {i for i, lk in links.items() if lk["status"] == "dead"}
     if skipped := sum(1 for it in todo if it["id"] in dead):
@@ -616,11 +626,11 @@ def status(cfg: dict, subject: str | None) -> None:
     for s in subjects:
         d = subject_dir(cfg, s)
         cat = load_catalog(d)
-        done = [it for it in cat.values() if (d / it["id"] / "words.jsonl").exists()]
+        done = [it for it in cat.values() if (item_dir(d, it) / "words.jsonl").exists()]
         errors = [it for it in cat.values() if (d / it["id"] / "error.txt").exists()]
         cost = 0.0
         for it in done:  # the cost record heads the file: skip reading the segments
-            cost += (head_record(d / it["id"] / "transcript.json") or {}).get("est_usd", 0.0)
+            cost += (head_record(item_dir(d, it) / "transcript.json") or {}).get("est_usd", 0.0)
         hours = sum(i["duration_s"] for i in done) / 3600
         total = sum(i["duration_s"] for i in cat.values()) / 3600
         print(f"{s}: {len(done)}/{len(cat)} transcribed ({hours:.0f}/{total:.0f} h), "
@@ -629,8 +639,8 @@ def status(cfg: dict, subject: str | None) -> None:
         if links:
             n = {k: sum(1 for i in cat if links.get(i, {}).get("status") == k)
                  for k in ("alive", "restricted", "dead")}
-            kept = sum(1 for i in cat if links.get(i, {}).get("status") == "dead"
-                       and (d / i / "words.jsonl").exists())
+            kept = sum(1 for i, it in cat.items() if links.get(i, {}).get("status") == "dead"
+                       and (item_dir(d, it) / "words.jsonl").exists())
             print(f"  links: {n['alive']} alive, {n['restricted']} restricted, {n['dead']} dead "
                   f"({kept} of them transcribed), {len(cat) - sum(n.values())} unchecked")
 
@@ -754,7 +764,7 @@ def check_links(cfg: dict, subject: str, ids: list[str] | None, everything: bool
     print(f"{subject}: {counts['alive']} alive, {counts['restricted']} restricted, "
           f"{counts['dead']} dead, {counts['unknown']} could not be checked")
     for it, was, now in changed:
-        kept = " (transcript kept)" if (d / it["id"] / "words.jsonl").exists() else ""
+        kept = " (transcript kept)" if (item_dir(d, it) / "words.jsonl").exists() else ""
         print(f"  {was} -> {now}{kept}: {it['id']} {it['title'][:60]!r} {it['url']}")
     if ids:
         for it in todo:
@@ -774,7 +784,7 @@ def list_links(cfg: dict, subject: str, status: str | None) -> None:
             if (lk["status"] != "alive" if status is None else status in ("all", lk["status"]))]
     for i, lk in sorted(rows, key=lambda r: r[1]["since"], reverse=True):
         it = cat.get(i, {})
-        kept = "transcribed" if (d / i / "words.jsonl").exists() else ""
+        kept = "transcribed" if (item_dir(d, it) if it else d / i).joinpath("words.jsonl").exists() else ""
         print(f"{lk['status']:<10} since {lk['since'][:10]}  {kept:<11}  {i}  "
               f"{it.get('title', '')[:60]!r}  {it.get('url', '')}  {lk['reason']}")
     print(f"{len(rows)} items")
