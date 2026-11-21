@@ -10,12 +10,14 @@ Developing#releases.
 
 ## Unreleased
 
-- Five old bugs Grok found while reviewing the rename (#366): a video YouTube lists again after a
+- Seven old bugs Grok found while reviewing the rename (#366): a video YouTube lists again after a
   spell as private counts in Pass B's feedback and the monthly report again; the report's weakest
   list no longer repeats videos from its best list (9-12 videos); `clipper archive add` skips an
   unavailable video in a channel listing instead of crashing; `clipper archive transcribe` no longer
   pays to transcribe a story item that is one of our own streams; and a paragraph break added or
-  removed in the Discord Retitle form's description now counts as an edit.
+  removed in the Discord Retitle form's description now counts as an edit; a daily digest the bot
+  couldn't queue (a share blip) is tried again the next minute instead of skipped until tomorrow;
+  and an archive YouTube retry never transcribes audio an earlier failed run left behind.
 - The package folder is `clippa/` now (#286, pass 2b), and the project is named `clippa`. Imports,
   `python -m clippa.cli` and the deploy files follow; the `clipper` and `clippa` commands both still
   work, as do `clipper.toml` and the log labels (`clipper.serve: ...`). **After pulling this, reinstall

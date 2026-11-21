@@ -386,3 +386,35 @@ def test_add_keeps_what_a_transcribe_wrote_during_the_listing(defaults, tmp_path
     archive.add(defaults, "oc", ["https://www.heinetwork.tv"])
     cat = archive.load_catalog(d)
     assert list(cat) == ["hei-new", "hei-old"] and cat["hei-old"]["duration_s"] == 3600.0
+
+
+def test_a_youtube_retry_never_sends_an_earlier_runs_audio(defaults, tmp_path, monkeypatch):
+    idir = tmp_path / "yt-x"
+    idir.mkdir()
+    (idir / "audio.aac").write_bytes(b"old")  # left by a run that failed after downloading
+    cfg = {**defaults, "paths": {**defaults["paths"], "modal_runs": tmp_path / "modal_runs.jsonl"}}
+    monkeypatch.setattr(archive.transcribe, "modal_settings", lambda tc, diarize: {})
+    sent = []
+
+    class Worker:
+        class transcribe:
+            @staticmethod
+            def remote(data, suffix, settings):
+                sent.append((data, suffix))
+                raise RuntimeError("stop here")
+
+    monkeypatch.setattr(archive.transcribe, "modal_worker", lambda tc, gpu: Worker)
+
+    class Done:
+        returncode, stdout, stderr = 0, "", ""
+
+    def run_retrying(cfg, *args, retry_on):
+        (idir / "audio.m4a").write_bytes(b"new")
+        (idir / "audio.info.json").write_text(json.dumps({"title": "x", "duration": 60}), encoding="utf-8")
+        return Done(), False
+
+    monkeypatch.setattr(archive.ytdl, "run_retrying", run_retrying)
+    it = {"id": "yt-x", "source": "youtube", "title": "x", "duration_s": 60.0, "url": "https://youtu.be/x"}
+    with pytest.raises(RuntimeError, match="stop here"):
+        archive.transcribe_item(cfg, idir, it, "L4")
+    assert sent == [(b"new", ".m4a")]

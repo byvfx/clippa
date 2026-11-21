@@ -314,6 +314,8 @@ def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[s
         return out, cost
 
     if it["source"] == "youtube":
+        for p in idir.glob("audio.*"):  # an earlier run's leftovers would be taken as this one's
+            p.unlink()
         args = ["-f", cfg["archive"]["youtube_format"], "--write-info-json", "--no-playlist",
                 "-o", str(idir / "audio.%(ext)s"), it["url"]]
         r, signed_in = ytdl.run_retrying(cfg, *args, retry_on=retry_on)  # see ytdl's docstring
