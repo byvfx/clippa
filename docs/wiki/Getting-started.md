@@ -54,8 +54,9 @@ prints the same as data. Behind it:
 `clipper serve`, the bot and the worker run as containers on the NAS:
 `clipper services status|stop|restart serve|bot|worker` runs `docker compose` there, and code
 changes go out with `bash deploy/hub/deploy.sh` ([Roles and services](Roles-and-services#services),
-[NAS hub](NAS-hub)). On a single Windows machine without Docker they are scheduled tasks instead,
-driven by the same command. The recorder is its own container on the NAS:
+[NAS hub](NAS-hub)). Serve and the bot run unattended only through compose (`deploy/hub`, any
+Docker host); only a GPU worker on Windows can be a scheduled task instead
+(`deploy\worker\worker-task.ps1`, which `clipper services` drives when `[serve] hub` is unset). The recorder is its own container on the NAS:
 `bash deploy/record/deploy.sh`, only when no show is live (a restart starts a new recording part).
 
 ## When something breaks
