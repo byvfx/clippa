@@ -37,7 +37,7 @@ CDIR=$(setting CLAUDE_DIR); CDIR=${CDIR:-/volume1/docker/clipper-claude}
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/src"
-cp "$HERE/Dockerfile" "$HERE/entrypoint.sh" "$HERE/checkup.sh" "$HERE/checkup-git.sh" "$HERE/checkup.md" \
+cp "$HERE/Dockerfile" "$HERE/entrypoint.sh" "$HERE/checkup.sh" "$HERE/checkup-git.sh" "$HERE/checkup-pr.sh" "$HERE/checkup.md" \
     "$HERE/audit.sh" "$HERE/audit-deep.md" "$TMP/src/"
 cp "$HERE/compose.yaml" "$TMP/"
 cp "$ENV_LOCAL" "$TMP/.env"
