@@ -43,3 +43,32 @@ def test_an_unchanged_pick_is_not_cut_again(tmp_path):
     jsonstate.write(dst.with_suffix(".json"), {"id": "t03", "in_s": 10.0, "out_s": 40.0})
     assert cut.unchanged_pick(dst, p, c)
     assert not cut.unchanged_pick(dst, p, {"in_s": 12.0, "out_s": 40.0})  # a re-score moved it
+
+
+def test_a_nas_cut_runs_the_package_it_sends(tmp_path, monkeypatch):
+    """#286: `python -m clippa.cli` from /code, not the image's entry point, which in an image built
+    before the rename imports its own older copy; the tarball holds clippa/ and the config."""
+    import io
+    import tarfile
+    from types import SimpleNamespace
+
+    from clippa import config
+
+    streams = tmp_path / "streams"
+    (streams / "kick-1").mkdir(parents=True)
+    toml = tmp_path / "clipper.toml"
+    toml.write_text(f'[paths]\nstreams = "{streams.as_posix()}"\n'
+                    '[cut]\nbackend = "nas"\nnas_host = "nas"\nnas_data = "/volume1/x"\n', encoding="utf-8")
+    cfg = config.load(toml, use_local=False)
+    seen = {}
+
+    def run(cmd, input=None, check=False):
+        seen["cmd"], seen["tar"] = cmd, input
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(cut.subprocess, "run", run)
+    cut.on_nas(streams / "kick-1", cfg, ["--only", "c01"])
+    remote = seen["cmd"][-1]
+    assert f"--entrypoint python {cfg['cut']['nas_image']} -m clippa.cli cut kick-1 --only c01" in remote
+    names = tarfile.open(fileobj=io.BytesIO(seen["tar"]), mode="r:gz").getnames()
+    assert "clippa/cut.py" in names and "clipper.toml" in names and not any(n.startswith("clipper/") for n in names)
