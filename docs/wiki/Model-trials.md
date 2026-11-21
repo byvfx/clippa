@@ -55,7 +55,20 @@ found, not how many good ones v8 missed. Where both picked the same moment the t
 nearly the same. v8 was kept on Kino and Channel 404 moved to it on 11-18 (user). The base
 `[scoring]` stays on v5.
 
-## Prompt v9, built, not tried yet
+## 2026-11-20: prompt v9, no better than v8
+
+On the same three Kino streams (Haiku Pass A, Sonnet Pass B, $0.67) v9 picked 9 of the 21
+approved moments, as v7 did. A plain v8 rerun (`compare score --repeat`, $0.55) picked 10,
+so the 21-vs-9 gap was review bias (only the original run's picks were reviewed) and rerun
+noise, not v7 or v9 picking worse. v9's Pass A matched the original run on 79% of windows,
+the v8 rerun on 74%. On the 66 labelled windows v9 got 36 labels right and 45 keep-or-not,
+v8 37 and 46 (fresh runs the same day): v9 finds a few more keeps (64% recall against 60%)
+less precisely (85% against 93%) and calls a keep needs-context less often (9 against 13).
+Nothing here beats a rerun's spread, so v8 stays on kino and c404 (user, 11-20); v9 stays in
+the package for a later trial. The lesson for the next prompt: compare a candidate with a
+`--repeat` of the current one, never with the run that was reviewed.
+
+### What v9 changes
 
 `score_a_v9` is v8 with two changes. `why` is the first field of the answer (from v9 on the
 Pass A schema puts it first; models write in schema order), so the model reasons through
@@ -63,8 +76,7 @@ payoff, context and quality before it gives a verdict or a cut, rather than just
 Claude and OpenAI keep schema order; a provider on JSON mode, or Gemini, may not, so try v9
 on Claude. And the prompt says where the cuts may go: a cut may start in the lead-in when the
 setup is said there, and ends by the window's last timestamp (the model sees nothing after
-it). The rule files are copies of v8. No show is on it; it gets the same three streams and
-the labels, next to v8, which now runs on kino and c404.
+it). The rule files are copies of v8.
 
 ## 2026-11-09: DeepSeek V4.1 Flash, the 10-17 snapshot
 
