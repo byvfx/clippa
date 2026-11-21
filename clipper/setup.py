@@ -182,9 +182,10 @@ class Ask:
         raw = input(f"  {prompt} [{'Y/n' if default else 'y/N'}]: ").strip().lower()
         return default if not raw else raw.startswith("y")
 
-    def secret(self, prompt: str) -> str:
+    def secret(self, prompt: str, skip: bool = True) -> str:
         """Typed without echo. Never from the answers file: keys come from the environment."""
-        return getpass.getpass(f"  {prompt} (hidden, Enter to skip): ").strip() if self.interactive else ""
+        hint = "hidden, Enter to skip" if skip else "hidden"
+        return getpass.getpass(f"  {prompt} ({hint}): ").strip() if self.interactive else ""
 
 
 def say(text: str = "") -> None:
@@ -218,6 +219,21 @@ def doctor_role(roles: list[str]) -> str:
     if len(picked) > 1:
         picked.discard("control")  # the service roles check more than control does
     return picked.pop() if len(picked) == 1 else "all" if picked else "nas"
+
+
+KITSU_NEEDED = "every role but a control station reviews through Kitsu"
+
+
+def kitsu_required(roles: list[str]) -> bool:
+    """`clipper doctor` fails without [review] host and the Kitsu token for these roles (#78)."""
+    return roles != ["recorder"] and not control_only(roles)
+
+
+def kitsu_host_error(v: str, required: bool) -> str | None:
+    """Why a typed Kitsu address won't do, or None: empty is a skip unless required."""
+    if not v:
+        return f"needed here: {KITSU_NEEDED} (Ctrl+C stops; `clipper setup` resumes here)" if required else None
+    return None if re.match(r"https?://[^/\s:]+", v) else "a URL, e.g. http://nas.local:8090"
 
 
 def control_only(roles: list[str]) -> bool:
@@ -644,7 +660,12 @@ PROVIDER_KEYS = {
 }
 
 
-def ensure_env_key(cfg: dict, ask: Ask, name: str, what: str, where: str, check: bool = True) -> None:
+def ensure_env_key(cfg: dict, ask: Ask, name: str, what: str, where: str, check: bool = True,
+                   required: str = "", if_refused: str = "") -> None:
+    """Ask for a key, Enter skips it. `required` (why) re-asks instead when typed at a terminal, until a
+    typed key is refused: then the check may be what's wrong (`if_refused` says what to look at), so
+    Enter skips again rather than trapping the user."""
+    refused = False
     if user_env(name):
         good, msg = check_key(name, cfg) if check else (True, "set")
         say(f"{name}: {msg}" if good else f"{name} is set, but: {msg}")
@@ -653,16 +674,25 @@ def ensure_env_key(cfg: dict, ask: Ask, name: str, what: str, where: str, check:
     else:
         say(f"{name}: {what}. Get one at {where}.")
     while True:
-        value = ask.secret(name)
+        insist = bool(required) and not refused
+        value = ask.secret(name, skip=not insist)
+        if not value and insist and ask.interactive:
+            say(f"{name} is needed here: {required}. (Ctrl+C stops; `clipper setup` resumes at this step.)")
+            continue
         if not value:
-            say(f"skipped {name}; `clipper setup --step keys` asks again")
+            say(f"skipped {name}; `clipper doctor` fails until it is set ({required})" if required
+                else f"skipped {name}")
+            if refused and if_refused:
+                say(if_refused)
+            say("`clipper setup --step keys` asks again")
             return
         os.environ[name] = value
         good, msg = check_key(name, cfg) if check else (True, "set")
         if good:
             say(f"{msg}. Saved as {set_user_env(name, value)}.")
             return
-        say(f"that didn't work: {msg}")
+        say(f"that didn't work: {msg}" + ("; Enter skips it" if required else ""))
+        refused = True
         os.environ.pop(name, None)
 
 
@@ -692,10 +722,14 @@ def step_keys(cfg: dict, st: dict, ask: Ask) -> None:  # noqa: C901
         else:
             ensure_env_key(cfg, ask, env, f"{prov} models ({uses[0]})", PROVIDER_KEYS[env])
     rc = cfg["review"]
+    need_kitsu = KITSU_NEEDED if kitsu_required(roles) else ""
     if not rc["host"] or "<" in rc["host"]:
         def url_ok(v: str) -> str | None:
-            return None if not v or re.match(r"https?://", v) else "a URL, e.g. http://nas.local:8090"
+            return kitsu_host_error(v, bool(need_kitsu and ask.interactive))
         host = ask.text("kitsu", "Kitsu address (review happens there)", "", url_ok).rstrip("/")
+        if not host and need_kitsu:
+            say(f"skipped the Kitsu address; `clipper doctor` fails until [review] host is set ({need_kitsu}); "
+                "`clipper setup --step keys` asks again")
         if host:
             host = host if host.endswith("/api") else host + "/api"
             toml_set(base(cfg)["_file"], "review", "host", host)
@@ -703,7 +737,10 @@ def step_keys(cfg: dict, st: dict, ask: Ask) -> None:  # noqa: C901
             cfg = config.load(base(cfg)["_file"])
     have_host = cfg["review"]["host"] and "<" not in cfg["review"]["host"]
     ensure_env_key(cfg, ask, cfg["review"]["token_env"], "a Kitsu bot token",
-                   "Kitsu -> Bots -> New bot (Supervisor) -> copy its token", check=bool(have_host))
+                   "Kitsu -> Bots -> New bot (Supervisor) -> copy its token", check=bool(have_host),
+                   required=need_kitsu,
+                   if_refused=f"If the address is what's wrong, fix [review] host = {cfg['review']['host']} "
+                              f"in {base(cfg)['_file']}." if have_host else "")
     if cfg["transcribe"]["backend"] == "modal" and not control_only(roles):
         if (Path.home() / ".modal.toml").exists() and not user_env("MODAL_TOKEN_ID"):
             say("Modal: token in ~/.modal.toml")
@@ -808,7 +845,13 @@ def main(cfg_path: str | None, step: str | None = None, answers: str | None = No
         cfg = config.load(cfg_path)
         if s == "check":
             return step_check(cfg, st, ask, offline)
-        {"mode": step_mode, "roles": step_roles, "machine": step_machine, "keys": step_keys}[s](cfg, st, ask)
+        try:
+            {"mode": step_mode, "roles": step_roles, "machine": step_machine, "keys": step_keys}[s](cfg, st, ask)
+        except KeyboardInterrupt:
+            st["done"].pop(s, None)  # a step done before (or redone with --step) is asked again next run
+            save_state(cfg, st)
+            print(f"\nStopped; `clipper setup` carries on from {s}.")
+            return 130
         cfg = config.load(cfg_path)
         bad = [r for r in checks_for(cfg, st, s) if r[0] == "FAIL"]
         if bad:

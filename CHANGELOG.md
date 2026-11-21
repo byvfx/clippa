@@ -10,6 +10,9 @@ Developing#releases.
 
 ## Unreleased
 
+- `clipper setup` no longer lets you skip the Kitsu address and token on a worker, serve or bot
+  machine (only a control station may): `clipper doctor` failed without them, so a finished setup
+  looked broken (#78).
 - `[streams] keep_free_pct` makes the daily source-and-audio prune disk-aware: with it set (say 15), streams older
   than `keep_source_days` go oldest first only while the share has less than that percent free, so recordings
   stay as long as there's room. The checkup warns when free space is under it. `clipper streams prune
