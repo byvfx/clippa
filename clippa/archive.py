@@ -119,6 +119,8 @@ def list_youtube(url: str) -> list[dict]:
             raise ClipperError(f"yt-dlp {tab}: {ytdl.last_error(r)}")
         data = json.loads(r.stdout)
         for e in data.get("entries") or []:
+            if not (e and e.get("id")):
+                continue  # yt-dlp lists a deleted or unavailable video as None
             items.append({"id": f"yt-{e['id']}", "source": "youtube",
                           "url": f"https://www.youtube.com/watch?v={e['id']}",
                           "title": e.get("title") or "", "duration_s": float(e.get("duration") or 0),
@@ -398,7 +400,9 @@ def run_transcribe(cfg: dict, subject: str, limit: int | None, oldest: bool, gpu
     cat = load_catalog(d)
     if not cat:
         raise ClipperError(f"no catalog for {subject!r}: clipper archive add {subject} <url>")
-    todo = [it for it in cat.values() if not (d / it["id"] / "words.jsonl").exists()]
+    # An item with a `dir` is one of our own streams (a `clipper story` item): the pipeline
+    # transcribes it there (item_dir), so it is never paid for again here.
+    todo = [it for it in cat.values() if not it.get("dir") and not (d / it["id"] / "words.jsonl").exists()]
     links = load_links(d)
     dead = {i for i, lk in links.items() if lk["status"] == "dead"}
     if skipped := sum(1 for it in todo if it["id"] in dead):
@@ -616,11 +620,11 @@ def status(cfg: dict, subject: str | None) -> None:
     for s in subjects:
         d = subject_dir(cfg, s)
         cat = load_catalog(d)
-        done = [it for it in cat.values() if (d / it["id"] / "words.jsonl").exists()]
+        done = [it for it in cat.values() if (item_dir(d, it) / "words.jsonl").exists()]
         errors = [it for it in cat.values() if (d / it["id"] / "error.txt").exists()]
         cost = 0.0
         for it in done:  # the cost record heads the file: skip reading the segments
-            cost += (head_record(d / it["id"] / "transcript.json") or {}).get("est_usd", 0.0)
+            cost += (head_record(item_dir(d, it) / "transcript.json") or {}).get("est_usd", 0.0)
         hours = sum(i["duration_s"] for i in done) / 3600
         total = sum(i["duration_s"] for i in cat.values()) / 3600
         print(f"{s}: {len(done)}/{len(cat)} transcribed ({hours:.0f}/{total:.0f} h), "

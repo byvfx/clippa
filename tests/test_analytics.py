@@ -150,3 +150,18 @@ def test_run_saves_before_a_lasting_error(share):
     with pytest.raises(HttpError):
         analytics.run(cfg)
     assert jsonstate.load(analytics.path_of(cfg))["b"]["views"] == 7  # the counts still landed
+
+
+def test_a_video_listed_again_is_no_longer_missing(share):
+    cfg, _ = share
+    e = {"key": "kick-1/s00_x", "stream": "kick-1", "kind": "segment", "publish_at": "2026-11-01T10:00:00-08:00"}
+    data = {"a": {"missing": True, "views": 1}}
+    analytics.refresh_counts(cfg, data, {"a": e}, FakeData(), NOW)
+    assert "missing" not in data["a"] and data["a"]["views"] == 7
+
+
+def test_best_and_weakest_never_share_a_video():
+    for n in (3, 8, 9, 12, 13, 20):
+        best, worst = analytics.best_and_worst(list(range(n)))
+        assert best == list(range(min(n, 8))) and not set(best) & set(worst)
+        assert worst == list(range(n - 1, max(n - 6, 7), -1))   # weakest first, at most 5

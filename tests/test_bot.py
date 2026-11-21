@@ -186,3 +186,13 @@ def test_a_bad_digest_time_or_no_threads_still_posts(defaults, monkeypatch):
     chan.send = send
     asyncio.run(b.post_blinds())
     assert [t for t, _ in chan.sent][1] == "1:c" and posted[-1] == ("c", "5")   # in the channel itself
+
+
+def test_a_form_edit_counts_paragraphs_not_wrapping():
+    """Discord may re-wrap a field (#366 review): line breaks inside a paragraph don't make an edit,
+    a blank line added or taken out does."""
+    assert bot.same_text("Line one\nLine two", "Line one Line two")      # re-wrapped: no edit
+    assert bot.same_text("a b\r\n\r\nc", "a  b\n\nc ")                     # CRLF and spaces: no edit
+    assert not bot.same_text("Line one\n\nLine two", "Line one\nLine two")  # a paragraph break: an edit
+    assert not bot.same_text("one two", "one three")
+    assert bot.same_text("", "") and bot.same_text("\n\n", "")

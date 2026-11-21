@@ -40,6 +40,7 @@ import contextlib
 import io
 import logging
 import os
+import re
 import time
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
@@ -122,6 +123,15 @@ DETAILS = [("YouTube title", "title", "YouTube title", 100, False),
            ("Playlist", "playlist", "Playlist", 150, False)]
 
 
+def same_text(a: str, b: str) -> bool:
+    """A form field left as it was: the same words in the same paragraphs. Discord may re-wrap
+    text (so line breaks and spaces inside a paragraph don't count), but a blank line added or
+    taken out is an edit."""
+    def paras(t: str) -> list[list[str]]:
+        return [p.split() for p in re.split(r"\n\s*\n", (t or "").replace("\r\n", "\n").strip()) if p.strip()]
+    return paras(a) == paras(b)
+
+
 class Details(discord.ui.Modal):
     def __init__(self, bot: Bot, ref: str, row: dict):
         super().__init__(title="YouTube title and details", timeout=900)
@@ -140,8 +150,7 @@ class Details(discord.ui.Modal):
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         await interaction.response.defer()
-        same = lambda a, b: a.split() == b.split()
-        changes = {col: f.value for col, f, shown in self.fields if not same(f.value, shown)}
+        changes = {col: f.value for col, f, shown in self.fields if not same_text(f.value, shown)}
         await self.bot.apply(interaction, "details", self.ref, changes)
 
 
