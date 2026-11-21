@@ -233,11 +233,11 @@ def test_a_ledger_entry_without_a_time_is_skipped(defaults, tmp_path):
     assert f["repair"]["state"] == "would" and len(repairs.ledger(cfg)) == 3
 
 
-def test_serve_runs_only_the_checks_with_repairs(defaults, tmp_path):
+def test_serve_runs_only_the_checks_with_repairs_and_the_sign_ins(defaults, tmp_path):
     from clipper import serve
 
     assert repairs.checks() == ["streams", "housekeeping"]
-    assert set(repairs.checks()) <= set(checkup.CHECKS)
+    assert set(repairs.checks()) | set(checkup.ALERT_CHECKS) <= set(checkup.CHECKS)
     cfg = in_tmp(defaults, tmp_path)
     s = serve.Serve(cfg)
     started = []
@@ -246,7 +246,8 @@ def test_serve_runs_only_the_checks_with_repairs(defaults, tmp_path):
     (job,) = [j for j in s.jobs() if j.name == "checkup"]
     job.start()
     assert job.every_s == 3600
-    assert started == [("checkup", ["checkup", "--fix", "--only", "streams", "--only", "housekeeping"])]
+    assert started == [("checkup", ["checkup", "--fix", "--alert", "--only", "streams", "--only", "housekeeping",
+                                    "--only", "signins"])]   # --alert: a gone sign-in can't wait for the morning
 
 
 def test_only_offers_every_check():

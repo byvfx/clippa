@@ -23,8 +23,9 @@ Jobs (`jobs()`; each runs `clipper ...` as a child process; an interval of 0 tur
     backup     `clipper backup` when the newest zip is [backup] every_days old (looked at hourly)
     prune      daily with [streams] keep_source_days: `clipper streams prune --yes --older-than N`
                (and `--while-free-below P` with [streams] keep_free_pct)
-    checkup    every [checkup] fix_minutes: `clipper checkup --fix` (#287) over the checks that have
-               repairs: the ones [checkup] fix lists act, the others are logged as would-fix
+    checkup    every [checkup] fix_minutes: `clipper checkup --fix --alert` (#287) over the checks
+               that have repairs (the ones [checkup] fix lists act, the others are logged as
+               would-fix) and signins: a sign-in that is gone is DMed once, not left for the morning
 A job that exits non-zero is queued as a DM (clipper/alerts.py; the bot sends it). One marked
 retry (analytics, prune: free, and a day apart) that fails runs again in RETRY_FAILED_S, doubling
 with each failure in a row, up to its own interval; the others wait their interval.
@@ -58,6 +59,7 @@ import requests
 from . import (
     actions,
     alerts,
+    checkup,
     daemon,
     news,
     preshow,
@@ -83,6 +85,13 @@ def backup_due(cfg: dict, now: float | None = None) -> bool:
 
     p = backup.newest(cfg)
     return p is None or (now or time.time()) - p.stat().st_mtime >= cfg["backup"]["every_days"] * 86400
+
+
+def checkup_args() -> list[str]:
+    """The checkup job's command: the checks that have a repair (--fix, #287) and the ones whose
+    bad findings can't wait for the morning report (--alert: a sign-in that is gone)."""
+    names = dict.fromkeys([*repairs.checks(), *checkup.ALERT_CHECKS])
+    return ["checkup", "--fix", "--alert", *(a for c in names for a in ("--only", c))]
 
 
 def has_opencv() -> bool:
@@ -191,8 +200,7 @@ class Serve:
              retry=True),
             Job("checkup", cfg["checkup"]["fix_minutes"] * 60,  # #287: no model; repairs are capped
              lambda: not self.running("checkup"),
-             lambda: task(self.run_clipper("checkup", ["checkup", "--fix", *(
-                 a for c in repairs.checks() for a in ("--only", c))]))),
+             lambda: task(self.run_clipper("checkup", checkup_args()))),
         ]
 
     async def run_clipper(self, name: str, args: list[str], streak: bool = True) -> int | None:

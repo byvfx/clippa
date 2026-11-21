@@ -85,6 +85,13 @@ def test_the_jobs_table_follows_the_config(defaults, tmp_path):
     assert {j.name for j in serve.Serve(cfg).jobs() if j.retry} == {"analytics", "prune"}
 
 
+def test_the_checkup_jobs_command_is_one_the_parser_takes():
+    from clipper import cli
+
+    ns = cli.build_parser().parse_args(serve.checkup_args())
+    assert ns.fix and ns.alert and ns.only == ["streams", "housekeeping", "signins"]
+
+
 def test_status_says_when_each_job_runs_next(defaults, tmp_path, monkeypatch):
     cfg = cfg_in(defaults, tmp_path, youtube={"auto_upload_minutes": 60}, tiktok={"auto_send_minutes": 0})
     s = serve.Serve(cfg)

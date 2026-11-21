@@ -1,6 +1,8 @@
 """`clipper checkup` (#185): the problems alerts miss, found from the files alone."""
 from datetime import UTC, datetime, timedelta
 
+import pytest
+
 from clipper import checkup, cli, daemon, jsonstate
 
 NOW = datetime(2026, 11, 9, 20, 0, tzinfo=UTC)
@@ -266,6 +268,73 @@ def test_signins_from_cookies_files_and_tokens(defaults, tmp_path):
     assert "signin:youtube-export" not in keys(checkup.check_signins(cfg, NOW))
     cfg["checkup"]["signin_days"] = 0
     assert checkup.check_signins(cfg, NOW) == []
+
+
+def test_alert_dms_a_gone_sign_in_once_and_again_when_it_comes_back(defaults, tmp_path):
+    from clipper import alerts
+
+    cfg = in_tmp(defaults, tmp_path)
+    gone = checkup.finding("signin:youtube", "signins", checkup.BAD, "YouTube cookies y.txt hold no live sign-in",
+                           look="export it")
+    soon = checkup.finding("signin:twitch", "signins", checkup.WARN, "Twitch cookies t.txt: the sign-in expires 11-11")
+    stuck = checkup.finding("stuck:kick-1:cut", "streams", checkup.BAD, "kick-1 is stuck in cut")
+    report = {"at": NOW.isoformat(), "checks": ["streams", "signins"], "findings": [gone, soon, stuck]}
+    assert checkup.alert(cfg, {**report, "findings": [soon, stuck]}) == []
+    assert not (cfg["paths"]["streams"] / ".checkup").exists()        # the usual hour writes nothing
+    assert keys(checkup.alert(cfg, report)) == {"signin:youtube"}     # not the warning, not another check's
+    (f,) = alerts.outbox(cfg).glob("*.json")
+    ev = jsonstate.load(f)
+    assert ev["kind"] == "checkup"
+    assert ev["text"] == "YouTube cookies y.txt hold no live sign-in\nlook: export it"
+    assert checkup.alert(cfg, report) == []                           # still gone an hour later: said once
+    assert checkup.alert(cfg, {**report, "checks": ["streams"], "findings": [stuck]}) == []
+    assert checkup.alert(cfg, report) == []                           # a run without signins forgot nothing
+    assert checkup.alert(cfg, {**report, "findings": [soon]}) == []   # signed in again: forgotten
+    later = {**report, "at": (NOW + timedelta(hours=1)).isoformat()}
+    assert keys(checkup.alert(cfg, later)) == {"signin:youtube"}      # gone again: a new DM
+    sent = [jsonstate.load(f)["key"] for f in alerts.outbox(cfg).glob("*.json")]
+    assert len(set(sent)) == 2    # a key of its own each time: the bot's cooldown mustn't swallow the second
+
+
+def test_alert_keeps_what_it_knows_through_a_crashed_check_a_broken_file_and_a_dm_not_queued(
+        defaults, tmp_path, monkeypatch):
+    from clipper import alerts
+
+    cfg = in_tmp(defaults, tmp_path)
+    gone = checkup.finding("signin:youtube", "signins", checkup.BAD, "YouTube cookies y.txt hold no live sign-in")
+    crash = checkup.finding("check:signins", "signins", checkup.BAD, "the signins check failed: OSError: boom")
+    report = {"at": NOW.isoformat(), "checks": ["signins"], "findings": [gone]}
+    monkeypatch.setattr(alerts, "send", lambda *a, **k: False)
+    assert checkup.alert(cfg, report) == []                           # not queued: not remembered
+    monkeypatch.undo()
+    assert keys(checkup.alert(cfg, report)) == {"signin:youtube"}     # ...so the next hour tries again
+    assert keys(checkup.alert(cfg, {**report, "findings": [crash]})) == {"check:signins"}
+    assert checkup.alert(cfg, report) == []                           # the crash forgot nothing: no second DM
+    path = cfg["paths"]["streams"] / ".checkup" / "alerted.json"
+    assert set(jsonstate.load(path)["sent"]) == {"signin:youtube"}    # the crash cleared, and was forgotten
+    jsonstate.write(path, {"sent": {"signin:youtube": "2026-11-09", "signin:x-token": {"check": "signins"}}})
+    assert keys(checkup.alert(cfg, report)) == {"signin:youtube"}     # an entry that isn't one: as if unseen
+    jsonstate.write(path, ["not", "a", "dict"])
+    assert keys(checkup.alert(cfg, report)) == {"signin:youtube"}
+
+
+def test_checkup_alert_queues_the_dm_and_a_finding_alone_never_fails_serves_job(defaults, tmp_path, capsys):
+    from clipper import alerts
+
+    cfg = in_tmp(defaults, tmp_path)
+    cfg["paths"]["tiktok_token"] = tmp_path / "tt.json"
+    jsonstate.write(cfg["paths"]["tiktok_token"], {"refresh_expires_at": 1})
+    args = cli.build_parser().parse_args(["checkup", "--fix", "--alert", "--only", "signins"])
+    with pytest.raises(SystemExit) as e:
+        cli.cmd_checkup(cfg, args)
+    assert e.value.code == 0
+    assert "DM queued: TikTok sign-in expired" in capsys.readouterr().out
+    (f,) = alerts.outbox(cfg).glob("*.json")
+    assert jsonstate.load(f)["text"].endswith("look: clipper tiktok --sign-in")
+    args = cli.build_parser().parse_args(["checkup", "--only", "signins"])   # by hand: no DM, exit 1
+    with pytest.raises(SystemExit) as e:
+        cli.cmd_checkup(cfg, args)
+    assert e.value.code == 1 and len(list(alerts.outbox(cfg).glob("*.json"))) == 1
 
 
 def test_repeated_errors_group_lines_that_differ_only_in_ids():

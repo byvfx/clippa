@@ -19,6 +19,7 @@ streams/.record/status.json
 streams/.notify/outbox/      DMs waiting for the bot, one JSON file each
 streams/.checkup/state.json  the findings the last scheduled checkup saw (Checkup)
 streams/.checkup/repairs.json  what checkup --fix repaired, or would have (Checkup#repairs)
+streams/.checkup/alerted.json  the gone sign-ins checkup --alert already DMed (Checkup)
 streams/.audit/              the saved weekly digests and monthly deep audits (Audit)
 ```
 

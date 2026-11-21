@@ -10,6 +10,7 @@ clipper checkup                  # every check
 clipper checkup --only streams   # one check (repeatable)
 clipper checkup --json           # the report as JSON, for a script or Claude
 clipper checkup --fix            # make the repairs [checkup] fix allows (serve does, hourly)
+clipper checkup --alert          # DM a sign-in that is gone, once (serve does, hourly)
 ```
 
 ## What it checks
@@ -41,6 +42,17 @@ keys in `streams/.checkup/state.json`, so the next run can mark which findings a
 which it saw before ("since 11-08 08:30"). Only the scheduled run uses `--mark`. A run by hand
 doesn't, so it never hides anything from the next scheduled run.
 
+## A sign-in that is gone
+
+Most findings wait for the morning report. A sign-in that is gone doesn't: the next signed-in
+grab fails. So serve's hourly run also reads the signins check, with `--alert`: a **bad**
+signins finding (a cookies file with no live sign-in or unreadable, a TikTok or X sign-in
+expired) is DMed once, when it first shows, as kind `checkup`, during quiet hours held like any
+DM. It isn't repeated while it lasts (`streams/.checkup/alerted.json` remembers it; the nightly
+report still lists it), and one that clears and comes back is DMed again. The warnings (a
+sign-in expiring within `signin_days`, a stale YouTube export) stay in the nightly report.
+`clipper status` lists every signins finding under **needs you**, warnings too.
+
 ## Repairs
 
 Some findings have a fixed repair, from a short list, with no model call (`clipper/repairs.py`,
@@ -54,8 +66,9 @@ run (a checkup without `--fix`, like the nightly one, changes nothing).
 | `retry` | a run that failed with no retries left, when its error is a passing one: a rate limit, a dropped connection, a remote server's 5xx (`passing`, whole words) | `retry_after_hours` (3) after the run failed, gives back one attempt in `run.json`; the worker runs it again on its next pass. Never while a worker holds the stream, nor for a run held on a rejected key |
 | `tmp` | the housekeeping finding | deletes those temp files |
 
-serve runs `clipper checkup --fix` every `fix_minutes` (60), over the checks that have repairs
-(streams and housekeeping). Only the kinds listed in `fix` act; the
+serve runs `clipper checkup --fix --alert` every `fix_minutes` (60), over the checks that have
+repairs (streams and housekeeping) and signins ([above](Checkup#a-sign-in-that-is-gone)). Only
+the kinds listed in `fix` act; the
 others are **would-fix**: what they would have done goes in the ledger
 (`streams/.checkup/repairs.json`), once a day per finding, and nothing else changes. `fix` is
 empty to start, so the first week only reports. Read it with the nightly reports, then turn the
@@ -65,7 +78,7 @@ repair stops `--fix` with an error.
 Every repair is safe to repeat and capped: at most `max_repairs` (2) tries per finding key in 7
 days, counted in the ledger, a failed try included. After that the finding says "tried 2 times in
 7 days: it needs you" and stays for you. `--fix` exits 1 only when a repair failed (serve DMs
-that); a finding alone is the nightly report's business. No repair ever uploads or publishes,
+that); a finding alone is the nightly report's business, but for a sign-in that is gone. No repair ever uploads or publishes,
 makes a Kitsu decision, touches the recorder or source footage, edits the config or viewer-facing
 text, or restarts anything. No repair calls a model itself, but a run given one more attempt
 reruns its failed stage, which calls models or Modal as it always does (score, segments,

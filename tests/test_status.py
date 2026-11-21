@@ -84,6 +84,16 @@ def test_what_needs_you_comes_first_and_old_streams_are_hidden(defaults, tmp_pat
     assert any(x.startswith("  kick-old (") for x in status.lines(cfg, days=1, everything=True))
 
 
+def test_a_gone_sign_in_is_under_needs_you(defaults, tmp_path):
+    cfg = in_tmp(defaults, tmp_path)
+    cfg["paths"]["x_token"] = tmp_path / "x.json"
+    jsonstate.write(cfg["paths"]["x_token"], {"refresh_expires_at": 1})
+    out = status.lines(cfg, days=1)
+    needs = out[1:out.index("")]
+    assert any(x.startswith("  BAD  X sign-in expired") for x in needs)
+    assert "       look: clipper x --sign-in" in needs
+
+
 def test_held_counts_only_what_could_still_go_out(defaults, tmp_path):
     """A rejected item that arrived held is done with; an approved held one in a stream past
     stale_days can't go out without a pin: neither keeps its stream in "needs you"."""
