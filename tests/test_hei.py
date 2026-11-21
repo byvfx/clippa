@@ -1,6 +1,7 @@
 """heinetwork.tv as an archive source, and what came with it: `archive add --match`, keeping
 videos, and the posts sheet. Offline: the site, yt-dlp and Google are stand-ins."""
 import json
+import os
 
 import pytest
 
@@ -386,3 +387,117 @@ def test_add_keeps_what_a_transcribe_wrote_during_the_listing(defaults, tmp_path
     archive.add(defaults, "oc", ["https://www.heinetwork.tv"])
     cat = archive.load_catalog(d)
     assert list(cat) == ["hei-new", "hei-old"] and cat["hei-old"]["duration_s"] == 3600.0
+
+
+def test_a_youtube_retry_never_sends_an_earlier_runs_audio(defaults, tmp_path, monkeypatch):
+    idir = tmp_path / "yt-x"
+    idir.mkdir()
+    (idir / "audio.aac").write_bytes(b"old")  # left by an earlier run, in another format
+    os.utime(idir / "audio.aac", (1_000_000, 1_000_000))
+    cfg = {**defaults, "paths": {**defaults["paths"], "modal_runs": tmp_path / "modal_runs.jsonl"}}
+    monkeypatch.setattr(archive.transcribe, "modal_settings", lambda tc, diarize: {})
+    sent = []
+
+    class Worker:
+        class transcribe:
+            @staticmethod
+            def remote(data, suffix, settings):
+                sent.append((data, suffix))
+                raise RuntimeError("stop here")
+
+    monkeypatch.setattr(archive.transcribe, "modal_worker", lambda tc, gpu: Worker)
+
+    class Done:
+        returncode, stdout, stderr = 0, "", ""
+
+    def run_retrying(cfg, *args, retry_on):
+        (idir / "audio.m4a").write_bytes(b"new")
+        (idir / "audio.info.json").write_text(json.dumps({"title": "x", "duration": 60}), encoding="utf-8")
+        return Done(), False
+
+    monkeypatch.setattr(archive.ytdl, "run_retrying", run_retrying)
+    it = {"id": "yt-x", "source": "youtube", "title": "x", "duration_s": 60.0, "url": "https://youtu.be/x"}
+    with pytest.raises(RuntimeError, match="stop here"):
+        archive.transcribe_item(cfg, idir, it, "L4")
+    assert sent == [(b"new", ".m4a")]
+
+
+def test_a_youtube_retry_keeps_a_finished_download(defaults, tmp_path, monkeypatch):
+    """A run that died after downloading left audio.m4a: a retry that fails keeps it, one
+    yt-dlp skips (already downloaded) sends it."""
+    idir = tmp_path / "yt-x"
+    idir.mkdir()
+    (idir / "audio.m4a").write_bytes(b"done")
+    cfg = {**defaults, "paths": {**defaults["paths"], "modal_runs": tmp_path / "modal_runs.jsonl"}}
+    monkeypatch.setattr(archive.transcribe, "modal_settings", lambda tc, diarize: {})
+    sent = []
+
+    class Worker:
+        class transcribe:
+            @staticmethod
+            def remote(data, suffix, settings):
+                sent.append((data, suffix))
+                raise RuntimeError("stop here")
+
+    monkeypatch.setattr(archive.transcribe, "modal_worker", lambda tc, gpu: Worker)
+    it = {"id": "yt-x", "source": "youtube", "title": "x", "duration_s": 60.0, "url": "https://youtu.be/x"}
+
+    class Failed:
+        returncode, stdout, stderr = 1, "", "ERROR: Sign in to confirm you're not a bot"
+
+    monkeypatch.setattr(archive.ytdl, "run_retrying", lambda cfg, *a, retry_on: (Failed(), False))
+    with pytest.raises(RuntimeError, match="yt-dlp"):
+        archive.transcribe_item(cfg, idir, it, "L4")
+    assert (idir / "audio.m4a").read_bytes() == b"done"
+
+    class Done:
+        returncode, stdout, stderr = 0, "", ""
+
+    def skipped(cfg, *args, retry_on):
+        (idir / "audio.info.json").write_text(json.dumps({"title": "x", "duration": 60}), encoding="utf-8")
+        return Done(), False
+
+    monkeypatch.setattr(archive.ytdl, "run_retrying", skipped)
+    with pytest.raises(RuntimeError, match="stop here"):
+        archive.transcribe_item(cfg, idir, it, "L4")
+    assert sent == [(b"done", ".m4a")]
+
+
+def test_a_youtube_download_is_the_one_its_info_names(defaults, tmp_path, monkeypatch):
+    """yt-dlp can date a file by the upload (Last-Modified), and a crashed run leaves a .ytdl
+    resume note: this run's file is the ext its info names, and every leftover goes once it's done."""
+    idir = tmp_path / "yt-x"
+    idir.mkdir()
+    (idir / "audio.webm.ytdl").write_text("{}", encoding="utf-8")  # a crashed run's resume note
+    (idir / "audio.webm").write_bytes(b"other format")
+    cfg = {**defaults, "paths": {**defaults["paths"], "modal_runs": tmp_path / "modal_runs.jsonl"}}
+    monkeypatch.setattr(archive.transcribe, "modal_settings", lambda tc, diarize: {})
+    sent = []
+
+    class Worker:
+        class transcribe:
+            @staticmethod
+            def remote(data, suffix, settings):
+                sent.append((data, suffix))
+                raise RuntimeError("stop here")
+
+    monkeypatch.setattr(archive.transcribe, "modal_worker", lambda tc, gpu: Worker)
+
+    class Done:
+        returncode, stdout, stderr = 0, "", ""
+
+    seen = []
+
+    def run_retrying(cfg, *args, retry_on):
+        seen.extend(args)
+        (idir / "audio.m4a").write_bytes(b"this run")
+        os.utime(idir / "audio.m4a", (1_000_000, 1_000_000))  # dated by the upload, years ago
+        (idir / "audio.info.json").write_text(json.dumps({"title": "x", "duration": 60, "ext": "m4a"}),
+                                              encoding="utf-8")
+        return Done(), False
+
+    monkeypatch.setattr(archive.ytdl, "run_retrying", run_retrying)
+    it = {"id": "yt-x", "source": "youtube", "title": "x", "duration_s": 60.0, "url": "https://youtu.be/x"}
+    with pytest.raises(RuntimeError, match="stop here"):
+        archive.transcribe_item(cfg, idir, it, "L4")
+    assert sent == [(b"this run", ".m4a")] and "--no-mtime" in seen

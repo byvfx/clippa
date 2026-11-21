@@ -171,6 +171,7 @@ def refresh_counts(cfg: dict, data: dict, by_id: dict, yt, now: datetime) -> Non
                         "views": int(st.get("viewCount", 0)), "likes": int(st.get("likeCount", 0)),
                         "comments": int(st.get("commentCount", 0)),
                         "checked_at": now.isoformat(timespec="seconds"), **entry_details(cfg, e)})
+            rec.pop("missing", None)  # listed again (private, then public): back in feedback and reports
     gone = [vid for vid in ids if vid in data and data[vid].get("checked_at") != now.isoformat(timespec="seconds")]
     for vid in gone:
         data[vid]["missing"] = True  # deleted or private on YouTube
@@ -344,6 +345,7 @@ def report(cfg: dict, month: str = "", lift: bool = False) -> dict:
                 "category": r.get("category", ""), "score": r.get("score", ""), "topic": r.get("topic", "")}
 
     ranked = sorted(d7, key=lambda r: -r["d7"]["views"])
+    best, worst = best_and_worst(ranked)
     return {
         "month": month, "prev_month": prev, "fetched_at": ch.get("fetched_at", ""),
         "totals": totals(month), "prev_totals": totals(prev),
@@ -355,8 +357,8 @@ def report(cfg: dict, month: str = "", lift: bool = False) -> dict:
         "by_weekday": sorted(_group(d7, lambda r: WEEKDAYS[r["local"].weekday()]),
                              key=lambda g: WEEKDAYS.index(g["key"])),
         "by_hour": sorted(_group(d7, lambda r: f"{r['local'].hour:02d}:00"), key=lambda g: g["key"]),
-        "best": [row(r) for r in ranked[:8]],
-        "worst": [row(r) for r in ranked[-5:][::-1]] if len(ranked) > 8 else [],
+        "best": [row(r) for r in best],
+        "worst": [row(r) for r in worst],
         "traffic": [{**t, "label": TRAFFIC.get(t["source"], t["source"].replace("_", " ").title())}
                     for t in (ch.get("traffic") or {}).get(month, [])],
         "daily": [{"day": d["day"], "views": d["views"], "minutes": d["estimatedMinutesWatched"],
@@ -365,6 +367,12 @@ def report(cfg: dict, month: str = "", lift: bool = False) -> dict:
         "videos": [row(r) for r in sorted(mine, key=lambda r: r["local"])],
         "lift": lift_table(cfg) if lift else [],
     }
+
+
+def best_and_worst(ranked: list, best: int = 8, worst: int = 5) -> tuple[list, list]:
+    """The top `best` of a list ranked best first, and up to `worst` weakest of the rest,
+    weakest first: a video is never in both (with 9 ranked, the weakest is just the 9th)."""
+    return ranked[:best], ranked[best:][-worst:][::-1]
 
 
 def lift_table(cfg: dict) -> list[dict]:

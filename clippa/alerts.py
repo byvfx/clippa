@@ -170,13 +170,13 @@ def checks(cfg: dict, st: dict, now: datetime, digest=None) -> None:
                               f"(warning under {nc['disk_free_gb']} GB)", key="disk")
     if digest and nc["digest_time"] and st["digest"] != now.date().isoformat() \
             and (now.hour, now.minute) >= _hm(nc["digest_time"]):
-        st["digest"] = now.date().isoformat()
         try:
             text = digest(cfg, now)
         except Exception as e:  # noqa: BLE001  # say so once, rather than every pass
             log.warning("digest: %s: %s", type(e).__name__, e)
             text = f"Daily digest failed: {type(e).__name__}: {e}"[:1900]
-        send(cfg, "digest", text, key=f"digest:{now.date()}")
+        if send(cfg, "digest", text, key=f"digest:{now.date()}"):  # not queued: try next pass
+            st["digest"] = now.date().isoformat()
     if "spend" in nc["kinds"]:
         try:  # #49: once an hour, Modal's billing for the month
             from .modalmon import spend_alert

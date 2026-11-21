@@ -14,6 +14,16 @@ Developing#releases.
   (#286, pass 2c): grep for `clipp` to catch lines from before and after. The war room's last-upload
   box and checkup's repeated-error count read both. The bootstrap now adds a `clippa` command to
   `~/.local/bin` beside `clipper` (run it again to get one), and doctor's `command` line checks both.
+- Seven old bugs Grok found while reviewing the rename (#366): a video YouTube lists again after a
+  spell as private counts in Pass B's feedback and the monthly report again; the report's weakest
+  list no longer repeats videos from its best list (9-12 videos); `clipper archive add` skips an
+  unavailable video in a channel listing instead of crashing; `clipper archive transcribe` no longer
+  pays to transcribe a story item that is one of our own streams; a paragraph break added or
+  removed in the Discord Retitle form's description now counts as an edit; a daily digest the bot
+  couldn't queue (a share blip) is tried again the next minute instead of skipped until tomorrow;
+  an archive YouTube retry keeps a download an earlier run finished (the file its info names) and
+  clears every leftover once it is transcribed; and `archive status` / `archive links` count a
+  dead link's transcript where a story item keeps it.
 - The package folder is `clippa/` now (#286, pass 2b), and the project is named `clippa`. Imports,
   `python -m clippa.cli` and the deploy files follow; the `clipper` and `clippa` commands both still
   work, as do `clipper.toml` and the log labels (`clipper.serve: ...`). **After pulling this, reinstall
