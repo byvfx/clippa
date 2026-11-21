@@ -254,10 +254,10 @@ of phone use; #300 (access levels, a local Jev-like classifier in front of the m
   models). PR #356: checks `tools` (yt-dlp age), `signins` (cookies and TikTok/X tokens), `logs` (repeating errors), `approvals`
   (approved items the plan never saw), and the nightly run may open one PR a run through `checkup-pr` (own worktree, tests
   without credentials, never merges). Watch the first week of nightly reports and any `checkup/` PR.
-  **Sign-ins hourly (branch `feat/checkup-signins-hourly`, PR opened 11-21, waiting on its review):** serve's checkup job becomes
+  **Sign-ins hourly (PR #359, merged 11-21; not deployed yet):** serve's checkup job becomes
   `checkup --fix --alert` and reads `signins` too: a sign-in that is gone (bad, not the expiring warnings) is DMed once, when it
-  first shows (`streams/.checkup/alerted.json`), and `clipper status` lists signins findings under "needs you". Needs the
-  review, the merge and a hub deploy.
+  first shows (`streams/.checkup/alerted.json`), and `clipper status` lists signins findings under "needs you". Reaches
+  serve with the next hub deploy; `--alert` has run in tests only (the live sign-in check was clean).
 - **Bootstrap follow-up (11-07):** `deploy/bootstrap.sh` installs Homebrew `ffmpeg`, which has no libass (`subtitles`) filter, so a
   Mac worker fails Short captions; `ffmpeg-full` has it but is keg-only: install it and point clipper at it, or document it.
   `deploy/hub/deploy.sh` from `lofn` needs `deploy/hub/env.local` (it overwrites the NAS `.env`).
