@@ -58,8 +58,10 @@ if [ "$(uname)" = Linux ] && have apt-get; then
   fi
 fi
 
-if [ ! -x .venv/bin/clipper ]; then
-  echo "== Python packages (first sync; setup adds the ones its roles need)"
+# A venv that can't run its command gets synced too: one made before the package moved to
+# clippa/ (#286) still has bin/clipper, but it fails on import.
+if ! .venv/bin/clipper --version >/dev/null 2>&1; then
+  echo "== Python packages (first sync, or a venv that no longer runs; setup adds the ones its roles need)"
   uv sync
 fi
 

@@ -72,8 +72,12 @@ if (-not (Test-Command ffmpeg)) {
     }
 }
 
-if (-not (Test-Path $clipper)) {
-    Write-Host '== Python packages (first sync; setup adds the ones its roles need)'
+# A venv that can't run its command gets synced too: one made before the package moved to
+# clippa/ (#286) still has clipper.exe, but it fails on import.
+$runs = $false
+if (Test-Path $clipper) { & $clipper --version *> $null; $runs = ($LASTEXITCODE -eq 0) }
+if (-not $runs) {
+    Write-Host '== Python packages (first sync, or a venv that no longer runs; setup adds the ones its roles need)'
     uv sync
     if ($LASTEXITCODE -ne 0) { throw 'uv sync failed' }
 }
