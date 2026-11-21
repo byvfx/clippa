@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 from conftest import ROOT
 
-from clipper import config
-from clipper.errors import ClipperError
+from clippa import config
+from clippa.errors import ClipperError
 
 TOML = """
 [meta]
@@ -85,9 +85,9 @@ def test_unknown_show_is_refused(cfg_path):
 
 
 def test_defaults_toml_is_the_single_source():
-    """clipper/defaults.toml is DEFAULTS: every key there, documented, and the None defaults
+    """clippa/defaults.toml is DEFAULTS: every key there, documented, and the None defaults
     (TOML has no null) as commented lines there plus config.NONE_DEFAULTS."""
-    text = (ROOT / "clipper" / "defaults.toml").read_text(encoding="utf-8")
+    text = (ROOT / "clippa" / "defaults.toml").read_text(encoding="utf-8")
     data = tomllib.loads(text)
     for (s, k), v in config.NONE_DEFAULTS.items():
         assert v is None and k not in data[s] and f"# {k} =" in text, (s, k)
@@ -189,7 +189,7 @@ def test_explain_lists_each_layer(cfg_path, tmp_path, monkeypatch):
 
 
 def test_setup_starter_config_is_clean(tmp_path):
-    from clipper import setup
+    from clippa import setup
     path = tmp_path / "clipper.toml"
     path.write_text(setup.NEW_CONFIG, encoding="utf-8")
     cfg = config.load(path, use_local=False)
@@ -333,7 +333,7 @@ INSTALL = re.compile(r"(?<![a-z])(kino|lolcow|andy|ppp|jer|jeremy|hambly|quarter
 
 def test_defaults_example_and_setup_name_no_install():
     hits = []
-    for f in ("clipper/defaults.toml", "clipper/config.py", "clipper.example.toml", "clipper/setup.py", "clipper/cli.py"):
+    for f in ("clippa/defaults.toml", "clippa/config.py", "clipper.example.toml", "clippa/setup.py", "clippa/cli.py"):
         for i, line in enumerate((ROOT / f).read_text(encoding="utf-8").splitlines(), 1):
             m = INSTALL.search(line)
             if m:

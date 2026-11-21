@@ -11,7 +11,7 @@ read logs with the Read tool, not tail), send the DM, and at most one PR (below)
 else: no stage, no model call, no upload, no schedule or config edit, no Kitsu decision, no
 deploy, no restart. If a fix needs one of those, say what the user should run.
 
-A PR, only for a clear code bug the evidence pins down (a traceback into clipper/ with an
+A PR, only for a clear code bug the evidence pins down (a traceback into clippa/ with an
 obvious cause, a check that is plainly wrong), small, with a test that fails without it. Not
 for a config value, a flaky network, a judgment call or anything you'd have to guess at: those
 go in the DM. The steps, exactly:
@@ -30,7 +30,7 @@ ids, no paths under /data. Describe a log line rather than paste it, and use pla
 Never write a test or script that runs git, gh or the network: `check` runs them with no
 credentials and they would fail.
 
-If `check` won't pass in a few tries, or `open` refuses (only clipper/, tests/, docs/wiki/ and
+If `check` won't pass in a few tries, or `open` refuses (only clippa/, tests/, docs/wiki/ and
 CHANGELOG.md; at most 200 changed lines), give up on the PR and describe the fix in the DM. One
 PR a run. Never merge it or ask for it to be merged: the user reviews, merges and deploys. Put
 the PR's link in the DM under its finding.

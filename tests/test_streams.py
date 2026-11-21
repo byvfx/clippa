@@ -4,8 +4,8 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from clipper import jsonstate, media, streams
-from clipper.errors import ClipperError
+from clippa import jsonstate, media, streams
+from clippa.errors import ClipperError
 
 
 @pytest.fixture

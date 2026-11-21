@@ -1,0 +1,237 @@
+"""Notifications (#22): Discord DMs from the bot when something needs you.
+
+Usage:
+    clipper alert test            queue a test DM (the bot sends it within a minute)
+    clipper alert digest          print today's digest (--send: DM it now)
+    clipper alert send TEXT       queue TEXT ('-': stdin) as a DM, kind --kind (default checkup)
+
+Any clipper process (the worker, the NAS recorder, uploads, the bot) calls
+`alerts.send(cfg, kind, text)`, which drops one small JSON file into
+streams/.notify/outbox/ (the streams share every machine already reaches). The bot, the one
+process that is always up and has the Discord token, picks them up every minute and DMs
+[notify] user_id (default: the first [discord] allowed user):
+- only the kinds in [notify] kinds: ready (a stream is in review), upload (upload or TikTok
+  failed, YouTube limits, sign-in expired), failure (a stage failed after its retries, a
+  crash, a background job failing), recorder (stalls, crashes, finalize failures), disk
+  (the streams share filling up), digest (daily summary at digest_time), spend (Modal's
+  month passing each [modal] alert_every_usd, checked hourly), checkup (the nightly
+  `clipper checkup` report, deploy/claude/checkup.sh; a sign-in that is gone, from serve's
+  hourly `checkup --alert`);
+- the same problem (same key) at most once per cooldown_hours;
+- nothing during quiet_hours: held, then sent together when they end.
+The bot itself adds the disk check, the digest and "can't read the streams share" (which
+the outbox can't carry).
+"""
+
+from __future__ import annotations
+
+import itertools
+import json
+import logging
+import os
+import re
+import shutil
+import socket
+import time
+from datetime import datetime, timedelta
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+import requests
+
+from . import config, jsonstate
+from .errors import ClipperError
+
+log = logging.getLogger("clipper.alerts")
+
+_SEQ = itertools.count()
+ICON = {"ready": "🎬", "upload": "📤", "failure": "❌", "recorder": "🔴", "disk": "💾",
+        "digest": "📰", "spend": "💸", "checkup": "🩺", "test": "🔔"}
+
+
+def outbox(cfg: dict) -> Path:
+    return Path(cfg["paths"]["streams"]) / ".notify" / "outbox"
+
+
+def send(cfg: dict, kind: str, text: str, key: str = "") -> bool:
+    """Queue a notification for the bot. Never raises: a lost alert mustn't stop the caller;
+    False when it couldn't be queued.
+    key: what counts as "the same problem" for cooldown_hours (default: the text, digits
+    ignored, so "no video for 61 s" and "... 75 s" are one)."""
+    try:
+        d = outbox(cfg)
+        d.mkdir(parents=True, exist_ok=True)
+        ev = {"kind": kind, "text": text, "key": key or f"{kind}:{re.sub(r'[0-9]+', '#', text)[:80]}",
+              "at": datetime.now().astimezone().isoformat(timespec="seconds"),
+              "host": socket.gethostname()}
+        # Sorts by time (then order within this process); unique across machines.
+        name = f"{time.time_ns()}-{os.getpid()}-{next(_SEQ):06d}-{os.urandom(2).hex()}.json"
+        tmp = d / f"{name}.tmp"  # whole files only: other machines read this folder
+        tmp.write_text(json.dumps(ev, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(d / name)
+        return True
+    except OSError as e:
+        log.warning("notification not queued (%s): %s", e, text)
+        return False
+
+
+class Alerts:
+    """Log every alert; also post to Discord through a webhook URL (env var named by
+    [record] alert_webhook_env) or the review bot's token into alert_channel_id. The recorder,
+    the worker and TikTok captions use it; warnings also go to the bot's outbox (send)."""
+
+    def __init__(self, cfg: dict):
+        rc = cfg["record"]
+        self.webhook = (config.getenv(rc["alert_webhook_env"]) or "").strip()
+        self.channel = str(rc["alert_channel_id"] or "")
+        self.cfg = cfg
+        self.mention = rc["alert_mention"]
+
+    def __call__(self, text: str, level: int = logging.WARNING, kind: str | None = "auto",
+                 key: str = "") -> None:
+        log.log(level, "ALERT %s", text)
+        if kind == "auto":  # the recorder's: warnings are DMs (#22), news like "is live" isn't
+            kind = "recorder" if level >= logging.WARNING else None
+        if kind:
+            send(self.cfg, kind, text, key)
+        body = f"{self.mention} {text}".strip() if level >= logging.WARNING else text
+        try:
+            if self.webhook:
+                requests.post(self.webhook, json={"content": body[:1900]}, timeout=20)
+            elif self.channel:
+                from . import notify
+
+                notify.Rest(self.cfg)("POST", f"/channels/{self.channel}/messages",
+                                      {"content": body[:1900]})
+        except (requests.RequestException, ClipperError) as e:
+            log.error("alert not delivered: %s", e)
+
+
+# ---------- the bot's side ----------
+
+def _tz(cfg: dict) -> ZoneInfo:
+    return ZoneInfo(cfg["schedule"]["timezone"])
+
+
+def _hm(s: str) -> tuple[int, int]:
+    """"HH:MM" -> (h, m); a ClipperError names the setting (config.problems warns at load,
+    doctor fails, and the bot's notify loop logs the reason instead of a traceback)."""
+    try:
+        h, m = s.strip().split(":")
+        h, m = int(h), int(m)
+        if not (0 <= h < 24 and 0 <= m < 60):
+            raise ValueError
+    except ValueError:
+        raise ClipperError(f"[notify] quiet_hours / digest_time: {s.strip()!r} isn't HH:MM") from None
+    return h, m
+
+
+def quiet(cfg: dict, now: datetime) -> bool:
+    q = cfg["notify"]["quiet_hours"].strip()
+    if not q:
+        return False
+    a, b = (_hm(x) for x in q.split("-"))
+    t = (now.hour, now.minute)
+    return a <= t < b if a <= b else t >= a or t < b  # "23:00-07:00" wraps midnight
+
+
+def _state_path(cfg: dict) -> Path:
+    return Path(cfg["paths"]["streams"]) / ".notify" / "state.json"
+
+
+def load_state(cfg: dict) -> dict:
+    try:
+        st = jsonstate.load(_state_path(cfg))
+    except (OSError, ValueError):
+        st = {}
+    return {"sent": {}, "digest": "", "disk_at": 0.0, **st}
+
+
+def save_state(cfg: dict, st: dict) -> None:
+    now = datetime.now().astimezone()
+    keep = timedelta(days=7)  # cooldowns are hours; don't let the file grow forever
+    st["sent"] = {k: v for k, v in st["sent"].items() if now - datetime.fromisoformat(v) < keep}
+    p = _state_path(cfg)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    jsonstate.write(p, st, indent=1)
+
+
+def checks(cfg: dict, st: dict, now: datetime, digest=None) -> None:
+    """The bot's own checks, queued like any other alert: the disk once an hour, the
+    digest once a day at digest_time. digest: (cfg, now) -> the text (the bot passes
+    clippa.digest.text); None queues no digest, so this module never reads the war room."""
+    nc = cfg["notify"]
+    if time.time() - st["disk_at"] >= 3600 and nc["disk_free_gb"]:
+        st["disk_at"] = time.time()
+        root = Path(cfg["paths"]["streams"])
+        free = shutil.disk_usage(root).free / 1e9
+        if free < nc["disk_free_gb"]:
+            send(cfg, "disk", f"the streams share ({root}) has {free:.0f} GB free "
+                              f"(warning under {nc['disk_free_gb']} GB)", key="disk")
+    if digest and nc["digest_time"] and st["digest"] != now.date().isoformat() \
+            and (now.hour, now.minute) >= _hm(nc["digest_time"]):
+        st["digest"] = now.date().isoformat()
+        try:
+            text = digest(cfg, now)
+        except Exception as e:  # noqa: BLE001  # say so once, rather than every pass
+            log.warning("digest: %s: %s", type(e).__name__, e)
+            text = f"Daily digest failed: {type(e).__name__}: {e}"[:1900]
+        send(cfg, "digest", text, key=f"digest:{now.date()}")
+    if "spend" in nc["kinds"]:
+        try:  # #49: once an hour, Modal's billing for the month
+            from .modalmon import spend_alert
+
+            spend_alert(cfg, st)
+        except Exception as e:  # noqa: BLE001  # no modal extra, signed out, Modal down
+            log.debug("modal spend check: %s", e)
+
+
+def pending(cfg: dict, link: str = "", digest=None) -> tuple[list[str], list[Path], dict]:
+    """What to DM now: the messages (each under Discord's 2000 characters), the outbox files
+    they cover and the state to save once they're sent. Nothing during quiet hours.
+    digest: see checks()."""
+    nc, tz = cfg["notify"], _tz(cfg)
+    now = datetime.now(tz)
+    st = load_state(cfg)
+    checks(cfg, st, now, digest)
+    d = outbox(cfg)
+    files = sorted(d.glob("*.json")) if d.is_dir() else []
+    if not files or quiet(cfg, now):
+        save_state(cfg, st)
+        return [], [], st
+    lines, linked = [], False
+    for f in files:
+        try:
+            ev = jsonstate.load(f)
+        except (OSError, ValueError):
+            continue
+        if ev["kind"] not in nc["kinds"] and ev["kind"] != "test":
+            continue
+        last = st["sent"].get(ev["key"])
+        if last and ev["kind"] != "test" \
+                and now - datetime.fromisoformat(last) < timedelta(hours=nc["cooldown_hours"]):
+            continue
+        st["sent"][ev["key"]] = now.isoformat(timespec="seconds")
+        at = datetime.fromisoformat(ev["at"]).astimezone(tz)
+        when = f"[{at:%a %H:%M}] " if now - at > timedelta(minutes=10) else ""  # held or late
+        lines.append(f"{ICON.get(ev['kind'], '•')} {when}{ev['text']}")
+        linked |= ev["kind"] in ("ready", "digest", "test")
+    if lines and link and linked:
+        lines.append(f"War room: {link}")
+    msgs, cur = [], ""
+    for line in lines:
+        line = line[:1900]
+        if cur and len(cur) + len(line) + 1 > 1900:
+            msgs.append(cur)
+            cur = ""
+        cur = f"{cur}\n{line}" if cur else line
+    if cur:
+        msgs.append(cur)
+    return msgs, files, st
+
+
+def done(cfg: dict, files: list[Path], st: dict) -> None:
+    """After the DMs went out: drop the outbox files, remember what was sent."""
+    for f in files:
+        f.unlink(missing_ok=True)
+    save_state(cfg, st)

@@ -4,11 +4,11 @@ this page is the short version.
 ## Layout
 
 ```
-clipper/              the package, one module per stage, cli.py wires them
-clipper/prompts/      the prompt files, versioned, shipped inside the package; the version in use is set in clipper.toml
+clippa/              the package, one module per stage, cli.py wires them
+clippa/prompts/      the prompt files, versioned, shipped inside the package; the version in use is set in clipper.toml
 deploy/               bootstrap (new machine); compose stacks for the NAS hub (serve, bot, worker), the recorder, Kitsu and Claude; Windows task scripts for a GPU worker
 streams/<id>/         one folder per stream: source, transcript, cuts, metadata, review state
-clipper/defaults.toml every setting with its default, documented; config.py loads it (clipper.example.toml is a starter clipper.toml)
+clippa/defaults.toml every setting with its default, documented; config.py loads it (clipper.example.toml is a starter clipper.toml)
 tests/                offline tests (pytest); CI runs them and ruff on every push
 docs/wiki/            these pages; pushed to the wiki on every push to main
 HANDOFF.md            current state between work sessions (short); docs/log/ has the dated diary
@@ -18,24 +18,24 @@ reports/              the monthly analytics reports (the old audits are in docs/
 
 ## Shape
 
-- Every pipeline stage is a `clipper <stage>` subcommand, wired in `clipper/cli.py`, one module
-  per stage. A new pipeline stage is also a row in `clipper/stages.py`, which the worker and
+- Every pipeline stage is a `clipper <stage>` subcommand, wired in `clippa/cli.py`, one module
+  per stage. A new pipeline stage is also a row in `clippa/stages.py`, which the worker and
   `clipper run` read.
 - Stages read and write files in `streams/<id>/` and are idempotent. JSON state goes through
-  `clipper/jsonstate.py`.
-- Config: defaults in `clipper/config.py` < `clipper.toml` < `clipper.local.toml` < `CLIPPER_*`
+  `clippa/jsonstate.py`.
+- Config: defaults in `clippa/config.py` < `clipper.toml` < `clipper.local.toml` < `CLIPPER_*`
   env ([Configuration](Configuration)). Use `config.for_stream(cfg, sdir)` whenever a stream is known; `config.base(cfg)` is the config
   before any override. A two-letter section alias (`sc`, `rc`, `wc`) only in a module that reads
   one section; elsewhere spell the section out.
-- Model calls go through `clipper/llm.py`; the provider is the model string's prefix
+- Model calls go through `clippa/llm.py`; the provider is the model string's prefix
   ([Model providers](Model-providers)).
-- Library code raises `ClipperError` (`clipper/errors.py`); only `cli.main` exits.
-- Prompts are `clipper/prompts/<name>_<version>.md`, inside the package (`[paths] prompts` adds a
+- Library code raises `ClipperError` (`clippa/errors.py`); only `cli.main` exits.
+- Prompts are `clippa/prompts/<name>_<version>.md`, inside the package (`[paths] prompts` adds a
   folder of your own, read first); `prompts.VERSIONS` names the config key that holds each one's
   version (doctor and a test read it). Add a new version rather than editing one that produced
   reviewed output.
 - Kitsu is the record for review decisions; the bot and the war room act through
-  `clipper/actions.py`.
+  `clippa/actions.py`.
 - Stages print, services log. A `clipper <stage>` prints its progress (the worker and serve copy
   a child's output into `run_<stage>.log` and `serve.log`); serve, the bot, the worker and the
   recorder log through `logging`, never `print`. The processes share state through the streams
@@ -46,12 +46,12 @@ reports/              the monthly analytics reports (the old audits are in docs/
 
 Each step is checked by a test where it can be, so a missing one fails `pytest`, not a user:
 
-1. The parser and `cmd_<name>` in `clipper/cli.py`, in its group's `add_<group>`, and the name in
+1. The parser and `cmd_<name>` in `clippa/cli.py`, in its group's `add_<group>`, and the name in
    `COMMAND_GROUPS` (test).
-2. Its settings in `clipper/defaults.toml`, a comment on each (that file is the documentation;
+2. Its settings in `clippa/defaults.toml`, a comment on each (that file is the documentation;
    `config.DEFAULTS` is it loaded; a None default is a commented line there plus
    `config.NONE_DEFAULTS`). Nothing machine- or show-specific in a default (test).
-3. A pipeline stage is also a row in `clipper/stages.py` (test).
+3. A pipeline stage is also a row in `clippa/stages.py` (test).
 4. A `clipper doctor` check when it needs a key, a service or a file, with the fix in the message.
 5. A wiki page or section, in the sidebar (test), and `wiki.page(...)` links in its messages (test).
 6. Tests for its pure logic in `tests/`, and the cost printed before any model call it makes. A
@@ -97,10 +97,10 @@ A release is a git tag `vX.Y.Z` on main. Pushing the tag makes the GitHub Releas
 (`.github/workflows/release.yml`): the wheel and sdist, with the **lead** of that version's
 section of `CHANGELOG.md` (its lines before the first `###`: a sentence on what the release is
 and a short list of highlights) as the notes, and a link to the whole file for the detail by date.
-The number is the last release's, in `clipper/__init__.py`,
+The number is the last release's, in `clippa/__init__.py`,
 `pyproject.toml` and the `clipper` entry of `uv.lock`; a test keeps the first two equal and
 `uv lock --check` the third. Between releases a copy says which commit it is
-(`clipper/buildinfo.py`): `0.2.0` on the tag, `0.2.0+3.g570bb87` three commits past it, `.dirty`
+(`clippa/buildinfo.py`): `0.2.0` on the tag, `0.2.0+3.g570bb87` three commits past it, `.dirty`
 with uncommitted changes. The NAS containers have no `.git`, so `deploy/hub/deploy.sh` and
 `deploy/record/deploy.sh` write the checkout's `git describe` into the image
 (`deploy/stamp.sh`); serve, the bot and the recorder put the result in their heartbeats and
@@ -130,7 +130,7 @@ or publishes anything; it deploys nothing. Tags are `vX.Y.Z`, or `v0.3.0rc1` for
 
 ## Code review on PRs
 
-A PR that changes code (`clipper/`, `tests/`, `deploy/`, `.github/`, `pyproject.toml`) gets two
+A PR that changes code (`clippa/`, `tests/`, `deploy/`, `.github/`, `pyproject.toml`) gets two
 reviews (since 2026-11-13):
 
 1. **Claude, locally, before the first push.** Claude Code runs its `code-review` skill on the

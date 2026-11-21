@@ -10,6 +10,11 @@ Developing#releases.
 
 ## Unreleased
 
+- The package folder is `clippa/` now (#286, pass 2b), and the project is named `clippa`. Imports,
+  `python -m clippa.cli` and the deploy files follow; the `clipper` and `clippa` commands both still
+  work, as do `clipper.toml` and the log labels (`clipper.serve: ...`). **After pulling this, reinstall
+  the project in your venv once**, or the `clipper` command fails to import:
+  `uv pip uninstall clipper`, then `uv pip install --no-deps -e .` (or a `uv sync` with your extras).
 - New Discord review buttons are sent as `clippa:...` and new Kitsu bot notes start with `[clippa]`
   (#286, pass 2a). Cards and notes from before still work: the bot answers both button prefixes and
   sync still tells both kinds of note from a reviewer's comment.

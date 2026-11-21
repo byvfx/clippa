@@ -4,8 +4,8 @@ import tomllib
 import pytest
 from conftest import ROOT
 
-from clipper import __version__, buildinfo, cli, stages
-from clipper.errors import ClipperError
+from clippa import __version__, buildinfo, cli, stages
+from clippa.errors import ClipperError
 
 
 def commands() -> dict[str, argparse.ArgumentParser]:
@@ -111,7 +111,7 @@ def test_every_argument_and_command_has_help():
     help is argparse's own."""
     import ast
 
-    tree = ast.parse((ROOT / "clipper" / "cli.py").read_text(encoding="utf-8"))
+    tree = ast.parse((ROOT / "clippa" / "cli.py").read_text(encoding="utf-8"))
     bare = [f"cli.py:{n.lineno}" for n in ast.walk(tree)
             if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
             and n.func.attr in ("add_argument", "add_parser")

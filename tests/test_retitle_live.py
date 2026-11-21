@@ -5,9 +5,9 @@ import json
 
 import pytest
 
-from clipper import actions, catalog, jsonstate, youtube
-from clipper.errors import ClipperError
-from clipper.warroom import review as wr
+from clippa import actions, catalog, jsonstate, youtube
+from clippa.errors import ClipperError
+from clippa.warroom import review as wr
 
 KEY = "kick-1/s02_blade"
 

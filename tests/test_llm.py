@@ -1,12 +1,12 @@
-"""The provider routing in clipper/llm.py (#72), against a fake chat/completions server."""
+"""The provider routing in clippa/llm.py (#72), against a fake chat/completions server."""
 from __future__ import annotations
 
 import copy
 
 import pytest
 
-from clipper import costs, doctor, llm
-from clipper.errors import ClipperError
+from clippa import costs, doctor, llm
+from clippa.errors import ClipperError
 
 
 class FakeResponse:
@@ -253,7 +253,7 @@ def test_prices_match_the_longest_listed_prefix():
 def test_a_401_is_a_rejected_key_not_a_retry(posted, monkeypatch, defaults):
     """A provider's 401 raises KeyRejected (exit KEY_REJECTED, which the worker holds a
     stream on) after one request; other errors stay RuntimeError."""
-    from clipper.errors import KEY_REJECTED, KeyRejected
+    from clippa.errors import KEY_REJECTED, KeyRejected
 
     sent, replies = posted
     monkeypatch.setenv("OPENROUTER_API_KEY", "k")
@@ -280,7 +280,7 @@ def test_the_keys_fingerprint_changes_with_a_key_and_hides_it(monkeypatch, tmp_p
 
 
 def test_geminis_400_for_a_bad_key_is_a_rejected_key(posted, monkeypatch, defaults):
-    from clipper.errors import KeyRejected
+    from clippa.errors import KeyRejected
 
     sent, replies = posted
     monkeypatch.setenv("GEMINI_API_KEY", "k")
@@ -297,8 +297,8 @@ def test_a_key_file_that_cant_be_read_raises_rather_than_seeming_to_change(monke
 
 
 def test_cli_exits_key_rejected_on_a_claude_auth_error_past_the_preflight(monkeypatch, capsys):
-    from clipper import cli
-    from clipper.errors import KEY_REJECTED
+    from clippa import cli
+    from clippa.errors import KEY_REJECTED
 
     auth = type("AuthenticationError", (Exception,), {"__module__": "anthropic._exceptions"})
     monkeypatch.setattr(cli, "run_command", lambda args: (_ for _ in ()).throw(auth("invalid x-api-key")))

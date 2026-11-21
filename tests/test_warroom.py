@@ -5,8 +5,8 @@ from http.server import ThreadingHTTPServer
 
 import pytest
 
-from clipper import actions, warroom
-from clipper.errors import ClipperError
+from clippa import actions, warroom
+from clippa.errors import ClipperError
 
 
 @pytest.fixture
@@ -120,7 +120,7 @@ def test_the_page_has_no_mis_encoded_text():
 def test_faces_window(tmp_path, defaults, monkeypatch):
     import numpy as np
 
-    from clipper import faces, jsonstate
+    from clippa import faces, jsonstate
 
     cfg = {**defaults, "paths": {**defaults["paths"], "streams": tmp_path, "faces": str(tmp_path / "known")}}
     monkeypatch.setattr(warroom.faces, "for_stream", lambda c, sdir: cfg)
@@ -155,7 +155,7 @@ def test_faces_window(tmp_path, defaults, monkeypatch):
 
 
 def test_face_pick_grabs_the_cut_or_a_compilations_preview(tmp_path, defaults, monkeypatch):
-    from clipper import faces
+    from clippa import faces
 
     cfg = {**defaults, "paths": {**defaults["paths"], "streams": tmp_path}}
     sdir = tmp_path / "kick-1"
@@ -179,7 +179,7 @@ def test_face_pick_grabs_the_cut_or_a_compilations_preview(tmp_path, defaults, m
 
 
 def test_investigations_list_newest_first_and_render_the_one_asked_for(defaults, tmp_path):
-    from clipper import jsonstate
+    from clippa import jsonstate
 
     defaults["paths"]["archive"] = tmp_path
     for subject, made in (("jer", "2026-11-03T00:00:00+00:00"), ("dsp", "2026-11-04T00:00:00+00:00")):
@@ -198,7 +198,7 @@ def test_investigations_list_newest_first_and_render_the_one_asked_for(defaults,
 def test_next_slot_for_every_segment_leaves_out_a_full_budget(tmp_path, defaults, monkeypatch):
     from datetime import UTC, datetime, timedelta
 
-    from clipper import jsonstate, schedule
+    from clippa import jsonstate, schedule
 
     cfg = {**defaults, "paths": {**defaults["paths"], "streams": tmp_path, "schedule": tmp_path / "schedule.json"}}
     jsonstate.write(cfg["paths"]["schedule"], {"entries": []})
@@ -232,7 +232,7 @@ def test_next_slot_for_every_segment_leaves_out_a_full_budget(tmp_path, defaults
 
 
 def test_hidden_shows_leave_the_page(tmp_path):
-    from clipper import config
+    from clippa import config
     path = tmp_path / "clipper.toml"
     path.write_text('[warroom]\nhide_shows = ["trish"]\n[shows.kino]\nchannels = ["k"]\n'
                     '[shows.trish]\nchannels = ["t"]\n', encoding="utf-8")
@@ -315,7 +315,7 @@ def test_signed_out_page_is_a_page(serve):
 
 def test_retake_cost():
     """#203: the mean of recent retakes that recorded a cost, and this month's."""
-    from clipper.warroom.data import retake_cost
+    from clippa.warroom.data import retake_cost
 
     hs = [{"at": "2026-11-12T10:00:00+00:00", "cost_usd": 0.03}, {"at": "2026-11-01T10:00:00+00:00", "cost_usd": 0.01},
           {"at": "2026-11-01T09:00:00+00:00"}, {"at": "2026-10-30T10:00:00+00:00", "cost_usd": 0.02}]
@@ -332,8 +332,8 @@ def test_cast_find_estimate(tmp_path, defaults):
     """#203: a Find's label cost before it runs, from past cast label calls in the costs log."""
     import json
 
-    from clipper import costs
-    from clipper.warroom.cast import find_estimate
+    from clippa import costs
+    from clippa.warroom.cast import find_estimate
 
     log = tmp_path / "costs.jsonl"
     cfg = {**defaults, "paths": {**defaults["paths"], "costs": log}}
@@ -363,7 +363,7 @@ def test_page_scripts_parse():
 
 
 def test_log_tail_filters_and_blanks_secrets(tmp_path, defaults, monkeypatch):
-    from clipper.warroom import logview
+    from clippa.warroom import logview
     log = tmp_path / "serve.log"
     log.write_text("".join(f"2026-11-13 10:00:{k:02d} INFO    clipper.serve: job {k} ok\n" for k in range(50))
                    + "2026-11-13 10:01:00 WARNING clipper.warroom: kick-1: KeyError: 'x'\n"
@@ -384,7 +384,7 @@ def test_log_tail_filters_and_blanks_secrets(tmp_path, defaults, monkeypatch):
 
 
 def test_log_tail_reads_only_the_end_of_a_big_file(tmp_path, monkeypatch):
-    from clipper.warroom import logview
+    from clippa.warroom import logview
     monkeypatch.setattr(logview, "TAIL_BYTES", 100)
     p = tmp_path / "x.log"
     p.write_text("".join(f"line {k:04d}\n" for k in range(1000)), encoding="utf-8")
@@ -393,7 +393,7 @@ def test_log_tail_reads_only_the_end_of_a_big_file(tmp_path, monkeypatch):
 
 
 def test_log_scrub_covers_secret_files_and_url_keys(tmp_path, defaults, monkeypatch):
-    from clipper.warroom import logview
+    from clippa.warroom import logview
     sec = tmp_path / "secrets"
     sec.mkdir()
     (sec / "dvids_secret.txt").write_text("pubkey-0123456789\nsecretkey-abcdefghij\n", encoding="utf-8")
@@ -412,7 +412,7 @@ def test_log_scrub_covers_secret_files_and_url_keys(tmp_path, defaults, monkeypa
 
 def test_log_filters_see_only_scrubbed_text(tmp_path, defaults, monkeypatch):
     """Copilot on #244: a filter on the raw line would confirm a key's prefix; short keys count too."""
-    from clipper.warroom import logview
+    from clippa.warroom import logview
     monkeypatch.setenv("SOME_API_KEY", "k3y9")
     log = tmp_path / "serve.log"
     log.write_text("ERROR called with k3y9 and sk-live-abcdef123456\n", encoding="utf-8")
@@ -429,7 +429,7 @@ def test_the_chat_page_is_its_own(tmp_path, defaults):
     """/chat (#158): its own markup, style and script beside the war room's, served by the same
     server behind the same key. The war room shows that same page in a frame at its side, so the
     two share one code path; it never loads the chat's script or style itself."""
-    from clipper.warroom import httpd
+    from clippa.warroom import httpd
 
     html = httpd.PAGES["/chat"].read_text(encoding="utf-8")
     assert '<script src="/chat.js"></script>' in html and '<link rel="stylesheet" href="/chat.css">' in html
@@ -447,7 +447,7 @@ def test_the_chat_page_is_its_own(tmp_path, defaults):
 def test_the_look_has_its_fonts_and_one_icon_set():
     """The default look's fonts ship in web/fonts/ and serve sends them; every icon the page and
     its scripts ask for is in the one sprite, and no emoji stands in for one."""
-    from clipper.warroom import httpd
+    from clippa.warroom import httpd
 
     theme = (warroom.WEB / "themes" / "warroom.css").read_text(encoding="utf-8")
     fonts = re.findall(r'url\("\.\./fonts/([\w.-]+)"\)', theme)
@@ -476,7 +476,7 @@ def test_the_look_has_its_fonts_and_one_icon_set():
 
 
 def test_heat_buckets_keep_the_hottest_second_and_the_gaps():
-    from clipper.warroom import heat
+    from clippa.warroom import heat
 
     nan = float("nan")
     assert heat.buckets([]) == (1, [])
@@ -488,7 +488,7 @@ def test_heat_buckets_keep_the_hottest_second_and_the_gaps():
 
 
 def test_heat_windows_without_their_numbers_are_left_out():
-    from clipper.warroom import heat
+    from clippa.warroom import heat
 
     w = {"start_s": 1, "end_s": 9, "peak_s": 5, "heat": 2.5}
     got = heat.windows([{**w, "heat": None}, {**w, "chat_z": "7", "transcript_peak": None}, {**w, "rank": 9, "end_s": float("nan")}])
@@ -497,7 +497,7 @@ def test_heat_windows_without_their_numbers_are_left_out():
 
 
 def test_heat_state_is_one_word_for_where_an_item_is():
-    from clipper.warroom import heat
+    from clippa.warroom import heat
 
     row = lambda **kw: {"decision": "pending", "scheduled": "", "uploaded": False, **kw}
     assert heat.state_of(None) == "cut"
@@ -513,7 +513,7 @@ def test_heat_window_gives_the_curve_the_windows_and_where_each_item_sits(tmp_pa
     import pyarrow as pa
     import pyarrow.parquet as pq
 
-    from clipper import jsonstate
+    from clippa import jsonstate
 
     cfg = {**defaults, "paths": {**defaults["paths"], "streams": tmp_path, "schedule": tmp_path / "schedule.json"}}
     monkeypatch.setattr(warroom.heat, "for_stream", lambda c, sdir: cfg)
@@ -573,7 +573,7 @@ def test_heat_window_gives_the_curve_the_windows_and_where_each_item_sits(tmp_pa
 def test_a_stream_says_when_it_ended_and_when_its_items_may_go_out(tmp_path, defaults):
     """The Schedule's Week and Timeline: a finished stream's end, and kick_first_hours after it;
     a recording (no duration yet) or a hand-made meta.json has neither, and the page still loads."""
-    from clipper import jsonstate
+    from clippa import jsonstate
 
     cfg = {**defaults, "paths": {**defaults["paths"], "streams": tmp_path}}
     done = tmp_path / "kick-1"
@@ -597,7 +597,7 @@ def test_the_schedule_sends_upload_times_and_slots_to_the_horizon(tmp_path, defa
     from datetime import datetime, timedelta
     from zoneinfo import ZoneInfo
 
-    from clipper import jsonstate
+    from clippa import jsonstate
 
     cfg = {**defaults, "paths": {**defaults["paths"], "streams": tmp_path, "schedule": tmp_path / "schedule.json"}}
     monkeypatch.setattr(warroom.review, "all_rows", lambda c: [])
@@ -617,7 +617,7 @@ def test_a_taken_slot_past_three_weeks_is_not_offered_again(tmp_path, defaults, 
     # PR #329 review: entries were cut at 21 days while the open slots went to horizon_days.
     from datetime import datetime, timedelta
 
-    from clipper import jsonstate
+    from clippa import jsonstate
 
     cfg = {**defaults, "schedule": {**defaults["schedule"], "horizon_days": 28},
            "paths": {**defaults["paths"], "streams": tmp_path, "schedule": tmp_path / "schedule.json"}}

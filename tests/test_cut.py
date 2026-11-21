@@ -1,7 +1,7 @@
 from pytest import approx
 
-from clipper import cut, jsonstate
-from clipper.cut import compilation_parts
+from clippa import cut, jsonstate
+from clippa.cut import compilation_parts
 
 
 def seg(id, start, end, cut_start=None):
@@ -30,7 +30,7 @@ def test_parts_out_of_stream_order_keep_their_own_ends():
 
 
 def test_part_offsets_are_exact():
-    from clipper.cut import part_offsets
+    from clippa.cut import part_offsets
     spans = [(98.0, 195.04), (195.04, 300.0), (497.0, 600.0)]
     assert part_offsets(spans) == [[98.0, 195.04, 0.0], [195.04, 300.0, 97.04], [497.0, 600.0, 202.0]]
 

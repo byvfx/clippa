@@ -1,10 +1,10 @@
-"""Scoring (clipper/scoring.py): the paid-rerun guard, Pass B hygiene (its picks are kept
+"""Scoring (clippa/scoring.py): the paid-rerun guard, Pass B hygiene (its picks are kept
 candidates, each once), the windows.json hash, and pick numbers that survive re-scores."""
 import pytest
 
-from clipper import jsonstate, scoring
-from clipper.errors import ClipperError
-from clipper.states import carry_numbers
+from clippa import jsonstate, scoring
+from clippa.errors import ClipperError
+from clippa.states import carry_numbers
 
 
 def test_score_refuses_a_paid_rerun_without_force(defaults, tmp_path):
@@ -34,7 +34,7 @@ class FakePrompts:
 
 def test_pass_b_picks_are_kept_candidates_once(defaults, monkeypatch):
     monkeypatch.setattr(scoring, "feedback_block", lambda cfg, key: "", raising=False)
-    from clipper import analytics
+    from clippa import analytics
     monkeypatch.setattr(analytics, "feedback_block", lambda cfg, key: "")
     kept = [{"id": "t01", "in_s": 0, "out_s": 10, "short_in_s": 0, "short_out_s": 5, "category": "c",
              "score": 8, "heat": 1.0, "hook": "h", "title": "t", "why": "w"}]

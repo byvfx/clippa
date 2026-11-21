@@ -1,11 +1,11 @@
-"""clipper/serve.py: the jobs table, its heartbeat, and the bot's client to it."""
+"""clippa/serve.py: the jobs table, its heartbeat, and the bot's client to it."""
 import threading
 from http.server import ThreadingHTTPServer
 
 import pytest
 
-from clipper import actions, schedule, serve, warroom
-from clipper.errors import ClipperError
+from clippa import actions, schedule, serve, warroom
+from clippa.errors import ClipperError
 
 
 def cfg_in(defaults, tmp_path, **sections) -> dict:
@@ -86,7 +86,7 @@ def test_the_jobs_table_follows_the_config(defaults, tmp_path):
 
 
 def test_the_checkup_jobs_command_is_one_the_parser_takes():
-    from clipper import cli
+    from clippa import cli
 
     ns = cli.build_parser().parse_args(serve.checkup_args())
     assert ns.fix and ns.alert and ns.only == ["streams", "housekeeping", "signins"]
@@ -181,7 +181,7 @@ def test_retake_runs_on_notes_or_on_its_sync_timer(defaults, tmp_path, monkeypat
 
 
 def test_doctor_wants_schedule_and_news_shared_when_serve_is_elsewhere(defaults, tmp_path):
-    from clipper import doctor
+    from clippa import doctor
 
     cfg = {**defaults, "serve": {"url": "http://nas:8765/"},
            "paths": {**defaults["paths"], "streams": tmp_path / "streams", "schedule": tmp_path / "schedule.json",

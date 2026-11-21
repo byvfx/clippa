@@ -46,9 +46,9 @@ clipper run <stream id>
 
 ## In the repo
 
-- `clipper/`: the package, one module per stage; `clipper/cli.py` wires them
+- `clippa/`: the package, one module per stage; `clippa/cli.py` wires them
 - `docs/wiki/`: the wiki's pages (edit them here, in the same PR as the code)
-- `clipper/defaults.toml`: every setting with its default, documented; `clipper.example.toml` is a starter clipper.toml
+- `clippa/defaults.toml`: every setting with its default, documented; `clipper.example.toml` is a starter clipper.toml
 - `HANDOFF.md`: current state between work sessions; `docs/log/` has the dated diary
 - `CLAUDE.md`: rules for code sessions
 - `studio/`: the studio's working files (mockups, research notes, media-heavy reports); not part of the package

@@ -1,7 +1,7 @@
 import pytest
 
-from clipper.errors import ClipperError
-from clipper.timefmt import age_s, clock, hms, length, now_iso, parse_time
+from clippa.errors import ClipperError
+from clippa.timefmt import age_s, clock, hms, length, now_iso, parse_time
 
 
 def test_hms_cuts_to_the_second():

@@ -5,7 +5,7 @@ import re
 
 from conftest import ROOT
 
-from clipper import __version__
+from clippa import __version__
 
 
 def sections() -> list[tuple[str, str]]:

@@ -1,7 +1,7 @@
 import pytest
 
-from clipper import shorts
-from clipper.errors import ClipperError
+from clippa import shorts
+from clippa.errors import ClipperError
 
 
 def words(*spans, seg_every=3):
@@ -78,7 +78,7 @@ def test_a_retake_trim_is_grown_to_min_s(tmp_path, defaults):
     """#77 L16: a retake that trims a Short under [shorts] min_s is widened by whole lines."""
     import json
 
-    from clipper import retake
+    from clippa import retake
     ws = words(*[(t, t + 0.8) for t in range(40)], seg_every=1)
     (tmp_path / "words.jsonl").write_text("\n".join(json.dumps(w) for w in ws), encoding="utf-8")
     (tmp_path / "meta.json").write_text(json.dumps({"duration_s": 40}), encoding="utf-8")
@@ -97,7 +97,7 @@ def test_a_retake_trim_over_min_s_with_little_speech_is_grown(tmp_path, defaults
     """Copilot on #106: a 16 s trim holding 4 s of speech snaps to ~4 s; it must still grow."""
     import json
 
-    from clipper import retake
+    from clippa import retake
     ws = words(*[(t, t + 0.8) for t in (*range(20), *range(30, 34), *range(44, 70))], seg_every=1)
     (tmp_path / "words.jsonl").write_text("\n".join(json.dumps(w) for w in ws), encoding="utf-8")
     (tmp_path / "meta.json").write_text(json.dumps({"duration_s": 70}), encoding="utf-8")
@@ -114,8 +114,8 @@ def test_a_compilation_retake_trims_its_first_and_last_segments(tmp_path):
 
     import pytest
 
-    from clipper import retake
-    from clipper.errors import ClipperError
+    from clippa import retake
+    from clippa.errors import ClipperError
     segs = [{"id": "s1", "start_s": 100.0, "end_s": 200.0, "title": "a", "file": "s1_x.mp4"},
             {"id": "s2", "start_s": 300.0, "end_s": 400.0, "title": "b", "file": "s2_x.mp4"},
             {"id": "s3", "start_s": 399.5, "end_s": 500.0, "title": "c", "file": "s3_x.mp4"}]
@@ -138,7 +138,7 @@ def test_a_segment_retake_snaps_only_the_end_it_moves(tmp_path, defaults):
     with silence before it."""
     import json
 
-    from clipper import retake
+    from clippa import retake
     ws = words(*[(t, t + 0.8) for t in range(10, 40)], seg_every=1)
     (tmp_path / "words.jsonl").write_text("\n".join(json.dumps(w) for w in ws), encoding="utf-8")
     (tmp_path / "meta.json").write_text(json.dumps({"duration_s": 100}), encoding="utf-8")
@@ -155,7 +155,7 @@ def test_a_retake_trim_snapped_under_3_s_is_refused(tmp_path, defaults):
 
     import pytest
 
-    from clipper import retake
+    from clippa import retake
     ws = words((25.0, 25.5), seg_every=1)
     (tmp_path / "words.jsonl").write_text(json.dumps(ws[0]), encoding="utf-8")
     (tmp_path / "meta.json").write_text(json.dumps({"duration_s": 100}), encoding="utf-8")
@@ -169,7 +169,7 @@ def test_trimming_both_ends_of_a_compilation_re_cuts_it_once(tmp_path, monkeypat
     """Copilot on #151: both segments are cut, then the compilation, once."""
     import json
 
-    from clipper import cut, retake
+    from clippa import cut, retake
     segs = [{"id": "s1", "start_s": 0.0, "end_s": 100.0, "file": "s1_x.mp4"},
             {"id": "s2", "start_s": 100.0, "end_s": 200.0, "file": "s2_x.mp4"}]
     (tmp_path / "segments.json").write_text(json.dumps({"segments": segs, "compilations": [

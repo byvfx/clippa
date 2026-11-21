@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from clipper import jsonstate, status
+from clippa import jsonstate, status
 
 
 def in_tmp(cfg: dict, tmp_path) -> dict:
@@ -39,7 +39,7 @@ def test_status_with_nothing_at_all(defaults, tmp_path):
 
 def test_status_counts_reviews_from_files_without_kitsu(defaults, tmp_path, monkeypatch):
     """An old publish saved no Kitsu links; plain `clipper status` still never asks Kitsu for them."""
-    from clipper import review
+    from clippa import review
 
     defaults = in_tmp(defaults, tmp_path)
     sdir = defaults["paths"]["streams"] / "kick-1"
@@ -130,7 +130,7 @@ def test_a_pinned_hold_or_a_show_without_stale_days_keeps_waiting(defaults, tmp_
 def test_status_json_keeps_stdout_for_the_document(defaults, tmp_path, monkeypatch, capsys):
     import json
 
-    from clipper import cli
+    from clippa import cli
 
     cfg = in_tmp(defaults, tmp_path)
     real = status.collect
@@ -156,7 +156,7 @@ def test_status_json_is_plain_data(defaults, tmp_path):
 
 
 def test_worker_rows_carry_show_and_date_and_drop_old_finished_runs(defaults, tmp_path):
-    from clipper import worker
+    from clippa import worker
 
     cfg = in_tmp(defaults, tmp_path)
     cfg["shows"] = {"kino": {"channels": ["kinocasinogaming"], "overrides": {}}}

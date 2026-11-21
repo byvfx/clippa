@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from clipper import clipart
-from clipper.errors import ClipperError
+from clippa import clipart
+from clippa.errors import ClipperError
 
 REAL_DOWNLOAD = clipart.download  # before the fixture stubs it
 
@@ -484,7 +484,7 @@ def test_two_downloads_of_one_picture_dont_share_a_temp_file(tmp_path, monkeypat
 
 
 def test_cli_and_doctor(cfg, monkeypatch, capsys):
-    from clipper import cli, doctor
+    from clippa import cli, doctor
 
     args = cli.build_parser().parse_args(["clipart", "add", "pack", "--credit", "Kenney", "--licence", "CC0",
                                           "--tag", "emote"])

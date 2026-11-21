@@ -11,9 +11,9 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from clipper import catalog, chat, costs, llm
-from clipper.errors import ClipperError
-from clipper.warroom import chat as routes
+from clippa import catalog, chat, costs, llm
+from clippa.errors import ClipperError
+from clippa.warroom import chat as routes
 
 TZ = ZoneInfo("America/Los_Angeles")
 MON = datetime(2026, 11, 16, 10, 0, tzinfo=TZ)

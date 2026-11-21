@@ -105,6 +105,6 @@ to what they serve.
 
 ## Settings
 
-`[clipart]` in `clipper/defaults.toml`: `sources`, `per_source`, `licences`, `commons_pictures`, `max_px`,
+`[clipart]` in `clippa/defaults.toml`: `sources`, `per_source`, `licences`, `commons_pictures`, `max_px`,
 `max_mb`, `iconify_sets`, `pixabay_type`, `pixabay_transparent`, `timeout_s`. `clipper doctor`
 checks the source and licence names, warns when Pixabay has no key, and counts the library.

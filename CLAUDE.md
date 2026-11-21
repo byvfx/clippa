@@ -7,25 +7,25 @@ docs are the GitHub wiki, built from `docs/wiki/` (one flat page per file, `Home
 `_Sidebar.md` lists every page); `.github/workflows/wiki.yml` pushes it on every push to main,
 so edit the pages there, never in the wiki itself. Link pages wiki-style (`[Faces](Faces)`,
 `[x](War-room#faces)`); `tests/test_wiki.py` checks the links and the sidebar. Messages link a page with
-`wiki.page("Name", "heading")` (`clipper/wiki.py`; the test checks those too). README.md is a
+`wiki.page("Name", "heading")` (`clippa/wiki.py`; the test checks those too). README.md is a
 short pointer and SETUP.md maps its old sections to wiki pages. At the end of a session update HANDOFF.md in place (no diaries there) and add a dated
 entry at the end of the month's log; keep the wiki pages true whenever behaviour changes, and add a bullet to CHANGELOG.md's Unreleased for a change a user would notice (wiki Developing#changelog), in
 the same PR as the change.
 
 ## Shape
 
-- Every pipeline stage is a `clipper <stage>` subcommand, wired in `clipper/cli.py`,
-  one module per stage in `clipper/`. New functionality is a subcommand or a flag on one,
+- Every pipeline stage is a `clipper <stage>` subcommand, wired in `clippa/cli.py`,
+  one module per stage in `clippa/`. New functionality is a subcommand or a flag on one,
   never a loose script. A new command's parser goes in its group's `add_<group>` in cli.py
   and its name in `COMMAND_GROUPS` (a test checks); a new pipeline stage is also a row in
-  `clipper/stages.py`, which the worker and `clipper run` read.
+  `clippa/stages.py`, which the worker and `clipper run` read.
 - A stream is `streams/<id>/`; stages read and write files there and are idempotent, so
   `clipper run` can skip what is done. Review state is `review.json`, retakes `retakes.json`.
-  JSON files go through `clipper/jsonstate.py`: `load`/`read` (retry a file mid-replace), `read_or`
+  JSON files go through `clippa/jsonstate.py`: `load`/`read` (retry a file mid-replace), `read_or`
   (a default for a missing or broken file: services and the page only),
   `write` (tmp + replace), `update`/`merge` (under a lock). A test fails on a raw
   `json.loads(path.read_text())`.
-- Config: defaults in `clipper/defaults.toml` (commented; `config.py` loads it as `DEFAULTS`, the
+- Config: defaults in `clippa/defaults.toml` (commented; `config.py` loads it as `DEFAULTS`, the
   None defaults listed in `config.NONE_DEFAULTS`) < `clipper.toml` < `clipper.local.toml` (this machine's
   own values, written by `clipper setup`) < `CLIPPER_<SECTION>_<KEY>` env; the last two also win
   over show and stream overrides.
@@ -36,12 +36,12 @@ the same PR as the change.
   spell the section out, since `sc` is scoring in one file and story or schedule in the next.
 - Shows: `[shows.<key>]` tables; a show's sub-tables override base sections. Each show has
   its own Kitsu production. Everything uploads to one YouTube channel.
-- Model calls go through `clipper/llm.py` (`llm.Claude` is an alias of `LLM`); the provider is the
+- Model calls go through `clippa/llm.py` (`llm.Claude` is an alias of `LLM`); the provider is the
   model string's prefix (`openai:`, `gemini:`, `local:`, bare = Claude). Don't call an SDK directly.
-- Errors: library code raises `ClipperError` (`clipper/errors.py`) with a one-line message, never
+- Errors: library code raises `ClipperError` (`clippa/errors.py`) with a one-line message, never
   `SystemExit`; only `cli.main` turns it into an exit. The bot, war room and worker catch it
   like any exception. A test fails on a new `raise SystemExit` outside cli.py.
-- Prompts are `clipper/prompts/<name>_<version>.md`, inside the package (`clipper/prompts/__init__.py` loads them;
+- Prompts are `clippa/prompts/<name>_<version>.md`, inside the package (`clippa/prompts/__init__.py` loads them;
   `[paths] prompts` adds a folder of your own, read first); the version in use is a config key, and
   `prompts.VERSIONS` says which one for each prompt (doctor and a test read it; a stage never assigns a version by
   hand). Add a new version rather than editing one that produced reviewed output.
@@ -51,7 +51,7 @@ the same PR as the change.
 
 ## Rules
 
-- No machine-specific values in `clipper/defaults.toml`: no IPs, hostnames, user ids, local
+- No machine-specific values in `clippa/defaults.toml`: no IPs, hostnames, user ids, local
   paths, nothing of this install's (a test checks for its names). They go in `clipper.toml`
   (gitignored) or env vars, with a placeholder in `clipper.example.toml` (the starter).
   `clipper doctor` should fail with a fix when a required one is unset.
@@ -60,10 +60,10 @@ the same PR as the change.
   search, `DVIDS_API_KEY` for b-roll (or `secrets/dvids_secret.txt`, public key first), `PIXABAY_API_KEY` for clip art and b-roll (or `secrets/pixabay_secret.txt`), and `OPENAI_API_KEY` / `GEMINI_API_KEY` / `OPENROUTER_API_KEY` if a stage uses those providers) or files
   under `secrets/`. Never write them into tracked files, logs, or messages.
 - Anything a new check or install step needs belongs in `clipper doctor` and its wiki page, not
-  only in a chat answer (and in `clipper setup`, `clipper/setup.py`, when a new user would
+  only in a chat answer (and in `clipper setup`, `clippa/setup.py`, when a new user would
   have to do it).
 - Kitsu is the record for review decisions. Bot buttons and the war room act through
-  `clipper/actions.py`; do not write decisions anywhere else.
+  `clippa/actions.py`; do not write decisions anywhere else.
 - Uploads are automatic since 2026-10-20: `clipper serve` replans and runs `clipper upload` every
   `[youtube] auto_upload_minutes` (60 here; the default 0 means only by hand), private with publishAt, at most `max_per_24h`. Do not run
   `clipper upload` or `clipper review publish` by hand without being asked.
@@ -136,7 +136,7 @@ Windows notes above don't apply.
   and Windows (`.github/workflows/check.yml`), except one that changes only notes no test reads
   (root `*.md` but for `CHANGELOG.md`, `docs/log/`, `docs/archive/`, `reports/`, `studio/` but for its `streamers.json`):
   that PR shows no checks.
-  A PR that changes code (`clipper/`, `tests/`, `deploy/`, `.github/`, `pyproject.toml`) gets two
+  A PR that changes code (`clippa/`, `tests/`, `deploy/`, `.github/`, `pyproject.toml`) gets two
   reviews (user, 2026-11-13): yours first, the
   `code-review` skill at high effort on the branch against main before the first push, findings
   fixed before the PR opens; then Copilot's, which a repo ruleset requests when the PR opens.

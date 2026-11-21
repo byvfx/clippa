@@ -3,9 +3,9 @@ import time
 
 import pytest
 
-from clipper import jsonstate, swarm
-from clipper.errors import ClipperError
-from clipper.kick import RateLimiter
+from clippa import jsonstate, swarm
+from clippa.errors import ClipperError
+from clippa.kick import RateLimiter
 
 
 @pytest.fixture
@@ -193,7 +193,7 @@ def test_a_busy_channel_is_cut_to_the_dates_and_the_goals_words():
 
 
 def test_every_request_waits_on_its_source_and_searches_keep_the_dates(cfg, monkeypatch):
-    from clipper import archive
+    from clippa import archive
 
     waits = []
 

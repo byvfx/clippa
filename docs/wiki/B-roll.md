@@ -78,7 +78,7 @@ isn't a source. Nor is C-SPAN, whose own camera footage is copyrighted.
 
 ## Settings
 
-`[broll]` in `clipper/defaults.toml`: `sources`, `dvids_category`, `pixabay_type`, `per_source`,
+`[broll]` in `clippa/defaults.toml`: `sources`, `dvids_category`, `pixabay_type`, `per_source`,
 `max_s`, `max_height`, `licences`, `audio`, `codec` (empty uses `[cut] clip_codec`), `crf`,
 `timeout_s`. `clipper doctor` checks the source and licence names and `pixabay_type`, warns when
 DVIDS or Pixabay has no key, and counts the library.

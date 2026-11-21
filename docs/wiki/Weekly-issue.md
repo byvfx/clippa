@@ -32,7 +32,7 @@ cover shows a photo panel instead.
    Then `clipper weekly --render` (`--only 01,03` for a few pages). `--draft` writes a new
    draft and keeps the old file as a backup. `--write 04,05` has the writer prompt redo
    those articles (deck, columns, pull quote) from the week's summaries, matching the voice
-   of `clipper/prompts/weekly_article_example.md`; a draft that would run off the page is sent back
+   of `clippa/prompts/weekly_article_example.md`; a draft that would run off the page is sent back
    once to be cut. To change the voice, put a piece of your own with that name in the folder
    `[paths] prompts` names; it is read before the packaged one.
 3. Post by hand: TikTok takes all ten 3:4 pages as one carousel. YouTube Posts show images
@@ -50,7 +50,7 @@ Issue numbers continue from `[weekly] first_issue` across the folders in `weekly
 The look is data: the canvas, the palette, the cover's geometry (teaser strip, kicker,
 headline width, inset, starburst, barcode block, subject height) and the fixed copy
 ("LOLCOW OF THE WEEK", "READERS' POLL", the barcode digits, ...) have defaults in
-`clipper/weekly/style.py`. To change any of them, put a `style.toml` next to the issues
+`clippa/weekly/style.py`. To change any of them, put a `style.toml` next to the issues
 (`weekly/style.toml`, i.e. in `[paths] weekly`) with the same tables and keys, only the ones
 you change, and `clipper weekly --render`:
 

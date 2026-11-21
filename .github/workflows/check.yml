@@ -8,7 +8,7 @@
 # (tests/test_changelog.py). paths-ignore can't make those exceptions.
 # Never excluded, because a test reads them: docs/wiki/ (tests/test_wiki.py checks the links
 # and the sidebar), docs/big-story.toml and clipper.example.toml (tests/test_config.py), and
-# clipper/prompts/*.md. "*.md" is the repo root only: `*` doesn't cross a `/`.
+# clippa/prompts/*.md. "*.md" is the repo root only: `*` doesn't cross a `/`.
 name: check
 
 on:

@@ -1,7 +1,7 @@
 """`clipper compare`'s report logic (#72): no model calls."""
 from __future__ import annotations
 
-from clipper import compare
+from clippa import compare
 
 
 def kept(i: str, score: int, a: float, b: float) -> dict:

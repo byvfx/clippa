@@ -1,5 +1,5 @@
 [project]
-name = "clipper"
+name = "clippa"
 version = "0.2.0"
 description = "Stream clipping pipeline: ingest, transcribe, score, render, review, publish"
 requires-python = ">=3.12,<3.13"
@@ -44,8 +44,8 @@ discord = [
 ]
 
 [project.scripts]
-clipper = "clipper.cli:main"
-clippa = "clipper.cli:main"   # the new name (#286); both work
+clipper = "clippa.cli:main"
+clippa = "clippa.cli:main"   # the new name (#286); both work
 
 # Tests and lint (`uv sync` installs this group; CI runs both, .github/workflows/check.yml).
 [dependency-groups]
@@ -87,7 +87,7 @@ build-backend = "hatchling.build"
 exclude = ["studio/"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["clipper"]   # defaults.toml and clipper/prompts/*.md ship with the code
+packages = ["clippa"]   # defaults.toml and clippa/prompts/*.md ship with the code
 
 # PyPI's Windows torch wheels are CPU-only; pull the CUDA 12.8 builds instead.
 [tool.uv.sources]

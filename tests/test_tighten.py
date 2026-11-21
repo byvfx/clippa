@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from clipper import jsonstate, shorts, tighten
+from clippa import jsonstate, shorts, tighten
 
 
 @pytest.fixture
@@ -106,7 +106,7 @@ def three_shorts(tmp_path, monkeypatch, defaults):
         dst.write_bytes(b"x")
         return 0, 0, {"input_lufs": -20.0}, [], round(b - a, 3)
     monkeypatch.setattr(shorts, "cut_and_render", render)
-    from clipper import thumbs
+    from clippa import thumbs
     monkeypatch.setattr(thumbs, "shorts_only", lambda *a, **k: 0)
     return sd, defaults, seen
 

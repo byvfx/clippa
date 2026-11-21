@@ -1,6 +1,6 @@
-"""clipper/actions.py: the row every card, list and panel is built from (describe), from the
+"""clippa/actions.py: the row every card, list and panel is built from (describe), from the
 local files alone, and the small formatters it uses."""
-from clipper import actions, jsonstate, review
+from clippa import actions, jsonstate, review
 
 
 def test_other_voices_only_speaks_over_the_limit():

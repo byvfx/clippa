@@ -6,8 +6,8 @@ import zipfile
 
 import pytest
 
-from clipper import backup, config, jsonstate, serve
-from clipper.errors import ClipperError
+from clippa import backup, config, jsonstate, serve
+from clippa.errors import ClipperError
 
 
 @pytest.fixture

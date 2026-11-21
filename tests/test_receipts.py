@@ -1,7 +1,7 @@
 import pytest
 
-from clipper import receipts
-from clipper.errors import ClipperError
+from clippa import receipts
+from clippa.errors import ClipperError
 
 DATA = {"subject": "jer", "show": "Kino Casino",
         "stories": [{"story": "The Lawsuit", "use": True}, {"story": "Skipped", "use": False},

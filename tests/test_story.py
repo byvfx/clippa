@@ -4,8 +4,8 @@ import re
 import pytest
 from conftest import ROOT
 
-from clipper import archive_index, jsonstate, story
-from clipper.errors import ClipperError
+from clippa import archive_index, jsonstate, story
+from clippa.errors import ClipperError
 
 
 @pytest.fixture
@@ -181,7 +181,7 @@ def test_a_story_from_findings_to_dossier(cfg, tmp_path, capsys):
 
 
 def test_a_linked_stream_is_indexed_with_the_catalogs_meta(cfg, tmp_path):
-    from clipper import archive
+    from clippa import archive
 
     sdir = tmp_path / "streams" / "kick-9"
     transcribed(sdir, "jer got banned", title="stream title", source="source.mkv")
@@ -203,7 +203,7 @@ def test_given_urls(cfg):
 
 
 def test_a_failed_download_stops_before_the_dossier(cfg, monkeypatch):
-    from clipper import archive
+    from clippa import archive
 
     slug = story.new(cfg, "Jer banned from Kick", since="2026-10-28")
     d = story.story_dir(cfg, slug)
@@ -268,7 +268,7 @@ def test_a_kick_vod_given_by_hand_that_we_recorded_is_linked(cfg, tmp_path, monk
 def test_no_windows_still_replaces_the_moments(cfg):
     slug = story.new(cfg, "Jer banned from Kick", since="2026-10-28")
     d = story.story_dir(cfg, slug)
-    from clipper import archive
+    from clippa import archive
 
     transcribed(d / "yt-x", "nothing about it here")
     archive.save_catalog(d, {"yt-x": {"id": "yt-x", "source": "youtube", "url": "u"}})
@@ -280,7 +280,7 @@ def test_no_windows_still_replaces_the_moments(cfg):
 
 
 def _prompts(cfg):
-    from clipper.prompts import Prompts
+    from clippa.prompts import Prompts
 
     p = Prompts(cfg)
     p.version = cfg["story"]["prompt_version"]

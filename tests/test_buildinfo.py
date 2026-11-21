@@ -1,4 +1,4 @@
-"""clipper/buildinfo.py: the version a copy reports (`clipper --version`, doctor, heartbeats)."""
+"""clippa/buildinfo.py: the version a copy reports (`clipper --version`, doctor, heartbeats)."""
 import json
 import re
 import shlex
@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 import pytest
 from conftest import ROOT
 
-from clipper import __version__, buildinfo, daemon, services
+from clippa import __version__, buildinfo, daemon, services
 
 
 @pytest.fixture(autouse=True)

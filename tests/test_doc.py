@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from clipper import doc, jsonstate, story_edit
-from clipper.errors import ClipperError
+from clippa import doc, jsonstate, story_edit
+from clippa.errors import ClipperError
 
 PLAN = """
 title = "The Lighthouse"
@@ -377,7 +377,7 @@ def test_a_fade_is_named_for_the_file_it_is_cut_from(plan, dc):
 def test_a_changed_file_is_measured_and_converted_again(tmp_path, monkeypatch):
     import os
 
-    from clipper import media as media_mod
+    from clippa import media as media_mod
 
     f = tmp_path / "music" / "theme.mp3"
     f.parent.mkdir()
@@ -496,7 +496,7 @@ def test_new_makes_a_piece_that_parses(defaults, tmp_path):
 
 
 def test_voice_refuses_a_banned_word_and_prices_a_dry_run(defaults, tmp_path, capsys, monkeypatch):
-    from clipper import narrate
+    from clippa import narrate
 
     d = piece(defaults, tmp_path)
     monkeypatch.setattr(narrate, "speak", lambda *a, **k: pytest.fail("a dry run buys nothing"))
@@ -554,7 +554,7 @@ def a_wav(path, seconds=1.0):
 
 
 def test_voice_takes_your_recording_and_buys_nothing(defaults, tmp_path, capsys, monkeypatch):
-    from clipper import narrate
+    from clippa import narrate
 
     d = piece(defaults, tmp_path)
     plan = doc.load_plan(defaults, "lighthouse")[1]

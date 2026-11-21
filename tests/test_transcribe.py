@@ -1,6 +1,6 @@
-"""The transcribe stage (clipper/transcribe.py): the pure fix-ups on WhisperX's words. The
+"""The transcribe stage (clippa/transcribe.py): the pure fix-ups on WhisperX's words. The
 GPU, Modal and ffmpeg paths are not run here."""
-from clipper import transcribe
+from clippa import transcribe
 
 
 def test_fill_missing_times_spreads_unaligned_words_between_their_neighbours():

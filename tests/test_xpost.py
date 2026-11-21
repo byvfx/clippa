@@ -2,8 +2,8 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from clipper import cli, jsonstate, xpost
-from clipper.errors import ClipperError
+from clippa import cli, jsonstate, xpost
+from clippa.errors import ClipperError
 
 NOW = datetime(2026, 11, 1, 20, 0, tzinfo=UTC)
 
@@ -76,7 +76,7 @@ def test_by_default_x_takes_the_newest_stream_first_without_waiting_for_youtube(
 
 
 def test_hook_first_text_and_mentions():
-    from clipper.review import bare_title
+    from clippa.review import bare_title
 
     cfg = {"meta": {"show_name": "Kino Casino", "title_format": "{SHOW} | {title}"}}
     assert bare_title(cfg, "KINO CASINO | Joe turned down $1,000") == "Joe turned down $1,000"
@@ -222,7 +222,7 @@ def test_an_issue_claim_stops_a_second_run_and_counts_against_the_allowance(tmp_
 
 
 def test_the_issue_goes_to_discord_as_the_carousel_then_two_square_posts(tmp_path):
-    from clipper import notify
+    from clippa import notify
 
     pages = [tmp_path / f"{n:02d}_p.jpg" for n in range(1, 11)]
     issue = {"issue": 3, "week": "OCT 25-31, 2026", "post": {"part1": "one", "part2": "two"}}
@@ -238,7 +238,7 @@ def test_the_issue_goes_to_discord_as_the_carousel_then_two_square_posts(tmp_pat
 
 
 def test_a_caption_too_long_for_discord_is_refused_not_cut(tmp_path):
-    from clipper import notify
+    from clippa import notify
 
     pages = [tmp_path / f"{n:02d}_p.jpg" for n in range(1, 11)]
     (tmp_path / "youtube").mkdir()
@@ -250,7 +250,7 @@ def test_a_caption_too_long_for_discord_is_refused_not_cut(tmp_path):
 
 
 def test_one_discord_run_at_a_time_and_a_dead_claim_lets_go(tmp_path):
-    from clipper import notify
+    from clippa import notify
 
     dpath = tmp_path / "discord.json"
     t = datetime(2026, 11, 7, 12, tzinfo=UTC)
@@ -262,7 +262,7 @@ def test_one_discord_run_at_a_time_and_a_dead_claim_lets_go(tmp_path):
 
 
 def test_discord_refuses_the_build_options(tmp_path, monkeypatch):
-    from clipper import notify
+    from clippa import notify
 
     monkeypatch.setattr(notify, "post_issue", lambda *a: pytest.fail("posted"))
     args = cli.build_parser().parse_args(["weekly", "--render", "--discord"])

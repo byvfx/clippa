@@ -2,8 +2,8 @@ import json
 
 import pytest
 
-from clipper import youtube
-from clipper.errors import ClipperError
+from clippa import youtube
+from clippa.errors import ClipperError
 
 ANALYTICS = "https://www.googleapis.com/auth/yt-analytics.readonly"
 

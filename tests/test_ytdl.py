@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from clipper import ytdl
-from clipper.errors import ClipperError
+from clippa import ytdl
+from clippa.errors import ClipperError
 
 
 def fake_run(monkeypatch, stderr):
@@ -194,7 +194,7 @@ def test_read_netscape_round_trips_and_keeps_httponly_lines():
 
 
 def test_cookies_command_defaults_and_overrides(monkeypatch, tmp_path):
-    from clipper import cli
+    from clippa import cli
 
     got = []
     monkeypatch.setattr(ytdl, "export_browser_cookies", lambda spec, out: got.append((spec, out)) or 3)

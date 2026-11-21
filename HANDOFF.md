@@ -10,7 +10,7 @@ changed here, then add a dated entry at the end of the log.
 Stream clipper for Kino Casino (Kick channel `kinocasinogaming`), Channel 404 News and ChudLogic → YouTube
 channel **Lolcow Cinema**. Repo `C:\clipper`, remote https://github.com/byvfx/clipper (public, on purpose:
 the user said so 2026-11-10; every tracked file, issue and PR comment is readable by anyone).
-Python package `clipper/` (`clipper/defaults.toml` is every setting, documented; prompts in `clipper/prompts/`),
+Python package `clippa/` (`clippa/defaults.toml` is every setting, documented; prompts in `clippa/prompts/`),
 config `clipper.toml` (gitignored, on the NAS; `clipper.example.toml` is a tracked starter). The user docs are
 the GitHub wiki, built from `docs/wiki/` (`.github/workflows/wiki.yml` pushes it on every push to main);
 README.md and SETUP.md are short pointers; CLAUDE.md the conventions; `reports/` the monthly analytics; `docs/archive/` the old audits.
@@ -34,7 +34,7 @@ Project memory (`~/.claude/projects/C--clipper/memory/`, MEMORY.md first) holds 
 replan + upload, pre-show grabs, retakes, daily jobs), the Discord bot (`clipper bot`) and the worker.
 
 Around it (each a subcommand; details in the wiki and the log): `record`, `worker`, `shorts`, `retake`, `preshow`, `pick`, `weekly`,
-`receipts`, `archive`, `investigate`, `story` (the swarm, `clipper/swarm.py`), `people`, `faces`, `cast`, `speakers`, `narrate` /
+`receipts`, `archive`, `investigate`, `story` (the swarm, `clippa/swarm.py`), `people`, `faces`, `cast`, `speakers`, `narrate` /
 `perform` (Mother Moo), `tiktok`, `x`, `rumble`, `analytics`, `costs`, `compare` / `models`, `status`, `services`, `alert`, `doctor`.
 
 ## User decisions (keep)
@@ -44,8 +44,11 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
 - The app is **Clippa** (2026-11-09, branding only): war room, Discord status card, wiki Home/sidebar/banner,
   README. **The full rename (#286) is under way, in passes:** pass 1 (PR #363, deployed 11-21) reads both
   names everywhere clipper reads one (`CLIPPA_*` first, `clippa.toml`, a `clippa` command); pass 2a
-  writes `clippa:` button ids and `[clippa]` Kitsu notes (old cards and notes still answer to both).
-  Next: 2b the package folder, 2c text and docs plus a `clippa` command on PATH; then pass 3 (deploy
+  writes `clippa:` button ids and `[clippa]` Kitsu notes (old cards and notes still answer to both);
+  2b moves the package to `clippa/` (project `clippa`; a venv made before it needs `uv pip uninstall
+  clipper` + `uv pip install --no-deps -e .` once; the claude container needs a redeploy for
+  checkup-pr's allowed paths). Next: 2c text and docs, logger labels (`clipper.serve:` is parsed by
+  warroom/data.py and checkup: accept both first) and a `clippa` command on PATH; then pass 3 (deploy
   day: compose projects, Modal apps, `deploy/` env names; stop the old compose project first), 4 the
   repo name, 5 drop the fallbacks.
 - Titles/descriptions/cut points approved as-is; fun descriptions are liked. Long video per recurring topic
@@ -101,7 +104,7 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
 - Hand-over (2026-11-08 audits, `docs/archive/code-audit-2026-11-08.md` §7): build as a public package but this deployment first,
   little tech debt, simple for the user; `studio/` holds mockups, research notes and media reports, out of the package; serve and the
   bot are compose-only. **Merge policy and reviews are in CLAUDE.md (Checks)** and wiki Developing#code-review-on-prs: a code PR
-  (`clipper/`, `tests/`, `deploy/`, `.github/`, `pyproject.toml`) gets the local `code-review` skill before the first push, then
+  (`clippa/`, `tests/`, `deploy/`, `.github/`, `pyproject.toml`) gets the local `code-review` skill before the first push, then
   Copilot, or Grok's `review` workflow while Copilot is out of credits (back 11-20 "for a few more days"; delete the workflow once
   Copilot reviews again; its repo secret `OPENROUTER_API_KEY` stays); merge once the review is in, each finding answered, CI green.
   Other PRs (wiki, `uv.lock`, `clipper.example.toml`, `streamers.json`) have CI but no review, notes-only ones neither; both merge on
@@ -323,7 +326,7 @@ The Python is replaceable; the months of editorial judgement are in prompts and 
 like footage. `clipper backup` (PR #248, #204; wiki Backups) zips the list below into `backups/taste/`
 (about 17 MB, 390 files; the newest 8 kept; secrets only with `--with-secrets`), and serve makes one every 7 days. The first was made by hand 11-13 (`backups/taste/taste-2026-11-13-1707.zip`,
 no secrets). Copy one off the NAS now and then. Not in it: `deploy/*/env.local` and the Kitsu volumes.
-- **In git:** `clipper/prompts/` (never edit a version that produced reviewed output), `clipper.example.toml`, `studio/`, `reports/`, this file.
+- **In git:** `clippa/prompts/` (never edit a version that produced reviewed output), `clipper.example.toml`, `studio/`, `reports/`, this file.
 - **Not in git (all in the NAS folder):** `clipper.toml`, `backups/`, each `streams/<id>/config.toml`, `secrets/` (tokens are a
   re-consent to recreate), `faces/known.json`, `photos/` + cast.json, `layouts/`, `people.json`, `schedule.json`, `deploy/*/env.local`,
   and the Kitsu volumes (every review decision and note).

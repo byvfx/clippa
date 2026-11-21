@@ -4,8 +4,8 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from clipper import jsonstate, youtube
-from clipper.errors import ClipperError
+from clippa import jsonstate, youtube
+from clippa.errors import ClipperError
 
 ANALYTICS = "https://www.googleapis.com/auth/yt-analytics.readonly"
 

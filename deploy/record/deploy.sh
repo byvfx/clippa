@@ -55,7 +55,7 @@ trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/src"
 cp "$ROOT/pyproject.toml" "$ROOT/uv.lock" "$TMP/src/"
 cp "$HERE/Dockerfile" "$TMP/src/"
-cp -r "$ROOT/clipper" "$TMP/src/clipper"
+cp -r "$ROOT/clippa" "$TMP/src/clippa"
 find "$TMP/src" -name __pycache__ -prune -exec rm -rf {} +
 source "$HERE/../stamp.sh"
 stamp_build "$ROOT" "$TMP/src"   # which commit the image is: clipper --version, the heartbeat

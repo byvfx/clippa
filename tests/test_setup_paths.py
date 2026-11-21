@@ -3,7 +3,7 @@ import shlex
 
 import pytest
 
-from clipper import setup
+from clippa import setup
 
 
 def test_join_config_path_as_people_type_it(tmp_path, monkeypatch):
@@ -50,9 +50,9 @@ def test_unknown_user_in_home_path_is_a_message(tmp_path):
 
 
 def test_join_uses_a_shared_config_in_place(tmp_path, monkeypatch):
-    from clipper import config
+    from clippa import config
 
-    home, share, checkout = tmp_path / "home", tmp_path / "share", tmp_path / "home" / "clipper"
+    home, share, checkout = tmp_path / "home", tmp_path / "share", tmp_path / "home" / "clippa"
     for d in (share, checkout):
         d.mkdir(parents=True)
     monkeypatch.setenv("HOME", str(home))
@@ -73,24 +73,24 @@ def test_join_uses_a_shared_config_in_place(tmp_path, monkeypatch):
 
 
 def test_join_copies_a_downloaded_config(tmp_path, monkeypatch):
-    from clipper import config
+    from clippa import config
 
     home = tmp_path / "home"
     (home / "Downloads").mkdir(parents=True)
-    (home / "clipper").mkdir()
+    (home / "clippa").mkdir()
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("USERPROFILE", str(home))
     (home / "Downloads" / "clipper.toml").write_text("# shared\n", encoding="utf-8")
     monkeypatch.setattr(setup, "set_user_env", lambda k, v: pytest.fail("no env for a copy"))
-    cfg = config.load(home / "clipper" / "clipper.toml", use_local=False)
+    cfg = config.load(home / "clippa" / "clipper.toml", use_local=False)
     setup.step_mode(cfg, {"done": {}}, setup.Ask({"mode": "join", "from": "~/Downloads/clipper.toml"}))
-    assert (home / "clipper" / "clipper.toml").read_text(encoding="utf-8") == "# shared\n"
+    assert (home / "clippa" / "clipper.toml").read_text(encoding="utf-8") == "# shared\n"
 
 
 def test_a_dash_skips_the_streams_folder_only_on_a_control_station(tmp_path, monkeypatch):
     """Copilot on #166: `-` is "skip" for control alone; elsewhere it's a folder name
     like any other, saved like any other."""
-    from clipper import config
+    from clippa import config
 
     monkeypatch.setattr(setup.shutil, "which", lambda name: "/usr/bin/" + name)
     saved = []

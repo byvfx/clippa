@@ -7,8 +7,8 @@ import subprocess
 
 import pytest
 
-from clipper import cli, kick
-from clipper.errors import ClipperError
+from clippa import cli, kick
+from clippa.errors import ClipperError
 
 
 class FakeYtdlp:

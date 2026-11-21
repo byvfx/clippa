@@ -2,8 +2,8 @@ import json
 
 import pytest
 
-from clipper import investigate, jsonstate
-from clipper.investigate import Budget, OverBudget
+from clippa import investigate, jsonstate
+from clippa.investigate import Budget, OverBudget
 
 WORDS = ["so", "I", "told", "you", "the", "merch", "store", "made", "forty", "thousand", "dollars", "in", "October", "and", "that", "is", "real"]
 
@@ -352,7 +352,7 @@ class FakeDiscord:
 
 
 def test_leads_post_as_a_thread_per_run_and_are_edited_not_reposted(defaults, tmp_path, monkeypatch):
-    from clipper import notify
+    from clippa import notify
 
     subject(defaults, tmp_path)
     defaults["discord"]["guild_id"] = "g"
@@ -404,7 +404,7 @@ def test_a_lead_message_is_short_and_links_to_the_war_room():
 
 
 def posted_leads(defaults, tmp_path, monkeypatch, keeps=(True,)):
-    from clipper import notify
+    from clippa import notify
 
     subject(defaults, tmp_path)
     defaults["discord"]["guild_id"] = "g"
@@ -439,8 +439,8 @@ def test_a_lead_no_longer_kept_is_marked_withdrawn_even_when_none_are_left(defau
 
 
 def test_only_a_missing_thread_is_remade_and_a_passing_failure_keeps_the_ids(defaults, tmp_path, monkeypatch):
-    from clipper.errors import ClipperError
-    from clipper.notify import Missing
+    from clippa.errors import ClipperError
+    from clippa.notify import Missing
 
     api, data = posted_leads(defaults, tmp_path, monkeypatch)
     state = jsonstate.read(tmp_path / "jer" / "investigate" / "discord.json", {})
@@ -467,7 +467,7 @@ def test_an_earlier_run_is_found_among_the_backups(defaults, tmp_path):
 
 
 def test_check_searches_with_the_swarm_seeded_by_the_old_searches(defaults, tmp_path, monkeypatch):
-    from clipper import swarm
+    from clippa import swarm
 
     subject(defaults, tmp_path)
     lead = {"id": "L01", "headline": "Merch numbers move", "search": "jer merch revenue", "story": "S",

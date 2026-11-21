@@ -1,7 +1,7 @@
 import json
 from datetime import UTC, datetime
 
-from clipper import jsonstate, youtube, ytquota
+from clippa import jsonstate, youtube, ytquota
 
 YC = {"daily_quota": 10000, "upload_units": 600, "max_per_24h": 15}
 NOON = datetime(2026, 10, 30, 19, 0, tzinfo=UTC)  # 12:00 Pacific

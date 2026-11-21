@@ -1,5 +1,5 @@
-"""The Discord bot (clipper/bot.py), the one process holding the token. Its handlers are thin:
-resolve the item, decide through clipper/actions.py, replan through serve; the allowlist
+"""The Discord bot (clippa/bot.py), the one process holding the token. Its handlers are thin:
+resolve the item, decide through clippa/actions.py, replan through serve; the allowlist
 refuses everyone else. Needs discord.py (the `discord` extra; CI installs it)."""
 import asyncio
 from types import SimpleNamespace
@@ -8,7 +8,7 @@ import pytest
 
 pytest.importorskip("discord")
 
-from clipper import actions, bot, serve
+from clippa import actions, bot, serve
 
 
 def test_chunks_keeps_each_message_under_the_limit():
@@ -95,7 +95,7 @@ class FakeChannel:
 
 
 def test_the_bot_posts_alerts_then_the_digest_in_a_thread(defaults, monkeypatch):
-    from clipper import blinds
+    from clippa import blinds
 
     b, chan, marks = make_bot(defaults), FakeChannel(), []
     own = [{"id": "cdan-1", "ours": True}]
@@ -123,7 +123,7 @@ def test_the_bot_posts_alerts_then_the_digest_in_a_thread(defaults, monkeypatch)
 
 
 def test_a_blind_button_answers_and_ends_the_message_with_it(defaults, monkeypatch):
-    from clipper import blinds
+    from clippa import blinds
 
     b, got, edits = make_bot(defaults), [], []
     monkeypatch.setattr(blinds, "answer", lambda cfg, bid, name, why, none, not_ours, who="":
@@ -150,7 +150,7 @@ def test_a_blind_button_answers_and_ends_the_message_with_it(defaults, monkeypat
 
 
 def test_a_bad_digest_time_or_no_threads_still_posts(defaults, monkeypatch):
-    from clipper import blinds
+    from clippa import blinds
 
     b, chan, posted = make_bot(defaults), FakeChannel(), []
     monkeypatch.setattr(blinds, "own_alerts", lambda cfg: [{"id": "a"}])

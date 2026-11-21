@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import json
 
-from clipper import jsonstate, review_check, shorts
-from clipper.checkup import BAD, WARN
+from clippa import jsonstate, review_check, shorts
+from clippa.checkup import BAD, WARN
 
 WATCH = {"panels": [{"src": [0, 0.137, 0.74, 0.74], "h": 608},
                     {"src": [0.74, 0.21, 0.26, 0.31], "h": 656, "cam": True},
@@ -263,7 +263,7 @@ def test_same_person_is_loose_about_spellings(defaults):
 # ---------- where the findings show ----------
 
 def test_findings_reach_describe_counts_status_and_the_card(defaults, tmp_path, monkeypatch):
-    from clipper import actions, notify, review, status
+    from clippa import actions, notify, review, status
 
     sdir = tmp_path / "kick-3"
     sdir.mkdir()
@@ -291,7 +291,7 @@ def test_findings_reach_describe_counts_status_and_the_card(defaults, tmp_path, 
 
 
 def test_publish_fills_the_checks_column_and_goes_on_when_they_break(defaults, tmp_path, monkeypatch):
-    from clipper import review
+    from clippa import review
 
     todo = [{"key": "v01_t1", "fields": {}}, {"key": "v02_t2", "fields": {}}]
     monkeypatch.setattr(review_check, "run", lambda d, cfg, t: {
@@ -318,7 +318,7 @@ def test_text_dedupes_host_per_field(defaults):
 
 def test_signature_follows_what_the_checks_read(defaults, tmp_path):
     sd = fake_stream(defaults, tmp_path)
-    from clipper import config, review
+    from clippa import config, review
 
     cfg = config.for_stream(defaults, sd)
     it = review.items(sd, ["segments"], cfg)[0]
@@ -335,7 +335,7 @@ def test_signature_follows_what_the_checks_read(defaults, tmp_path):
 
 def test_the_kitsu_column_gets_what_checks_json_kept(defaults, tmp_path, monkeypatch):
     # an older run finishing after a newer one: checks.json keeps the newer result, and so must Kitsu
-    from clipper import jsonstate, review
+    from clippa import jsonstate, review
 
     sd = tmp_path / "kick-9"
     sd.mkdir()

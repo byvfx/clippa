@@ -5,8 +5,8 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from clipper import audit, jsonstate
-from clipper.errors import ClipperError
+from clippa import audit, jsonstate
+from clippa.errors import ClipperError
 
 NOW = datetime(2026, 11, 15, 16, 30, tzinfo=UTC)
 TZ = ZoneInfo("UTC")

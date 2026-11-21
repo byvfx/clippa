@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from clipper import broll, jsonstate
-from clipper.errors import ClipperError
+from clippa import broll, jsonstate
+from clippa.errors import ClipperError
 
 REAL_ENCODE = broll.encode  # before the fixture stubs it
 
@@ -592,7 +592,7 @@ def test_pixabay_without_a_file_is_skipped(cfg, monkeypatch):
 
 
 def test_cli_source_choices_are_the_sources():
-    from clipper.cli import build_parser
+    from clippa.cli import build_parser
 
     for src in broll.SOURCES:
         assert build_parser().parse_args(["broll", "find", "x", "--source", src]).source == [src]

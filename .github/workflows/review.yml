@@ -11,7 +11,7 @@ name: review
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    paths: ["clipper/**", "tests/**", "deploy/**", ".github/**", "pyproject.toml"]
+    paths: ["clippa/**", "tests/**", "deploy/**", ".github/**", "pyproject.toml"]
 
 concurrency:  # one review per PR at a time; a push while one runs waits for it (only the newest
   # waiting one runs), so a paid review already thinking is never thrown away

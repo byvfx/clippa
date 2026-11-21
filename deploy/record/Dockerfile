@@ -9,7 +9,7 @@ RUN apt-get update \
 COPY --from=ghcr.io/astral-sh/uv:0.13.1 /uv /usr/local/bin/uv
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
-COPY clipper ./clipper
+COPY clippa ./clippa
 RUN uv sync --frozen --no-dev --no-editable --no-cache
 
 ENV PATH=/app/.venv/bin:$PATH \

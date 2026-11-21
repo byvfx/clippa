@@ -1,6 +1,6 @@
 from conftest import ROOT
 
-from clipper import config, doctor
+from clippa import config, doctor
 
 
 def prompts_check(tmp_path, toml: str) -> list[tuple[str, str, str, str]]:
@@ -64,7 +64,7 @@ def test_v7_prompts_need_the_show_gambling_rule(defaults):
 
 def test_repo_state_reads_branch_ahead_and_changes():
     assert doctor.repo_state("## main...origin/main\n") == ("main", 0, 0)
-    assert doctor.repo_state("## nas-claude...origin/nas-claude [ahead 2, behind 1]\n M clipper/x.py\n?? y\n") \
+    assert doctor.repo_state("## nas-claude...origin/nas-claude [ahead 2, behind 1]\n M clippa/x.py\n?? y\n") \
         == ("nas-claude", 2, 2)
     assert doctor.repo_state("## local-only\n") == ("local-only", 0, 0)
     assert doctor.repo_state("## HEAD (no branch)\n") == ("", 0, 0)
@@ -128,7 +128,7 @@ def test_doctor_checks_the_hubs_cookies_file(tmp_path, monkeypatch):
     import os
     import time
 
-    from clipper import doctor, ytdl
+    from clippa import doctor, ytdl
 
     said = []
     monkeypatch.setattr(doctor, "RESULTS", said)

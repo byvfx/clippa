@@ -1,0 +1,126 @@
+/* warroom: the war room's own look, and its default (step 4 of the redesign, 2026-11-18): a video
+   editor's dark panels that fit edge to edge, one blue accent for what is selected, a colour per
+   show, and green, amber and red for status only. Inter for the interface, JetBrains Mono for
+   numbers, times and ids (both bundled in web/fonts/, OFL). This file is the one place the war
+   room's colours live (clippa/web/warroom.css is only structure); the chat maps onto the same
+   palette, so the two sit together. Dark always.
+   A look is the custom properties that warroom.css and chat.css read (tests/test_chat.py checks
+   every look defines them all), plus rules of its own for what a property can't say; such a rule
+   picks out one page's own classes (the chat's .msg, .window, .compose-marks), never .card or
+   .btn, which both pages have. */
+@font-face { font-family: "Inter"; src: url("../fonts/InterVariable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "JetBrains Mono"; src: url("../fonts/JetBrainsMono-Regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "JetBrains Mono"; src: url("../fonts/JetBrainsMono-Medium.woff2") format("woff2"); font-weight: 500 700; font-display: swap; }
+
+:root {
+  /* the palette */
+  --bg: #111215; --panel: #18191d; --panel2: #1e2025; --raise: #25272d; --line: #2b2e35; --line2: #383b44;
+  --text: #e7e8eb; --dim: #a0a4ad; --faint: #7b808a;
+  --accent: #5b93f0; --on-accent: #0b1220; --accent-bg: rgb(91 147 240 / 0.14);
+  --red: #e1574e; --green: #45b583; --blue: #6ea2f5; --amber: #e2a63c; --violet: #a88bff;
+  --clip: #7f8fa8; --short: #d0839f; --segment: #6f9fcf; --compilation: #b59a6a;   /* the kind: a stripe or a dot, never a fill */
+  --show-1: #b07ce8; --show-2: #e8874d; --show-3: #48b5c8; --show-4: #d8c24a; --show-5: #e86a8a; --show-6: #7fb85c;  /* one per show, in [shows] order */
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+  --sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  /* the war room (warroom.css); it also reads the windows, title bars and buttons below */
+  --head: #111215f2;         /* the header bar */
+  --bar: #141518f2;          /* the page bar, and a phone's bottom bars */
+  --panel-pad: 0;            /* inside a panel, around its title bar and body */
+  --tb-pad: 0 12px;          /* a panel's title (its height is --tb-h) */
+  --tb-h: 38px;
+  --tb-line: 1px solid var(--line);
+  --tb-sub: var(--faint);    /* the small text at a title's right */
+  --tb-tool-ink: var(--dim); /* a button on a panel's title */
+  --dlg-radius: 10px;
+  --pill: 6px;               /* chips and tabs */
+  --tab-line: transparent;   /* a queue tab's border */
+  --field: var(--bg);        /* inputs and selects */
+  --field-border: 1px solid var(--line);
+  --sel: var(--raise);       /* the queue tab that's on */
+  --sel-ink: var(--text);
+  --tag: var(--raise);
+  --track: var(--raise);     /* meters and stage bars, empty */
+  --hover-line: var(--line2); /* a card or chip under the pointer */
+  --btn-hover: var(--line2);
+  --live-bg: #2b1517;        /* a live show's chip */
+  --pop-shadow: 0 12px 30px rgb(0 0 0 / 0.45);
+  --float-shadow: 0 20px 50px rgb(0 0 0 / 0.5);
+  --good-bg: #1a2a23; --good-line: #2e6b52; --good-ink: #6fd3a6;
+  --bad-bg: #2c1a1b; --bad-line: #74302d; --bad-ink: #f08a83;
+  --warn-bg: #2c2417; --warn-line: #6e5424; --warn-ink: #f0c070;
+
+  /* the chat (chat.css), and what the war room shares with it */
+  --label-buddies: "Clippa";
+  --label-chat: "Chat";
+
+  --desk: var(--bg);
+  --desk-image: none;
+  --font: 13px/1.45 var(--sans);
+  --ink: var(--text);
+  --muted: var(--dim);
+  --link: var(--blue);
+
+  --win: var(--panel);
+  --win-border: 1px solid var(--line);
+  --win-radius: 8px;
+  --win-shadow: none;
+  --win-pad: 6px;
+
+  --tb: var(--panel2);
+  --tb-ink: var(--dim);
+  --tb-font: 600 10.5px var(--sans);
+  --tb-spacing: 0.1em;
+  --tb-case: uppercase;
+  --tb-radius: 0;
+  --tb-height: 26px;
+  --tb-icon: var(--accent);
+  --tb-btn: transparent;
+  --tb-btn-ink: var(--dim);
+  --tb-btn-border: 1px solid var(--line);
+
+  --pane: var(--bg);
+  --pane-border: 1px solid var(--line);
+  --pane-radius: 6px;
+  --pane-shadow: none;
+  --status-border: 1px solid var(--line);
+
+  --group: var(--dim);
+  --group-weight: 600;
+  --on: var(--green);
+  --idle: var(--amber);
+  --away: var(--violet);
+  --off: #4a4e57;
+
+  --who-weight: 600;
+  --me: var(--accent);
+  --them: var(--violet);
+  --system: var(--dim);
+  --ts: var(--faint);
+  --ts-font: 11px var(--mono);
+  --div: 1px solid var(--line);
+
+  --card: var(--panel2);
+  --card-border: 1px solid var(--line);
+  --card-radius: 7px;
+  --card-shadow: none;
+  --write: #2f5fa8;
+  --spend: #6f52c4;
+  --est: rgb(168 139 255 / 0.12);
+  --report: rgb(69 181 131 / 0.1);
+  --report-failed: rgb(225 87 78 / 0.12);
+  --code: var(--bg);
+
+  --btn: var(--panel2);
+  --btn-ink: var(--text);
+  --btn-font: var(--sans);
+  --btn-border: 1px solid var(--line2);
+  --btn-radius: 6px;
+  --btn-shadow: none;
+  --btn-down-border: 1px solid var(--accent);
+  --btn-down-shadow: none;
+  --scheme: dark;   /* the chat's native controls (chat.css) */
+}
+
+.window .titlebar { border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.titlebar-icon { border-radius: 50%; width: 8px; height: 8px; }

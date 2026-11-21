@@ -23,7 +23,7 @@ streams/.checkup/alerted.json  the gone sign-ins checkup --alert already DMed (C
 streams/.audit/              the saved weekly digests and monthly deep audits (Audit)
 ```
 
-## 1. State files and their locks (`clipper/jsonstate.py`)
+## 1. State files and their locks (`clippa/jsonstate.py`)
 
 Every shared JSON file (`schedule.json`, `review.json`, `review_state.json`, `run.json`,
 `thumbnails.json`, `discord.json`, `retakes.json`, ...) is written whole, through a temp file
@@ -59,7 +59,7 @@ again once the file is over 120 s old; delete it by hand only when nothing is ru
 - **the recorder** keeps each live recording's state in `streams/<id>/live/state.json` (parts,
   gaps, chat coverage) and finalizes from it.
 
-## 3. Heartbeats (`clipper/daemon.py`)
+## 3. Heartbeats (`clippa/daemon.py`)
 
 serve and the bot write `streams/.serve/status.json` and `.bot/status.json` every **60 s**:
 `{at, host, pid, started_at, ...}`. Without one for **180 s** a service counts as down. serve's
@@ -77,7 +77,7 @@ there but still can't be read is reported as unreadable, not as absent: Health s
 the reason, `clipper record status` exits 1, and the recorder's stop, restart and deploy refuse
 without `--force`, since nothing says whether a show is live.
 
-## 4. The DM outbox (`clipper/alerts.py`)
+## 4. The DM outbox (`clippa/alerts.py`)
 
 Any process calls `alerts.send(cfg, kind, text, key)`: one small JSON file
 (`{kind, text, key, at, host}`) lands in `streams/.notify/outbox/`, named so it sorts by time,
@@ -124,7 +124,7 @@ process instead and logs it to `logs/retake.log`.
   for each failure in a row, never later than their interval, and back to it after a run that works.
   `clipper services status` shows the streak ("3 failed in a row"). cast auto isn't one of them: each
   run can spend on labels and image search.
-- **the worker** runs each stage as `python -m clipper.cli <stage> <stream>`, output to
+- **the worker** runs each stage as `python -m clippa.cli <stage> <stream>`, output to
   `streams/<id>/run_<stage>.log`, status in `run.json` (`stages.<name>.status`, and on a failure
   `error: "<stage> exited N: <last three lines>"`). It resumes at the first unfinished stage.
   A failed run is tried `[worker] max_attempts` times, `retry_minutes` apart, except exit 4

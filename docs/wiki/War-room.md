@@ -62,13 +62,13 @@ The war room and its chat wear one look, picked on the Settings page (or **Look*
 chat's buddy list): `warroom`, the default, or `millennium`, the alternate, the same two as the
 [Clippa messenger](Clippa-messenger#looks) (`retro` and `pager` were retired on 2026-11-18; a
 browser that had one picked goes back to the default). The browser remembers the pick and its
-other tabs follow it, `/chat` included. A look is one file in `clipper/web/themes/`; see
+other tabs follow it, `/chat` included. A look is one file in `clippa/web/themes/`; see
 [Looks](Clippa-messenger#looks) for what goes in one.
 
 `warroom` looks like a video editor: dark panels edge to edge with flat title bars, one blue
 accent for what is selected, a colour per show, and green, amber and red for status only. The
 interface is set in Inter and the numbers, times and ids in JetBrains Mono, both shipped in
-`clipper/web/fonts/` (SIL Open Font License, the licence files beside them), so the page loads
+`clippa/web/fonts/` (SIL Open Font License, the licence files beside them), so the page loads
 nothing from outside. The icons are one line set, drawn in the page itself. While a panel waits
 for its first numbers it shows a grey outline of its rows.
 
@@ -379,13 +379,13 @@ panels, and the windows (Cast, News, Blinds, Investigations, Keys, the log) open
 
 ## For developers
 
-The page is in `clipper/web/` (`warroom.html` and what it loads). `warroom.css` is structure
+The page is in `clippa/web/` (`warroom.html` and what it loads). `warroom.css` is structure
 only: every colour and the shape of windows, title bars, buttons and fields comes from the look's
 file in `web/themes/` (`themes/warroom.css` is the one place the default's colours live, and
 declares its fonts from `web/fonts/`), loaded by `theme.js`, which the chat page shares. The icons
 are `<symbol>`s in a sprite at the top of `warroom.html`, each with the id `i-` and its name;
 markup points an `<svg class="ic">`'s `<use>` at one and scripts call `ic("name")` (`js/core.js`), and a test
-checks that every name asked for is in the sprite and that no emoji stands in for one. `js/chatdock.js` shows and hides the chat frame. The server is the `clipper/warroom/`
+checks that every name asked for is in the sprite and that no emoji stands in for one. `js/chatdock.js` shows and hides the chat frame. The server is the `clippa/warroom/`
 package. `httpd.py` holds the route tables `GET_API` and `POST_API`, which map each `/api/...` path to
-a function; `data.py` builds the page's data, `review.py` the decisions (through `clipper/actions.py`),
+a function; `data.py` builds the page's data, `review.py` the decisions (through `clippa/actions.py`),
 and each panel has a module of its own.

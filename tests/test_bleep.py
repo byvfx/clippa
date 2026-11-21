@@ -1,6 +1,6 @@
 from pytest import approx
 
-from clipper.bleep import Bleeper
+from clippa.bleep import Bleeper
 
 
 def bleeper(**over):

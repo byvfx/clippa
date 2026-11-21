@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from clipper import checkup, cli, daemon, jsonstate
+from clippa import checkup, cli, daemon, jsonstate
 
 NOW = datetime(2026, 11, 9, 20, 0, tzinfo=UTC)
 
@@ -172,7 +172,7 @@ def test_lines_when_all_is_good():
 
 
 def test_alert_send_queues_a_checkup_dm(defaults, tmp_path, capsys):
-    from clipper import alerts
+    from clippa import alerts
 
     cfg = in_tmp(defaults, tmp_path)
     args = cli.build_parser().parse_args(["alert", "send", "Checkup: kick-1 is stuck in cut"])
@@ -195,7 +195,7 @@ def test_alert_send_reads_cut_utf8_from_stdin_and_trims_to_discord(defaults, tmp
     import io
     import sys
 
-    from clipper import alerts
+    from clippa import alerts
 
     cfg = in_tmp(defaults, tmp_path)
     raw = ("é" * 1950).encode() + "—".encode()[:2]   # over 1900 characters, cut mid-character
@@ -208,7 +208,7 @@ def test_alert_send_reads_cut_utf8_from_stdin_and_trims_to_discord(defaults, tmp
 
 
 def test_the_disk_check_is_off_by_default_and_warns_under_keep_free_pct(defaults, tmp_path, monkeypatch):
-    from clipper import streams
+    from clippa import streams
     cfg = in_tmp(defaults, tmp_path)
     monkeypatch.setattr(streams, "free_pct", lambda cfg, plus=0: 4.0)
     assert checkup.check_disk(cfg) == []                       # keep_free_pct = 0
@@ -271,7 +271,7 @@ def test_signins_from_cookies_files_and_tokens(defaults, tmp_path):
 
 
 def test_alert_dms_a_gone_sign_in_once_and_again_when_it_comes_back(defaults, tmp_path):
-    from clipper import alerts
+    from clippa import alerts
 
     cfg = in_tmp(defaults, tmp_path)
     gone = checkup.finding("signin:youtube", "signins", checkup.BAD, "YouTube cookies y.txt hold no live sign-in",
@@ -298,7 +298,7 @@ def test_alert_dms_a_gone_sign_in_once_and_again_when_it_comes_back(defaults, tm
 
 def test_alert_keeps_what_it_knows_through_a_crashed_check_a_broken_file_and_a_dm_not_queued(
         defaults, tmp_path, monkeypatch):
-    from clipper import alerts
+    from clippa import alerts
 
     cfg = in_tmp(defaults, tmp_path)
     gone = checkup.finding("signin:youtube", "signins", checkup.BAD, "YouTube cookies y.txt hold no live sign-in")
@@ -319,7 +319,7 @@ def test_alert_keeps_what_it_knows_through_a_crashed_check_a_broken_file_and_a_d
 
 
 def test_checkup_alert_queues_the_dm_and_a_finding_alone_never_fails_serves_job(defaults, tmp_path, capsys):
-    from clipper import alerts
+    from clippa import alerts
 
     cfg = in_tmp(defaults, tmp_path)
     cfg["paths"]["tiktok_token"] = tmp_path / "tt.json"

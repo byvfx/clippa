@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from clipper import config
+from clippa import config
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -21,7 +21,7 @@ def clean_env(monkeypatch):
     config._CHANNELS.clear()
     monkeypatch.setattr(config, "_registry", lambda name: "")   # nor this user's saved Windows variables
     # OpenRouter's public model list stays unfetched: tests are offline.
-    from clipper import llm
+    from clippa import llm
 
     monkeypatch.setattr(llm, "_OPENROUTER_PRICES", {})
     monkeypatch.setattr(llm, "_OPENROUTER_CONTEXT", {})

@@ -1,10 +1,10 @@
-"""The signals stage (clipper/signals.py): the per-second maths that turns chat and loudness
+"""The signals stage (clippa/signals.py): the per-second maths that turns chat and loudness
 into a heat curve and candidate windows. Pure functions; no audio or files here."""
 import re
 
 import numpy as np
 
-from clipper import signals
+from clippa import signals
 
 
 def test_shift_earlier_moves_a_reaction_onto_its_cause():
