@@ -314,12 +314,13 @@ def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[s
         return out, cost
 
     if it["source"] == "youtube":
-        for p in idir.glob("audio.*"):  # an earlier run's leftovers would be taken as this one's
-            p.unlink()
         args = ["-f", cfg["archive"]["youtube_format"], "--write-info-json", "--no-playlist",
                 "-o", str(idir / "audio.%(ext)s"), it["url"]]
         r, signed_in = ytdl.run_retrying(cfg, *args, retry_on=retry_on)  # see ytdl's docstring
-        audio = [p for p in idir.glob("audio.*") if p.suffix not in (".json", ".part")]
+        # A finished download left by a run that died later is kept (yt-dlp calls it downloaded);
+        # beside one in another format, the newest is this run's.
+        audio = sorted((p for p in idir.glob("audio.*") if p.suffix not in (".json", ".part")),
+                       key=lambda p: p.stat().st_mtime, reverse=True)
         if r.returncode or not audio:
             raise RuntimeError(f"yt-dlp: {ytdl.last_error(r)}")
         info_path = idir / "audio.info.json"
@@ -332,7 +333,8 @@ def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[s
                     date=datetime.fromtimestamp(ts, UTC).date().isoformat() if ts else None)
         data = audio[0].read_bytes()
         out, cost = call(worker.transcribe, data, audio[0].suffix, settings)
-        audio[0].unlink()
+        for p in audio:  # transcribed: this one and any older leftover go
+            p.unlink()
     elif it["source"] in ("kick", "hei"):
         # The video `archive video` kept, else the stream's smallest download: Kick's HLS
         # variants carry video and audio together (no audio-only format), HEI's has an audio
@@ -635,8 +637,8 @@ def status(cfg: dict, subject: str | None) -> None:
         if links:
             n = {k: sum(1 for i in cat if links.get(i, {}).get("status") == k)
                  for k in ("alive", "restricted", "dead")}
-            kept = sum(1 for i in cat if links.get(i, {}).get("status") == "dead"
-                       and (d / i / "words.jsonl").exists())
+            kept = sum(1 for i, it in cat.items() if links.get(i, {}).get("status") == "dead"
+                       and (item_dir(d, it) / "words.jsonl").exists())
             print(f"  links: {n['alive']} alive, {n['restricted']} restricted, {n['dead']} dead "
                   f"({kept} of them transcribed), {len(cat) - sum(n.values())} unchecked")
 
@@ -780,7 +782,7 @@ def list_links(cfg: dict, subject: str, status: str | None) -> None:
             if (lk["status"] != "alive" if status is None else status in ("all", lk["status"]))]
     for i, lk in sorted(rows, key=lambda r: r[1]["since"], reverse=True):
         it = cat.get(i, {})
-        kept = "transcribed" if (d / i / "words.jsonl").exists() else ""
+        kept = "transcribed" if (item_dir(d, it) if it else d / i).joinpath("words.jsonl").exists() else ""
         print(f"{lk['status']:<10} since {lk['since'][:10]}  {kept:<11}  {i}  "
               f"{it.get('title', '')[:60]!r}  {it.get('url', '')}  {lk['reason']}")
     print(f"{len(rows)} items")

@@ -47,3 +47,14 @@ def test_one_of_our_streams_is_never_transcribed_again(tmp_path, monkeypatch):
     monkeypatch.setattr(archive, "transcribe_estimate", lambda cfg, s, todo, gpu, par: seen.append(todo) or "")
     archive.run_transcribe(cfg, "s", None, False, "L4", 1, dry_run=True)
     assert [it["id"] for it in seen[0]] == ["yt-a"]
+    # status and the link list find that transcript too, on a dead link
+    archive.save_json(d, "links.json", {"kick-1": {"status": "dead", "since": "2026-11-01T00:00:00", "reason": "gone"}})
+    import contextlib
+    import io
+
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        archive.status(cfg, "s")
+        archive.list_links(cfg, "s", None)
+    assert "1/2 transcribed" in out.getvalue() and "(1 of them transcribed)" in out.getvalue()
+    assert "transcribed  kick-1" in out.getvalue()
