@@ -2,7 +2,8 @@
 # The nightly checkup (#185), run by the claude container at CHECKUP_AT (entrypoint.sh).
 # `clipper checkup` first, no model: nothing found = a one-line "all good" DM and no Claude run;
 # findings = a headless `claude -p` (checkup.md) that reads the logs and DMs one report. That
-# run is read-only: the tools below are all it may use.
+# run is read-only but for one thing: a clear code fix may become one PR, edited only in its own
+# worktree and opened through checkup-pr (#287 step 6). The tools below are all it may use.
 #
 # It runs CHECKUP_REF's code (default main) from its own detached worktree, updated each run,
 # never the clone a phone session has on some branch: PYTHONPATH puts the worktree's clipper
@@ -13,6 +14,13 @@
 set -u
 DRY=""
 [ "${1:-}" = "--dry-run" ] && DRY=1
+# One checkup at a time: a dry run by hand during the nightly one would otherwise share its PR
+# worktree. A dry run also gets a worktree of its own, and checkup-pr open refuses in it.
+exec 9>/tmp/checkup.lock
+flock -n 9 || { echo "a checkup is already running" >&2; exit 0; }
+[ -n "$DRY" ] && export CHECKUP_DRY=1 CHECKUP_PR_DIR="${CHECKUP_PR_DIR:-$HOME/checkup-fix}-dry"
+FIX=${CHECKUP_PR_DIR:-$HOME/checkup-fix}
+rm -f "$FIX.branch"   # checkup-pr: one PR a run
 REF=${CHECKUP_REF:-main}
 WT=${CHECKUP_WORKTREE:-$HOME/checkup-src}
 day=$(date +%m-%d)
@@ -58,13 +66,15 @@ DRY RUN: don't run \`clipper alert send\`; print the message as your final answe
 # One argument per rule (a rule has spaces in it); in -p mode anything else is refused. Exact
 # commands, not prefixes, wherever an extra flag could write (`status --sync`, `checkup --mark`);
 # git goes through checkup-git, which refuses the options that write. Logs are read with Read.
-set -- Read Grep Glob \
+# Edit and Write only inside checkup-pr's worktree ("//" = an absolute path in a rule), and git's
+# writes only through checkup-pr.
+set -- Read Grep Glob "Edit(/$FIX/**)" "Write(/$FIX/**)" "Bash(checkup-pr:*)" \
     "Bash(clipper checkup)" "Bash(clipper checkup --json)" "Bash(clipper status)" \
     "Bash(clipper doctor --offline)" "Bash(clipper doctor --offline --role claude)" \
     "Bash(clipper record status)" "Bash(clipper worker --status)" "Bash(clipper alert send:*)" \
     "Bash(checkup-git:*)"
 if ! claude -p "$prompt" --max-turns 40 \
-        --disallowedTools Edit Write NotebookEdit WebFetch WebSearch \
+        --disallowedTools NotebookEdit WebFetch WebSearch \
         --allowedTools "$@" </dev/null; then
     # No diagnosis (signed out, usage limit): the findings alone still go out (alert send cuts
     # them to Discord's length by characters).

@@ -219,3 +219,100 @@ def test_the_disk_check_is_off_by_default_and_warns_under_keep_free_pct(defaults
     monkeypatch.setattr(streams, "free_pct", lambda cfg, plus=0: 40.0)
     assert checkup.check_disk(cfg) == []
     assert keys(checkup.check_housekeeping(cfg, NOW)) == set()
+
+
+def test_tools_warns_on_an_old_yt_dlp(defaults):
+    assert checkup.check_tools(defaults, NOW, version="2026.11.04.232659.dev0") == []
+    (f,) = checkup.check_tools(defaults, NOW, version="2026.08.01")
+    assert f["key"] == "tools:yt-dlp" and "100 days old" in f["text"]
+    assert checkup.check_tools(defaults, NOW, version="") == []
+    defaults["checkup"]["ytdlp_days"] = 0
+    assert checkup.check_tools(defaults, NOW, version="2020.01.01") == []
+
+
+def _netscape(path, rows):
+    path.write_text("# Netscape HTTP Cookie File\n" + "".join(
+        f"{d}\tTRUE\t/\tTRUE\t{int(exp)}\t{name}\tv\n" for d, name, exp in rows), encoding="utf-8")
+
+
+def test_signins_from_cookies_files_and_tokens(defaults, tmp_path):
+    import os
+
+    cfg = in_tmp(defaults, tmp_path)
+    ts = NOW.timestamp()
+    yt = tmp_path / "youtube_cookies.txt"
+    cfg["paths"]["youtube_cookies"] = yt
+    cfg["youtube"]["cookies_from_browser"] = ""
+    _netscape(yt, [(".youtube.com", "SID", ts + 200 * 86400), (".youtube.com", "VISITOR", ts - 10)])
+    os.utime(yt, (ts, ts))
+    tw = tmp_path / "twitch.txt"
+    cfg["paths"]["twitch_cookies"] = tw
+    _netscape(tw, [(".twitch.tv", "auth-token", ts + 2 * 86400)])
+    cfg["paths"]["hei_cookies"] = tmp_path / "none.txt"
+    cfg["paths"]["tiktok_token"] = tmp_path / "tt.json"
+    jsonstate.write(cfg["paths"]["tiktok_token"], {"refresh_expires_at": ts - 5})
+    cfg["paths"]["x_token"] = tmp_path / "x.json"   # no file: nothing
+    found = {f["key"]: f for f in checkup.check_signins(cfg, NOW)}
+    assert set(found) == {"signin:twitch", "signin:tiktok-token"}
+    assert found["signin:twitch"]["level"] == checkup.WARN and "expires 11-11" in found["signin:twitch"]["text"]
+    assert found["signin:tiktok-token"]["level"] == checkup.BAD
+    _netscape(yt, [(".youtube.com", "SID", ts - 1)])
+    os.utime(yt, (ts, ts))
+    assert checkup.check_signins(cfg, NOW)[0]["key"] == "signin:youtube"
+    _netscape(yt, [(".youtube.com", "SID", ts + 200 * 86400)])
+    os.utime(yt, (ts - 30 * 3600, ts - 30 * 3600))
+    assert "signin:youtube-export" in keys(checkup.check_signins(cfg, NOW))
+    cfg["youtube"]["cookies_from_browser"] = "firefox:clipper"   # doctor checks the profile instead
+    assert "signin:youtube-export" not in keys(checkup.check_signins(cfg, NOW))
+    cfg["checkup"]["signin_days"] = 0
+    assert checkup.check_signins(cfg, NOW) == []
+
+
+def test_repeated_errors_group_lines_that_differ_only_in_ids():
+    tz = checkup.ZoneInfo("America/Los_Angeles")
+    since = datetime(2026, 11, 9, 0, 0, tzinfo=tz)
+    text = "\n".join([
+        *(f"2026-11-09 1{i}:00:00 ERROR   clipper.serve: upload kick-13{i}/v0{i}_t1 failed: 'quota {i}'"
+          for i in range(5)),
+        "2026-11-08 10:00:00 ERROR   clipper.serve: upload kick-1/v01 failed: 'old'",
+        "2026-11-09 12:00:00 WARNING clipper.serve: upload kick-1/v01 failed: 'a warning'",
+        "2026-11-09T12:00:00 ERROR worker: once"])
+    (row,) = checkup.repeated_errors(text, since, 5, tz)
+    assert row[1] == 5 and row[2].endswith("'quota 4'")
+    assert checkup.repeated_errors(text, since, 6, tz) == []
+    assert checkup.repeated_errors(text, since + timedelta(hours=11), 1, tz)[0][1] == 4   # 11:00 is before
+
+
+def test_logs_check_reads_serves_and_the_bots_log(defaults, tmp_path):
+    cfg = in_tmp(defaults, tmp_path)
+    now = datetime.now(UTC)
+    t = now.astimezone(checkup.ZoneInfo(cfg["schedule"]["timezone"])).replace(tzinfo=None) - timedelta(minutes=5)
+    cfg["paths"]["serve_log"] = tmp_path / "serve.log"
+    cfg["paths"]["bot_log"] = tmp_path / "missing.log"
+    (tmp_path / "serve.log").write_text("".join(
+        f"{t:%Y-%m-%d %H:%M:%S} ERROR   clipper.serve: job x failed with {i}\n" for i in range(6)), encoding="utf-8")
+    (f,) = checkup.check_logs(cfg, now)
+    assert f["check"] == "logs" and "6 times" in f["text"]
+    cfg["checkup"]["repeat_errors"] = 0
+    assert checkup.check_logs(cfg, now) == []
+
+
+def test_approvals_finds_an_item_the_plan_never_saw(defaults, tmp_path):
+    cfg = in_tmp(defaults, tmp_path)
+    cfg["youtube"]["auto_upload_minutes"] = 60
+    jsonstate.write(cfg["paths"]["schedule"], {
+        "generated_at": iso(-timedelta(minutes=30)), "entries": [{"key": "kick-1/v01"}],
+        "unscheduled": [{"key": "kick-1/s02", "reason": "hold"}]})
+    old, new = iso(-timedelta(hours=5)), iso(-timedelta(minutes=10))
+    stream(cfg, "kick-1", files={"review.json": {
+        "v01": {"status": "approved", "updated_at": old}, "s02": {"status": "approved", "updated_at": old},
+        "v03": {"status": "approved", "updated_at": old}, "v04": {"status": "approved", "updated_at": new},
+        "v05": {"status": "wfa", "updated_at": old}, "v06": {"status": "approved"}}})
+    (f,) = checkup.check_approvals(cfg, NOW)
+    assert f["key"] == "approvals:unplanned" and f["text"].endswith("kick-1/v03")
+    jsonstate.write(cfg["paths"]["schedule"], {"generated_at": iso(-timedelta(hours=4)), "entries": []})
+    assert keys(checkup.check_approvals(cfg, NOW)) == {"approvals:plan", "approvals:unplanned"}
+    cfg["paths"]["schedule"].unlink()   # no plan at all: the approvals are still found
+    assert keys(checkup.check_approvals(cfg, NOW)) == {"approvals:unplanned"}
+    cfg["checkup"]["approved_hours"] = 0
+    assert checkup.check_approvals(cfg, NOW) == []

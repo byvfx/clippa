@@ -10,6 +10,11 @@ Developing#releases.
 
 ## Unreleased
 
+- `clipper checkup` has four more checks: `tools` (yt-dlp over `ytdlp_days` old), `signins` (a
+  cookies file's sign-in gone or expiring, the YouTube export stale, a TikTok or X sign-in
+  expiring), `logs` (the same error repeating in serve's or the bot's log) and `approvals` (an
+  approved item the plan never saw, or a plan serve stopped replanning). The nightly checkup may
+  now open one PR for a clear code fix, through `checkup-pr`; it never merges or deploys (#287).
 - `clipper setup` no longer lets you skip the Kitsu address and token on a worker, serve or bot
   machine (only a control station may): `clipper doctor` failed without them, so a finished setup
   looked broken (#78).

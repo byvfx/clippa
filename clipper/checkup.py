@@ -14,7 +14,11 @@ misses its upload, a title that breaks the house rules. This looks for those:
     lint       what is about to go out: [checkup] words in a title, description or
                thumbnail text, no description, a title or description over YouTube's limit
     auto       an item that approved itself (#259) and that a person then undid
-    housekeeping  temp files a killed write left behind
+    housekeeping  temp files a killed write left behind; the share's free space
+    tools      yt-dlp older than ytdlp_days
+    signins    a cookies file's sign-in gone or expiring, a TikTok or X sign-in expiring
+    logs       the same error repeating in serve's or the bot's log
+    approvals  an approved item the plan never saw; a plan serve stopped replanning
 
 --fix (#287, clipper/repairs.py) repairs what it can from a short allowlist and logs it; a run
 without it still says, per finding, what a repair would do. No model, no network; nothing
@@ -269,9 +273,200 @@ def check_housekeeping(cfg: dict, now: datetime) -> list[dict]:
                           look="safe to delete; `clipper checkup --fix` does with [checkup] fix = [\"tmp\"]")]
 
 
+def ytdlp_version() -> str:
+    """yt-dlp's installed version ("" = not installed), from its metadata: no import of yt-dlp."""
+    from importlib import metadata
+
+    try:
+        return metadata.version("yt-dlp")
+    except metadata.PackageNotFoundError:
+        return ""
+
+
+def check_tools(cfg: dict, now: datetime, version: str | None = None) -> list[dict]:
+    """yt-dlp older than [checkup] ytdlp_days (0 = off): its version is its release date, and an
+    old one is how fetch, pre-shows and archives break when YouTube changes. It is this install's
+    yt-dlp (the nightly run's: the claude container's venv; serve's: the hub image)."""
+    days = cfg["checkup"]["ytdlp_days"]
+    v = ytdlp_version() if version is None else version
+    m = re.match(r"(\d{4})\.(\d{1,2})\.(\d{1,2})", v)
+    if not days or not m:
+        return []
+    released = datetime(*map(int, m.groups()), tzinfo=UTC)
+    age = (now - released).days
+    if age <= days:
+        return []
+    return [finding("tools:yt-dlp", "tools", WARN,
+                    f"yt-dlp {v} in the install this checkup ran in is {age} days old (ytdlp_days {days}): "
+                    "YouTube and Kick downloads break as the sites change", look="`uv lock --upgrade-package yt-dlp` in a PR, then deploy the hub")]
+
+
+# Each cookies file with a sign-in: (label, its [paths] key; "youtube" = ytdl.cookies_file).
+SIGNINS = (("YouTube", "youtube"), ("Twitch", "twitch_cookies"), ("HEI", "hei_cookies"))
+
+
+def _signin_cookies(label: str, rows: list) -> list:
+    from . import hei, ytdl
+
+    if label == "YouTube":
+        return [c for c in ytdl.youtube_only(rows) if c.name in ytdl.SESSION]
+    if label == "HEI":
+        return [c for c in hei.site_cookies(rows) if c.name.startswith(hei.SIGNED_IN)]
+    return [c for c in rows if "twitch.tv" in c.domain and c.name == "auth-token"]
+
+
+def _cookie_findings(cfg: dict, now: datetime, warn_s: float) -> list[dict]:
+    from . import doctor, ytdl
+
+    out, ts = [], now.timestamp()
+    for label, key in SIGNINS:
+        if key == "youtube" and ytdl.browser(cfg):
+            continue   # signed in through a browser profile instead: doctor checks that one
+        f = ytdl.cookies_file(cfg) if key == "youtube" else cfg["paths"][key]
+        if not f.is_file():
+            continue   # optional: no file, no signed-in source to check
+        look = f"sign in again and export {f.name} (wiki: Archives, Fetching-VODs)"
+        try:
+            signin = _signin_cookies(label, ytdl.read_cookies(f))
+        except (OSError, ValueError, KeyError) as e:
+            out.append(finding(f"signin:{label.lower()}", "signins", BAD, f"{label} cookies {f.name} unreadable: {e}",
+                               look=look))
+            continue
+        live = ytdl.live(signin, ts)
+        dated = [c.expires for c in live if c.expires is not None]
+        if not live:
+            out.append(finding(f"signin:{label.lower()}", "signins", BAD,
+                               f"{label} cookies {f.name} hold no live sign-in", look=look))
+        elif dated and min(dated) - ts < warn_s:
+            out.append(finding(f"signin:{label.lower()}", "signins", WARN,
+                               f"{label} cookies {f.name}: the sign-in expires "
+                               f"{datetime.fromtimestamp(min(dated), UTC):%m-%d}", look=look))
+        elif key == "youtube" and (ts - f.stat().st_mtime) / 3600 > doctor.COOKIES_STALE_HOURS:
+            out.append(finding("signin:youtube-export", "signins", WARN,
+                               f"YouTube cookies {f.name} last exported "
+                               f"{(ts - f.stat().st_mtime) / 3600:.0f} h ago: YouTube retires old ones",
+                               look="is the laptop on and its clipper-cookies task running? "
+                                    "deploy\\cookies\\cookies-task.ps1 -Status"))
+    return out
+
+
+def check_signins(cfg: dict, now: datetime) -> list[dict]:
+    """Sign-ins that are about to stop working, from the files: a cookies file's sign-in cookie
+    (YouTube, Twitch, HEI) gone or expiring within [checkup] signin_days, and the YouTube export
+    going stale; a sign-in token (TikTok's, X's) whose refresh token expires within signin_days.
+    YouTube's own token doesn't expire (a verified app); a revoked one shows up in the logs."""
+    warn_s = cfg["checkup"]["signin_days"] * 86400
+    if not warn_s:
+        return []
+    out = _cookie_findings(cfg, now, warn_s)
+    for label, key, cmd in (("TikTok", "tiktok_token", "clipper tiktok --sign-in"),
+                            ("X", "x_token", "clipper x --sign-in")):
+        tok = jsonstate.read_or(cfg["paths"][key], {})
+        until = tok.get("refresh_expires_at") if isinstance(tok, dict) else None
+        if isinstance(until, int | float) and until - now.timestamp() < warn_s:
+            gone = until <= now.timestamp()
+            out.append(finding(f"signin:{label.lower()}-token", "signins", BAD if gone else WARN,
+                               f"{label} sign-in {'expired' if gone else 'expires'} "
+                               f"{datetime.fromtimestamp(until, UTC):%m-%d}", look=cmd))
+    return out
+
+
+LOG_LINE = re.compile(r"^(\d{4}-\d\d-\d\d[ T]\d\d:\d\d:\d\d)\S*\s+(ERROR|CRITICAL)\s+(.*)")
+LOG_TAIL_BYTES = 4 << 20   # the end of each log is enough for a day; a rotated log is 10 MB at most
+
+
+def error_shape(msg: str) -> str:
+    """An error line with what changes between repeats (ids, numbers, quoted values) blanked, so
+    the same error from different streams counts as one."""
+    s = re.sub(r"'[^']*'|\"[^\"]*\"", "'…'", msg)
+    s = re.sub(r"\b[0-9a-f]{8,}\b|\d+", "N", s)
+    return s[:160]
+
+
+def repeated_errors(text: str, since: datetime, least: int, tz: ZoneInfo) -> list[tuple[str, int, str]]:
+    """[(shape, count, last line)] of the ERROR and CRITICAL lines after `since` that came at least
+    `least` times, most first. A log's times have no zone: they are tz's (the services' TZ)."""
+    seen: dict[str, list] = {}
+    for line in text.splitlines():
+        m = LOG_LINE.match(line)
+        if not m:
+            continue
+        t = datetime.fromisoformat(m.group(1).replace("T", " ")).replace(tzinfo=tz)
+        if t < since:
+            continue
+        shape = error_shape(m.group(3))
+        seen.setdefault(shape, [0, ""])
+        seen[shape][0] += 1
+        seen[shape][1] = m.group(3)
+    return sorted(((s, n, last) for s, (n, last) in seen.items() if n >= least), key=lambda x: -x[1])
+
+
+def _tail(path: Path) -> str:
+    with path.open("rb") as f:
+        f.seek(max(0, path.stat().st_size - LOG_TAIL_BYTES))
+        return f.read().decode("utf-8", "replace")
+
+
+def check_logs(cfg: dict, now: datetime) -> list[dict]:
+    """The same error, give or take its ids, at least [checkup] repeat_errors times in serve's or
+    the bot's log in the last repeat_hours (0 = off): an alert fires once, a loop keeps failing.
+    The logs' times are read in [schedule] timezone, the services' TZ in the hub's compose."""
+    ck = cfg["checkup"]
+    tz = ZoneInfo(cfg["schedule"]["timezone"])
+    if not ck["repeat_errors"]:
+        return []
+    since = now - timedelta(hours=ck["repeat_hours"])
+    out = []
+    for name in ("serve", "bot"):
+        path = cfg["paths"].get(f"{name}_log")
+        if not path or not Path(path).is_file():
+            continue
+        for shape, n, last in repeated_errors(_tail(Path(path)), since, ck["repeat_errors"], tz)[:3]:
+            key = re.sub(r"\W+", "-", shape.lower())[:60].strip("-")
+            out.append(finding(f"logs:{name}:{key}", "logs", WARN,
+                               f"{name}.log: the same error {n} times in {ck['repeat_hours']} h: {last[:200]}",
+                               look=f"logs/{Path(path).name}"))
+    return out
+
+
+def check_approvals(cfg: dict, now: datetime) -> list[dict]:
+    """An item approved (review.json, which mirrors Kitsu) at least [checkup] approved_hours ago
+    that the plan neither scheduled nor skipped with a reason: the replan never saw it. And a plan
+    older than approved_hours while serve should replan hourly (0 = off)."""
+    hours = cfg["checkup"]["approved_hours"]
+    path: Path = cfg["paths"]["schedule"]
+    if not hours:
+        return []
+    plan = jsonstate.load(path) if path.exists() else {}   # no plan yet: every approval is unplanned
+    out = []
+    every = cfg["youtube"]["auto_upload_minutes"]
+    made = _age_s(plan.get("generated_at"), now)
+    if plan and every and made > max(hours * 3600, 2 * every * 60):
+        out.append(finding("approvals:plan", "approvals", BAD,
+                           f"schedule.json was last planned {_hours(made)} ago; serve replans every {every} min",
+                           look="serve's upload job (clipper status; logs/serve.log)"))
+    known = {e.get("key") for e in plan.get("entries", [])} | {
+        u.get("key") for u in plan.get("unscheduled", []) if isinstance(u, dict)}
+    root: Path = cfg["paths"]["streams"]
+    lost = []
+    for f in sorted(root.glob("*/review.json")) if root.is_dir() else []:
+        for key, it in jsonstate.read_or(f, {}).items():
+            age = _age_s(it.get("updated_at"), now) if isinstance(it, dict) else 0
+            if (isinstance(it, dict) and it.get("status") == "approved" and age != float("inf")
+                    and f"{f.parent.name}/{key}" not in known and age > hours * 3600):
+                lost.append(f"{f.parent.name}/{key}")
+    if lost:
+        out.append(finding("approvals:unplanned", "approvals", BAD,
+                           f"{len(lost)} approved item{'s' if len(lost) != 1 else ''} the plan never saw "
+                           f"(approved over {hours} h ago): " + ", ".join(lost[:5]) + (" ..." if len(lost) > 5 else ""),
+                           look="serve's upload job replans hourly (logs/serve.log); `clipper schedule --list`"))
+    return out
+
+
 CHECKS: dict[str, Callable[[dict, datetime], list[dict]]] = {
     "services": check_services, "streams": check_streams, "schedule": check_schedule, "lint": check_lint,
-    "auto": check_auto, "housekeeping": check_housekeeping}
+    "auto": check_auto, "housekeeping": check_housekeeping, "tools": check_tools, "signins": check_signins,
+    "logs": check_logs, "approvals": check_approvals}
 
 
 # ---------- running them ----------

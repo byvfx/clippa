@@ -15,8 +15,9 @@ worker keep running the code of the last hub deploy; a merged change reaches the
 `bash deploy/hub/deploy.sh` from the laptop.
 
 It also runs the nightly [checkup](Checkup#the-nightly-report) at `CHECKUP_AT` (in
-`env.local`; empty = off): `clipper checkup`, then, only if that finds something, a read-only
-`claude -p` that works out the causes and DMs you one report. After it, on their days, come the
+`env.local`; empty = off): `clipper checkup`, then, only if that finds something, a
+`claude -p` that works out the causes and DMs you one report (read-only, but for one PR for a
+[clear code fix](Checkup#a-pr-for-a-clear-code-fix)). After it, on their days, come the
 weekly digest and the monthly deep [audit](Audit).
 
 ## Deploy

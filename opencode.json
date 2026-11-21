@@ -1,0 +1,34 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["CLAUDE.md"],
+  "permissions": [
+    { "action": "shell", "resource": "*", "effect": "ask" },
+
+    { "action": "shell", "resource": "git status *", "effect": "allow" },
+    { "action": "shell", "resource": "git diff *", "effect": "allow" },
+    { "action": "shell", "resource": "git log *", "effect": "allow" },
+    { "action": "shell", "resource": "git show *", "effect": "allow" },
+    { "action": "shell", "resource": "git branch *", "effect": "allow" },
+
+    { "action": "shell", "resource": "gh pr view *", "effect": "allow" },
+    { "action": "shell", "resource": "gh pr checks *", "effect": "allow" },
+    { "action": "shell", "resource": "gh pr list *", "effect": "allow" },
+    { "action": "shell", "resource": "gh api graphql *", "effect": "allow" },
+
+    { "action": "shell", "resource": "uvx ruff@0.17.3 *", "effect": "allow" },
+    { "action": "shell", "resource": "*python.exe -m pytest *", "effect": "allow" },
+    { "action": "shell", "resource": "clipper doctor *", "effect": "allow" },
+    { "action": "shell", "resource": "clipper services status*", "effect": "allow" },
+
+    { "action": "shell", "resource": "bash deploy/*", "effect": "deny" },
+    { "action": "shell", "resource": "clipper services restart*", "effect": "deny" },
+    { "action": "shell", "resource": "clipper services stop*", "effect": "deny" },
+
+    { "action": "shell", "resource": "clipper upload*", "effect": "ask" },
+    { "action": "shell", "resource": "clipper review publish*", "effect": "ask" },
+    { "action": "shell", "resource": "clipper score*", "effect": "ask" },
+    { "action": "shell", "resource": "clipper segments*", "effect": "ask" },
+    { "action": "shell", "resource": "clipper meta*", "effect": "ask" },
+    { "action": "shell", "resource": "clipper thumbs*", "effect": "ask" }
+  ]
+}
