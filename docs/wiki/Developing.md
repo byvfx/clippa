@@ -60,7 +60,7 @@ Each step is checked by a test where it can be, so a missing one fails `pytest`,
 ## Checks
 
 ```bash
-uvx ruff@0.17.3 check clipper tests
+uvx ruff@0.17.3 check clippa tests
 .venv/Scripts/python.exe -m pytest -q
 ```
 

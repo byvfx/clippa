@@ -315,7 +315,7 @@ of phone use; #300 (access levels, a local Jev-like classifier in front of the m
 - **NAS recorder deploy:** `bash deploy/record/deploy.sh`, only when nothing is live (it refuses otherwise).
 - **Per-stream overrides** (a big night): `streams/<id>/config.toml` (`[schedule] priority = true`,
   `kick_first_hours = 0`, more picks). `CLIPPER_SCHEDULE_START=<date> clipper schedule --reshuffle` refills today.
-- **Checks:** `clipper doctor --role gpu --offline`, `uvx ruff@0.17.3 check clipper tests`,
+- **Checks:** `clipper doctor --role gpu --offline`, `uvx ruff@0.17.3 check clippa tests`,
   `.venv/Scripts/python.exe -m pytest -q`, test stream `kick-131151926`.
 - **Clean installs (#78):** Windows via a Sandbox `.wsb` running `deploy\bootstrap.ps1 --answers ... --offline`, Linux via Docker
   `ubuntu:24.04` running `bash deploy/bootstrap.sh --answers ... --offline` (~5 min); no keys go in; then the wiki Install-checklist.

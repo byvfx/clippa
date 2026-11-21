@@ -38,7 +38,7 @@ check)
     trap 'rm -rf "$jail"' EXIT
     clean() { env -i PATH="/app/.venv/bin:/usr/local/bin:/usr/bin:/bin" HOME="$jail" LANG=C.UTF-8 \
         UV_CACHE_DIR="$jail/uv" "$@"; }
-    clean uv tool run ruff@0.17.3 check clipper tests   # the image has uv, not uvx
+    clean uv tool run ruff@0.17.3 check clippa tests   # the image has uv, not uvx
     clean /app/.venv/bin/python -m pytest -q -p no:cacheprovider
     ;;
 open)

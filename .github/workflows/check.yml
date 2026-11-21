@@ -49,6 +49,6 @@ jobs:
       - name: Install (base dependencies + dev group + the discord extra for the bot's tests; no GPU extras)
         run: uv sync --locked --extra discord
       - name: Ruff
-        run: uv run ruff check clipper tests
+        run: uv run ruff check clippa tests
       - name: Tests
         run: uv run pytest -q

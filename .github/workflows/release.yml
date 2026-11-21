@@ -46,7 +46,7 @@ jobs:
       - name: Lint and tests on the tagged commit, as check.yml runs them (the discord extra, no GPU extras)
         run: |
           uv sync --locked --extra discord
-          uv run ruff check clipper tests
+          uv run ruff check clippa tests
           uv run pytest -q
       - name: Build the wheel and sdist
         run: uv build
