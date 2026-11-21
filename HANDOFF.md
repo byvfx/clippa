@@ -156,8 +156,8 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   secrets/openrouter_secret.txt. Moving a stage to another model is a config change whenever the user wants it.
 
 ## Waiting on the user
-- v0.2.0 is released (tag 11-19). The recorder was redeployed 11-20 at 74be7d2 (`0.2.0+59` in its heartbeat). The claude container
-  (up since 11-16) still has the old `checkup.sh`: `bash deploy/claude/deploy.sh` with `CHECKUP_AT` (Checkup, Open work).
+- v0.2.0 is released (tag 11-19). The recorder was redeployed 11-20 at 74be7d2 (`0.2.0+59` in its heartbeat). The hub and the
+  claude container were deployed 11-20 at bd1369b (#356); the nightly checkup is on (`CHECKUP_AT=08:30`, first real run 11-21).
 - Clippa chat works on the phone (user, 11-20). `[chat] model` is Haiku (`claude-haiku-5-5`) by default; any provider's model string
   works there, so BYOK is `[chat] model = "openrouter:<vendor>/<model>"` with `OPENROUTER_API_KEY` (wiki Model-providers); the
   Discord bot doesn't use the chat. The cloud environment named "clipper" (11-18) holds an OpenRouter key for cloud Grok reviews: kept (user).
@@ -224,9 +224,10 @@ of phone use; #300 (access levels, a local Jev-like classifier in front of the m
 - **War room heat graph (PR #294, live 11-19):** 🔥 on a stream or item (`/api/heat`, wiki War-room#heat); not yet seen on a real phone.
 - **Review pre-flight checks and approval by silence (#259):** steps A (`clipper review check`, PR #263) and B (`clipper review
   auto`, PR #265, serve's `auto` job every 10 min), stale-finding rechecks (#270) and hardening (#273) are live (wiki Review).
-  **On for Kino since 11-15** (`[shows.kino.review] auto_approve = true`; backup `backups/clipper.toml.before_kino_auto_approve_2026-11-15`).
-  Next, after a few days of Kino with nothing undone (checkup's `auto` check, `clipper review auto --dry-run`): Channel 404's
-  Shorts, then close #259. Segments (#258 A-C) are merged and deployed (PRs #260-#262). Segment floor, from 7-day views: scores 1-3
+  **On for Kino since 11-15 and Channel 404 since 11-20** (`[shows.<key>.review] auto_approve = true`, Shorts only: the
+  segment and compilation floors are 0; backups `backups/clipper.toml.before_kino_auto_approve_2026-11-15`,
+  `...before_c404_auto_approve_2026-11-20`). Next: a few days of Don's Shorts with nothing undone (checkup's `auto` check),
+  then close #259. Segments (#258 A-C) are merged and deployed (PRs #260-#262). Segment floor, from 7-day views: scores 1-3
   underperform, 4-5 are a coin flip, 6+ do better; suggested `auto_min_segment = 4` (Kino holds 63 of 183 scored, Channel 404 23
   of 106), **not set**: after the Shorts, at the user's word (a checkbox on #259). #258 stays open for step D only,
   `[segments] min_score` (not cutting low segments at all), after two weeks of `lift` tables (~11-29), at the user's word. Shorts backtest: 105 of 181 approved Shorts would have approved themselves.
@@ -245,12 +246,14 @@ of phone use; #300 (access levels, a local Jev-like classifier in front of the m
   "Popcorn function" maths plot (`commons-c2e98328`) from the clip art.
 - **Usability review (11-10):** built and merged 11-13 (#199, #204, #228, #205). Still open: new users and the public repo #207
   (this install's values in tracked files, packaging; its Getting-started scheduled-task line fixed in PR #353, 11-20).
-- **Checkup (wiki Checkup):** the nightly run (`deploy/claude/checkup.sh`) is not on yet: the user puts `CHECKUP_AT=08:30` in
-  `deploy/claude/env.local` and redeploys the claude container; first run: check headless `claude -p` runs on the Remote Control
-  sign-in and the `--allowedTools` rules work (`checkup.sh --dry-run`); then a week of nightly reports. **#287 step 2 is PR #341,
-  merged and deployed 11-20 (serve and bot at a506494, the `checkup` job running):** `clipper checkup --fix` (`clipper/repairs.py`, serve every `[checkup] fix_minutes`), repairs `retry` and
-  `tmp`, both would-fix while `[checkup] fix = []`. Next: a week of would-fix reports; `fix = ["tmp"]`, later `"retry"`, at the
-  user's word; new checks (yt-dlp, cookies and tokens, repeat log errors, Kitsu approvals not scheduled); PRs from the nightly run.
+- **Checkup (wiki Checkup):** the nightly run (`deploy/claude/checkup.sh`) is on since 11-20 (08:30; a dry run printed "all
+  good", so the headless `claude -p` path and its `--allowedTools` rules are still untried: check the first report with
+  findings, and the first `checkup/` PR if one comes). **#287 is closed (11-20):**
+  `clipper checkup --fix` (PR #341; repairs `retry`, `tmp`) with `[checkup] fix = ["tmp"]` on the NAS since 11-20 (user; backup
+  `backups/clipper.toml.before_checkup_fix_tmp_2026-11-20`); `"retry"` stays would-fix until the user says (its rerun may call
+  models). PR #356: checks `tools` (yt-dlp age), `signins` (cookies and TikTok/X tokens), `logs` (repeating errors), `approvals`
+  (approved items the plan never saw), and the nightly run may open one PR a run through `checkup-pr` (own worktree, tests
+  without credentials, never merges). Watch the first week of nightly reports and any `checkup/` PR.
 - **Bootstrap follow-up (11-07):** `deploy/bootstrap.sh` installs Homebrew `ffmpeg`, which has no libass (`subtitles`) filter, so a
   Mac worker fails Short captions; `ffmpeg-full` has it but is keg-only: install it and point clipper at it, or document it.
   `deploy/hub/deploy.sh` from `lofn` needs `deploy/hub/env.local` (it overwrites the NAS `.env`).
