@@ -435,13 +435,13 @@ def check_approvals(cfg: dict, now: datetime) -> list[dict]:
     older than approved_hours while serve should replan hourly (0 = off)."""
     hours = cfg["checkup"]["approved_hours"]
     path: Path = cfg["paths"]["schedule"]
-    if not hours or not path.exists():
+    if not hours:
         return []
-    plan = jsonstate.load(path)
+    plan = jsonstate.load(path) if path.exists() else {}   # no plan yet: every approval is unplanned
     out = []
     every = cfg["youtube"]["auto_upload_minutes"]
     made = _age_s(plan.get("generated_at"), now)
-    if every and made > max(hours * 3600, 2 * every * 60):
+    if plan and every and made > max(hours * 3600, 2 * every * 60):
         out.append(finding("approvals:plan", "approvals", BAD,
                            f"schedule.json was last planned {_hours(made)} ago; serve replans every {every} min",
                            look="serve's upload job (clipper status; logs/serve.log)"))

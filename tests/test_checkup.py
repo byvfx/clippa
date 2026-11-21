@@ -312,5 +312,7 @@ def test_approvals_finds_an_item_the_plan_never_saw(defaults, tmp_path):
     assert f["key"] == "approvals:unplanned" and f["text"].endswith("kick-1/v03")
     jsonstate.write(cfg["paths"]["schedule"], {"generated_at": iso(-timedelta(hours=4)), "entries": []})
     assert keys(checkup.check_approvals(cfg, NOW)) == {"approvals:plan", "approvals:unplanned"}
+    cfg["paths"]["schedule"].unlink()   # no plan at all: the approvals are still found
+    assert keys(checkup.check_approvals(cfg, NOW)) == {"approvals:unplanned"}
     cfg["checkup"]["approved_hours"] = 0
     assert checkup.check_approvals(cfg, NOW) == []

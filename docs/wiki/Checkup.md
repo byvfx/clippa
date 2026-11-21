@@ -100,13 +100,15 @@ the DM says what to run.
 When a finding pins down a code bug (a traceback into `clipper/` with an obvious cause), the
 nightly run may fix it as one PR, through `checkup-pr` (`deploy/claude/checkup-pr.sh`):
 
-- `checkup-pr start <slug>` makes a worktree at `~/checkup-fix` on a branch `checkup/<MMDD>-<slug>`
+- `checkup-pr start <slug>` makes a worktree at `~/checkup-fix` on a branch `checkup/<YYYYMMDD-HHMM>-<slug>`
   off `origin/main`. Claude's Edit and Write work only there, never in the clone.
 - `checkup-pr check` runs ruff and the tests there, as CI does, with no token, key or login in
   their environment (the tests are code the run just wrote: none of them can push, merge or spend).
 - `checkup-pr open "<title>" -` commits, pushes and opens the PR (its body on stdin). It refuses
   a change outside `clipper/`, `tests/`, `docs/wiki/` and `CHANGELOG.md`, one over 200 changed
-  lines (`CHECKUP_PR_MAX_LINES`), a second PR in the same run, and anything in a `--dry-run`.
+  lines (`CHECKUP_PR_MAX_LINES`), a second PR in the same run, and anything in a `--dry-run` (which gets its own worktree,
+  `~/checkup-fix-dry`). Only one checkup runs at a time. A retry of `open` after a failed push
+  picks up the commit it made, and prints the PR's link when it is already open.
 
 The repository is public, so the prompt keeps this install's values (secrets, IPs, ids, `/data`
 paths) out of the code, the tests and the PR body. The DM links the PR under its finding. The PR gets the usual reviews (the `review` workflow

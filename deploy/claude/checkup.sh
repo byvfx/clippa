@@ -14,8 +14,13 @@
 set -u
 DRY=""
 [ "${1:-}" = "--dry-run" ] && DRY=1
-rm -f /tmp/checkup-pr.branch            # checkup-pr: one PR a run
-[ -n "$DRY" ] && export CHECKUP_DRY=1   # checkup-pr open refuses in a dry run
+# One checkup at a time: a dry run by hand during the nightly one would otherwise share its PR
+# worktree. A dry run also gets a worktree of its own, and checkup-pr open refuses in it.
+exec 9>/tmp/checkup.lock
+flock -n 9 || { echo "a checkup is already running" >&2; exit 0; }
+[ -n "$DRY" ] && export CHECKUP_DRY=1 CHECKUP_PR_DIR="${CHECKUP_PR_DIR:-$HOME/checkup-fix}-dry"
+FIX=${CHECKUP_PR_DIR:-$HOME/checkup-fix}
+rm -f "$FIX.branch"   # checkup-pr: one PR a run
 REF=${CHECKUP_REF:-main}
 WT=${CHECKUP_WORKTREE:-$HOME/checkup-src}
 day=$(date +%m-%d)
@@ -63,7 +68,6 @@ DRY RUN: don't run \`clipper alert send\`; print the message as your final answe
 # git goes through checkup-git, which refuses the options that write. Logs are read with Read.
 # Edit and Write only inside checkup-pr's worktree ("//" = an absolute path in a rule), and git's
 # writes only through checkup-pr.
-FIX=${CHECKUP_PR_DIR:-$HOME/checkup-fix}
 set -- Read Grep Glob "Edit(/$FIX/**)" "Write(/$FIX/**)" "Bash(checkup-pr:*)" \
     "Bash(clipper checkup)" "Bash(clipper checkup --json)" "Bash(clipper status)" \
     "Bash(clipper doctor --offline)" "Bash(clipper doctor --offline --role claude)" \
