@@ -69,12 +69,32 @@ def slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:50]
 
 
+def _split_limit(seg_cfg: dict) -> float:
+    """[segments] split_over_s in seconds. Missing, 0 and negative are off (0.0).
+
+    bool is rejected on purpose: it is an int, so float(True) would be 1.0 and flag
+    every segment longer than a second."""
+    raw = seg_cfg.get("split_over_s")
+    if raw is None:
+        return 0.0
+    limit = None
+    if not isinstance(raw, bool):
+        try:
+            limit = float(raw)
+        except (TypeError, ValueError):
+            limit = None
+    if limit is None:
+        raise ClipperError(f"[segments] split_over_s must be a number of seconds, not {raw!r}")
+    return limit if limit > 0 else 0.0
+
+
 def apply_filters(segs: list[dict], seg_cfg: dict) -> None:
     """Mark each segment cut, or say why not. With [segments] split_over_s set, one longer
     than that is `resplit` (skip reason "re-split") instead of the length drop, so the
-    footage stays visible for a re-split. 0, the default, leaves the length drop as it is."""
+    footage stays visible for a re-split. 0 (the default) and a negative leave the length
+    drop as it is. A value that is not a number is an error."""
     allowed = set(seg_cfg["source_share"])
-    limit = seg_cfg.get("split_over_s") or 0
+    limit = _split_limit(seg_cfg)
     for s in segs:
         reasons = []
         s.pop("resplit", None)  # a rerun with the setting off clears a flag from before
@@ -222,7 +242,7 @@ def run(stream_dir: Path, cfg: dict, force: bool = False, dry_run: bool = False,
         data = split(stream_dir, cfg, claude, prompts)
     segs = data["segments"]
     apply_filters(segs, seg_cfg)
-    report_resplits(segs, seg_cfg.get("split_over_s") or 0)
+    report_resplits(segs, _split_limit(seg_cfg))
     data["compilations"] = compilations(data, cfg, claude, prompts)
     if scoring:
         from .segscore import score_stream

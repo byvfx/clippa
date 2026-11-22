@@ -1,7 +1,10 @@
 """The segments stage (clippa/segments.py): the pure parts around the model call."""
 import json
 
+import pytest
+
 from clippa import jsonstate, segments
+from clippa.errors import ClipperError
 
 
 def test_slug_is_a_safe_file_name():
@@ -43,6 +46,35 @@ def test_split_over_s_flags_a_long_segment_for_a_resplit():
     exact = {"standalone": True, "kind": "topic", "source_share": "none", "duration_s": 50 * 60}
     segments.apply_filters([exact], {**base, "split_over_s": 50 * 60})
     assert exact["cut"] and "resplit" not in exact   # longer than the limit, not equal to it
+
+
+def test_negative_split_over_s_is_off(capsys):
+    """Below 0 is off, the same as 0: min_s/max_s still decide the cut, nothing is re-split."""
+    cfg = {"source_share": ["none", "some"], "skip_kinds": ["ad"], "min_s": 120, "max_s": 3600,
+           "split_over_s": -1}
+    in_range = {"id": "s01", "standalone": True, "kind": "topic", "source_share": "none",
+                "duration_s": 600}
+    too_long = {"id": "s02", "standalone": True, "kind": "topic", "source_share": "none",
+                "duration_s": 71 * 60}
+    too_short = {"id": "s03", "standalone": True, "kind": "topic", "source_share": "none",
+                 "duration_s": 30}
+    segs = [in_range, too_long, too_short]
+    segments.apply_filters(segs, cfg)
+    assert in_range["cut"] and in_range["skip_reasons"] == [] and "resplit" not in in_range
+    assert not too_long["cut"] and too_long["skip_reasons"] == ["71 min"] and "resplit" not in too_long
+    assert not too_short["cut"] and too_short["skip_reasons"] == ["0 min"] and "resplit" not in too_short
+    segments.report_resplits(segs, segments._split_limit(cfg))
+    assert "RESPLIT" not in capsys.readouterr().out
+
+
+def test_text_split_over_s_is_a_clear_error():
+    """A value float() cannot read is a ClipperError naming the setting, not a bare TypeError."""
+    cfg = {"source_share": ["none"], "skip_kinds": [], "min_s": 120, "max_s": 3600,
+           "split_over_s": "fifty"}
+    segs = [{"standalone": True, "kind": "topic", "source_share": "none", "duration_s": 600}]
+    with pytest.raises(ClipperError, match=r"\[segments\] split_over_s") as raised:
+        segments.apply_filters(segs, cfg)
+    assert "fifty" in str(raised.value)
 
 
 def _words(*spans: tuple[float, float]) -> str:
