@@ -240,6 +240,15 @@ show in `[shows.<key>.edit]` only at their word); #67's model edit plan waits un
 `actions.edit_meta` (PR #291) and the `bulk`/`undo`/stream-name tools (PR #299) are all live (wiki Clippa-messenger); next, a week
 of phone use; #300 (access levels, a local Jev-like classifier in front of the model, a lab first); then a small `clippa mcp`.
 
+- **Segments prompt v4 (opt-in, not the default):** `segments_v4.md` adds a 50-minute cap; `compilation_v4.md`
+  is the v3 compilation text so the shared `[segments] prompt_version` has both files. The default stays `v3`
+  and `max_s` stays 3600. Set v4 only after a hub deploy of those files. The cap is the prompt; a later code
+  change flags longer segments for a re-split. `docs/config-7-hybrid-segv4.toml` is the model mix to paste
+  into one stream's `config.toml`; `docs/config-7-hybrid-segv4-openrouter.toml` is the same mix with Claude
+  through OpenRouter (`anthropic/claude-opus-5.5` and the other catalog ids). OpenCode agents from that trial
+  are in `opencode.json`; deploy, restart and upload permissions are unchanged, and `reviewer` stays on
+  `openrouter/x-ai/grok-4.7`.
+
 - **War room redesign (11-18):** all 8 steps live (PRs #314-#333; #324 done, PR #339); plan https://claude.ai/artifact/2Ny9Ad8bfWpjhyvtpx87eW,
   mockup https://claude.ai/artifact/H8uGqKzPmXJcXnAAUcNK4Z. Left: Library/Research/Settings still open the old windows from tiles; follow-ups #325-#328.
 - **War room heat graph (PR #294, live 11-19):** 🔥 on a stream or item (`/api/heat`, wiki War-room#heat); not yet seen on a real phone.

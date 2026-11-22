@@ -112,3 +112,22 @@ def test_a_folder_of_your_own_is_read_first(defaults, tmp_path):
     assert "show_name" in (prompts.PACKAGED / name).read_text(encoding="utf-8")   # the stage fills that one
     with pytest.raises(ClipperError, match=tmp_path.name):              # the error names both places
         prompts.Prompts({**cfg, "meta": {**cfg["meta"], "prompt_version": "v999"}}).get("meta")
+
+
+def test_segments_v4_loads_and_the_default_stays_v3(defaults):
+    """v4 is on file and loads through Prompts. The default key still names v3, and max_s
+    stays 3600: the 50-minute cap is the prompt's wording, not the cut limit."""
+    assert defaults["segments"]["prompt_version"] == "v3"
+    assert defaults["segments"]["max_s"] == 3600
+
+    def load(version):
+        cfg = {**defaults, "segments": {**defaults["segments"], "prompt_version": version}}
+        p = prompts.Prompts(cfg)
+        p.vars["min_aside_s"] = cfg["segments"]["min_aside_s"]  # segments.run sets this, then get
+        return p.get("segments"), p.get("compilation")
+
+    v3_seg, v3_comp = load("v3")
+    v4_seg, v4_comp = load("v4")
+    assert "50 minutes" not in v3_seg
+    assert "No segment runs longer than 50 minutes" in v4_seg
+    assert v3_comp == v4_comp  # compilation_v4 is the v3 text, so the shared version key has both files

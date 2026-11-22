@@ -112,6 +112,83 @@ def test_big_story_preset_only_has_known_settings():
     assert not unknown, "docs/big-story.toml: " + ", ".join(unknown)
 
 
+# Clipper's Claude ids use hyphens. OpenRouter's catalog lists the same models with dots.
+CLAUDE_ON_OPENROUTER = {
+    "claude-haiku-5-5": "openrouter:anthropic/claude-haiku-5.5",
+    "claude-sonnet-5-5": "openrouter:anthropic/claude-sonnet-5.5",
+    "claude-opus-5-5": "openrouter:anthropic/claude-opus-5.5",
+}
+
+
+def _model_values(data: dict) -> dict[str, str]:
+    return {f"{s}.{k}": v for s, vals in data.items() if isinstance(vals, dict)
+            for k, v in vals.items() if isinstance(v, str) and (
+                v.startswith("claude-") or v.startswith("openrouter:"))}
+
+
+def test_hybrid_segv4_example_parses(tmp_path):
+    """Both config-7 overlays parse, use only real settings, and select prompt v4 without
+    moving max_s. The OpenRouter file is the direct one with each bare claude-* model rewritten
+    to OpenRouter's catalog id. Neither repeats a [llm.prices] key defaults.toml already has."""
+    direct = tomllib.loads((ROOT / "docs" / "config-7-hybrid-segv4.toml").read_text(encoding="utf-8"))
+    routed = tomllib.loads(
+        (ROOT / "docs" / "config-7-hybrid-segv4-openrouter.toml").read_text(encoding="utf-8"))
+    for name, data in (("config-7-hybrid-segv4.toml", direct),
+                       ("config-7-hybrid-segv4-openrouter.toml", routed)):
+        unknown = [f"[{s}] {k}" for s, v in data.items() if isinstance(v, dict)
+                   for k in v if k not in config.DEFAULTS.get(s, {})]
+        assert not unknown, f"docs/{name}: " + ", ".join(unknown)
+        assert data["segments"]["prompt_version"] == "v4"
+        assert "max_s" not in data["segments"]
+        repeated = set(config.DEFAULTS["llm"]["prices"]) & set(data["llm"]["prices"])
+        assert not repeated, f"docs/{name} repeats default prices: {sorted(repeated)}"
+
+    direct_models, routed_models = _model_values(direct), _model_values(routed)
+    assert direct_models.keys() == routed_models.keys()
+    for key, model in direct_models.items():
+        expect = CLAUDE_ON_OPENROUTER.get(model, model)
+        assert routed_models[key] == expect, (key, model, routed_models[key])
+    assert routed["segments"]["effort"] == direct["segments"]["effort"] == "medium"
+    assert routed["llm"]["prices"]["openrouter:anthropic/claude-opus-5.5"] == [4, 20]
+
+    cfg = config.load(tmp_path / "clipper.toml", use_local=False)
+    assert cfg["segments"]["prompt_version"] == "v3" and cfg["segments"]["max_s"] == 3600
+    for name, model in (("config-7-hybrid-segv4.toml", "claude-opus-5-5"),
+                        ("config-7-hybrid-segv4-openrouter.toml",
+                         "openrouter:anthropic/claude-opus-5.5")):
+        sdir = tmp_path / name
+        sdir.mkdir()
+        (sdir / config.STREAM_CONFIG).write_text(
+            (ROOT / "docs" / name).read_text(encoding="utf-8"), encoding="utf-8")
+        one = config.for_stream(cfg, sdir)
+        assert one["segments"]["prompt_version"] == "v4"
+        assert one["segments"]["max_s"] == 3600
+        assert one["segments"]["model"] == model
+
+
+def test_opencode_keeps_deploy_locks_and_the_reviewer_model():
+    """The recommended agents sit beside the permissions already in opencode.json. Reviewer
+    stays on the owner's model; oss-reviewer keeps its empty permission list."""
+    data = json.loads((ROOT / "opencode.json").read_text(encoding="utf-8"))
+    rules = {(p["action"], p["resource"], p["effect"]) for p in data["permissions"]}
+    assert ("shell", "bash deploy/*", "deny") in rules
+    assert ("shell", "clipper services restart*", "deny") in rules
+    assert ("shell", "clipper services stop*", "deny") in rules
+    assert ("shell", "clipper upload*", "ask") in rules
+    assert ("shell", "clipper review publish*", "ask") in rules
+    agents = data["agents"]
+    assert agents["reviewer"]["model"] == "openrouter/x-ai/grok-4.7"
+    assert any(p.get("action") == "edit" and p.get("effect") == "deny"
+               for p in agents["reviewer"]["permissions"])
+    assert agents["oss-reviewer"]["model"] == "openrouter/deepseek/deepseek-v4.1-flash-1017"
+    assert agents["oss-reviewer"]["permissions"] == []
+    assert agents["build"]["model"] == "anthropic/claude-opus-5-5"
+    assert agents["plan"]["model"] == "anthropic/claude-opus-5-5#high"
+    assert agents["explore"]["model"] == "anthropic/claude-haiku-5-5"
+    assert agents["checkup"]["model"] == "anthropic/claude-sonnet-5-5"
+    assert agents["audit"]["model"] == "anthropic/claude-sonnet-5-5#high"
+
+
 def test_example_loads(tmp_path):
     cfg = config.load(ROOT / "clipper.example.toml", use_local=False)
     for key in cfg["shows"]:

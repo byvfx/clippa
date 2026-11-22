@@ -21,6 +21,12 @@ Developing#releases.
   A NAS cut (`[cut] backend = "nas"`) reads the config it sends, as before, and keeps running as
   `clipper-cut-<id>` until the last pass: that name is the lock old and new code share. A second cut
   of a stream that is still being cut there says to wait for it.
+- Segments prompt v4 is in the package (`clippa/prompts/segments_v4.md` and `compilation_v4.md`)
+  and stays off: `[segments] prompt_version` is still `v3` and `max_s` is still 3600. v4 asks the
+  model to keep a segment under 50 minutes; that cap is the prompt only. Set `prompt_version = "v4"`
+  only after those files are deployed. The model mix from the same trial is
+  `docs/config-7-hybrid-segv4.toml`, and `docs/config-7-hybrid-segv4-openrouter.toml` is the
+  same mix with Claude sent through OpenRouter (paste either into one stream's `config.toml`).
 
 ## 0.3.0 (2026-11-21)
 
