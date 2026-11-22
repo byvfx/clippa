@@ -12,6 +12,10 @@ Developing#releases.
 
 ### 2026-11
 
+- 11-22: The repo is `byvfx/clippa` (#286 pass 4). GitHub redirects the old `byvfx/clipper` links,
+  clones and wiki pages, so nothing breaks; message links, the docs and the image-search user agents
+  name the new one. Point an existing clone at it with `git remote set-url origin
+  https://github.com/byvfx/clippa.git`.
 - 11-22: A segment longer than `[segments] split_over_s` (0, off, so a config that doesn't set
   it is unchanged) is flagged for a re-split instead of being dropped for length. A time Clippa
   can't read, such as `1:xx`, is a one-line error, the same as any other bad time.

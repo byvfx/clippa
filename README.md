@@ -7,7 +7,7 @@
   </a>
 </p>
 
-[![check](https://github.com/byvfx/clipper/actions/workflows/check.yml/badge.svg?branch=main)](https://github.com/byvfx/clipper/actions/workflows/check.yml)
+[![check](https://github.com/byvfx/clippa/actions/workflows/check.yml/badge.svg?branch=main)](https://github.com/byvfx/clippa/actions/workflows/check.yml)
 
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20Clippa-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/byvfx)
 
@@ -26,8 +26,8 @@ fetch / record -> signals -> transcribe -> score -> segments -> faces -> cut -> 
                         upload <- schedule <- review (Kitsu, Discord, war room) <- review publish
 ```
 
-**The docs are in the [wiki](https://github.com/byvfx/clipper/wiki)**, built from
-[docs/wiki/](docs/wiki/) on every push to main. New here: [Getting started](https://github.com/byvfx/clipper/wiki/Getting-started).
+**The docs are in the [wiki](https://github.com/byvfx/clippa/wiki)**, built from
+[docs/wiki/](docs/wiki/) on every push to main. New here: [Getting started](https://github.com/byvfx/clippa/wiki/Getting-started).
 
 ## Quick start
 

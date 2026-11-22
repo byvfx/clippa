@@ -212,7 +212,7 @@ output on thinking and wrote nothing, as `deepseek/deepseek-v4-pro` did at mediu
 
 The `wiki` workflow (`.github/workflows/wiki.yml`) pushes the pages to the wiki when a change
 lands on main. Images go in `docs/wiki/images/` and are linked by their full wiki address
-(`https://github.com/byvfx/clipper/wiki/images/<file>`). Callouts (`> [!TIP]`, `> [!WARNING]`),
+(`https://github.com/byvfx/clippa/wiki/images/<file>`). Callouts (`> [!TIP]`, `> [!WARNING]`),
 Mermaid diagrams and `<kbd>` keys all render.
 
 - One file per page, flat: `Install-Windows.md` is the page "Install Windows". `_Sidebar.md`

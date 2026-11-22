@@ -42,7 +42,7 @@ from .errors import ClipperError
 INDEX = "cast.json"
 PHOTO_EXT = {".jpg", ".jpeg", ".png", ".webp"}
 SOURCES = ("commons", "channels", "search")
-UA = "clipper-cast/1.0 (cast photo library; https://github.com/byvfx/clipper)"  # Wikimedia asks for one
+UA = "clippa-cast/1.0 (cast photo library; https://github.com/byvfx/clippa)"  # Wikimedia asks for one
 MAX_BYTES = 15_000_000
 SAME_PHOTO = 0.95  # two photos whose faces are this alike are one photo (a crop, a resize)
 

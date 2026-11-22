@@ -1,8 +1,8 @@
 <p align="center">
   <a href="https://byvfx.github.io/clippa/">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://github.com/byvfx/clipper/wiki/images/overview-hero-dark.png">
-      <img src="https://github.com/byvfx/clipper/wiki/images/overview-hero-light.png" alt="Clippa case study: an eight-hour stream's heat map with the picks marked, and the four headline figures" width="100%">
+      <source media="(prefers-color-scheme: dark)" srcset="https://github.com/byvfx/clippa/wiki/images/overview-hero-dark.png">
+      <img src="https://github.com/byvfx/clippa/wiki/images/overview-hero-light.png" alt="Clippa case study: an eight-hour stream's heat map with the picks marked, and the four headline figures" width="100%">
     </picture>
   </a>
 </p>

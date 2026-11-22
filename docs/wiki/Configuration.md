@@ -22,7 +22,7 @@ context and Shorts layouts. A show's sub-tables override the base sections for t
 One stream can go further with its own `streams/<id>/config.toml` (same sections), for a big
 night: more picks, the breaking story in `[scoring] stream_context`, and `[schedule]
 priority = true` so its items go out ahead of the backlog. Unknown keys there are refused.
-[`docs/big-story.toml`](https://github.com/byvfx/clipper/blob/main/docs/big-story.toml) is the ready-made one to copy: more picks and Shorts, priority, and the
+[`docs/big-story.toml`](https://github.com/byvfx/clippa/blob/main/docs/big-story.toml) is the ready-made one to copy: more picks and Shorts, priority, and the
 night's compilation. A `[schedule] stream_budget` kind at 0 goes only when pinned, so
 `compilation = 0` there keeps compilations for big-story nights.
 `clippa/defaults.toml` documents every key with its default; `clipper.toml` holds only what

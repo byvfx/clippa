@@ -47,7 +47,7 @@ SOURCES = ("nasa", "dvids", "prelinger", "commons", "pixabay")
 STATUSES = ("new", "kept", "long")
 LICENCES = ("pd", "cc0", "pixabay", "cc-by", "cc-by-sa")
 PIXABAY_CACHE = ".pixabay_cache.json"  # Pixabay's API terms: keep each response 24 hours
-UA = "clipper-broll/1.0 (b-roll library; https://github.com/byvfx/clipper)"  # Wikimedia asks for one
+UA = "clippa-broll/1.0 (b-roll library; https://github.com/byvfx/clippa)"  # Wikimedia asks for one
 VIDEO_EXT = {".mp4", ".mov", ".mkv", ".webm", ".m4v", ".ts", ".mpg", ".mpeg", ".ogv"}
 
 # Words in a description or credit that say someone outside the archive owns the picture.
