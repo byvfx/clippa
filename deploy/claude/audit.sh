@@ -40,6 +40,13 @@ fi
 git -C "$WT" fetch -q origin "$REF" && git -C "$WT" checkout -q --detach FETCH_HEAD \
     || echo "couldn't update $WT to origin/$REF: running what it has ($(git -C "$WT" log --oneline -1))" >&2
 export PYTHONPATH="$WT"
+# `clippa` runs the worktree's code whatever console scripts /app's venv has: a phone session
+# may have synced it on a branch from before #286's rename, which installs only `clipper`.
+# On PATH, so the `claude -p` below finds the same one.
+mkdir -p "$HOME/.checkup-bin"   # written beside it and moved in: a run using it never sees it half-written
+printf '#!/bin/sh\nexec python -m clippa.cli "$@"\n' > "$HOME/.checkup-bin/clippa.$$"
+chmod 755 "$HOME/.checkup-bin/clippa.$$" && mv -f "$HOME/.checkup-bin/clippa.$$" "$HOME/.checkup-bin/clippa"
+export PATH="$HOME/.checkup-bin:$PATH"
 cd "$WT"
 
 if ! clippa audit -h >/dev/null 2>&1; then

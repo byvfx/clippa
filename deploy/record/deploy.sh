@@ -51,7 +51,7 @@ fi
 if [ ! -f "$ENV_LOCAL" ]; then
     cp "$HERE/env.template" "$ENV_LOCAL"
     chmod 600 "$ENV_LOCAL"
-    echo "created $ENV_LOCAL (add CLIPPA_ALERT_WEBHOOK for Discord alerts)"
+    echo "created $ENV_LOCAL (add CLIPPA_ALERT_WEBHOOK for Discord alerts; an older env.local's CLIPPER_ALERT_WEBHOOK works too)"
 fi
 DATA=$(data_dir "$ENV_LOCAL")   # CLIPPA_DATA, or an older env.local's CLIPPER_DATA
 

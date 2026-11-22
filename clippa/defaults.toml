@@ -99,9 +99,10 @@ sudo = ""                    # prefix for docker there if the ssh user needs it 
 chat_tail_s = 15           # chat kept past a part's end (chat trails the video)
 on_finish = ""             # command per finished recording, run without a shell: {stream_id} {stream_dir} {channel}
 # Alerts (recording started/finished, video drops, stalls, crashes) always go to the log;
-# also to Discord via a webhook URL in $CLIPPER_ALERT_WEBHOOK, or the review bot's token
-# posting into alert_channel_id.
-alert_webhook_env = "CLIPPER_ALERT_WEBHOOK"
+# also to Discord via a webhook URL in $CLIPPA_ALERT_WEBHOOK (the old CLIPPER_ALERT_WEBHOOK is
+# read the same, either name here reads both), or the review bot's token posting into
+# alert_channel_id.
+alert_webhook_env = "CLIPPA_ALERT_WEBHOOK"
 alert_channel_id = ""
 alert_mention = ""         # prepended to warnings, e.g. "<@123456789012345678>"
 
