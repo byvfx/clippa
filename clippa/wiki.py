@@ -4,7 +4,7 @@ heading) that exists."""
 
 from __future__ import annotations
 
-URL = "https://github.com/byvfx/clipper/wiki"
+URL = "https://github.com/byvfx/clippa/wiki"
 
 
 def page(name: str, section: str = "") -> str:

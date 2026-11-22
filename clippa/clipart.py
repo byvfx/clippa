@@ -40,7 +40,7 @@ INDEX = "clipart.json"
 SOURCES = ("commons", "met", "cleveland", "iconify", "pixabay")
 STATUSES = ("new", "kept")
 LICENCES = ("pd", "cc0", "permissive", "pixabay", "cc-by", "cc-by-sa")
-UA = "clipper-clipart/1.0 (clip art library; https://github.com/byvfx/clipper)"  # Wikimedia asks for one
+UA = "clippa-clipart/1.0 (clip art library; https://github.com/byvfx/clippa)"  # Wikimedia asks for one
 IMAGE_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
 MIME_EXT = {"image/png": ".png", "image/jpeg": ".jpg", "image/gif": ".gif", "image/webp": ".webp",
             "image/svg+xml": ".svg"}

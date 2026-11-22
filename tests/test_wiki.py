@@ -75,5 +75,5 @@ def test_code_links_resolve():
 def test_page_addresses_name_the_wiki():
     from clippa import wiki
 
-    assert wiki.page("Speakers") == "https://github.com/byvfx/clipper/wiki/Speakers"
-    assert wiki.page("War-room", "faces") == "https://github.com/byvfx/clipper/wiki/War-room#faces"
+    assert wiki.page("Speakers") == "https://github.com/byvfx/clippa/wiki/Speakers"
+    assert wiki.page("War-room", "faces") == "https://github.com/byvfx/clippa/wiki/War-room#faces"

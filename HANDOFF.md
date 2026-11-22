@@ -8,7 +8,7 @@ lists every entry by date; grep the log, don't read it whole). At the end of a s
 changed here, then add a dated entry at the end of the log.
 
 Stream Clippa for Kino Casino (Kick channel `kinocasinogaming`), Channel 404 News and ChudLogic → YouTube
-channel **Lolcow Cinema**. Repo `C:\clipper`, remote https://github.com/byvfx/clipper (public, on purpose:
+channel **Lolcow Cinema**. Repo `C:\clipper`, remote https://github.com/byvfx/clippa (public, on purpose:
 the user said so 2026-11-10; every tracked file, issue and PR comment is readable by anyone).
 Python package `clippa/` (`clippa/defaults.toml` is every setting, documented; prompts in `clippa/prompts/`),
 config `clipper.toml` (gitignored, on the NAS; `clipper.example.toml` is a tracked starter). The user docs are
@@ -63,7 +63,10 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   the tailscale volume and `TS_HOSTNAME=clipper`, the Kitsu deploy's `env.clipper`, the Windows tasks,
   the NAS cut container name `clipper-cut-<id>` (the lock old and new code share) and the claude container's
   `CLIPPER_*` twins of its `CLIPPA_*` settings (for a session on a pre-rename branch).
-  Then 4 the repo name, 5 drop the fallbacks.
+  **Pass 4** (11-22): the user renamed the repo to `byvfx/clippa` (GitHub redirects the old name;
+  never make a new `byvfx/clipper`, which would end the redirect); the laptop checkout and the NAS
+  claude clone point at it, and the links, docs and user agents name it. Next, 5: drop the fallbacks
+  once `clippa doctor` shows no old names in use.
 - Titles/descriptions/cut points approved as-is; fun descriptions are liked. Long video per recurring topic
   (compilations) plus segments plus short picks. `third_party_audio = "allow_reactions"`,
   `audience_knowledge = "fans"`, Victor/blackjack segments stay; Kino's gambling is commentary, not play
@@ -235,7 +238,7 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
 Agent-first (01-15), v0.7.0 Second channel (02-05), v0.8.0 Next mini-doc toolkit (02-26), v0.9.0 The Udder Truth (03-31), v1.0.0
 Clippa 1.0 (05-31); #370 lists the issues. A release closes its milestone (wiki Developing#releases). A new issue gets a priority
 label, and the milestone of the version it is meant for (none for `parked` and `waiting`).
-Write "#77 L6" rather than "fix #77" in commit messages: GitHub closes the issue on "fix". Roadmaps are issues only (byvfx/clipper):
+Write "#77 L6" rather than "fix #77" in commit messages: GitHub closes the issue on "fix". Roadmaps are issues only (byvfx/clippa):
 Instagram Reels #39, lore-order playlists #43, archive fun #63, crisis mode #73, setup #78, live clips #81,
 blind items #111, investigate anyone #138, meaning search #53, P&L revenue #50 (the cost ledger is built). Old-issue triage
 11-20: #36 closed (its Posts parents #30/#32 went 11-09), #56 folded into #48 as a checkbox; the rest checked and kept. **Transcript-framed edits #66** (one issue; sections
