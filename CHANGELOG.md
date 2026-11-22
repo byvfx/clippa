@@ -19,7 +19,8 @@ Developing#releases.
   the alert webhook is `CLIPPA_ALERT_WEBHOOK` (`[record] alert_webhook_env`), the old name still read.
   Set `[serve] hub = "clippa-hub"` after the hub deploy (`clippa services` copes until then).
   A NAS cut (`[cut] backend = "nas"`) reads the config it sends, as before, and keeps running as
-  `clipper-cut-<id>` until the last pass: that name is the lock old and new code share.
+  `clipper-cut-<id>` until the last pass: that name is the lock old and new code share. A second cut
+  of a stream that is still being cut there says to wait for it.
 
 ## 0.3.0 (2026-11-21)
 

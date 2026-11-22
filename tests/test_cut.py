@@ -79,6 +79,8 @@ def test_a_nas_cut_runs_the_package_it_sends(tmp_path, monkeypatch):
     assert "-e CLIPPA_CONFIG=/code/clipper.toml" in remote and "CLIPPER_CONFIG" not in remote
     assert "--name clipper-cut-kick-1 " in remote   # the lock pre-rename code takes too
     assert "--filter 'name=^/?clipper-cut-kick-1$'" in remote and remote.index("exit 75") < remote.index("docker run")
+    assert "cat >/dev/null; exit 75" in remote   # reads the tarball first, so ssh ends with this exit
+    assert "running=$(docker ps -q --filter" in remote   # a docker error stops the run, not read as none
     monkeypatch.setattr(cut.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=cut.CUT_RUNNING))
     with pytest.raises(ClipperError, match="still going .* wait for it"):
         cut.on_nas(streams / "kick-1", cfg, [])

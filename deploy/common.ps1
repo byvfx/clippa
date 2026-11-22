@@ -32,10 +32,17 @@ function Import-RecorderWebhook {
     if ($env:CLIPPER_ALERT_WEBHOOK) { return 'CLIPPER_ALERT_WEBHOOK' }
     $recEnv = Join-Path $ClipperRoot 'deploy\record\env.local'
     if (Test-Path $recEnv) {
-        $line = Select-String -Path $recEnv -Pattern '^CLIPP(A|ER)_ALERT_WEBHOOK=(.+)$' | Select-Object -First 1
-        if ($line) {
-            $env:CLIPPA_ALERT_WEBHOOK = $line.Matches[0].Groups[2].Value.Trim()
-            return "the recorder's, from $recEnv"
+        # Read as docker reads it: the new name first, a name's last line, no quotes, an empty
+        # value giving way to the other name
+        foreach ($name in 'CLIPPA_ALERT_WEBHOOK', 'CLIPPER_ALERT_WEBHOOK') {
+            $line = Select-String -Path $recEnv -CaseSensitive -Pattern "^$name=(.*)$" | Select-Object -Last 1
+            if ($line) {
+                $v = $line.Matches[0].Groups[1].Value.Trim().Trim('"').Trim("'")
+                if ($v) {
+                    $env:CLIPPA_ALERT_WEBHOOK = $v
+                    return "the recorder's, from $recEnv"
+                }
+            }
         }
     }
     return 'none; alerts go to [record] alert_channel_id through the bot token, if set'

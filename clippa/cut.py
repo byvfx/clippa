@@ -362,7 +362,11 @@ def on_nas(stream_dir: Path, cfg: dict, argv: list[str]) -> None:
     # A cut of this stream still going (the lock is held): say so, rather than docker's name clash
     # and the rm -f hint below, which would kill it.
     held = shlex.quote(f"name=^/?clipper-cut-{sid}$")   # docker keeps the name with a leading /
-    guard = f"if docker ps -q --filter {held} | grep -q .; then exit {CUT_RUNNING}; fi; "
+    # It reads the tarball first: a remote that exits while ssh still sends it can end as ssh's
+    # 255 instead of this exit, and the hint for that one says to rm -f the live cut.
+    # docker ps on its own line, so set -e stops on its error rather than read it as "none running"
+    guard = (f"running=$(docker ps -q --filter {held}); "
+             f'if [ -n "$running" ]; then cat >/dev/null; exit {CUT_RUNNING}; fi; ')
     remote = ('set -e; ' + guard + pick + 'd=$(mktemp -d "$HOME/clippa-cut.XXXXXX"); trap \'rm -rf "$d"\' EXIT; '
               'tar -xzf - -C "$d"; chmod -R a+rX "$d"; '
               + shlex.join(docker) + ' -v "$d":/code:ro --entrypoint python "$img" ' + shlex.join(run))
@@ -375,6 +379,7 @@ def on_nas(stream_dir: Path, cfg: dict, argv: list[str]) -> None:
         raise ClipperError(f"a cut of {sid} is still going on {cc['nas_host']} (clipper-cut-{sid}): wait for it "
                          f"to finish; only if it is stuck: ssh {cc['nas_host']} docker rm -f clipper-cut-{sid}")
     if r.returncode:
-        raise ClipperError(f"cut on {cc['nas_host']} failed (exit {r.returncode}); a run still going "
-                         f"there: ssh {cc['nas_host']} docker rm -f clipper-cut-{sid}")
+        raise ClipperError(f"cut on {cc['nas_host']} failed (exit {r.returncode}); if no cut of {sid} is "
+                         f"running there any more (ssh {cc['nas_host']} docker ps), a stuck one goes with: "
+                         f"ssh {cc['nas_host']} docker rm -f clipper-cut-{sid}")
     print(f"cut on {cc['nas_host']} in {time.time() - t:.0f}s", flush=True)
