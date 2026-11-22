@@ -200,4 +200,4 @@ def test_the_container_ships_the_audit_files():
     for name in ("Dockerfile", "deploy.sh"):
         body = (here / name).read_text(encoding="utf-8")
         assert "audit.sh" in body and "audit-deep.md" in body, name
-    assert "clipper-audit" in (here / "entrypoint.sh").read_text(encoding="utf-8")
+    assert "clippa-audit" in (here / "entrypoint.sh").read_text(encoding="utf-8")

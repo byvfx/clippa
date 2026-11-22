@@ -9,11 +9,11 @@ working on Clippa. This has been the setup here since 2026-11-05.
 |---|---|---|
 | `serve` | `clippa serve` | war room on 127.0.0.1:8765, hourly replan and upload, retakes, daily jobs |
 | `bot` | `clippa bot` | Discord; reaches serve on 127.0.0.1 |
-| `worker` | `clippa worker` | every stage of each finished recording; cuts locally (`CLIPPER_CUT_BACKEND=local`) |
+| `worker` | `clippa worker` | every stage of each finished recording; cuts locally (`CLIPPA_CUT_BACKEND=local`) |
 | `tailscale` | tailscaled, userspace | serves the war room on the tailnet from `tailscale-serve.json` ([Phone access](Phone-access)) |
 
-All four use host networking and their own compose project (`clipper-hub`), so a deploy never
-restarts the recorder. The image is Debian 13 (ffmpeg 7.1) with Intel's media driver:
+All four use host networking and their own compose project (`clippa-hub`, in `~/clippa-hub` on the
+NAS; `clipper-hub` before the rename's pass 3), so a deploy never restarts the recorder. The image is Debian 13 (ffmpeg 7.1) with Intel's media driver:
 `/dev/dri` is passed in and `h264_qsv` encodes on the NAS iGPU, as on the laptop.
 
 Claude Code can run beside them too, in its own container, so Clippa can be driven and
@@ -40,7 +40,7 @@ the part from the stream's folder on.
 
 Covers, the weekly issue and Shorts captions want Impact, Bahnschrift, Georgia and Arial. Put
 the `.ttf` files in the NAS folder's `fonts/` (copied from `C:\Windows\Fonts`): the containers
-mount it as `/usr/local/share/fonts/clipper`, where libass finds them by family and clipper
+mount it as `/usr/local/share/fonts/clippa`, where libass finds them by family and clipper
 by file name (a font list's `C:/Windows/Fonts/impact.ttf` finds `impact.ttf` there).
 `clippa doctor` names the font each check found.
 
@@ -52,6 +52,16 @@ code changes: this replaces restarting serve or the bot. A stage or upload runni
 moment stops; the worker resumes the stream at its first unfinished stage, and an upload that
 didn't finish goes again on the next hourly run. `bash deploy/hub/deploy.sh bot` updates one.
 
+The compose project was `clipper-hub` (in `~/clipper-hub`) until the rename's pass 3 (#286). The
+first deploy after it builds the new image, then stops the old project (`docker compose down`:
+its named volumes stay) and renames its `compose.yaml` to `compose.yaml.retired-<date>`, so
+nothing can start it again beside the new one, and then starts all four in `~/clippa-hub`.
+`deploy/record/deploy.sh` and `deploy/claude/deploy.sh` do the same for `clipper-record` and
+`clipper-claude` (`deploy/retire.sh`). The tailscale container keeps the old project's state
+volume (`clipper-hub_tailscale-state`), so its sign-in and the war room's tailnet address stay.
+Then set `[serve] hub = "clippa-hub"` in `clipper.toml`; until you do, `clippa services` finds
+the new folder anyway and `clippa doctor` warns.
+
 The first run copies `deploy/hub/env.template` to `deploy/hub/env.local` (gitignored) and
 stops: fill in the keys (`ANTHROPIC_API_KEY`, `KITSU_TOKEN`, `MODAL_TOKEN_ID` /
 `MODAL_TOKEN_SECRET` from `~/.modal.toml`, the alert webhook). The other keys are files in
@@ -61,7 +71,7 @@ user variables, else the shell's environment), by name only, and stops on one th
 At a terminal it asks whether to copy this machine's values in; elsewhere set
 `DEPLOY_KEYS=sync` to copy them or `DEPLOY_KEYS=keep` to deploy as is. A key rotated on the
 laptop and not here would otherwise ship the old one, and every model call on the hub fails. There is no browser in the containers, so pre-shows use
-a private copy of `secrets/youtube_cookies.txt` (`CLIPPER_YOUTUBE_COOKIES_FROM_BROWSER` is empty
+a private copy of `secrets/youtube_cookies.txt` (`CLIPPA_YOUTUBE_COOKIES_FROM_BROWSER` is empty
 there), which the laptop's `clipper-cookies` task copies from its Firefox profile every 4 hours
 (`clippa doctor` warns when it's a day old)
 ([Archives](Archives#keeping-the-nas-hubs-cookies-fresh)). That one job ties the NAS to the
@@ -69,10 +79,10 @@ laptop: with the laptop off for days, signed-in pre-show grabs stop once the coo
 
 ## Day to day
 
-With `[serve] hub = "clipper-hub"`, `clippa services status|stop|restart serve|bot|worker`
+With `[serve] hub = "clippa-hub"`, `clippa services status|stop|restart serve|bot|worker`
 on the laptop runs `docker compose` on the NAS over ssh. Logs: `logs/serve.log` and
-`logs/bot.log` in the NAS folder as before, plus `ssh nas 'cd clipper-hub && docker compose
-logs -f serve'`. Check a container with `ssh nas 'cd clipper-hub && docker compose exec serve
+`logs/bot.log` in the NAS folder as before, plus `ssh nas 'cd clippa-hub && docker compose
+logs -f serve'`. Check a container with `ssh nas 'cd clippa-hub && docker compose exec serve
 clippa doctor --role serve'`.
 
 Which code a container runs: `clippa services status` prints each service's version from its
@@ -88,7 +98,7 @@ service that shows a different commit than main's runs older code than the last 
 
 ## Back to the laptop
 
-Stop the containers (`ssh nas 'cd clipper-hub && docker compose stop serve bot worker'`), set
+Stop the containers (`ssh nas 'cd clippa-hub && docker compose stop serve bot worker'`), set
 `[serve] hub = ""`, and enable the three scheduled tasks again ([Roles and
 services](Roles-and-services)). The config and state stay on the NAS; the laptop reads them over
 the share.

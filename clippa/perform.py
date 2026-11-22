@@ -177,7 +177,9 @@ def sync_key(pc: dict) -> str:
 def lipsync_latentsync(video: Path, audio_wav: Path, pc: dict) -> bytes:
     import modal
 
-    fn = modal.Function.from_name(pc["latentsync_app"], "lipsync")
+    from .transcribe import modal_deployed
+
+    fn = modal_deployed(modal.Function.from_name, pc["latentsync_app"], "lipsync")
     out = fn.remote(video.read_bytes(), audio_wav.read_bytes(), pc["latentsync_steps"], pc["latentsync_guidance"])
     print(f"LatentSync: {out['seconds']:.0f} s on Modal")
     return out["video"]

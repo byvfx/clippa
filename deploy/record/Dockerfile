@@ -1,4 +1,4 @@
-# clipper live recorder: `clipper record watch` (no GPU extras).
+# Clippa's live recorder: `clippa record watch` (no GPU extras).
 FROM python:3.12-slim-bookworm
 
 RUN apt-get update \
@@ -13,8 +13,8 @@ COPY clippa ./clippa
 RUN uv sync --frozen --no-dev --no-editable --no-cache
 
 ENV PATH=/app/.venv/bin:$PATH \
-    CLIPPER_CONFIG=/data/clipper.toml \
-    CLIPPER_PATHS_STREAMS=/data/streams \
+    CLIPPA_CONFIG=/data/clipper.toml \
+    CLIPPA_PATHS_STREAMS=/data/streams \
     PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=utf-8
 WORKDIR /data
@@ -23,5 +23,5 @@ WORKDIR /data
 HEALTHCHECK --interval=60s --timeout=10s --start-period=60s --retries=3 \
     CMD python -c "import os,sys,time; sys.exit(time.time() - os.path.getmtime('/data/streams/.record/status.json') > 300)"
 
-ENTRYPOINT ["clipper"]
+ENTRYPOINT ["clippa"]
 CMD ["record", "watch"]

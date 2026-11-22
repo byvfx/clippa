@@ -1,12 +1,12 @@
-# clipper on the NAS: serve (war room + jobs), the Discord bot, the worker, and tailscale
+# Clippa on the NAS: serve (war room + jobs), the Discord bot, the worker, and tailscale
 # for the war room off the LAN. deploy.sh puts this next to .env (from env.local) and the
 # build context. Its own compose project, so deploys never restart the recorder
 # (deploy/record). Host networking: the bot reaches serve and tailscale reaches the war
 # room on 127.0.0.1, as on the laptop.
-name: clipper-hub
+name: clippa-hub   # was clipper-hub (#286 pass 3): deploy.sh stops and retires that one first
 
-x-clipper: &clipper
-  image: clipper-hub:latest
+x-clippa: &clippa
+  image: clippa-hub:latest
   restart: unless-stopped
   init: true                  # serve and the worker run stages as child processes
   user: "${PUID:-1000}:${PGID:-10}"
@@ -15,13 +15,13 @@ x-clipper: &clipper
   env_file: .env
   environment:
     TZ: ${TZ:-America/Los_Angeles}
-    CLIPPER_CUT_BACKEND: local                # this is the NAS: cut here, not over ssh
-    CLIPPER_YOUTUBE_COOKIES_FROM_BROWSER: ""  # no browser here: secrets/youtube_cookies.txt
+    CLIPPA_CUT_BACKEND: local                # this is the NAS: cut here, not over ssh
+    CLIPPA_YOUTUBE_COOKIES_FROM_BROWSER: ""  # no browser here: secrets/youtube_cookies.txt
   devices:
     - /dev/dri:/dev/dri
   volumes:
-    - ${CLIPPER_DATA:-/volume1/docker/clipper}:/data
-    - ${CLIPPER_DATA:-/volume1/docker/clipper}/fonts:/usr/local/share/fonts/clipper:ro
+    - ${CLIPPA_DATA:-/volume1/docker/clipper}:/data   # deploy.sh sets CLIPPA_DATA (env.local's, or its old CLIPPER_DATA)
+    - ${CLIPPA_DATA:-/volume1/docker/clipper}/fonts:/usr/local/share/fonts/clippa:ro
     - tailscale-socket:/var/run/tailscale
   logging:
     driver: json-file
@@ -31,15 +31,15 @@ x-clipper: &clipper
 
 services:
   serve:
-    <<: *clipper
+    <<: *clippa
     build: ./src
     command: ["serve"]
     stop_grace_period: 60s
   bot:
-    <<: *clipper
+    <<: *clippa
     command: ["bot"]
   worker:
-    <<: *clipper
+    <<: *clippa
     command: ["worker"]
     stop_grace_period: 60s
   tailscale:
@@ -52,7 +52,7 @@ services:
       TS_SOCKET: /var/run/tailscale/tailscaled.sock
       TS_HOSTNAME: ${TS_HOSTNAME:-clipper}
       TS_AUTHKEY: ${TS_AUTHKEY:-}   # empty: `docker compose logs tailscale` prints a sign-in link
-      # The war room on the tailnet, applied by tailscaled itself (root): the clipper
+      # The war room on the tailnet, applied by tailscaled itself (root): the clippa
       # containers run as PUID, which may read `tailscale status` but not change serve.
       TS_SERVE_CONFIG: /config/serve.json
     volumes:
@@ -62,4 +62,7 @@ services:
 
 volumes:
   tailscale-state:
+    # The old project's volume, so the renamed one keeps the tailnet sign-in and the phone's
+    # war room address (user, 2026-11-22). A rename of its own waits for #286's last pass.
+    name: clipper-hub_tailscale-state
   tailscale-socket:

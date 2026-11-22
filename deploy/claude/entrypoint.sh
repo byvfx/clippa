@@ -4,7 +4,7 @@
 # `claude remote-control` in /app.
 set -eu
 
-# Remote Control refuses API-key auth; clipper reads its key from [paths] anthropic_key.
+# Remote Control refuses API-key auth; clippa reads its key from [paths] anthropic_key.
 unset ANTHROPIC_API_KEY CLAUDE_CODE_OAUTH_TOKEN
 
 # gh reads GH_TOKEN itself; this makes git use it too (the first clone of the private repo,
@@ -14,9 +14,10 @@ if [ -n "${GH_TOKEN:-}" ]; then
 fi
 
 if [ ! -d /app/.git ]; then
-    [ -n "${CLIPPER_REPO:-}" ] || { echo "CLIPPER_REPO is empty: set it in deploy/claude/env.local" >&2; exit 1; }
-    echo "cloning $CLIPPER_REPO into /app"
-    GIT_TERMINAL_PROMPT=0 git clone "$CLIPPER_REPO" /app \
+    REPO=${CLIPPA_REPO:-${CLIPPER_REPO:-}}   # the old spelling, from an env.local before #286 pass 3
+    [ -n "$REPO" ] || { echo "CLIPPA_REPO is empty: set it in deploy/claude/env.local" >&2; exit 1; }
+    echo "cloning $REPO into /app"
+    GIT_TERMINAL_PROMPT=0 git clone "$REPO" /app \
         || { echo "clone failed: a private repo needs GH_TOKEN in deploy/claude/env.local" >&2; exit 1; }
 fi
 
@@ -26,18 +27,18 @@ if [ -n "${GIT_USER_EMAIL:-}" ]; then git config --global user.email "$GIT_USER_
 # A broken lock on a branch Claude left mid-change mustn't keep the session from starting.
 cd /app
 uv sync --frozen --extra modal --extra faces --extra discord \
-    || echo "uv sync failed: clipper may be out of date in /app/.venv" >&2
+    || echo "uv sync failed: clippa may be out of date in /app/.venv" >&2
 
 if ! claude auth status >/dev/null 2>&1; then
     echo "Claude Code isn't signed in. On the laptop:"
-    echo "  ssh -t nas 'cd clipper-claude && docker compose exec claude claude auth login'"
+    echo "  ssh -t nas 'cd clippa-claude && docker compose exec claude claude auth login'"
     echo "waiting for the sign-in..."
     until claude auth status >/dev/null 2>&1; do sleep 10; done
     echo "signed in"
 fi
 
 # The nightly checkup (#185) at CHECKUP_AT (HH:MM, the container's TZ; "" = off), in the
-# background beside the session: checkup.sh runs `clipper checkup` and, when it finds
+# background beside the session: checkup.sh runs `clippa checkup` and, when it finds
 # something, a read-only `claude -p` that DMs one report.
 if [ -n "${CHECKUP_AT:-}" ]; then
     (
@@ -46,13 +47,13 @@ if [ -n "${CHECKUP_AT:-}" ]; then
             next=$(date -d "today $CHECKUP_AT" +%s) || { echo "CHECKUP_AT=$CHECKUP_AT isn't HH:MM: no checkup" >&2; exit 0; }
             [ "$next" -gt "$now" ] || next=$(date -d "tomorrow $CHECKUP_AT" +%s)
             sleep $((next - now))
-            clipper-checkup >>/tmp/checkup.log 2>&1 || echo "checkup failed, see /tmp/checkup.log" >&2
-            clipper-audit >>/tmp/audit.log 2>&1 || echo "audit failed, see /tmp/audit.log" >&2   # its days only
+            clippa-checkup >>/tmp/checkup.log 2>&1 || echo "checkup failed, see /tmp/checkup.log" >&2
+            clippa-audit >>/tmp/audit.log 2>&1 || echo "audit failed, see /tmp/audit.log" >&2   # its days only
         done
     ) &
 fi
 
 # The first start asks to enable Remote Control and to trust /app: answer once with
-# `docker attach clipper-claude` (detach with Ctrl-P Ctrl-Q). Both answers are kept in home/.
-exec claude remote-control --name "${CLAUDE_SESSION_NAME:-clipper on the NAS}" \
+# `docker attach clippa-claude` (detach with Ctrl-P Ctrl-Q). Both answers are kept in home/.
+exec claude remote-control --name "${CLAUDE_SESSION_NAME:-Clippa on the NAS}" \
     --spawn same-dir --permission-mode "${CLAUDE_PERMISSION_MODE:-default}"

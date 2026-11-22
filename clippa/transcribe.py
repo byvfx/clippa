@@ -138,11 +138,36 @@ def transcribe_modal(wav: Path, tc: dict, runs: Path | None = None, method: str 
     return out, cost
 
 
+# The Modal apps took the Clippa name (#286 pass 3). Until `clippa transcribe --deploy` (or
+# `clippa perform lipsync --deploy`) has made the new one, a lookup finds the old app instead.
+# #286's last pass drops this.
+OLD_MODAL_APPS = {"clippa-whisperx": "clipper-whisperx", "clippa-lipsync": "clipper-lipsync"}
+
+
+def modal_found(lookup, app: str, name: str) -> tuple:
+    """(lookup(app, name) hydrated, the app name it was found under). lookup is
+    modal.Cls.from_name or modal.Function.from_name; the old name (OLD_MODAL_APPS) when only
+    that one is deployed."""
+    import modal
+
+    try:
+        return lookup(app, name).hydrate(), app
+    except modal.exception.NotFoundError:
+        if not (old := OLD_MODAL_APPS.get(app)):
+            raise
+        return lookup(old, name).hydrate(), old
+
+
+def modal_deployed(lookup, app: str, name: str):
+    """modal_found's object alone."""
+    return modal_found(lookup, app, name)[0]
+
+
 def modal_worker(tc: dict, gpu: str):
     """An instance of the deployed WhisperX class, on this GPU ("" = the app's default)."""
     import modal
 
-    cls = modal.Cls.from_name(tc["modal_app"], "WhisperX")
+    cls = modal_deployed(modal.Cls.from_name, tc["modal_app"], "WhisperX")
     return (cls.with_options(gpu=gpu) if gpu else cls)()
 
 

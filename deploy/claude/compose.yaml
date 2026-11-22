@@ -3,16 +3,16 @@
 # exposed. deploy.sh puts this next to .env (from env.local), the Anthropic key file and the
 # build context. Its own compose project, so deploying it never restarts the recorder or the
 # hub, and deploying the hub never ends a Claude session.
-name: clipper-claude
+name: clippa-claude   # was clipper-claude (#286 pass 3): deploy.sh stops and retires that one first
 
 services:
   claude:
     build: ./src
-    image: clipper-claude:latest
-    container_name: clipper-claude   # `docker attach clipper-claude` answers its first prompts
-    hostname: clipper-nas
+    image: clippa-claude:latest
+    container_name: clippa-claude   # `docker attach clippa-claude` answers its first prompts
+    hostname: clippa-nas
     restart: unless-stopped
-    init: true                  # clipper stages and Claude's tools run as child processes
+    init: true                  # clippa stages and Claude's tools run as child processes
     tty: true                   # remote-control asks to be enabled and to trust /app once
     stdin_open: true
     user: "${PUID:-1000}:${PGID:-10}"
@@ -21,16 +21,16 @@ services:
     env_file: .env              # without ANTHROPIC_API_KEY: Remote Control refuses API-key auth
     environment:
       TZ: ${TZ:-America/Los_Angeles}
-      CLIPPER_CUT_BACKEND: local
-      CLIPPER_YOUTUBE_COOKIES_FROM_BROWSER: ""
-      CLIPPER_PATHS_ANTHROPIC_KEY: /run/secrets/anthropic_key   # clipper's model calls
+      CLIPPA_CUT_BACKEND: local
+      CLIPPA_YOUTUBE_COOKIES_FROM_BROWSER: ""
+      CLIPPA_PATHS_ANTHROPIC_KEY: /run/secrets/anthropic_key   # clippa's model calls
     secrets:
       - anthropic_key
     devices:
       - /dev/dri:/dev/dri
     volumes:
-      - ${CLIPPER_DATA:-/volume1/docker/clipper}:/data
-      - ${CLIPPER_DATA:-/volume1/docker/clipper}/fonts:/usr/local/share/fonts/clipper:ro
+      - ${CLIPPA_DATA:-/volume1/docker/clipper}:/data   # deploy.sh sets CLIPPA_DATA (env.local's, or its old CLIPPER_DATA)
+      - ${CLIPPA_DATA:-/volume1/docker/clipper}/fonts:/usr/local/share/fonts/clippa:ro
       # The clone (/app) and Claude Code's home (sign-in, settings, memory, uv cache) persist
       # across deploys; deploy.sh makes both folders as the ssh user, so they belong to PUID.
       - ${CLAUDE_DIR:-/volume1/docker/clipper-claude}/repo:/app

@@ -837,9 +837,7 @@ def online_serve(cfg: dict, role: str) -> None:
 def online_hub(cfg: dict) -> None:
     """With [serve] hub: ssh to the NAS works and finds the compose project, which
     `clippa services` and deploy/hub/deploy.sh need."""
-    import shlex
-
-    from .services import recorder_ssh, ssh
+    from .services import OLD_COMPOSE_DIRS, cd_compose, recorder_ssh, ssh
 
     folder = cfg["serve"]["hub"]
     if not folder:
@@ -847,9 +845,12 @@ def online_hub(cfg: dict) -> None:
              "set [serve] hub in clipper.toml (the compose folder on the NAS): " + wiki.page("NAS-hub"))
         return
     host, _, sudo = recorder_ssh(cfg)
-    r = ssh(host, f"cd {shlex.quote(folder)} && {sudo} docker compose ps --services".strip())
+    r = ssh(host, f"{cd_compose(folder)} && {sudo} docker compose ps --services".strip())
     if r.returncode == 0:
         ok("online", f"hub on {host}:{folder}: " + (", ".join(r.stdout.split()) or "no containers up"))
+        if new := OLD_COMPOSE_DIRS.get(folder):
+            warn("online", f"[serve] hub says {folder!r}, the compose folder's name before #286 pass 3",
+                 f"set [serve] hub = \"{new}\" in clipper.toml once deploy/hub/deploy.sh has run")
     else:
         fail("online", f"hub on {host}:{folder}: {(r.stderr or r.stdout).strip()[-160:] or 'ssh failed'}",
              f"key login to the NAS (ssh -o BatchMode=yes {host}; ~/.ssh/config Host {host}): "
@@ -862,8 +863,14 @@ def online_modal(cfg: dict) -> None:
         return
     try:
         import modal
-        modal.Cls.from_name(cfg["transcribe"]["modal_app"], "WhisperX").hydrate()
-        ok("online", f"Modal app {cfg['transcribe']['modal_app']!r} deployed")
+
+        from .transcribe import modal_found
+        app = cfg["transcribe"]["modal_app"]
+        if (used := modal_found(modal.Cls.from_name, app, "WhisperX")[1]) != app:
+            warn("online", f"Modal app {app!r} isn't deployed: transcription uses the old {used!r} (#286)",
+                 f"clippa transcribe --deploy, then modal app stop {used}")
+        else:
+            ok("online", f"Modal app {app!r} deployed")
     except ImportError:
         pass  # check_gpu already failed it
     except Exception as e:  # noqa: BLE001

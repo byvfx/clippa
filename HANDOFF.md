@@ -51,9 +51,17 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   checkup read both) and has the bootstrap add a `clippa` command to ~/.local/bin; 2c-2 the text:
   messages, help, the war room, the wiki and notes say `clippa <cmd>` and Clippa (not the versioned
   prompts, `deploy/`, CI, history, or any machine name: `clipper.toml`, `CLIPPER_*`, containers, the
-  tailnet name, the `firefox:clipper` profile). Then pass 3 (deploy
-  day: compose projects, Modal apps, `deploy/` env names; stop the old compose project first), 4 the
-  repo name, 5 drop the fallbacks.
+  tailnet name, the `firefox:clipper` profile). **Pass 3** (branch `rename/pass3-deploy`, 11-22; not
+  deployed): compose projects `clippa-hub`/`clippa-record`/`clippa-claude` (the first deploy of each
+  stops the old `clipper-*` project and renames its compose.yaml, `deploy/retire.sh`; tailscale keeps
+  `clipper-hub_tailscale-state`), Modal apps `clippa-whisperx`/`clippa-lipsync` (lookups fall back to
+  the old app until deployed), `CLIPPA_DATA`/`CLIPPA_REPO`/`CLIPPA_TOML` with the old names read.
+  Deploy, with nothing live: recorder, then hub, then `[serve] hub = "clippa-hub"` in clipper.toml
+  (backup first), `clippa transcribe --deploy` + `modal app stop clipper-whisperx`, the claude
+  container last (it ends the NAS session). Kept for the last pass (user, 11-22: "get rid of all of
+  clipper eventually"): the data folder `/volume1/docker/clipper` and `clipper.toml`, CLAUDE_DIR,
+  the tailscale volume and `TS_HOSTNAME=clipper`, the Kitsu deploy's `env.clipper`, the Windows tasks.
+  Then 4 the repo name, 5 drop the fallbacks.
 - Titles/descriptions/cut points approved as-is; fun descriptions are liked. Long video per recurring topic
   (compilations) plus segments plus short picks. `third_party_audio = "allow_reactions"`,
   `audience_knowledge = "fans"`, Victor/blackjack segments stay; Kino's gambling is commentary, not play
@@ -387,7 +395,7 @@ no secrets). Copy one off the NAS now and then. Not in it: `deploy/*/env.local` 
 - Kino's pre-shows are on the main channel @TheKinoCasino since 11-04 (`clipper.toml` since 11-06). That
   feed's RSS 404s from the NAS, so the check reads yt-dlp's undated listing: entries below a grabbed pre-show
   count as older (#162). After a channel switch, grab the latest by hand.
-- A cut killed half way can leave `clipper-cut-<id>` running on the NAS: `ssh nas docker rm -f clipper-cut-<id>`.
+- A cut killed half way can leave `clippa-cut-<id>` (`clipper-cut-<id>` before pass 3) running on the NAS: `ssh nas docker rm -f <name>`.
 - `uv sync` can't replace a running clipper.exe (`uv pip install` instead, and include `--extra modal`
   later). yt-dlp needs deno for YouTube.
 - The worker runs the code of the last hub deploy, not the checkout: a merged change reaches the containers

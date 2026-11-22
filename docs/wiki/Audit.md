@@ -70,11 +70,11 @@ Claude can't run (signed out, usage limit), you get the repeat problems alone.
 To try either one by hand:
 
 ```bash
-ssh nas 'cd clipper-claude && docker compose exec claude clipper-audit --weekly --dry-run'
+ssh nas 'cd clippa-claude && docker compose exec claude clippa-audit --weekly --dry-run'
 ```
 
 ```bash
-ssh nas 'cd clipper-claude && docker compose exec claude clipper-audit --deep --dry-run'
+ssh nas 'cd clippa-claude && docker compose exec claude clippa-audit --deep --dry-run'
 ```
 
 `--dry-run` prints the DM instead of sending it and saves nothing. The timer's output is in

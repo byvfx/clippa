@@ -83,13 +83,28 @@ def test_status_shows_serve_and_bot_heartbeats(tmp_path, monkeypatch, capsys):
 
 def test_hub_services_go_over_ssh(defaults, monkeypatch):
     # [serve] hub: serve, the bot and the worker are containers on the NAS (deploy/hub).
-    cfg = {**defaults, "serve": {**defaults["serve"], "hub": "clipper-hub"}}
+    cfg = {**defaults, "serve": {**defaults["serve"], "hub": "clippa-hub"}}
     sent = []
     monkeypatch.setattr(services, "ssh", lambda host, cmd, timeout=20: sent.append((host, cmd))
                         or subprocess.CompletedProcess([host], 0, "ok", ""))
     assert services.run_task("bot", "restart", cfg) == 0
     host, cmd = sent[0]
-    assert host == "nas" and cmd.startswith("cd clipper-hub && ") and "docker compose restart bot" in cmd
+    assert host == "nas" and cmd.startswith("cd clippa-hub && ") and "docker compose restart bot" in cmd
+
+
+def test_an_old_compose_folder_reaches_the_renamed_one(defaults, monkeypatch):
+    # #286 pass 3: a config that still says clipper-hub (or clipper-record) cds into the new
+    # folder, or the old one where the new deploy hasn't run yet.
+    cfg = {**defaults, "serve": {**defaults["serve"], "hub": "clipper-hub"},
+           "record": {**defaults["record"], "compose_dir": "clipper-record"}}
+    sent = []
+    monkeypatch.setattr(services, "ssh", lambda host, cmd, timeout=20: sent.append(cmd)
+                        or subprocess.CompletedProcess([host], 0, "ok", ""))
+    services.run_task("bot", "restart", cfg)
+    services.recorder_compose(cfg, "restart")
+    assert sent[0].startswith("{ cd clippa-hub 2>/dev/null || cd clipper-hub; } && ")
+    assert sent[1].startswith("{ cd clippa-record 2>/dev/null || cd clipper-record; } && ")
+    assert services.cd_compose("my hub") == "cd 'my hub'"
 
 
 def test_serve_and_bot_have_no_task_without_a_hub(defaults, capsys):

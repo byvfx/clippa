@@ -336,7 +336,7 @@ def on_nas(stream_dir: Path, cfg: dict, argv: list[str]) -> None:
     sid = stream_dir.name
     env = {"PYTHONPATH": "/code", "CLIPPER_CONFIG": "/code/clipper.toml",
            "CLIPPER_PATHS_STREAMS": "/data/streams", "CLIPPER_CUT_BACKEND": "local"}
-    docker = ["docker", "run", "--rm", "--init", "--name", f"clipper-cut-{sid}",
+    docker = ["docker", "run", "--rm", "--init", "--name", f"clippa-cut-{sid}",
               *(["--user", cc["nas_user"]] if cc["nas_user"] else []),
               "-v", f"{cc['nas_data']}:/data",
               *[a for k, v in env.items() for a in ("-e", f"{k}={v}")]]
@@ -346,7 +346,7 @@ def on_nas(stream_dir: Path, cfg: dict, argv: list[str]) -> None:
     run = ["--entrypoint", "python", cc["nas_image"], "-m", "clippa.cli",
            *show_args(cfg), "cut", sid, *argv]  # a --show pin carries over
     # One folder per run (two cuts at once must not share code), gone when the run ends.
-    remote = ('set -e; d=$(mktemp -d "$HOME/clipper-cut.XXXXXX"); trap \'rm -rf "$d"\' EXIT; '
+    remote = ('set -e; d=$(mktemp -d "$HOME/clippa-cut.XXXXXX"); trap \'rm -rf "$d"\' EXIT; '
               'tar -xzf - -C "$d"; chmod -R a+rX "$d"; '
               + shlex.join(docker) + ' -v "$d":/code:ro ' + shlex.join(run))
     print(f"cutting on {cc['nas_host']} ({cc['nas_image']}, {cc['parallel']} at once)", flush=True)
@@ -355,5 +355,5 @@ def on_nas(stream_dir: Path, cfg: dict, argv: list[str]) -> None:
                        check=False)
     if r.returncode:
         raise ClipperError(f"cut on {cc['nas_host']} failed (exit {r.returncode}); a run still going "
-                         f"there: ssh {cc['nas_host']} docker rm -f clipper-cut-{sid}")
+                         f"there: ssh {cc['nas_host']} docker rm -f clippa-cut-{sid}")
     print(f"cut on {cc['nas_host']} in {time.time() - t:.0f}s", flush=True)

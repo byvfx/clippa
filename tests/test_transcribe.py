@@ -1,5 +1,9 @@
 """The transcribe stage (clippa/transcribe.py): the pure fix-ups on WhisperX's words. The
 GPU, Modal and ffmpeg paths are not run here."""
+import sys
+
+import pytest
+
 from clippa import transcribe
 
 
@@ -18,3 +22,31 @@ def test_fill_missing_times_at_the_ends():
     head = [{"word": "#"}, {"word": "a", "start": 2.0, "end": 3.0}]   # nothing before: it sits where a starts
     assert transcribe.fill_missing_times(head) == 1 and (head[0]["start"], head[0]["end"]) == (2.0, 2.0)
     assert transcribe.fill_missing_times([]) == 0
+
+
+def test_a_modal_lookup_finds_the_old_app_until_the_new_one_is_deployed(monkeypatch):
+    # #286 pass 3: clippa-whisperx is the default; until `clippa transcribe --deploy` makes
+    # it, a lookup finds the old clipper-whisperx. Another missing app still fails.
+    import types
+
+    class NotFound(Exception):
+        pass
+
+    monkeypatch.setitem(sys.modules, "modal", types.SimpleNamespace(exception=types.SimpleNamespace(NotFoundError=NotFound)))
+    deployed = {"clipper-whisperx"}
+
+    class Ref:
+        def __init__(self, app, name):
+            self.app, self.name = app, name
+
+        def hydrate(self):
+            if self.app not in deployed:
+                raise NotFound(self.app)
+            return self
+
+    found, used = transcribe.modal_found(Ref, "clippa-whisperx", "WhisperX")
+    assert (found.app, used) == ("clipper-whisperx", "clipper-whisperx")
+    deployed.add("clippa-whisperx")
+    assert transcribe.modal_found(Ref, "clippa-whisperx", "WhisperX")[1] == "clippa-whisperx"
+    with pytest.raises(NotFound):
+        transcribe.modal_found(Ref, "my-app", "WhisperX")
