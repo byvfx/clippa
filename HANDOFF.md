@@ -170,9 +170,7 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   (October's: `reports/analytics/2026-10-checkin.md`; its Decisions section is what November's follows up). Serve's `clippa
   analytics` retries Google's passing errors and skips a video still failing (#335, #336); a failed analytics or prune run comes
   back in 30 min, doubling per failure (`RETRY_FAILED_S`, #338). Details: log 11-20.
-- **Model providers (#72, closed 11-09):** the baseline stays Haiku + Sonnet; no other model came near it on the user's 66-window
-  gold set (wiki Model-providers, log 11-04/05). Tools: `clippa compare score`, `clippa models test|gold`; OpenRouter key in
-  secrets/openrouter_secret.txt. Moving a stage to another model is a config change whenever the user wants it.
+- **Model providers (#72, closed 11-09):** production still runs Haiku and Sonnet. Config-7 is being evaluated through the opt-in overlays `docs/config-7-hybrid-segv4.toml` and `docs/config-7-hybrid-segv4-openrouter.toml` (wiki Model-rollout); the defaults stay. Tools: `clippa compare score`, `clippa models test|gold`; OpenRouter key in `secrets/openrouter_secret.txt`.
 
 ## Waiting on the user
 - v0.3.0 is released (PR #372, tag 11-21, the user's word: "as is now"; the Release is titled "Clippa 0.3.0"). The hub was
