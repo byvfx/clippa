@@ -43,7 +43,7 @@ RUN chmod 755 /usr/local/bin/clippa-claude /usr/local/bin/clippa-checkup /usr/lo
 
 # /app is the clone, /home/claude Claude Code's home (both volumes). The config and every
 # relative [paths] entry live in /data, as in the hub; prompts come with the clone. Both spellings
-# of the config variable: the clone may be on a branch from before #286's rename.
+# of the config variable: the clone may be on a branch from before #286 pass 1, which reads only CLIPPER_*.
 ENV HOME=/home/claude \
     PATH=/app/.venv/bin:$PATH \
     CLIPPA_CONFIG=/data/clipper.toml \

@@ -1,7 +1,9 @@
+import pytest
 from pytest import approx
 
 from clippa import cut, jsonstate
 from clippa.cut import compilation_parts
+from clippa.errors import ClipperError
 
 
 def seg(id, start, end, cut_start=None):
@@ -76,5 +78,9 @@ def test_a_nas_cut_runs_the_package_it_sends(tmp_path, monkeypatch):
     # container's old name, the lock code from before the rename takes as well
     assert "-e CLIPPA_CONFIG=/code/clipper.toml" in remote and "CLIPPER_CONFIG" not in remote
     assert "--name clipper-cut-kick-1 " in remote   # the lock pre-rename code takes too
+    assert "--filter 'name=^/?clipper-cut-kick-1$'" in remote and remote.index("exit 75") < remote.index("docker run")
+    monkeypatch.setattr(cut.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=cut.CUT_RUNNING))
+    with pytest.raises(ClipperError, match="still going .* wait for it"):
+        cut.on_nas(streams / "kick-1", cfg, [])
     names = tarfile.open(fileobj=io.BytesIO(seen["tar"]), mode="r:gz").getnames()
     assert "clippa/cut.py" in names and "clipper.toml" in names and not any(n.startswith("clipper/") for n in names)
