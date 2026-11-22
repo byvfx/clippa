@@ -69,7 +69,10 @@ every pass (a few seconds) with each channel's state and who is live.
 
 Readers: `clippa status`, `clippa services status`, `clippa record status`, the
 [war room](War-room)'s Health panel and `clippa doctor`, from any machine that sees the share.
-"Down" therefore means one of two things: the process died, or it can't reach the share any more.
+"Down" therefore means one of these: the process died, or it can't reach the share any more, or (the
+bot) it has been off Discord that long. The bot skips its heartbeat while the gateway is
+disconnected, since discord.py keeps the process alive while it retries; a drop of a minute or two
+doesn't show.
 A read can land while the writer is replacing the file and find none, so a reader tries a
 missing or unreadable heartbeat again (three reads, 0.3 s apart) before calling it absent; only a
 service that never ran here, with no folder for its file, is answered at once. A file that is
@@ -147,7 +150,7 @@ process instead and logs it to `logs/retake.log`.
 | A stream is stuck | `streams/<id>/run.json` (`status`, `error`, the stage), `run_<stage>.log`, who holds `.run.lock` |
 | The bot's reply says it wasn't replanned | serve down or unreachable (`.serve/status.json`, `[serve] url`), or the token: a 401 in the reply means the key differs between the machines |
 | No DM | the outbox: files waiting means quiet hours or a bot that isn't draining (`.bot/status.json`, `bot.log`); empty means sent, filtered by kind or cooldown, or never queued |
-| Health says down | the heartbeat is over 180 s old: the service died, or it lost the share |
+| Health says down | the heartbeat is over 180 s old: the service died, or it lost the share (the bot: or Discord) |
 | "held by another process for over 60 s" | the holder named inside `<file>.lock` is slow, or died in the last two minutes; the next writer reclaims it once it is over 120 s old |
 | The war room page looks wrong after a pull | reload the browser first: the page, `warroom.css` and `js/*.js` are read from disk on every request (no-cache); only when the new page needs API routes the running server lacks, redeploy or restart serve while no upload runs |
 | A cut never finishes on the NAS | `ssh nas docker ps`, then `docker rm -f clipper-cut-<id>` |

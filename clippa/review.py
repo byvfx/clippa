@@ -169,6 +169,9 @@ class Listing:
         return e.stat().st_mtime if e else None   # cached by the scan on Windows
 
 
+UNREACHABLE = "Kitsu not reachable at"   # connect's error when the host doesn't answer
+
+
 def connect(rc: dict):
     import gazu
 
@@ -181,7 +184,7 @@ def connect(rc: dict):
     gazu.set_host(rc["host"])
     gazu.set_token(token)
     if not gazu.client.host_is_up():
-        raise ClipperError(f"Kitsu not reachable at {rc['host']}")
+        raise ClipperError(f"{UNREACHABLE} {rc['host']}")
     return gazu
 
 

@@ -374,6 +374,10 @@ def check_signins(cfg: dict, now: datetime) -> list[dict]:
 
 LOG_LINE = re.compile(r"^(\d{4}-\d\d-\d\d[ T]\d\d:\d\d:\d\d)\S*\s+(ERROR|CRITICAL)\s+(.*)")
 LOG_TAIL_BYTES = 4 << 20   # the end of each log is enough for a day; a rotated log is 10 MB at most
+# discord.py logs each try of its own reconnect at ERROR and keeps trying by itself: a network
+# drop of a minute or two writes several. Not a loop that keeps failing, and a bot that stays
+# down is the services check's (its heartbeat goes stale), so the logs check leaves these out.
+SELF_HEALING = re.compile(r"discord\.(?:client|gateway): Attempting a reconnect\b")
 
 
 def error_shape(msg: str) -> str:
@@ -387,11 +391,12 @@ def error_shape(msg: str) -> str:
 
 def repeated_errors(text: str, since: datetime, least: int, tz: ZoneInfo) -> list[tuple[str, int, str]]:
     """[(shape, count, last line)] of the ERROR and CRITICAL lines after `since` that came at least
-    `least` times, most first. A log's times have no zone: they are tz's (the services' TZ)."""
+    `least` times, most first, leaving out SELF_HEALING ones. A log's times have no zone: they
+    are tz's (the services' TZ)."""
     seen: dict[str, list] = {}
     for line in text.splitlines():
         m = LOG_LINE.match(line)
-        if not m:
+        if not m or SELF_HEALING.match(m.group(3)):
             continue
         t = datetime.fromisoformat(m.group(1).replace("T", " ")).replace(tzinfo=tz)
         if t < since:
