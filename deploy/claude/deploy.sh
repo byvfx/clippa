@@ -44,7 +44,7 @@ cp "$HERE/Dockerfile" "$HERE/entrypoint.sh" "$HERE/checkup.sh" "$HERE/checkup-gi
     "$HERE/audit.sh" "$HERE/audit-deep.md" "$TMP/src/"
 cp "$HERE/compose.yaml" "$TMP/"
 cp "$ENV_LOCAL" "$TMP/.env"
-echo "CLIPPA_DATA=$DATA" >> "$TMP/.env"   # compose.yaml's mounts read this spelling
+printf '\nCLIPPA_DATA=%s\n' "$DATA" >> "$TMP/.env"   # compose.yaml's mounts read this spelling
 # The repo to clone and who commits there default to this checkout's.
 fill() {  # fill KEY's empty line in .env (or add one) with a value
     grep -v "^$1=" "$TMP/.env" > "$TMP/env.new" || true

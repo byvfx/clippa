@@ -117,6 +117,21 @@ def check_command() -> None:
              "clippa and clipper commands to ~/.local/bin, then open a new terminal")
 
 
+# Settings whose old values the rename's pass 3 (#286) gave new names: a clipper.toml that still
+# sets the old one keeps using it (a cut on a recorder image nothing rebuilds any more).
+OLD_VALUES = {("cut", "nas_image"): ("clipper-record:latest", "clippa-record:latest"),
+              ("transcribe", "modal_app"): ("clipper-whisperx", "clippa-whisperx"),
+              ("perform", "latentsync_app"): ("clipper-lipsync", "clippa-lipsync"),
+              ("record", "compose_dir"): ("clipper-record", "clippa-record")}
+
+
+def old_names_set(cfg: dict) -> list[tuple[str, str, str]]:
+    """(section.key, the old value, the new one) for each OLD_VALUES setting still at its old
+    value. [serve] hub has its own warning, in the online check."""
+    return [(f"[{s}] {k}", old, new) for (s, k), (old, new) in OLD_VALUES.items()
+            if cfg.get(s, {}).get(k) == old]
+
+
 def check_config(cfg: dict, role: str = "all") -> None:
     root = base(cfg)
     if root.get("_file"):
@@ -128,6 +143,9 @@ def check_config(cfg: dict, role: str = "all") -> None:
         fail("config", msg, "fix the name (clippa/defaults.toml lists every setting) or remove it")
     if old := old_env_in_use():  # #286: still read, so a note, not a warning, until the fallback goes
         ok("config", f"old-spelling variables, still read (CLIPPA_* is the new one): {', '.join(old)}")
+    for where, value, new in old_names_set(root):
+        warn("config", f"{where} = {value!r}, its name before #286 pass 3",
+             f"set it to {new!r} in clipper.toml once that one is deployed (or remove the line for the default)")
     if root.get("_local_file"):
         ok("config", f"this machine: {root['_local_file'].name} sets " + ", ".join(
             f"{s}.{k}" for s, v in root["_local"].items() for k in v))

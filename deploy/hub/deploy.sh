@@ -47,7 +47,7 @@ source "$HERE/../stamp.sh"
 stamp_build "$ROOT" "$TMP/src"   # which commit the image is: clippa --version, the heartbeats
 cp "$HERE/compose.yaml" "$HERE/tailscale-serve.json" "$TMP/"
 cp "$ENV_LOCAL" "$TMP/.env"
-echo "CLIPPA_DATA=$DATA" >> "$TMP/.env"   # compose.yaml's mounts read this spelling
+printf '\nCLIPPA_DATA=%s\n' "$DATA" >> "$TMP/.env"   # compose.yaml's mounts read this spelling
 
 tar -C "$TMP" -czf - . | ssh "$HOST" "mkdir -p '$DIR' && rm -rf '$DIR/src' && tar -C '$DIR' -xzf - \
     && chmod 600 '$DIR/.env' && mkdir -p '$DATA/fonts' '$DATA/logs'"

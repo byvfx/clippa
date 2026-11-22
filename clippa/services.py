@@ -88,15 +88,17 @@ def record_status(cfg: dict, now: datetime | None = None) -> None:
 
 
 HUB_ACTION = {"status": "ps", "stop": "stop", "restart": "restart"}
-# The compose folders took the Clippa name (#286 pass 3): a config that still names the old one
-# reaches the new folder, or the old one where the new deploy hasn't run yet.
+# The compose folders took the Clippa name (#286 pass 3). Either name, in the config or as the
+# default, reaches the new folder, or the old one where the new deploy hasn't run yet.
 OLD_COMPOSE_DIRS = {"clipper-hub": "clippa-hub", "clipper-record": "clippa-record"}
 
 
 def cd_compose(folder: str) -> str:
     """The shell `cd` into a compose folder on the NAS (OLD_COMPOSE_DIRS: the new name first)."""
-    if new := OLD_COMPOSE_DIRS.get(folder):
-        return f"{{ cd {new} 2>/dev/null || cd {folder}; }}"
+    new = OLD_COMPOSE_DIRS.get(folder) or (folder if folder in OLD_COMPOSE_DIRS.values() else "")
+    if new:
+        old = next(o for o, n in OLD_COMPOSE_DIRS.items() if n == new)
+        return f"{{ cd {new} 2>/dev/null || cd {old}; }}"
     return f"cd {shlex.quote(folder)}"
 
 
