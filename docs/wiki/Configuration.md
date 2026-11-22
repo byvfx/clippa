@@ -8,7 +8,7 @@ then environment variables named `CLIPPER_<SECTION>_<KEY>` (for example
 `clippa.local.toml` beside it (when both spellings of a file are there, the new one is read),
 `CLIPPA_CONFIG`, `CLIPPA_LOCAL_CONFIG`, `CLIPPA_<SECTION>_<KEY>` and every other `CLIPPER_*`
 variable clipper itself reads (when both spellings are set, `CLIPPA_*` wins), and a `clippa`
-command in the venv beside `clippa`. The deploy scripts and compose files under `deploy/` took
+command in the venv beside `clipper`. The deploy scripts and compose files under `deploy/` took
 the new names in the rename's deploy step (pass 3): `CLIPPA_DATA`, `CLIPPA_REPO`, `CLIPPA_TOML`
 (an `env.local` that still says `CLIPPER_DATA` or `CLIPPER_REPO` is read the same), the compose
 projects `clippa-hub`, `clippa-record` and `clippa-claude`, and the Modal apps `clippa-whisperx`

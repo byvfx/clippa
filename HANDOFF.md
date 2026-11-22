@@ -13,7 +13,7 @@ the user said so 2026-11-10; every tracked file, issue and PR comment is readabl
 Python package `clippa/` (`clippa/defaults.toml` is every setting, documented; prompts in `clippa/prompts/`),
 config `clipper.toml` (gitignored, on the NAS; `clipper.example.toml` is a tracked starter). The user docs are
 the GitHub wiki, built from `docs/wiki/` (`.github/workflows/wiki.yml` pushes it on every push to main);
-README.md and SETUP.md are short pointers; CLAUDE.md the conventions; `reports/` the monthly analytics; `docs/archive/` the old audits.
+README.md and SETUP.md are short pointers; AGENTS.md the conventions; `reports/` the monthly analytics; `docs/archive/` the old audits.
 Project memory (`~/.claude/projects/C--clipper/memory/`, MEMORY.md first) holds durable preferences.
 - Plan doc: https://claude.ai/code/artifact/a9bb9e38-ced0-4455-8d8e-18a78122f45f; usage walkthrough (2026-10-27):
   https://claude.ai/code/artifact/0d0e04da-54f6-4f15-bad0-2df72a286383; interactive demo: https://claude.ai/artifact/ASL1grYiajRAELyoqTGitN
@@ -116,7 +116,7 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   (`--dry-run` prices score/segments/meta/thumbs). The taste layer is the asset: see "Back up".
 - Hand-over (2026-11-08 audits, `docs/archive/code-audit-2026-11-08.md` §7): build as a public package but this deployment first,
   little tech debt, simple for the user; `studio/` holds mockups, research notes and media reports, out of the package; serve and the
-  bot are compose-only. **Merge policy and reviews are in CLAUDE.md (Checks)** and wiki Developing#code-review-on-prs: a code PR
+  bot are compose-only. **Merge policy and reviews are in AGENTS.md (Checks)** and wiki Developing#code-review-on-prs: a code PR
   (`clippa/`, `tests/`, `deploy/`, `.github/`, `pyproject.toml`) gets the local `code-review` skill before the first push, then
   Copilot, or Grok's `review` workflow while Copilot is out of credits (back 11-20 "for a few more days"; delete the workflow once
   Copilot reviews again; its repo secret `OPENROUTER_API_KEY` stays); merge once the review is in, each finding answered, CI green.
