@@ -123,7 +123,7 @@ with uncommitted changes. The NAS containers have no `.git`, so `deploy/hub/depl
    `vX.Y.Z` (`vX.Y.ZrcN` is published as a pre-release).
 3. `bash deploy/hub/deploy.sh` as usual; the hub then reports the tag's version, or the commit
    past it.
-4. Close the version's milestone, if it has one (`gh api -X PATCH repos/byvfx/clipper/milestones/N
+4. Close the version's milestone, if it has one (`gh api -X PATCH repos/{owner}/{repo}/milestones/N
    -f state=closed`), moving any issue still open on it to the next one first.
 
 Milestones are versions (#370): each is named `vX.Y.0 <what it is>` with a due date, and when its

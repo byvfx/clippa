@@ -13,9 +13,9 @@ Developing#releases.
 ## 0.3.0 (2026-11-21)
 
 The app starts answering to its new name, Clippa, and looks after more of itself. The `clippa`
-command, package and texts are in; the `clipper` command, `clipper.toml`, the `CLIPPER_*` variables
-and the container names still work until the rename's deploy step (#286). After pulling, reinstall
-the project in your venv once (the "package folder is `clippa/`" note below says how).
+command, package and texts are in; the `clipper` command, `clipper.toml` and the `CLIPPER_*`
+variables still work, and the containers keep their names (`clipper-hub`), until the rename's
+deploy step (#286). After pulling, reinstall the project in your venv once (the "package folder is `clippa/`" note below says how).
 
 - **The rename, passes 1-2:** a `clippa` command beside `clipper`, `clippa.toml` and `CLIPPA_*`
   accepted, the package is `clippa/`, and messages, `--help`, the war room, the bot and the wiki say
@@ -27,12 +27,12 @@ the project in your venv once (the "package folder is `clippa/`" note below says
   actions and items, each Review card says why the item was picked, and the live-show chips stop
   spilling over the top bar.
 - **Running it:** a disk-aware prune (`[streams] keep_free_pct`), analytics that ride out Google's
-  passing errors, serve retrying a failed job in 30 minutes, and seven old bugs fixed (#366).
+  passing errors, serve retrying a failed job in 30 minutes, and eight old bugs fixed (#366).
 
 ### 2026-11
 
 - Messages, `--help`, the war room, the Discord bot's texts and the wiki say `clippa <command>` and
-  Clippa now (#286, pass 2c-2); `clippa --version` prints `clippa 0.2.0`. The `clipper` command still
+  Clippa now (#286, pass 2c-2); `clippa --version` prints `clippa 0.3.0`. The `clipper` command still
   works: use it where `clippa` isn't found yet (rerun the bootstrap to add it, or `uv sync` an older
   venv). Tab completion answers to both once you make its script again (`clippa completion bash` or
   `powershell`, wherever your profile loads it). File, setting and container names (`clipper.toml`,
@@ -41,7 +41,7 @@ the project in your venv once (the "package folder is `clippa/`" note below says
   (#286, pass 2c): grep for `clipp` to catch lines from before and after. The war room's last-upload
   box and checkup's repeated-error count read both. The bootstrap now adds a `clippa` command to
   `~/.local/bin` beside `clipper` (run it again to get one), and doctor's `command` line checks both.
-- Seven old bugs Grok found while reviewing the rename (#366): a video YouTube lists again after a
+- Eight old bugs Grok found while reviewing the rename (#366): a video YouTube lists again after a
   spell as private counts in Pass B's feedback and the monthly report again; the report's weakest
   list no longer repeats videos from its best list (9-12 videos); `clipper archive add` skips an
   unavailable video in a channel listing instead of crashing; `clipper archive transcribe` no longer
