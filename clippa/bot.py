@@ -56,6 +56,7 @@ from . import (
     digest,
     news,
     notify,
+    review,
     schedule,
     serve,
 )
@@ -251,6 +252,9 @@ class Bot(discord.Client):
                     try:  # one stream at a time, so buttons don't wait on the whole pass
                         edited += await self.blocking(cardsync.refresh_stream, self.cfg, d)
                     except UserError as e:
+                        if str(e).startswith(review.UNREACHABLE):   # every stream would say the same
+                            log.warning(f"card refresh: {e}; trying again in {every // 60} min")
+                            break
                         log.warning(f"card refresh {d.name}: {e}")
             except (Exception, SystemExit):
                 log.exception("card refresh failed")
