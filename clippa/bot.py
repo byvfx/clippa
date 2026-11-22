@@ -219,6 +219,7 @@ class Bot(discord.Client):
         self.lock = asyncio.Lock()  # one Kitsu job at a time
         self.started_at = datetime.now(UTC).isoformat(timespec="seconds")
         self.public_warned: set[int] = set()  # #blinds channels found public, warned about this run
+        self.offline_since: float | None = None  # when the gateway dropped (monotonic); None = connected
         register_commands(self)
 
     async def setup_hook(self) -> None:
@@ -236,7 +237,19 @@ class Bot(discord.Client):
             self.loop.create_task(self.notify_loop())
         self.loop.create_task(self.beat_loop())
 
+    async def on_disconnect(self) -> None:
+        if self.offline_since is None:
+            self.offline_since = time.monotonic()
+            log.info("disconnected from Discord; discord.py reconnects by itself")
+
+    async def on_connect(self) -> None:
+        self.offline_since = None
+
+    async def on_resumed(self) -> None:
+        self.offline_since = None
+
     async def on_ready(self) -> None:
+        self.offline_since = None
         log.info(f"clippa bot ready as {self.user} in guild {self.guild_id}; "
                  f"{len(self.allowed)} allowed user(s)")
 
@@ -247,15 +260,17 @@ class Bot(discord.Client):
         every = self.cfg["discord"]["refresh_minutes"] * 60
         while not self.is_closed():
             edited = 0
+            down: set[str] = set()   # "Kitsu not reachable at <host>" lines: said once a pass, not per stream
             try:
                 for d in await asyncio.to_thread(cardsync.stream_dirs, self.cfg):
                     try:  # one stream at a time, so buttons don't wait on the whole pass
                         edited += await self.blocking(cardsync.refresh_stream, self.cfg, d)
                     except UserError as e:
-                        if str(e).startswith(review.UNREACHABLE):   # every stream would say the same
+                        if not str(e).startswith(review.UNREACHABLE):
+                            log.warning(f"card refresh {d.name}: {e}")
+                        elif str(e) not in down:   # a show with its own Kitsu still gets its pass
+                            down.add(str(e))
                             log.warning(f"card refresh: {e}; trying again in {every // 60} min")
-                            break
-                        log.warning(f"card refresh {d.name}: {e}")
             except (Exception, SystemExit):
                 log.exception("card refresh failed")
             if edited:
@@ -263,11 +278,15 @@ class Bot(discord.Client):
             await asyncio.sleep(every)
 
     async def beat_loop(self) -> None:
-        """The heartbeat `clippa services status` and the war room's Health panel read."""
+        """The heartbeat `clippa services status`, the war room's Health panel and the checkup's
+        services check read. None while the gateway is down: discord.py's retries keep the process
+        alive, so a bot that can't get back would otherwise look up; after daemon.HEARTBEAT_S it
+        reads as down (a drop of a minute or two doesn't)."""
         await self.wait_until_ready()
         while not self.is_closed():
-            await asyncio.to_thread(daemon.beat, self.cfg, "bot", self.started_at,
-                                    user=str(self.user), guild=self.guild_id)
+            if self.offline_since is None:
+                await asyncio.to_thread(daemon.beat, self.cfg, "bot", self.started_at,
+                                        user=str(self.user), guild=self.guild_id)
             await asyncio.sleep(daemon.BEAT_S)
 
     async def news_loop(self) -> None:

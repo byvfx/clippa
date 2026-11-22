@@ -15,7 +15,9 @@ Developing#releases.
 - 11-22: The checkup no longer reports the bot's Discord reconnects after a short network drop as
   "the same error 6 times": discord.py's own "Attempting a reconnect" lines are left out of the logs
   check (a bot that stays down still shows in the services check). A card refresh that finds Kitsu
-  down says so once and tries again on the next pass, instead of a warning for every stream.
+  down says so once and tries again on the next pass, instead of a warning for every stream. The
+  bot's heartbeat now pauses while it is off Discord, so one that can't reconnect shows as down in
+  Health and the checkup after 3 minutes.
 - 11-22: The repo is `byvfx/clippa` (#286 pass 4). GitHub redirects the old `byvfx/clipper` links,
   clones and wiki pages, so nothing breaks; message links, the docs and the image-search user agents
   name the new one. Point an existing clone at it with `git remote set-url origin
