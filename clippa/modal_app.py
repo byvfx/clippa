@@ -28,7 +28,7 @@ import time
 
 import modal
 
-APP_NAME = "clipper-whisperx"
+APP_NAME = "clippa-whisperx"   # was clipper-whisperx (#286 pass 3): stop that one once this is deployed
 DEFAULT_GPU = "L4"
 GPU_PRICES = {  # $ per hour (modal.com/pricing, 2026-10-23), for the cost line only
     "T4": 0.59, "L4": 0.80, "A10": 1.10, "A10G": 1.10, "L40S": 1.95,

@@ -130,7 +130,7 @@ or Copilot); nothing merges or deploys it: you review, merge and run the hub dep
 It runs `main`'s code from its own worktree (`~/checkup-src` in the container, updated every
 run), not the clone, which a phone session may have on any branch; `CHECKUP_REF` in
 `env.local` picks another branch. Run it by hand with
-`ssh nas 'cd clipper-claude && docker compose exec claude clipper-checkup --dry-run'`
+`ssh nas 'cd clippa-claude && docker compose exec claude clippa-checkup --dry-run'`
 (`--dry-run` prints the DM instead of sending it and doesn't `--mark`); the timer's output is in
 `/tmp/checkup.log` in the container. The bot sends `checkup` DMs only once the hub runs code
 that has the kind (deployed after 2026-11-09).

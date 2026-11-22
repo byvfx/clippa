@@ -94,14 +94,15 @@ backfill_chat = true       # fill chat-socket outages from Kick's chat-history A
 backfill_min_s = 5
 # `clippa services stop|restart recorder` (and deploy/record/deploy.sh) reach the NAS by ssh:
 ssh_host = ""                # ssh host alias; "" = $RECORD_SSH_HOST, else "nas"
-compose_dir = ""             # the compose folder there, relative to the ssh user's home; "" = $RECORD_DIR, else "clipper-record"
+compose_dir = ""             # the compose folder there, relative to the ssh user's home; "" = $RECORD_DIR, else "clippa-record"
 sudo = ""                    # prefix for docker there if the ssh user needs it ("sudo"); "" = $RECORD_SUDO
 chat_tail_s = 15           # chat kept past a part's end (chat trails the video)
 on_finish = ""             # command per finished recording, run without a shell: {stream_id} {stream_dir} {channel}
 # Alerts (recording started/finished, video drops, stalls, crashes) always go to the log;
-# also to Discord via a webhook URL in $CLIPPER_ALERT_WEBHOOK, or the review bot's token
-# posting into alert_channel_id.
-alert_webhook_env = "CLIPPER_ALERT_WEBHOOK"
+# also to Discord via a webhook URL in $CLIPPA_ALERT_WEBHOOK (the old CLIPPER_ALERT_WEBHOOK is
+# read the same, either name here reads both), or the review bot's token posting into
+# alert_channel_id.
+alert_webhook_env = "CLIPPA_ALERT_WEBHOOK"
 alert_channel_id = ""
 alert_mention = ""         # prepended to warnings, e.g. "<@123456789012345678>"
 
@@ -154,7 +155,7 @@ batch_size = 8
 device = "cuda"
 backend = "whisperx"       # whisperx (CUDA) | mlx (Apple Silicon, `uv sync --extra mac`)
                            # | modal (cloud GPU, `uv sync --extra modal`)
-modal_app = "clipper-whisperx"  # deployed Modal app (`clippa transcribe --deploy`)
+modal_app = "clippa-whisperx"   # deployed Modal app (`clippa transcribe --deploy`); the old clipper-whisperx until then
 modal_gpu = "L40S"         # T4 | L4 | A10 | L40S | A100 | H100; "" = the app's default
                            # (8 h stream: L40S ~10 min ~$0.34, L4 ~19 min ~$0.26, H100 ~8 min ~$0.59)
 modal_audio = "flac"       # flac (lossless, ~60 MB/h) | opus (48 kbps, smaller upload)
@@ -424,7 +425,7 @@ backend = "local"              # local | nas
 nas_host = ""                   # ssh alias of the NAS, key login
 nas_data = ""                   # the recorder's CLIPPER_DATA, e.g. /volume1/docker/clipper
 nas_user = ""                   # the recorder's PUID:PGID, e.g. 1000:10
-nas_image = "clipper-record:latest"  # image of the one-off cut container
+nas_image = "clippa-record:latest"  # image of the one-off cut container (the recorder's, deploy/record)
 
 [bleep]
 # Cover slurs in cut audio (`clippa cut`) and mask them in captions and metadata text.
@@ -763,7 +764,7 @@ never_prune = []             # stream ids prune always leaves whole (a test stre
 url = ""
 # Where serve, the bot and the worker run, for `clippa services`. "" = this machine: only the
 # Windows worker has a scheduled task (deploy/worker); serve and the bot are whatever you
-# started by hand (status shows their heartbeats, stop and restart say so). "clipper-hub" = the
+# started by hand (status shows their heartbeats, stop and restart say so). "clippa-hub" = the
 # compose folder on the Docker host that deploy/hub/deploy.sh uses (relative to the ssh user's
 # home), reached over ssh like the recorder ([record] ssh_host).
 hub = ""
@@ -1265,7 +1266,7 @@ silence_min_s = 0.25           # ...for at least this long
 fps = 30
 crf = 21                       # pieces stay under the 30 MB single upload
 lipsync_engine = "latentsync"  # latentsync (Modal, no account) | sync (sync.so, needs a key)
-latentsync_app = "clipper-lipsync"  # Modal app (`clippa perform lipsync --deploy`)
+latentsync_app = "clippa-lipsync"   # Modal app (`clippa perform lipsync --deploy`); the old clipper-lipsync until then
 latentsync_steps = 20          # 20-50: higher is better and slower
 latentsync_guidance = 1.5      # 1.0-3.0: higher syncs harder, may jitter
 sync_model = "lipsync-2"       # sync.so: lipsync-2 | lipsync-2-pro

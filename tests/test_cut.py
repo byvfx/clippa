@@ -1,7 +1,9 @@
+import pytest
 from pytest import approx
 
 from clippa import cut, jsonstate
 from clippa.cut import compilation_parts
+from clippa.errors import ClipperError
 
 
 def seg(id, start, end, cut_start=None):
@@ -69,6 +71,18 @@ def test_a_nas_cut_runs_the_package_it_sends(tmp_path, monkeypatch):
     monkeypatch.setattr(cut.subprocess, "run", run)
     cut.on_nas(streams / "kick-1", cfg, ["--only", "c01"])
     remote = seen["cmd"][-1]
-    assert f"--entrypoint python {cfg['cut']['nas_image']} -m clippa.cli cut kick-1 --only c01" in remote
+    assert '--entrypoint python "$img" -m clippa.cli cut kick-1 --only c01' in remote
+    # the renamed recorder image, or the old one where deploy/record hasn't built it yet
+    assert "img=clippa-record:latest; " in remote and "|| img=clipper-record:latest; " in remote
+    # #286 pass 3: the new spelling, which wins over the image's own CLIPPA_CONFIG, and the
+    # container's old name, the lock code from before the rename takes as well
+    assert "-e CLIPPA_CONFIG=/code/clipper.toml" in remote and "CLIPPER_CONFIG" not in remote
+    assert "--name clipper-cut-kick-1 " in remote   # the lock pre-rename code takes too
+    assert "--filter 'name=^/?clipper-cut-kick-1$'" in remote and remote.index("exit 75") < remote.index("docker run")
+    assert "cat >/dev/null; exit 75" in remote   # reads the tarball first, so ssh ends with this exit
+    assert "running=$(docker ps -q --filter" in remote   # a docker error stops the run, not read as none
+    monkeypatch.setattr(cut.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=cut.CUT_RUNNING))
+    with pytest.raises(ClipperError, match="still going .* wait for it"):
+        cut.on_nas(streams / "kick-1", cfg, [])
     names = tarfile.open(fileobj=io.BytesIO(seen["tar"]), mode="r:gz").getnames()
     assert "clippa/cut.py" in names and "clipper.toml" in names and not any(n.startswith("clipper/") for n in names)

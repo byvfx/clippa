@@ -117,6 +117,21 @@ def check_command() -> None:
              "clippa and clipper commands to ~/.local/bin, then open a new terminal")
 
 
+# Settings whose old values the rename's pass 3 (#286) gave new names: a clipper.toml that still
+# sets the old one keeps using it (a cut on a recorder image nothing rebuilds any more).
+OLD_VALUES = {("cut", "nas_image"): ("clipper-record:latest", "clippa-record:latest"),
+              ("transcribe", "modal_app"): ("clipper-whisperx", "clippa-whisperx"),
+              ("perform", "latentsync_app"): ("clipper-lipsync", "clippa-lipsync"),
+              ("record", "compose_dir"): ("clipper-record", "clippa-record")}
+
+
+def old_names_set(cfg: dict) -> list[tuple[str, str, str]]:
+    """(section.key, the old value, the new one) for each OLD_VALUES setting still at its old
+    value. [serve] hub has its own warning, in the online check."""
+    return [(f"[{s}] {k}", old, new) for (s, k), (old, new) in OLD_VALUES.items()
+            if cfg.get(s, {}).get(k) == old]
+
+
 def check_config(cfg: dict, role: str = "all") -> None:
     root = base(cfg)
     if root.get("_file"):
@@ -128,6 +143,9 @@ def check_config(cfg: dict, role: str = "all") -> None:
         fail("config", msg, "fix the name (clippa/defaults.toml lists every setting) or remove it")
     if old := old_env_in_use():  # #286: still read, so a note, not a warning, until the fallback goes
         ok("config", f"old-spelling variables, still read (CLIPPA_* is the new one): {', '.join(old)}")
+    for where, value, new in old_names_set(root):
+        warn("config", f"{where} = {value!r}, its name before #286 pass 3",
+             f"set it to {new!r} in clipper.toml once that one is deployed (or remove the line for the default)")
     if root.get("_local_file"):
         ok("config", f"this machine: {root['_local_file'].name} sets " + ", ".join(
             f"{s}.{k}" for s, v in root["_local"].items() for k in v))
@@ -837,9 +855,7 @@ def online_serve(cfg: dict, role: str) -> None:
 def online_hub(cfg: dict) -> None:
     """With [serve] hub: ssh to the NAS works and finds the compose project, which
     `clippa services` and deploy/hub/deploy.sh need."""
-    import shlex
-
-    from .services import recorder_ssh, ssh
+    from .services import OLD_COMPOSE_DIRS, cd_compose, recorder_ssh, ssh
 
     folder = cfg["serve"]["hub"]
     if not folder:
@@ -847,9 +863,12 @@ def online_hub(cfg: dict) -> None:
              "set [serve] hub in clipper.toml (the compose folder on the NAS): " + wiki.page("NAS-hub"))
         return
     host, _, sudo = recorder_ssh(cfg)
-    r = ssh(host, f"cd {shlex.quote(folder)} && {sudo} docker compose ps --services".strip())
+    r = ssh(host, f"{cd_compose(folder)} && {sudo} docker compose ps --services".strip())
     if r.returncode == 0:
         ok("online", f"hub on {host}:{folder}: " + (", ".join(r.stdout.split()) or "no containers up"))
+        if new := OLD_COMPOSE_DIRS.get(folder):
+            warn("online", f"[serve] hub says {folder!r}, the compose folder's name before #286 pass 3",
+                 f"set [serve] hub = \"{new}\" in clipper.toml once deploy/hub/deploy.sh has run")
     else:
         fail("online", f"hub on {host}:{folder}: {(r.stderr or r.stdout).strip()[-160:] or 'ssh failed'}",
              f"key login to the NAS (ssh -o BatchMode=yes {host}; ~/.ssh/config Host {host}): "
@@ -862,8 +881,14 @@ def online_modal(cfg: dict) -> None:
         return
     try:
         import modal
-        modal.Cls.from_name(cfg["transcribe"]["modal_app"], "WhisperX").hydrate()
-        ok("online", f"Modal app {cfg['transcribe']['modal_app']!r} deployed")
+
+        from .transcribe import modal_found
+        app = cfg["transcribe"]["modal_app"]
+        if (used := modal_found(modal.Cls.from_name, app, "WhisperX")[1]) != app:
+            warn("online", f"Modal app {app!r} isn't deployed: transcription uses the old {used!r} (#286)",
+                 f"clippa transcribe --deploy, then modal app stop {used}")
+        else:
+            ok("online", f"Modal app {app!r} deployed")
     except ImportError:
         pass  # check_gpu already failed it
     except Exception as e:  # noqa: BLE001
@@ -895,10 +920,19 @@ def online_nas_cut(cfg: dict) -> None:
         fail("online", f"[cut] backend = \"nas\" without [cut] {', '.join(missing)}",
              "set them in clipper.toml (the ssh alias, and the recorder's CLIPPER_DATA)")
         return
-    probe = f"docker image inspect --format '{{{{.Id}}}}' {cc['nas_image']} && test -d {cc['nas_data']}/streams"
+    from .cut import OLD_IMAGES
+    image, old = cc["nas_image"], OLD_IMAGES.get(cc["nas_image"])
+    has = f"docker image inspect --format '{{{{.Id}}}}' {image} >/dev/null && echo {image}"
+    if old:  # cut.on_nas falls back to it until deploy/record builds the new one (#286 pass 3)
+        has = f"{{ {has} || {{ docker image inspect --format '{{{{.Id}}}}' {old} >/dev/null && echo {old}; }}; }}"
+    probe = f"{has} && test -d {cc['nas_data']}/streams"
     r = run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", cc["nas_host"], probe])
-    if r.returncode == 0:
-        ok("online", f"cut on the NAS: {cc['nas_host']} has {cc['nas_image']} and {cc['nas_data']}/streams")
+    found = (r.stdout or "").strip().splitlines()[-1:] or [""]
+    if r.returncode == 0 and found[0] == old:
+        warn("online", f"cut on the NAS: {cc['nas_host']} has only the old {old}, which the cuts use for now",
+             "bash deploy/record/deploy.sh (when nothing is live) builds " + image)
+    elif r.returncode == 0:
+        ok("online", f"cut on the NAS: {cc['nas_host']} has {image} and {cc['nas_data']}/streams")
     else:
         fail("online", f"cut on the NAS: {(r.stderr or r.stdout).strip()[-160:]}",
              "key login to the NAS (ssh -o BatchMode=yes <host>), and deploy the recorder once "

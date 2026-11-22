@@ -24,7 +24,7 @@ One supported way per role, unattended:
 | recorder | its own compose project on the NAS ([NAS recorder](NAS-recorder)) | `clippa services restart recorder` over ssh, refused while a show is recording; `bash deploy/record/deploy.sh` |
 
 `deploy/hub` is written for the NAS but runs on any Docker host: `env.local` sets
-`CLIPPER_DATA` (the folder mounted as `/data`, with `clipper.toml`, `streams/` and `secrets/`),
+`CLIPPA_DATA` (the folder mounted as `/data`, with `clipper.toml`, `streams/` and `secrets/`),
 `PUID`/`PGID` for the files it writes, and `RENDER_GID` for the Intel GPU device (drop the
 `/dev/dri` lines from `compose.yaml` on a host without one). Restart serve after scheduler or
 war-room changes, the bot after Discord changes. Serve and the bot by hand (`clippa serve`,

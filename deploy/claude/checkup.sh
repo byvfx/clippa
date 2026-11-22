@@ -1,15 +1,15 @@
 #!/bin/sh
 # The nightly checkup (#185), run by the claude container at CHECKUP_AT (entrypoint.sh).
-# `clipper checkup` first, no model: nothing found = a one-line "all good" DM and no Claude run;
+# `clippa checkup` first, no model: nothing found = a one-line "all good" DM and no Claude run;
 # findings = a headless `claude -p` (checkup.md) that reads the logs and DMs one report. That
 # run is read-only but for one thing: a clear code fix may become one PR, edited only in its own
 # worktree and opened through checkup-pr (#287 step 6). The tools below are all it may use.
 #
 # It runs CHECKUP_REF's code (default main) from its own detached worktree, updated each run,
-# never the clone a phone session has on some branch: PYTHONPATH puts the worktree's clipper
+# never the clone a phone session has on some branch: PYTHONPATH puts the worktree's clippa
 # ahead of /app's in the shared venv.
 #
-# By hand: docker compose exec claude clipper-checkup [--dry-run]
+# By hand: docker compose exec claude clippa-checkup [--dry-run]
 #   --dry-run prints the DM instead of sending it (Claude still runs when there are findings).
 set -u
 DRY=""
@@ -26,7 +26,7 @@ WT=${CHECKUP_WORKTREE:-$HOME/checkup-src}
 day=$(date +%m-%d)
 
 dm() {  # the DM: stdin
-    if [ -n "$DRY" ]; then echo "--- DM (dry run, not sent):"; cat; else clipper alert send --kind checkup -; fi
+    if [ -n "$DRY" ]; then echo "--- DM (dry run, not sent):"; cat; else clippa alert send --kind checkup -; fi
 }
 
 if [ ! -d "$WT/.git" ] && [ ! -f "$WT/.git" ]; then
@@ -36,47 +36,54 @@ fi
 git -C "$WT" fetch -q origin "$REF" && git -C "$WT" checkout -q --detach FETCH_HEAD \
     || echo "couldn't update $WT to origin/$REF: running what it has ($(git -C "$WT" log --oneline -1))" >&2
 export PYTHONPATH="$WT"
+# `clippa` runs the worktree's code whatever console scripts /app's venv has: a phone session
+# may have synced it on a branch from before #286's rename, which installs only `clipper`.
+# On PATH, so the `claude -p` below finds the same one.
+mkdir -p "$HOME/.checkup-bin"   # written beside it and moved in: a run using it never sees it half-written
+printf '#!/bin/sh\nexec python -m clippa.cli "$@"\n' > "$HOME/.checkup-bin/clippa.$$"
+chmod 755 "$HOME/.checkup-bin/clippa.$$" && mv -f "$HOME/.checkup-bin/clippa.$$" "$HOME/.checkup-bin/clippa"
+export PATH="$HOME/.checkup-bin:$PATH"
 cd "$WT"
 
-if ! clipper checkup -h >/dev/null 2>&1; then
-    echo "Checkup $day: origin/$REF has no \`clipper checkup\` yet (#185 not merged?), so nothing was checked." | dm
+if ! clippa checkup -h >/dev/null 2>&1; then
+    echo "Checkup $day: origin/$REF has no \`clippa checkup\` yet (#185 not merged?), so nothing was checked." | dm
     exit 0
 fi
 mark=--mark
 [ -n "$DRY" ] && mark=""   # a test run mustn't use up what the next real one reports as new
-report=$(clipper checkup --json $mark 2>/tmp/checkup.err)
+report=$(clippa checkup --json $mark 2>/tmp/checkup.err)
 code=$?
 if [ "$code" -eq 0 ]; then
     # and what serve's `checkup --fix` repaired (or would have) in the last 24 h, when anything (#287)
-    { echo "Checkup $day: all good."; clipper checkup 2>/dev/null | tail -n +2; } | dm
+    { echo "Checkup $day: all good."; clippa checkup 2>/dev/null | tail -n +2; } | dm
     exit 0
 fi
 # Exit 1 is findings only with a report; without one (a CLI error, --mark's write failing) the
 # checkup itself broke: say so without a model run.
 if [ "$code" -ne 1 ] || ! printf '%s' "$report" | grep -q '"findings"'; then
-    echo "Checkup $day: \`clipper checkup\` exited $code: $(tail -n 3 /tmp/checkup.err)" | dm
+    echo "Checkup $day: \`clippa checkup\` exited $code: $(tail -n 3 /tmp/checkup.err)" | dm
     exit 0
 fi
 printf '%s\n' "$report" > /tmp/checkup.json
 
-prompt=$(cat /usr/local/share/clipper/checkup.md)
+prompt=$(cat /usr/local/share/clippa/checkup.md)
 [ -n "$DRY" ] && prompt="$prompt
 
-DRY RUN: don't run \`clipper alert send\`; print the message as your final answer instead."
+DRY RUN: don't run \`clippa alert send\`; print the message as your final answer instead."
 # One argument per rule (a rule has spaces in it); in -p mode anything else is refused. Exact
 # commands, not prefixes, wherever an extra flag could write (`status --sync`, `checkup --mark`);
 # git goes through checkup-git, which refuses the options that write. Logs are read with Read.
 # Edit and Write only inside checkup-pr's worktree ("//" = an absolute path in a rule), and git's
 # writes only through checkup-pr.
 set -- Read Grep Glob "Edit(/$FIX/**)" "Write(/$FIX/**)" "Bash(checkup-pr:*)" \
-    "Bash(clipper checkup)" "Bash(clipper checkup --json)" "Bash(clipper status)" \
-    "Bash(clipper doctor --offline)" "Bash(clipper doctor --offline --role claude)" \
-    "Bash(clipper record status)" "Bash(clipper worker --status)" "Bash(clipper alert send:*)" \
+    "Bash(clippa checkup)" "Bash(clippa checkup --json)" "Bash(clippa status)" \
+    "Bash(clippa doctor --offline)" "Bash(clippa doctor --offline --role claude)" \
+    "Bash(clippa record status)" "Bash(clippa worker --status)" "Bash(clippa alert send:*)" \
     "Bash(checkup-git:*)"
 if ! claude -p "$prompt" --max-turns 40 \
         --disallowedTools NotebookEdit WebFetch WebSearch \
         --allowedTools "$@" </dev/null; then
     # No diagnosis (signed out, usage limit): the findings alone still go out (alert send cuts
     # them to Discord's length by characters).
-    clipper checkup 2>&1 | dm
+    clippa checkup 2>&1 | dm
 fi

@@ -10,6 +10,18 @@ Developing#releases.
 
 ## Unreleased
 
+- The rename's deploy step (#286 pass 3): the NAS compose projects are `clippa-hub`, `clippa-record`
+  and `clippa-claude`, and the Modal apps `clippa-whisperx` and `clippa-lipsync`. The first deploy
+  of each stops the old `clipper-*` project before the new one starts (never two bots or workers
+  at once); tailscale keeps its sign-in. Transcription uses the old Modal app until `clippa
+  transcribe --deploy` makes the new one, and `clippa doctor` says so. The `deploy/` scripts read
+  `CLIPPA_DATA`, `CLIPPA_REPO` and `CLIPPA_TOML`, and an older `env.local`'s `CLIPPER_*` the same;
+  the alert webhook is `CLIPPA_ALERT_WEBHOOK` (`[record] alert_webhook_env`), the old name still read.
+  Set `[serve] hub = "clippa-hub"` after the hub deploy (`clippa services` copes until then).
+  A NAS cut (`[cut] backend = "nas"`) reads the config it sends, as before, and keeps running as
+  `clipper-cut-<id>` until the last pass: that name is the lock old and new code share. A second cut
+  of a stream that is still being cut there says to wait for it.
+
 ## 0.3.0 (2026-11-21)
 
 The app starts answering to its new name, Clippa, and looks after more of itself. The `clippa`

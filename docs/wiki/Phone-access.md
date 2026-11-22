@@ -29,7 +29,7 @@ startup gives up after about a minute and restarts with a new link. Sign in from
 daemon on the same volumes instead, then start the service:
 
 ```bash
-ssh nas 'cd clipper-hub && docker compose stop tailscale && docker run -d --name ts-login --network host -v clipper-hub_tailscale-state:/var/lib/tailscale -v clipper-hub_tailscale-socket:/var/run/tailscale --entrypoint tailscaled tailscale/tailscale:v1.104.4 --tun=userspace-networking --statedir=/var/lib/tailscale --socket=/var/run/tailscale/tailscaled.sock'
+ssh nas 'cd clippa-hub && docker compose stop tailscale && docker run -d --name ts-login --network host -v clipper-hub_tailscale-state:/var/lib/tailscale -v clippa-hub_tailscale-socket:/var/run/tailscale --entrypoint tailscaled tailscale/tailscale:v1.104.4 --tun=userspace-networking --statedir=/var/lib/tailscale --socket=/var/run/tailscale/tailscaled.sock'
 ```
 
 ```bash
@@ -40,7 +40,7 @@ Open the link it prints and approve. If it still says logged out afterwards, res
 and run `up` again (the first approval here didn't reach it). Then:
 
 ```bash
-ssh nas 'docker rm -f ts-login && cd clipper-hub && docker compose up -d tailscale && docker compose restart serve'
+ssh nas 'docker rm -f ts-login && cd clippa-hub && docker compose up -d tailscale && docker compose restart serve'
 ```
 
 Restart serve so its health and the bot's links show the tailnet address. The container serves the war room itself

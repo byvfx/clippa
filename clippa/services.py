@@ -16,7 +16,7 @@ the NAS: its state is the heartbeat it writes every 2 s (streams/.record/status.
 stop/restart go over ssh like deploy/record/deploy.sh (RECORD_SSH_HOST, RECORD_DIR,
 RECORD_SUDO). A restart starts a new recording part, so it's refused while a show is being
 recorded unless --force; `all` never includes the recorder. NAS cuts are the
-clipper-cut-<stream> containers `[cut] backend = "nas"` runs; one left after its cut ended
+clipper-cut-<stream> containers `[cut] backend = "nas"` runs (the name stays until #286's last pass); one left after its cut ended
 can be removed with `ssh <nas> docker rm -f <name>` (status shows the command).
 """
 
@@ -88,13 +88,29 @@ def record_status(cfg: dict, now: datetime | None = None) -> None:
 
 
 HUB_ACTION = {"status": "ps", "stop": "stop", "restart": "restart"}
+# The compose folders took the Clippa name (#286 pass 3). Either name, in the config or as the
+# default, reaches the live one: the old folder until a deploy has retired its compose.yaml
+# (deploy/retire.sh; the new folder exists a few minutes before that, while the image builds),
+# then the new one.
+OLD_COMPOSE_DIRS = {"clipper-hub": "clippa-hub", "clipper-record": "clippa-record"}
+
+
+def cd_compose(folder: str) -> str:
+    """The shell `cd` into a compose folder on the NAS. For either name in OLD_COMPOSE_DIRS: the
+    old folder while its compose.yaml is there, else the new one."""
+    new = OLD_COMPOSE_DIRS.get(folder) or (folder if folder in OLD_COMPOSE_DIRS.values() else "")
+    if new:
+        old = next(o for o, n in OLD_COMPOSE_DIRS.items() if n == new)
+        return (f"{{ if [ -f {old}/compose.yaml ] || {{ [ -d {old} ] && [ ! -d {new} ]; }}; "
+                f"then cd {old}; else cd {new}; fi; }}")
+    return f"cd {shlex.quote(folder)}"
 
 
 def hub_compose(cfg: dict, name: str, action: str) -> int:
     """serve, bot or worker as a container on the NAS ([serve] hub): docker compose over ssh."""
     host, _, sudo = recorder_ssh(cfg)
     folder = cfg["serve"]["hub"]
-    cmd = f"cd {shlex.quote(folder)} && {sudo} docker compose {HUB_ACTION[action]} {name}"
+    cmd = f"{cd_compose(folder)} && {sudo} docker compose {HUB_ACTION[action]} {name}"
     if action != "status":
         cmd += f" && {sudo} docker compose ps {name}"
     r = ssh(host, cmd, timeout=120)
@@ -130,11 +146,12 @@ def ssh(host: str, command: str, timeout: float = 20) -> subprocess.CompletedPro
 
 
 def nas_cuts(cfg: dict) -> list[str]:
-    """The clipper-cut-* containers on the NAS, one "name  status" line each."""
+    """The clipper-cut-* containers on the NAS (and clippa-cut-*, the name after #286's last pass), one
+    "name  status" line each."""
     host = cfg["cut"]["nas_host"]
     if not host:
         return []
-    r = ssh(host, "docker ps --filter name=clipper-cut- --format '{{.Names}}  {{.Status}}'")
+    r = ssh(host, "docker ps --filter name=clippa-cut- --filter name=clipper-cut- --format '{{.Names}}  {{.Status}}'")
     if r.returncode:
         return [f"(couldn't list them on {host}: {(r.stderr or r.stdout).strip()[:120]})"]
     return [f"{line}   (remove: ssh {host} docker rm -f {line.split()[0]})"
@@ -146,13 +163,13 @@ def recorder_ssh(cfg: dict) -> tuple[str, str, str]:
     RECORD_* variables deploy/record/deploy.sh reads, else its defaults."""
     rc = cfg["record"]
     return (rc["ssh_host"] or os.environ.get("RECORD_SSH_HOST") or "nas",
-            rc["compose_dir"] or os.environ.get("RECORD_DIR") or "clipper-record",
+            rc["compose_dir"] or os.environ.get("RECORD_DIR") or "clippa-record",
             rc["sudo"] or os.environ.get("RECORD_SUDO", ""))
 
 
 def recorder_compose(cfg: dict, action: str) -> int:
     host, folder, sudo = recorder_ssh(cfg)
-    cmd = f"cd {shlex.quote(folder)} && {sudo} docker compose {action} && {sudo} docker compose ps"
+    cmd = f"{cd_compose(folder)} && {sudo} docker compose {action} && {sudo} docker compose ps"
     print(f"recorder: docker compose {action} on {host}", flush=True)
     r = ssh(host, cmd, timeout=120)
     print((r.stdout + r.stderr).strip())

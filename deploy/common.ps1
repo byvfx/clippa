@@ -11,7 +11,7 @@ $ClipperExe = Join-Path $ClipperRoot '.venv\Scripts\clipper.exe'
 # the process doesn't have them (the secrets of CLAUDE.md, HF_TOKEN for whisperx, and the
 # alert webhook). A new key a stage reads belongs here too.
 $ClipperKeys = 'ANTHROPIC_API_KEY', 'ANTHROPIC_WORKSPACE_ID', 'KITSU_TOKEN', 'DISCORD_BOT_TOKEN',
-               'CLIPPER_ALERT_WEBHOOK', 'MODAL_TOKEN_ID', 'MODAL_TOKEN_SECRET', 'ELEVENLABS_API_KEY',
+               'CLIPPA_ALERT_WEBHOOK', 'CLIPPER_ALERT_WEBHOOK', 'MODAL_TOKEN_ID', 'MODAL_TOKEN_SECRET', 'ELEVENLABS_API_KEY',
                'OPENAI_API_KEY', 'GEMINI_API_KEY', 'OPENROUTER_API_KEY', 'HF_TOKEN', 'BRAVE_API_KEY',
                'ANTHROPIC_ADMIN_KEY'
 
@@ -25,15 +25,24 @@ function Import-ClipperKeys {
 }
 
 function Import-RecorderWebhook {
-    # With no CLIPPER_ALERT_WEBHOOK, borrow the recorder's (deploy\record\env.local). Without
-    # either, alerts go through the bot's token into [record] alert_channel_id. Says which.
+    # With no alert webhook (CLIPPA_ALERT_WEBHOOK, or the old CLIPPER_ALERT_WEBHOOK, #286), borrow
+    # the recorder's (deploy\record\env.local, either name). Without either, alerts go through
+    # the bot's token into [record] alert_channel_id. Says which.
+    if ($env:CLIPPA_ALERT_WEBHOOK) { return 'CLIPPA_ALERT_WEBHOOK' }
     if ($env:CLIPPER_ALERT_WEBHOOK) { return 'CLIPPER_ALERT_WEBHOOK' }
     $recEnv = Join-Path $ClipperRoot 'deploy\record\env.local'
     if (Test-Path $recEnv) {
-        $line = Select-String -Path $recEnv -Pattern '^CLIPPER_ALERT_WEBHOOK=(.+)$' | Select-Object -First 1
-        if ($line) {
-            $env:CLIPPER_ALERT_WEBHOOK = $line.Matches[0].Groups[1].Value.Trim()
-            return "the recorder's, from $recEnv"
+        # Read as docker reads it: the new name first, a name's last line, no quotes, an empty
+        # value giving way to the other name
+        foreach ($name in 'CLIPPA_ALERT_WEBHOOK', 'CLIPPER_ALERT_WEBHOOK') {
+            $line = Select-String -Path $recEnv -CaseSensitive -Pattern "^$name=(.*)$" | Select-Object -Last 1
+            if ($line) {
+                $v = $line.Matches[0].Groups[1].Value.Trim().Trim('"').Trim("'")
+                if ($v) {
+                    $env:CLIPPA_ALERT_WEBHOOK = $v
+                    return "the recorder's, from $recEnv"
+                }
+            }
         }
     }
     return 'none; alerts go to [record] alert_channel_id through the bot token, if set'

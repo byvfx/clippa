@@ -1,13 +1,13 @@
 #!/bin/sh
 # The weekly digest and the monthly deep audit, run by the claude container after the morning
 # checkup (entrypoint.sh). Weekly on AUDIT_WEEKDAY (1 = Monday ... 7 = Sunday, the default):
-# `clipper audit --save`, no model, DM'd as it is. Monthly on AUDIT_MONTHDAY (default 1):
-# `clipper audit --brief` goes to a read-only `claude -p` (audit-deep.md), which follows the
+# `clippa audit --save`, no model, DM'd as it is. Monthly on AUDIT_MONTHDAY (default 1):
+# `clippa audit --brief` goes to a read-only `claude -p` (audit-deep.md), which follows the
 # repeat problems into the logs and code, DMs a summary and leaves a report. Either one empty = off.
 #
 # Like checkup.sh it runs CHECKUP_REF's code (default main) from the worktree checkup.sh keeps.
 #
-# By hand: docker compose exec claude clipper-audit [--weekly] [--deep] [--dry-run]
+# By hand: docker compose exec claude clippa-audit [--weekly] [--deep] [--dry-run]
 #   --weekly or --deep runs that one whatever the date; --dry-run prints the DM and saves nothing.
 set -u
 DRY="" WEEK="" DEEP=""
@@ -16,7 +16,7 @@ for a in "$@"; do
         --dry-run) DRY=1 ;;
         --weekly) WEEK=1 ;;
         --deep) DEEP=1 ;;
-        *) echo "clipper-audit: [--weekly] [--deep] [--dry-run]" >&2; exit 2 ;;
+        *) echo "clippa-audit: [--weekly] [--deep] [--dry-run]" >&2; exit 2 ;;
     esac
 done
 if [ -z "$WEEK$DEEP" ]; then
@@ -30,7 +30,7 @@ WT=${CHECKUP_WORKTREE:-$HOME/checkup-src}
 month=$(date +%Y-%m)
 
 dm() {  # the DM: stdin
-    if [ -n "$DRY" ]; then echo "--- DM (dry run, not sent):"; cat; else clipper alert send --kind checkup -; fi
+    if [ -n "$DRY" ]; then echo "--- DM (dry run, not sent):"; cat; else clippa alert send --kind checkup -; fi
 }
 
 if [ ! -d "$WT/.git" ] && [ ! -f "$WT/.git" ]; then
@@ -40,42 +40,49 @@ fi
 git -C "$WT" fetch -q origin "$REF" && git -C "$WT" checkout -q --detach FETCH_HEAD \
     || echo "couldn't update $WT to origin/$REF: running what it has ($(git -C "$WT" log --oneline -1))" >&2
 export PYTHONPATH="$WT"
+# `clippa` runs the worktree's code whatever console scripts /app's venv has: a phone session
+# may have synced it on a branch from before #286's rename, which installs only `clipper`.
+# On PATH, so the `claude -p` below finds the same one.
+mkdir -p "$HOME/.checkup-bin"   # written beside it and moved in: a run using it never sees it half-written
+printf '#!/bin/sh\nexec python -m clippa.cli "$@"\n' > "$HOME/.checkup-bin/clippa.$$"
+chmod 755 "$HOME/.checkup-bin/clippa.$$" && mv -f "$HOME/.checkup-bin/clippa.$$" "$HOME/.checkup-bin/clippa"
+export PATH="$HOME/.checkup-bin:$PATH"
 cd "$WT"
 
-if ! clipper audit -h >/dev/null 2>&1; then
-    echo "origin/$REF has no \`clipper audit\` yet: nothing run" >&2
+if ! clippa audit -h >/dev/null 2>&1; then
+    echo "origin/$REF has no \`clippa audit\` yet: nothing run" >&2
     exit 0
 fi
 
 weekly() {
     save=--save
     [ -n "$DRY" ] && save=""   # a test run mustn't count as a week
-    if out=$(clipper audit $save 2>/tmp/audit.err); then
+    if out=$(clippa audit $save 2>/tmp/audit.err); then
         printf '%s\n' "$out" | dm
     else
-        echo "Weekly audit: \`clipper audit\` failed: $(tail -n 3 /tmp/audit.err)" | dm
+        echo "Weekly audit: \`clippa audit\` failed: $(tail -n 3 /tmp/audit.err)" | dm
     fi
 }
 
 deep() {
-    if ! clipper audit --brief >/tmp/audit-brief.md 2>/tmp/audit.err; then
-        echo "Deep audit $month: \`clipper audit --brief\` failed: $(tail -n 3 /tmp/audit.err)" | dm
+    if ! clippa audit --brief >/tmp/audit-brief.md 2>/tmp/audit.err; then
+        echo "Deep audit $month: \`clippa audit --brief\` failed: $(tail -n 3 /tmp/audit.err)" | dm
         return
     fi
     if ! grep -q '^# Deep audit brief' /tmp/audit-brief.md; then
         echo "Deep audit $month: no weekly digests saved yet, so nothing to go on." | dm
         return
     fi
-    prompt=$(cat /usr/local/share/clipper/audit-deep.md)
+    prompt=$(cat /usr/local/share/clippa/audit-deep.md)
     [ -n "$DRY" ] && prompt="$prompt
 
-DRY RUN: don't run \`clipper alert send\`; put the message at the top of your final answer instead."
+DRY RUN: don't run \`clippa alert send\`; put the message at the top of your final answer instead."
     # As in checkup.sh: exact commands wherever an extra flag could write, git through checkup-git.
     set -- Read Grep Glob \
-        "Bash(clipper audit)" "Bash(clipper audit --all)" "Bash(clipper audit --brief)" "Bash(clipper costs)" \
-        "Bash(clipper checkup)" "Bash(clipper checkup --json)" "Bash(clipper status)" \
-        "Bash(clipper doctor --offline)" "Bash(clipper doctor --offline --role claude)" \
-        "Bash(clipper record status)" "Bash(clipper worker --status)" "Bash(clipper alert send:*)" \
+        "Bash(clippa audit)" "Bash(clippa audit --all)" "Bash(clippa audit --brief)" "Bash(clippa costs)" \
+        "Bash(clippa checkup)" "Bash(clippa checkup --json)" "Bash(clippa status)" \
+        "Bash(clippa doctor --offline)" "Bash(clippa doctor --offline --role claude)" \
+        "Bash(clippa record status)" "Bash(clippa worker --status)" "Bash(clippa alert send:*)" \
         "Bash(checkup-git:*)"
     if ! claude -p "$prompt" --max-turns 80 \
             --disallowedTools Edit Write NotebookEdit WebFetch WebSearch \
@@ -88,7 +95,7 @@ DRY RUN: don't run \`clipper alert send\`; put the message at the top of your fi
     fi
     if [ -n "$DRY" ]; then
         cat /tmp/audit-deep.md
-    elif ! clipper audit --keep-deep /tmp/audit-deep.md 2>/tmp/audit.err; then
+    elif ! clippa audit --keep-deep /tmp/audit-deep.md 2>/tmp/audit.err; then
         echo "Deep audit $month: the report wasn't saved: $(tail -n 3 /tmp/audit.err)" | dm
     fi
 }
