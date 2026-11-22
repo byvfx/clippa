@@ -223,6 +223,10 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
 - `ANTHROPIC_ADMIN_KEY` for Claude's own usage count on Costs, if wanted.
 
 ## Open work
+- **Long segments (config-7 prep, not in production):** `[segments] split_over_s` defaults to 0
+  (off). The NAS `clipper.toml` does not set it, and `max_s` is still 3600. Turn it on (3000, the
+  upcoming segments prompt's 50 minutes) only together with that prompt.
+
 **Priority labels (user, 2026-11-13):** every open issue carries one: `p1-now` (the queue, `gh issue list --label p1-now`),
 `p2-dated` (#258, #259, #158), `p3-track` (one big track at a time, the user picks: desktop install #46 →
 #44/#47/#45/#78; Udder Truth #58-#60; archive tooling #221-#227 before the next mini-doc; b-roll #229), `waiting` (#80, #48,
