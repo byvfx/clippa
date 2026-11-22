@@ -315,6 +315,9 @@ def cut_picks(stream_dir: Path, cfg: dict, ids: list[str] | None = None, force: 
 # kick-131151926, one 5 min segment: laptop to the share 20.4 s, on the NAS 10 s (0.5 s of it
 # the copy, the rest the AAC encode; three at once share the NAS's 6 cores).
 
+OLD_CUT_RUNNING = 75   # on_nas: the remote exit when a pre-rename clipper-cut-<id> holds the stream
+
+
 def on_nas(stream_dir: Path, cfg: dict, argv: list[str]) -> None:
     """Run `clippa cut <argv>` in a one-off container of the recorder image on the NAS, with
     this checkout's clippa/ package and config (the image's own copy may be older)."""
@@ -334,8 +337,10 @@ def on_nas(stream_dir: Path, cfg: dict, argv: list[str]) -> None:
         tar.add(pkg, "clippa", filter=lambda t: None if "__pycache__" in t.name else t)
         tar.add(toml, "clipper.toml")
     sid = stream_dir.name
-    env = {"PYTHONPATH": "/code", "CLIPPER_CONFIG": "/code/clipper.toml",
-           "CLIPPER_PATHS_STREAMS": "/data/streams", "CLIPPER_CUT_BACKEND": "local"}
+    # The new spelling: it wins over the image's own CLIPPA_CONFIG (#286 pass 3), which the old
+    # CLIPPER_CONFIG wouldn't, so the run reads the config sent in /code, not /data's.
+    env = {"PYTHONPATH": "/code", "CLIPPA_CONFIG": "/code/clipper.toml",
+           "CLIPPA_PATHS_STREAMS": "/data/streams", "CLIPPA_CUT_BACKEND": "local"}
     docker = ["docker", "run", "--rm", "--init", "--name", f"clippa-cut-{sid}",
               *(["--user", cc["nas_user"]] if cc["nas_user"] else []),
               "-v", f"{cc['nas_data']}:/data",
@@ -345,14 +350,22 @@ def on_nas(stream_dir: Path, cfg: dict, argv: list[str]) -> None:
     # run its own (older) copy instead of the one sent in /code.
     run = ["--entrypoint", "python", cc["nas_image"], "-m", "clippa.cli",
            *show_args(cfg), "cut", sid, *argv]  # a --show pin carries over
+    # The container's name is the lock on a stream's cut; one started under the old name (before
+    # #286 pass 3) doesn't collide with the new one, so it is checked first. A check, not a lock:
+    # it covers a cut left running across the upgrade, the gap this rename opens, nothing more.
+    old = shlex.quote(f"name=^clipper-cut-{sid}$")
+    guard = f"if docker ps -q --filter {old} | grep -q .; then exit {OLD_CUT_RUNNING}; fi; "
     # One folder per run (two cuts at once must not share code), gone when the run ends.
-    remote = ('set -e; d=$(mktemp -d "$HOME/clippa-cut.XXXXXX"); trap \'rm -rf "$d"\' EXIT; '
+    remote = ('set -e; ' + guard + 'd=$(mktemp -d "$HOME/clippa-cut.XXXXXX"); trap \'rm -rf "$d"\' EXIT; '
               'tar -xzf - -C "$d"; chmod -R a+rX "$d"; '
               + shlex.join(docker) + ' -v "$d":/code:ro ' + shlex.join(run))
     print(f"cutting on {cc['nas_host']} ({cc['nas_image']}, {cc['parallel']} at once)", flush=True)
     t = time.time()
     r = subprocess.run(["ssh", "-o", "BatchMode=yes", cc["nas_host"], remote], input=buf.getvalue(),
                        check=False)
+    if r.returncode == OLD_CUT_RUNNING:
+        raise ClipperError(f"clipper-cut-{sid} (from before the rename) is still cutting this stream on "
+                         f"{cc['nas_host']}: wait for it, or ssh {cc['nas_host']} docker rm -f clipper-cut-{sid}")
     if r.returncode:
         raise ClipperError(f"cut on {cc['nas_host']} failed (exit {r.returncode}); a run still going "
                          f"there: ssh {cc['nas_host']} docker rm -f clippa-cut-{sid}")

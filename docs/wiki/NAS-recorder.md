@@ -26,4 +26,5 @@ on Wi-Fi). In clipper.toml: `[cut] backend = "nas"`, `nas_host` (the ssh alias, 
 package and clipper.toml over ssh and runs in a one-off container (`clippa-cut-<stream>`),
 so the recorder needs no redeploy for code changes, only for a new image. Picks still cut
 here (they re-encode). `clippa doctor --role gpu` checks the ssh login and the image.
-A cut stopped half way can leave its container running: `ssh nas docker rm -f clippa-cut-<id>`.
+A cut stopped half way can leave its container running: `ssh nas docker rm -f clippa-cut-<id>`. A cut started before the rename's pass 3 runs as `clipper-cut-<id>`; while one is still
+running, a new cut of that stream refuses and says how to remove it.

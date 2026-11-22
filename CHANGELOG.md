@@ -17,6 +17,8 @@ Developing#releases.
   transcribe --deploy` makes the new one, and `clippa doctor` says so. The `deploy/` scripts read
   `CLIPPA_DATA`, `CLIPPA_REPO` and `CLIPPA_TOML`, and an older `env.local`'s `CLIPPER_*` the same.
   Set `[serve] hub = "clippa-hub"` after the hub deploy (`clippa services` copes until then).
+  A NAS cut (`[cut] backend = "nas"`) runs as `clippa-cut-<id>` and reads the config it sends, as
+  before; it refuses while a pre-rename `clipper-cut-<id>` is still cutting the same stream.
 
 ## 0.3.0 (2026-11-21)
 
