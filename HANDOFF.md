@@ -51,14 +51,14 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   checkup read both) and has the bootstrap add a `clippa` command to ~/.local/bin; 2c-2 the text:
   messages, help, the war room, the wiki and notes say `clippa <cmd>` and Clippa (not the versioned
   prompts, `deploy/`, CI, history, or any machine name: `clipper.toml`, `CLIPPER_*`, containers, the
-  tailnet name, the `firefox:clipper` profile). **Pass 3** (branch `rename/pass3-deploy`, 11-22; not
-  deployed): compose projects `clippa-hub`/`clippa-record`/`clippa-claude` (the first deploy of each
+  tailnet name, the `firefox:clipper` profile). **Pass 3** (PR #375, deployed 11-22 03:36-03:38, all
+  six steps): compose projects `clippa-hub`/`clippa-record`/`clippa-claude` (the first deploy of each
   stops the old `clipper-*` project and renames its compose.yaml, `deploy/retire.sh`; tailscale keeps
   `clipper-hub_tailscale-state`), Modal apps `clippa-whisperx`/`clippa-lipsync` (lookups fall back to
   the old app until deployed), `CLIPPA_DATA`/`CLIPPA_REPO`/`CLIPPA_TOML` with the old names read.
-  Deploy, with nothing live: recorder, then hub, then `[serve] hub = "clippa-hub"` in clipper.toml
-  (backup first), `clippa transcribe --deploy` + `modal app stop clipper-whisperx`, the claude
-  container last (it ends the NAS session). Kept for the last pass (user, 11-22: "get rid of all of
+  The old `clipper-*` folders on the NAS keep a `compose.yaml.retired-20261122-*`; `clipper-whisperx`
+  is stopped on Modal, `clipper-lipsync` still deployed (stop it once `clippa-lipsync` is, by
+  hand); clipper.toml's backup is `backups/clipper.toml.before_hub_rename_2026-11-22`. Kept for the last pass (user, 11-22: "get rid of all of
   clipper eventually"): the data folder `/volume1/docker/clipper` and `clipper.toml`, CLAUDE_DIR,
   the tailscale volume and `TS_HOSTNAME=clipper`, the Kitsu deploy's `env.clipper`, the Windows tasks,
   the NAS cut container name `clipper-cut-<id>` (the lock old and new code share) and the claude container's
