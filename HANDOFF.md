@@ -243,6 +243,10 @@ of phone use; #300 (access levels, a local Jev-like classifier in front of the m
 - **War room redesign (11-18):** all 8 steps live (PRs #314-#333; #324 done, PR #339); plan https://claude.ai/artifact/2Ny9Ad8bfWpjhyvtpx87eW,
   mockup https://claude.ai/artifact/H8uGqKzPmXJcXnAAUcNK4Z. Left: Library/Research/Settings still open the old windows from tiles; follow-ups #325-#328.
 - **War room heat graph (PR #294, live 11-19):** 🔥 on a stream or item (`/api/heat`, wiki War-room#heat); not yet seen on a real phone.
+- **Review load (11-22, draft):** `clippa review load` reads what a reviewer would see (items by kind,
+  check findings, Shorts held for other voices, auto-approve verdicts, the vision calls a check would
+  make, a costs jsonl, segments over 50 minutes). No writes and no model calls. Wiki Review. Brandon
+  reviews the draft; not merged.
 - **Review pre-flight checks and approval by silence (#259):** steps A (`clippa review check`, PR #263) and B (`clippa review
   auto`, PR #265, serve's `auto` job every 10 min), stale-finding rechecks (#270) and hardening (#273) are live (wiki Review).
   **On for Kino since 11-15 and Channel 404 since 11-20** (`[shows.<key>.review] auto_approve = true`, Shorts only: the

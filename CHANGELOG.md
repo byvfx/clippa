@@ -10,6 +10,10 @@ Developing#releases.
 
 ## Unreleased
 
+- 11-22: `clippa review load` counts what a reviewer would see from a pipeline run (items by
+  kind, check findings, Shorts held for other voices, what auto-approve would do, the vision
+  calls a check would make, spend from a costs file, segments over 50 minutes). It only reads.
+  [Review](Review#review-load).
 - The rename's deploy step (#286 pass 3): the NAS compose projects are `clippa-hub`, `clippa-record`
   and `clippa-claude`, and the Modal apps `clippa-whisperx` and `clippa-lipsync`. The first deploy
   of each stops the old `clipper-*` project before the new one starts (never two bots or workers
