@@ -90,7 +90,7 @@ def test_hub_services_go_over_ssh(defaults, monkeypatch):
                         or subprocess.CompletedProcess([host], 0, "ok", ""))
     assert services.run_task("bot", "restart", cfg) == 0
     host, cmd = sent[0]
-    assert host == "nas" and cmd.startswith("{ cd clippa-hub 2>/dev/null || cd clipper-hub; } && ")
+    assert host == "nas" and cmd.startswith("{ if [ -f clipper-hub/compose.yaml ] || { [ -d clipper-hub ] && [ ! -d clippa-hub ]; }; then cd clipper-hub; else cd clippa-hub; fi; } && ")
     assert "docker compose restart bot" in cmd
 
 
@@ -104,11 +104,11 @@ def test_an_old_compose_folder_reaches_the_renamed_one(defaults, monkeypatch):
                         or subprocess.CompletedProcess([host], 0, "ok", ""))
     services.run_task("bot", "restart", cfg)
     services.recorder_compose(cfg, "restart")
-    assert sent[0].startswith("{ cd clippa-hub 2>/dev/null || cd clipper-hub; } && ")
-    assert sent[1].startswith("{ cd clippa-record 2>/dev/null || cd clipper-record; } && ")
+    assert sent[0].startswith("{ if [ -f clipper-hub/compose.yaml ] || { [ -d clipper-hub ] && [ ! -d clippa-hub ]; }; then cd clipper-hub; else cd clippa-hub; fi; } && ")
+    assert sent[1].startswith(services.cd_compose("clippa-record") + " && ")
     assert services.cd_compose("my hub") == "cd 'my hub'"
     # the new default too, before deploy/record/deploy.sh has made its folder
-    assert services.cd_compose("clippa-record") == "{ cd clippa-record 2>/dev/null || cd clipper-record; }"
+    assert services.cd_compose("clippa-record") == services.cd_compose("clipper-record")
 
 
 def test_serve_and_bot_have_no_task_without_a_hub(defaults, capsys):
@@ -184,7 +184,7 @@ def test_retire_old_stops_the_old_compose_project_before_the_new_one_starts(tmp_
         script = (f'source "{retire.as_posix()}"\n'
                   f'ssh() {{ printf "%s\\n" "$2" >> "{log.as_posix()}"; case "$2" in\n'
                   '  ids=*) [ -n "$STATE" ] && echo "$STATE" || return 255 ;;\n'
-                  '  *down*) [ -z "$DOWN_FAILS" ] ;; esac; }\n'
+                  '  *down*|*"docker stop"*) [ -z "$DOWN_FAILS" ] ;; esac; }\n'
                   f'retire_old nas clipper-hub {new} ""; echo "retired=$RETIRED"')
         r = subprocess.run(["bash", "-c", script], capture_output=True, text=True, stdin=subprocess.DEVNULL,
                            env={"PATH": os.environ["PATH"], "STATE": state, "DOWN_FAILS": down_fails})
@@ -194,7 +194,9 @@ def test_retire_old_stops_the_old_compose_project_before_the_new_one_starts(tmp_
     assert "retired=1" in r.stdout and "cd 'clipper-hub' && " in cmds[0] and "down" in cmds[0]
     assert cmds[1].startswith("mv 'clipper-hub/compose.yaml' 'clipper-hub/compose.yaml.retired-")
     r, cmds = run("2 no", new="clipper-hub")     # HUB_DIR=clipper-hub: the folder in use, so by name
-    assert "retired=1" in r.stdout and cmds == [" docker compose -p 'clipper-hub' down --remove-orphans"]
+    assert "retired=1" in r.stdout and len(cmds) == 1
+    assert "label=com.docker.compose.project=clipper-hub" in cmds[0]   # no compose file needed
+    assert cmds[0].index("docker stop -t 60") < cmds[0].index("docker rm")
     r, cmds = run("0 yes")                        # stopped already: only the file goes
     assert "retired=0" in r.stdout and len(cmds) == 1 and cmds[0].startswith("mv ")
     r, cmds = run("")                             # ssh failed: never read as "nothing there"
@@ -218,3 +220,25 @@ def test_deploy_env_settings_read_either_spelling_without_quotes(tmp_path):
     assert data("CLIPPA_DATA=/srv/new\nCLIPPER_DATA=/srv/old\n") == "/srv/new"
     assert data("CLIPPA_DATA=\nCLIPPER_DATA='/srv/old'") == "/srv/old"
     assert data("PUID=1000\n") == "/volume1/docker/clipper"
+
+
+@pytest.mark.skipif(shutil.which("bash") is None or sys.platform == "win32",
+                    reason="needs bash (on Windows `bash` may be WSL's, which reads no C:/ paths)")
+def test_cd_compose_picks_the_live_folder(tmp_path):
+    """The old folder while its compose.yaml is there (also while a deploy builds the new one),
+    the new one once retire.sh has renamed it, or when there never was an old one."""
+    def where(*files):
+        d = tmp_path / str(len(list(tmp_path.iterdir())))
+        for f in files:
+            (d / f).parent.mkdir(parents=True, exist_ok=True)
+            (d / f).write_text("")
+        d.mkdir(exist_ok=True)
+        r = subprocess.run(["bash", "-c", services.cd_compose("clipper-hub") + " && basename \"$PWD\""],
+                           cwd=d, capture_output=True, text=True)
+        return r.stdout.strip() or "fails"
+
+    assert where("clipper-hub/compose.yaml") == "clipper-hub"                             # before the deploy
+    assert where("clipper-hub/compose.yaml", "clippa-hub/compose.yaml") == "clipper-hub"  # mid-deploy: still live
+    assert where("clipper-hub/compose.yaml.retired-1", "clippa-hub/compose.yaml") == "clippa-hub"
+    assert where("clippa-hub/compose.yaml") == "clippa-hub"                               # a new install
+    assert where() == "fails"

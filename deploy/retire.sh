@@ -9,8 +9,8 @@
 #   retire_old <host> <old project> <new dir> [sudo]
 #       Before the renamed project starts: when the old project (clipper-hub, ...) still has
 #       containers on the NAS, stop it (`docker compose down`: containers and network go, named
-#       volumes stay), from its own folder ~/<old project> when that is another folder, else by
-#       name (`docker compose -p`). Then rename that folder's compose.yaml to
+#       volumes stay), from its own folder ~/<old project> when that is another folder, else
+#       its containers by the project's label (`docker stop`, then `docker rm`). Then rename that folder's compose.yaml to
 #       compose.yaml.retired-<date>, so nothing (`clippa services`, a stale script) can start it
 #       again beside the new one; the folder and anything else in it stay. Two projects at once
 #       would run two bots and two workers, whose single-instance locks don't see each other.
@@ -53,7 +53,10 @@ retire_old() {
         if [ "$file" = yes ]; then
             ssh "$host" "cd '$old' && $sudo docker compose down --remove-orphans"
         else
-            ssh "$host" "$sudo docker compose -p '$old' down --remove-orphans"
+            # By the project's label, which needs no compose file on any Compose version: stop
+            # (with the usual grace period, as down does), then remove
+            ssh "$host" "ids=\$($sudo docker ps -aq --filter label=com.docker.compose.project=$old) \
+                && $sudo docker stop -t 60 \$ids && $sudo docker rm \$ids"
         fi || { echo "couldn't stop the old project $old on $host: nothing started; stop it by hand first" >&2; exit 1; }
         RETIRED=1
     fi

@@ -920,10 +920,19 @@ def online_nas_cut(cfg: dict) -> None:
         fail("online", f"[cut] backend = \"nas\" without [cut] {', '.join(missing)}",
              "set them in clipper.toml (the ssh alias, and the recorder's CLIPPER_DATA)")
         return
-    probe = f"docker image inspect --format '{{{{.Id}}}}' {cc['nas_image']} && test -d {cc['nas_data']}/streams"
+    from .cut import OLD_IMAGES
+    image, old = cc["nas_image"], OLD_IMAGES.get(cc["nas_image"])
+    has = f"docker image inspect --format '{{{{.Id}}}}' {image} >/dev/null && echo {image}"
+    if old:  # cut.on_nas falls back to it until deploy/record builds the new one (#286 pass 3)
+        has = f"{{ {has} || {{ docker image inspect --format '{{{{.Id}}}}' {old} >/dev/null && echo {old}; }}; }}"
+    probe = f"{has} && test -d {cc['nas_data']}/streams"
     r = run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", cc["nas_host"], probe])
-    if r.returncode == 0:
-        ok("online", f"cut on the NAS: {cc['nas_host']} has {cc['nas_image']} and {cc['nas_data']}/streams")
+    found = (r.stdout or "").strip().splitlines()[-1:] or [""]
+    if r.returncode == 0 and found[0] == old:
+        warn("online", f"cut on the NAS: {cc['nas_host']} has only the old {old}, which the cuts use for now",
+             "bash deploy/record/deploy.sh (when nothing is live) builds " + image)
+    elif r.returncode == 0:
+        ok("online", f"cut on the NAS: {cc['nas_host']} has {image} and {cc['nas_data']}/streams")
     else:
         fail("online", f"cut on the NAS: {(r.stderr or r.stdout).strip()[-160:]}",
              "key login to the NAS (ssh -o BatchMode=yes <host>), and deploy the recorder once "

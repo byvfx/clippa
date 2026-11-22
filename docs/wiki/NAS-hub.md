@@ -60,7 +60,7 @@ nothing can start it again beside the new one, and then starts all four in `~/cl
 `clipper-claude` (`deploy/retire.sh`). The tailscale container keeps the old project's state
 volume (`clipper-hub_tailscale-state`), so its sign-in and the war room's tailnet address stay.
 Then set `[serve] hub = "clippa-hub"` in `clipper.toml`; until you do, `clippa services` finds
-the new folder anyway and `clippa doctor` warns.
+the live folder anyway (the old one until the deploy retires it) and `clippa doctor` warns.
 
 The first run copies `deploy/hub/env.template` to `deploy/hub/env.local` (gitignored) and
 stops: fill in the keys (`ANTHROPIC_API_KEY`, `KITSU_TOKEN`, `MODAL_TOKEN_ID` /

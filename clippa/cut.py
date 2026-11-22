@@ -316,6 +316,7 @@ def cut_picks(stream_dir: Path, cfg: dict, ids: list[str] | None = None, force: 
 # the copy, the rest the AAC encode; three at once share the NAS's 6 cores).
 
 OLD_CUT_RUNNING = 75   # on_nas: the remote exit when a pre-rename clipper-cut-<id> holds the stream
+OLD_IMAGES = {"clippa-record:latest": "clipper-record:latest"}   # #286 pass 3; the last pass drops it
 
 
 def on_nas(stream_dir: Path, cfg: dict, argv: list[str]) -> None:
@@ -348,18 +349,24 @@ def on_nas(stream_dir: Path, cfg: dict, argv: list[str]) -> None:
     # `python -m clippa.cli`, not the image's own `clipper` entry point: that one imports the
     # package by the name the image was built with, so an image from before #286's rename would
     # run its own (older) copy instead of the one sent in /code.
-    run = ["--entrypoint", "python", cc["nas_image"], "-m", "clippa.cli",
-           *show_args(cfg), "cut", sid, *argv]  # a --show pin carries over
+    run = ["-m", "clippa.cli", *show_args(cfg), "cut", sid, *argv]  # a --show pin carries over
+    # The recorder image took the Clippa name (#286 pass 3): until deploy/record/deploy.sh has
+    # built it, the NAS has only the old one, which runs the code sent in /code just the same.
+    image = cc["nas_image"]
+    pick = f"img={shlex.quote(image)}; "
+    if old_image := OLD_IMAGES.get(image):
+        pick += f'docker image inspect "$img" >/dev/null 2>&1 || img={shlex.quote(old_image)}; '
     # The container's name is the lock on a stream's cut; one started under the old name (before
     # #286 pass 3) doesn't collide with the new one, so it is checked first. A check, not a lock:
     # it covers a cut left running across the upgrade, the gap this rename opens, nothing more.
-    old = shlex.quote(f"name=^clipper-cut-{sid}$")
+    old = shlex.quote(f"name=^/?clipper-cut-{sid}$")   # docker keeps the name with a leading /
     guard = f"if docker ps -q --filter {old} | grep -q .; then exit {OLD_CUT_RUNNING}; fi; "
     # One folder per run (two cuts at once must not share code), gone when the run ends.
-    remote = ('set -e; ' + guard + 'd=$(mktemp -d "$HOME/clippa-cut.XXXXXX"); trap \'rm -rf "$d"\' EXIT; '
+    remote = ('set -e; ' + guard + pick + 'd=$(mktemp -d "$HOME/clippa-cut.XXXXXX"); trap \'rm -rf "$d"\' EXIT; '
               'tar -xzf - -C "$d"; chmod -R a+rX "$d"; '
-              + shlex.join(docker) + ' -v "$d":/code:ro ' + shlex.join(run))
-    print(f"cutting on {cc['nas_host']} ({cc['nas_image']}, {cc['parallel']} at once)", flush=True)
+              + shlex.join(docker) + ' -v "$d":/code:ro --entrypoint python "$img" ' + shlex.join(run))
+    shown = f"{image}, or {old_image} where that isn't built yet" if old_image else image
+    print(f"cutting on {cc['nas_host']} ({shown}, {cc['parallel']} at once)", flush=True)
     t = time.time()
     r = subprocess.run(["ssh", "-o", "BatchMode=yes", cc["nas_host"], remote], input=buf.getvalue(),
                        check=False)
