@@ -7,6 +7,8 @@
   </a>
 </p>
 
+[![check](https://github.com/byvfx/clipper/actions/workflows/check.yml/badge.svg?branch=main)](https://github.com/byvfx/clipper/actions/workflows/check.yml)
+
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20Clippa-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/byvfx)
 
 **Clippa** turns long Kick streams into YouTube uploads: full-length segments, topic compilations,
