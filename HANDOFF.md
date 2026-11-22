@@ -165,7 +165,8 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   secrets/openrouter_secret.txt. Moving a stage to another model is a config change whenever the user wants it.
 
 ## Waiting on the user
-- v0.2.0 is released (tag 11-19). The recorder was redeployed 11-20 at 74be7d2 (`0.2.0+59` in its heartbeat). The hub and the
+- v0.3.0 is cut in PR #372 (11-21, the user's word: "as is now"); tag `v0.3.0` from main right after it merges (wiki
+  Developing#releases), then the hub deploy carries the number. v0.2.0 was tagged 11-19. The recorder was redeployed 11-20 at 74be7d2 (`0.2.0+59` in its heartbeat). The hub and the
   claude container were deployed 11-20 at bd1369b (#356); the nightly checkup is on (`CHECKUP_AT=08:30`, first real run 11-21).
 - Clippa chat works on the phone (user, 11-20). `[chat] model` is Haiku (`claude-haiku-5-5`) by default; any provider's model string
   works there, so BYOK is `[chat] model = "openrouter:<vendor>/<model>"` with `OPENROUTER_API_KEY` (wiki Model-providers); the
@@ -215,9 +216,10 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
 **Priority labels (user, 2026-11-13):** every open issue carries one: `p1-now` (the queue, `gh issue list --label p1-now`),
 `p2-dated` (#258, #259, #158), `p3-track` (one big track at a time, the user picks: desktop install #46 →
 #44/#47/#45/#78; Udder Truth #58-#60; archive tooling #221-#227 before the next mini-doc; b-roll #229), `waiting` (#80, #48,
-#45), `parked` (the rest). **Milestones (user, 11-16):** "Runs itself" (#259, #258, #287; due 12-06, a first guess), "Second
-channel (Sloth Beat)" (#46, #78, #44, #47, #45), "The Udder Truth: episode 1" (#58-#60), "Next mini-doc toolkit" (#221-#227,
-#229, #254), "Review and retakes" (#306, #309, #326, #327; 11-20); only the track in play gets a date. A new issue gets a priority label, and a milestone when it belongs to one.
+#45), `parked` (the rest). **Milestones are versions (#370, set up 11-21):** v0.4.0 Runs itself (12-06), v0.5.0 Review and retakes (12-20), v0.6.0
+Agent-first (01-15), v0.7.0 Second channel (02-05), v0.8.0 Next mini-doc toolkit (02-26), v0.9.0 The Udder Truth (03-31), v1.0.0
+Clippa 1.0 (05-31); #370 lists the issues. A release closes its milestone (wiki Developing#releases). A new issue gets a priority
+label, and the milestone of the version it is meant for (none for `parked` and `waiting`).
 Write "#77 L6" rather than "fix #77" in commit messages: GitHub closes the issue on "fix". Roadmaps are issues only (byvfx/clipper):
 Instagram Reels #39, lore-order playlists #43, archive fun #63, crisis mode #73, setup #78, live clips #81,
 blind items #111, investigate anyone #138, meaning search #53, P&L revenue #50 (the cost ledger is built). Old-issue triage
