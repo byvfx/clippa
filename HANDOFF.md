@@ -224,8 +224,9 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
 
 ## Open work
 - **Long segments (config-7 prep, not in production):** `[segments] split_over_s` defaults to 0
-  (off). The NAS `clipper.toml` does not set it, and `max_s` is still 3600. Turn it on (3000, the
-  upcoming segments prompt's 50 minutes) only together with that prompt.
+  (off). A negative value is off too; a non-number is a one-line error. The NAS `clipper.toml` does
+  not set it, and `max_s` is still 3600. Turn it on (3000, the upcoming segments prompt's 50 minutes)
+  only together with that prompt.
 
 **Priority labels (user, 2026-11-13):** every open issue carries one: `p1-now` (the queue, `gh issue list --label p1-now`),
 `p2-dated` (#258, #259, #158), `p3-track` (one big track at a time, the user picks: desktop install #46 →
