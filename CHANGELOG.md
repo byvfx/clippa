@@ -18,8 +18,8 @@ Developing#releases.
   `CLIPPA_DATA`, `CLIPPA_REPO` and `CLIPPA_TOML`, and an older `env.local`'s `CLIPPER_*` the same;
   the alert webhook is `CLIPPA_ALERT_WEBHOOK` (`[record] alert_webhook_env`), the old name still read.
   Set `[serve] hub = "clippa-hub"` after the hub deploy (`clippa services` copes until then).
-  A NAS cut (`[cut] backend = "nas"`) runs as `clippa-cut-<id>` and reads the config it sends, as
-  before; it refuses while a pre-rename `clipper-cut-<id>` is still cutting the same stream.
+  A NAS cut (`[cut] backend = "nas"`) reads the config it sends, as before, and keeps running as
+  `clipper-cut-<id>` until the last pass: that name is the lock old and new code share.
 
 ## 0.3.0 (2026-11-21)
 

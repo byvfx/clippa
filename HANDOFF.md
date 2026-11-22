@@ -60,7 +60,9 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   (backup first), `clippa transcribe --deploy` + `modal app stop clipper-whisperx`, the claude
   container last (it ends the NAS session). Kept for the last pass (user, 11-22: "get rid of all of
   clipper eventually"): the data folder `/volume1/docker/clipper` and `clipper.toml`, CLAUDE_DIR,
-  the tailscale volume and `TS_HOSTNAME=clipper`, the Kitsu deploy's `env.clipper`, the Windows tasks.
+  the tailscale volume and `TS_HOSTNAME=clipper`, the Kitsu deploy's `env.clipper`, the Windows tasks,
+  the NAS cut container name `clipper-cut-<id>` (the lock old and new code share) and the claude container's
+  `CLIPPER_*` twins of its `CLIPPA_*` settings (for a session on a pre-rename branch).
   Then 4 the repo name, 5 drop the fallbacks.
 - Titles/descriptions/cut points approved as-is; fun descriptions are liked. Long video per recurring topic
   (compilations) plus segments plus short picks. `third_party_audio = "allow_reactions"`,
@@ -395,7 +397,8 @@ no secrets). Copy one off the NAS now and then. Not in it: `deploy/*/env.local` 
 - Kino's pre-shows are on the main channel @TheKinoCasino since 11-04 (`clipper.toml` since 11-06). That
   feed's RSS 404s from the NAS, so the check reads yt-dlp's undated listing: entries below a grabbed pre-show
   count as older (#162). After a channel switch, grab the latest by hand.
-- A cut killed half way can leave `clippa-cut-<id>` (`clipper-cut-<id>` before pass 3) running on the NAS: `ssh nas docker rm -f <name>`.
+- A cut killed half way can leave `clipper-cut-<id>` running on the NAS (the name stays until #286's last pass: it is the lock
+  old and new code share): `ssh nas docker rm -f clipper-cut-<id>`.
 - `uv sync` can't replace a running clipper.exe (`uv pip install` instead, and include `--extra modal`
   later). yt-dlp needs deno for YouTube.
 - The worker runs the code of the last hub deploy, not the checkout: a merged change reaches the containers

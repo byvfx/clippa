@@ -1,9 +1,7 @@
-import pytest
 from pytest import approx
 
 from clippa import cut, jsonstate
 from clippa.cut import compilation_parts
-from clippa.errors import ClipperError
 
 
 def seg(id, start, end, cut_start=None):
@@ -74,12 +72,9 @@ def test_a_nas_cut_runs_the_package_it_sends(tmp_path, monkeypatch):
     assert '--entrypoint python "$img" -m clippa.cli cut kick-1 --only c01' in remote
     # the renamed recorder image, or the old one where deploy/record hasn't built it yet
     assert "img=clippa-record:latest; " in remote and "|| img=clipper-record:latest; " in remote
-    # #286 pass 3: the new spelling, which wins over the image's own CLIPPA_CONFIG, and a cut
-    # still running under the old container name holds the stream
+    # #286 pass 3: the new spelling, which wins over the image's own CLIPPA_CONFIG, and the
+    # container's old name, the lock code from before the rename takes as well
     assert "-e CLIPPA_CONFIG=/code/clipper.toml" in remote and "CLIPPER_CONFIG" not in remote
-    assert "--filter 'name=^/?clipper-cut-kick-1$'" in remote and remote.index("exit 75") < remote.index("docker run")
-    monkeypatch.setattr(cut.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=cut.OLD_CUT_RUNNING))
-    with pytest.raises(ClipperError, match="docker rm -f clipper-cut-kick-1"):
-        cut.on_nas(streams / "kick-1", cfg, [])
+    assert "--name clipper-cut-kick-1 " in remote   # the lock pre-rename code takes too
     names = tarfile.open(fileobj=io.BytesIO(seen["tar"]), mode="r:gz").getnames()
     assert "clippa/cut.py" in names and "clipper.toml" in names and not any(n.startswith("clipper/") for n in names)

@@ -24,6 +24,11 @@ services:
       CLIPPA_CUT_BACKEND: local
       CLIPPA_YOUTUBE_COOKIES_FROM_BROWSER: ""
       CLIPPA_PATHS_ANTHROPIC_KEY: /run/secrets/anthropic_key   # clippa's model calls
+      # The same in the old spelling, for a session on a branch from before #286's rename (which
+      # reads only CLIPPER_*); #286's last pass drops these
+      CLIPPER_CUT_BACKEND: local
+      CLIPPER_YOUTUBE_COOKIES_FROM_BROWSER: ""
+      CLIPPER_PATHS_ANTHROPIC_KEY: /run/secrets/anthropic_key
     secrets:
       - anthropic_key
     devices:

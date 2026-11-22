@@ -42,10 +42,12 @@ RUN chmod 755 /usr/local/bin/clippa-claude /usr/local/bin/clippa-checkup /usr/lo
     && ln -s clippa-checkup /usr/local/bin/clipper-checkup && ln -s clippa-audit /usr/local/bin/clipper-audit
 
 # /app is the clone, /home/claude Claude Code's home (both volumes). The config and every
-# relative [paths] entry live in /data, as in the hub; prompts come with the clone.
+# relative [paths] entry live in /data, as in the hub; prompts come with the clone. Both spellings
+# of the config variable: the clone may be on a branch from before #286's rename.
 ENV HOME=/home/claude \
     PATH=/app/.venv/bin:$PATH \
     CLIPPA_CONFIG=/data/clipper.toml \
+    CLIPPER_CONFIG=/data/clipper.toml \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never \
     DISABLE_AUTOUPDATER=1 \

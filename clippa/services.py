@@ -16,7 +16,7 @@ the NAS: its state is the heartbeat it writes every 2 s (streams/.record/status.
 stop/restart go over ssh like deploy/record/deploy.sh (RECORD_SSH_HOST, RECORD_DIR,
 RECORD_SUDO). A restart starts a new recording part, so it's refused while a show is being
 recorded unless --force; `all` never includes the recorder. NAS cuts are the
-clippa-cut-<stream> containers (clipper-cut-<stream> before #286 pass 3) `[cut] backend = "nas"` runs; one left after its cut ended
+clipper-cut-<stream> containers `[cut] backend = "nas"` runs (the name stays until #286's last pass); one left after its cut ended
 can be removed with `ssh <nas> docker rm -f <name>` (status shows the command).
 """
 
@@ -146,7 +146,8 @@ def ssh(host: str, command: str, timeout: float = 20) -> subprocess.CompletedPro
 
 
 def nas_cuts(cfg: dict) -> list[str]:
-    """The clippa-cut-* containers on the NAS (and the old clipper-cut-*), one "name  status" line each."""
+    """The clipper-cut-* containers on the NAS (and clippa-cut-*, the name after #286's last pass), one
+    "name  status" line each."""
     host = cfg["cut"]["nas_host"]
     if not host:
         return []
