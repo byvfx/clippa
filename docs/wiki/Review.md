@@ -111,8 +111,10 @@ checks, call a model, or edit `checks.json`, `auto.json`, `review.json` or anyth
 clippa review load <stream...> [--config PATH] [--costs PATH] [--arm NAME] [--json]
 ```
 
-`--config` is that arm's clipper.toml (the global `--config` is the same file, and this flag
-wins when both are set). `--costs` is that arm's costs jsonl; the default is `[paths] costs`.
+`--config` is that arm's clipper.toml and nothing else: `clipper.local.toml` and `CLIPPER_*` /
+`CLIPPA_*` are this machine's values, so they are not applied, and the report says so. The
+global `--config` still loads this machine's overrides; the flag on `review load` wins when
+both are set. `--costs` is that arm's costs jsonl; the default is `[paths] costs`.
 `--arm` is the name in the table and the JSON; it defaults to the config file's name. One row
 per stream, then a total. `--json` prints one document. Every row carries `arm`, `stream` and
 `config`, and `total` is a row whose `stream` is `total`. Concatenate the rows and drop the
@@ -123,10 +125,10 @@ totals to put several arms in one table.
 | short, pick, segment, comp | The cut files review would list, all four kinds, so a compilation counts even when `[review] include` leaves compilations as playlists of their segments. With no `segments.json`, the counts are the kinds in `review_state.json` and the row says so. |
 | findings | Items in `checks.json` with at least one finding. Under the table: how many of those items have a bad or a warn for text, a Short's picture, the cover and the subject. Two warnings of the same check count once. |
 | held | Shorts still [held for other voices](#shorts-held-for-other-voices): over `[scoring] max_source_audio_s` while `[shorts] hold_source_audio` is on, and the Hold a person sees is still on. That Hold is `review.json` (the last sync), else what publish wrote, else the proposal on the cut. A hold you released is not counted. The detail line also says how many are over the limit. |
-| approve, waits | What [approval by silence](#approval-by-silence) would do, the same rules as `clippa review auto --dry-run`, and nothing is approved. approve is due or still in the grace window; waits is a person, with the reasons under the table. No `review_state.json` leaves the cells blank. Auto-approve off is a note, not a batch of approvals. |
+| approve, waits | What [approval by silence](#approval-by-silence) would do, and nothing is approved. Published items use the same rules as `clippa review auto --dry-run`, grace window included. A stream that was never published, and any cut that isn't in `review_state.json`, is judged as if it had just been published and nobody had touched it: findings or a missing or failed check, the kind's score floor, a Short [held for other voices](#shorts-held-for-other-voices), and stories and one-offs. The grace window is not applied to those, and Kitsu is not read. The row says which (`published` or `cuts (unpublished)`). Auto-approve off is a note, not a batch of approvals. |
 | vision | How many cover vision calls a [pre-flight check](#pre-flight-checks) would make, and their price (`review check --dry-run`). Nothing is called. |
 | cost | That stream's lines in the costs file: the total in the table, and by stage under it. Another stream's lines in the same file are not counted. |
-| longest, >50m | `segments.json`: the longest segment, and how many run over 50 minutes (3000 seconds). |
+| longest, >50m | `segments.json`: the longest segment, and how many run longer than `[segments] split_over_s`. That setting arrives with the re-split; until a config has it, the limit is 50 minutes (3000 seconds). A segment of exactly the limit is not over it. |
 
 A blank cell is something the local files don't say. The command does not ask Kitsu.
 

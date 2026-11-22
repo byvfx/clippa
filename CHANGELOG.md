@@ -12,7 +12,9 @@ Developing#releases.
 
 - 11-22: `clippa review load` counts what a reviewer would see from a pipeline run (items by
   kind, check findings, Shorts held for other voices, what auto-approve would do, the vision
-  calls a check would make, spend from a costs file, segments over 50 minutes). It only reads.
+  calls a check would make, spend from a costs file, segments over `[segments] split_over_s`,
+  50 minutes when that setting is absent). A stream that was never published is judged from
+  its cuts, with no grace window. `--config` is that file alone. It only reads.
   [Review](Review#review-load).
 - The rename's deploy step (#286 pass 3): the NAS compose projects are `clippa-hub`, `clippa-record`
   and `clippa-claude`, and the Modal apps `clippa-whisperx` and `clippa-lipsync`. The first deploy

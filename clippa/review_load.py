@@ -17,12 +17,18 @@ never called, because that one approves. Each column is a local file:
                  [scoring] max_source_audio_s while [shorts] hold_source_audio is on, and the
                  Hold a person sees (review.json, else the published proposal, else the
                  proposal on the cut) is still on. A released hold is not counted
-    auto         review_auto.verdicts: would-approve (due or still in the grace window)
-                 against waits-for-a-person, with the reasons. No review_state.json: blank
+    auto         review_auto.verdict, never run(). Published items (review_state.json) use
+                 the dry-run rules, grace window included. A stream that was never published,
+                 and any cut item missing from review_state.json, is judged as if it had just
+                 been published and nobody had touched it: the same rules (findings, a missing
+                 or failed check, the kind's score floor, a Short held for other voices,
+                 stories and one-offs), with no grace window and no Kitsu. source is
+                 "published" or "cuts (unpublished)"
     vision       review_check.estimate: cover vision calls a check run would make, and their
                  price. Nothing is called
     cost         the --costs jsonl (or [paths] costs): this stream's lines, total and by stage
-    segments     segments.json: the longest, and how many run over 50 minutes (3000 s)
+    segments     segments.json: the longest, and how many run over [segments] split_over_s
+                 (3000 s, 50 minutes, when that setting is absent)
 
 --json is one document. Every row carries arm, stream and config, so several arms'
 rows concatenate into one comparison (drop each document's total, or keep stream "total").
@@ -30,7 +36,9 @@ rows concatenate into one comparison (drop each document's total, or keep stream
 from __future__ import annotations
 
 import json
+import os
 from collections import Counter
+from datetime import UTC, datetime
 from pathlib import Path
 
 from . import config, costs, jsonstate, review, review_auto, review_check, wiki
@@ -204,26 +212,78 @@ def findings_summary(sdir: Path, notes: list[str]) -> dict:
     return out
 
 
-def auto_summary(cfg: dict, sdir: Path, now, notes: list[str]) -> dict:
-    """review_auto.verdicts, never applied. would_approve is due or waiting; waits is a person."""
-    blank = {"would_approve": None, "waits": None, "reasons": {}, "by_state": {}}
+def _published_state(sdir: Path, notes: list[str]) -> dict:
+    """review_state.json, or {} when it isn't there. A broken file is said, and read as none."""
     path = sdir / "review_state.json"
     if not path.exists():
-        notes.append("no review_state.json; auto verdicts are for published items")
-        return blank
-    state = jsonstate.read_or(path, {})
-    if not state:
-        notes.append("review_state.json has no published items")
-        return {**blank, "would_approve": 0, "waits": 0}
-    verdicts = review_auto.verdicts(cfg, sdir, now=now)
-    by_state = dict(Counter(v.state for v in verdicts.values()))
+        return {}
+    try:
+        state = jsonstate.load(path)
+    except (OSError, ValueError) as e:
+        notes.append(f"review_state.json unreadable ({type(e).__name__}); judging the cuts")
+        return {}
+    return state if isinstance(state, dict) else {}
+
+
+def _cut_fields(it: dict) -> dict:
+    """Score and Hold as the cut proposes them. A person's Kitsu edit is not on an unpublished item."""
+    fields = it.get("fields") or {}
+    return {name: fields[name] for name in ("Score", "Hold", "Other voices")
+            if name in fields and fields[name] not in (None, "")}
+
+
+def _cut_verdict(cfg: dict, kind: str, it: dict, checks: dict, now: datetime) -> review_auto.Verdict:
+    """review_auto.verdict as if this cut had just been published and nobody had touched it.
+    No grace window: a clean item that would wait out the clock counts as due."""
+    fields = _cut_fields(it)
+    state = {"kind": it.get("kind"), "fields": dict(fields)}
+    decision = {"decision": "pending", "fields": dict(fields)}
+    got = review_auto.verdict(cfg, kind, it["key"], state, decision, checks.get(it["key"]),
+                              {}, False, now)
+    if got.state in ("due", "waiting"):
+        return review_auto.Verdict(got.key, "due")
+    return got
+
+
+def _tally(verdicts: list[review_auto.Verdict]) -> dict:
+    by_state = dict(Counter(v.state for v in verdicts))
     reasons = dict(sorted(
-        Counter(v.why or "(no reason)" for v in verdicts.values() if v.state == "person").items(),
+        Counter(v.why or "(no reason)" for v in verdicts if v.state == "person").items(),
         key=lambda kv: (-kv[1], kv[0])))
-    if by_state.get("off"):
-        notes.append(f"auto-approve is off ({by_state['off']} published item(s) left to a person)")
     return {"would_approve": by_state.get("due", 0) + by_state.get("waiting", 0),
             "waits": by_state.get("person", 0), "reasons": reasons, "by_state": by_state}
+
+
+def auto_summary(cfg: dict, sdir: Path, items: list[dict], now, notes: list[str]) -> dict:
+    """Would-approve against waits-for-a-person. Published items: review_auto.verdicts (the
+    dry-run, grace included). Anything else on the cuts: verdict() with no grace and no Kitsu.
+    run() is never called."""
+    now = now or datetime.now(UTC)
+    state = _published_state(sdir, notes)
+    published = review_auto.verdicts(cfg, sdir, now=now) if state else {}
+    checks = review_check.load(sdir)
+    kind = review_auto.stream_kind(sdir)
+    cuts = [_cut_verdict(cfg, kind, it, checks, now) for it in items if it["key"] not in published]
+    verdicts = [*published.values(), *cuts]
+    if not verdicts:
+        notes.append("no published items and no cut items to judge")
+        return {**_tally([]), "source": "cuts (unpublished)"}
+    tally = _tally(verdicts)
+    if published and cuts:
+        tally["source"] = "published"
+        n = len(cuts)
+        word = "cut item" if n == 1 else "cut items"
+        notes.append(f"{n} {word} not in review_state.json, judged from the cuts "
+                     "(no grace window, not a Kitsu publish)")
+    elif published:
+        tally["source"] = "published"
+    else:
+        tally["source"] = "cuts (unpublished)"
+        notes.append("auto verdicts are from the cuts (unpublished), as if just published and "
+                     "untouched (no grace window, not a Kitsu publish)")
+    if tally["by_state"].get("off"):
+        notes.append(f"auto-approve is off ({tally['by_state']['off']} item(s) left to a person)")
+    return tally
 
 
 def vision_summary(sdir: Path, cfg: dict, notes: list[str]) -> dict:
@@ -263,9 +323,21 @@ def _seg_len(seg: dict) -> float | None:
     return None
 
 
-def segment_stats(sdir: Path, notes: list[str]) -> dict:
-    """Longest segment and how many run over 50 minutes, from segments.json."""
-    blank = {"longest_s": None, "over_50min": None, "n": 0}
+def over_limit_s(cfg: dict | None) -> float:
+    """[segments] split_over_s when the config has it (added with the re-split), else 50 minutes.
+    A bad value keeps the 50 minutes, rather than counting every segment or none."""
+    raw = ((cfg or {}).get("segments") or {}).get("split_over_s", LONG_S)
+    try:
+        limit = float(raw)
+    except (TypeError, ValueError):
+        return float(LONG_S)
+    return limit if limit > 0 else float(LONG_S)
+
+
+def segment_stats(sdir: Path, notes: list[str], cfg: dict | None = None) -> dict:
+    """Longest segment and how many run over the split limit, from segments.json."""
+    limit = over_limit_s(cfg)
+    blank = {"longest_s": None, "over_50min": None, "n": 0, "over_s": limit}
     path = sdir / "segments.json"
     if not path.exists():
         # load_items already says so when the row is built from a stream with no segments.json
@@ -285,8 +357,8 @@ def segment_stats(sdir: Path, notes: list[str]) -> dict:
     if not lengths:
         notes.append("segments.json has no lengths")
         return {**blank, "over_50min": 0}
-    return {"longest_s": max(lengths), "over_50min": sum(got > LONG_S for got in lengths),
-            "n": len(lengths)}
+    return {"longest_s": max(lengths), "over_50min": sum(got > limit for got in lengths),
+            "n": len(lengths), "over_s": limit}
 
 
 def one(cfg: dict, sdir: Path, costs_path: Path | None, arm: str, config_path: str, now) -> dict:
@@ -311,10 +383,10 @@ def one(cfg: dict, sdir: Path, costs_path: Path | None, arm: str, config_path: s
         "items": counts,
         "findings": findings_summary(sdir, notes),
         "held_other_voices": held, "other_voices_over_limit": over,
-        "auto": auto_summary(scfg, sdir, now, notes),
+        "auto": auto_summary(scfg, sdir, items, now, notes),
         "vision": vision_summary(sdir, scfg, notes),
         "cost": cost_summary(costs_path, sdir.name, notes),
-        "segments": segment_stats(sdir, notes),
+        "segments": segment_stats(sdir, notes, scfg),
         "notes": notes,
     }
 
@@ -353,6 +425,8 @@ def _sum_named(rows: list[dict], section: str, key: str) -> dict:
 def total_row(rows: list[dict], arm: str, config_path: str, costs_path: Path | None) -> dict:
     """The same shape as a stream row. Longest is the max; everything else adds."""
     longs = [row["segments"]["longest_s"] for row in rows if row["segments"]["longest_s"] is not None]
+    limits = {row["segments"].get("over_s") for row in rows}
+    sources = {row["auto"].get("source") for row in rows}
     stages: dict[str, float] = {}
     for row in rows:
         for stage, usd in row["cost"]["by_stage"].items():
@@ -367,26 +441,31 @@ def total_row(rows: list[dict], arm: str, config_path: str, costs_path: Path | N
         "auto": {"would_approve": _sum_int([row["auto"]["would_approve"] for row in rows]),
                  "waits": _sum_int([row["auto"]["waits"] for row in rows]),
                  "reasons": _sum_named(rows, "auto", "reasons"),
-                 "by_state": _sum_named(rows, "auto", "by_state")},
+                 "by_state": _sum_named(rows, "auto", "by_state"),
+                 "source": sources.pop() if len(sources) == 1 else "mixed"},
         "vision": {"calls": _sum_int([row["vision"]["calls"] for row in rows]),
                    "usd": _sum_usd([row["vision"]["usd"] for row in rows])},
         "cost": {"usd": _sum_usd([row["cost"]["usd"] for row in rows]),
                  "by_stage": dict(sorted(stages.items()))},
         "segments": {"longest_s": max(longs) if longs else None,
                      "over_50min": _sum_int([row["segments"]["over_50min"] for row in rows]),
-                     "n": sum(row["segments"]["n"] for row in rows)},
+                     "n": sum(row["segments"]["n"] for row in rows),
+                     "over_s": limits.pop() if len(limits) == 1 else None},
         "notes": [],
     }
 
 
-def collect(cfg: dict, refs: list[str], costs_path: Path | None, arm: str = "", now=None) -> dict:
-    """Every stream, plus a total. Read only."""
+def collect(cfg: dict, refs: list[str], costs_path: Path | None, arm: str = "", now=None,
+            local_overrides: bool = True) -> dict:
+    """Every stream, plus a total. Read only. local_overrides: False when --config loaded the
+    arm file with clipper.local.toml and CLIPPER_*/CLIPPA_* set aside."""
     arm = _arm_name(cfg, arm)
     config_path = _config_path(cfg)
     path = None if costs_path is None else Path(costs_path)
     rows = [one(cfg, directory, path, arm, config_path, now) for directory in resolve(cfg, refs)]
     return {"arm": arm, "config": config_path, "costs_file": "" if path is None else str(path),
-            "read_only": True, "rows": rows, "total": total_row(rows, arm, config_path, path)}
+            "read_only": True, "local_overrides": local_overrides, "rows": rows,
+            "total": total_row(rows, arm, config_path, path)}
 
 
 def money(value) -> str:
@@ -465,6 +544,10 @@ def lines(rep: dict) -> list[str]:
     head = [
         f"review load  arm={rep['arm']}  config={rep['config'] or '(none)'}  "
         f"costs={rep['costs_file'] or '(none)'}",
+    ]
+    if rep.get("local_overrides") is False:
+        head.append(f"config {rep['config']}: local overrides ignored")
+    head += [
         f"read only: no files written, no Kitsu, no model or vision calls  {PAGE}",
         "",
     ]
@@ -472,19 +555,40 @@ def lines(rep: dict) -> list[str]:
     return head + _table([*rep["rows"], rep["total"]]) + ([""] + detail if detail else [])
 
 
+def _without_machine_env(fn):
+    """CLIPPER_* and CLIPPA_* are this machine. Hold them out of fn, then put them back."""
+    saved = {key: os.environ.pop(key) for key in list(os.environ)
+             if key.startswith(("CLIPPER_", "CLIPPA_"))}
+    try:
+        return fn()
+    finally:
+        os.environ.update(saved)
+
+
 def run(cfg: dict, args, now=None) -> dict:
-    """The command. --config reloads that arm's clipper.toml. Prints the table, or JSON."""
-    if getattr(args, "load_config", None):
-        path = Path(args.load_config)
-        if not path.is_file():
-            raise ClipperError(f"no config {path}")
-        cfg = config.load(path)
+    """The command. --config reloads that arm's clipper.toml, with local overrides off
+    for the whole report (a stream config.toml must not pick the machine's env back up).
+    Prints the table, or JSON."""
+    def report(loaded: dict, bare: bool) -> dict:
+        costs_path = Path(args.costs) if getattr(args, "costs", None) else Path(loaded["paths"]["costs"])
+        rep = collect(loaded, list(args.streams), costs_path, getattr(args, "arm", "") or "",
+                      now=now, local_overrides=not bare)
+        if getattr(args, "json", False):
+            print(json.dumps(rep, indent=1, default=str, ensure_ascii=False))
+        else:
+            print("\n".join(lines(rep)))
+        return rep
+
+    if not getattr(args, "load_config", None):
+        return report(cfg, False)
+    path = Path(args.load_config)
+    if not path.is_file():
+        raise ClipperError(f"no config {path}")
+
+    def load_and_report() -> dict:
+        loaded = config.load(path, use_local=False)
         if getattr(args, "show", None):
-            cfg = config.pin_show(cfg, args.show)
-    costs_path = Path(args.costs) if getattr(args, "costs", None) else Path(cfg["paths"]["costs"])
-    rep = collect(cfg, list(args.streams), costs_path, getattr(args, "arm", "") or "", now=now)
-    if getattr(args, "json", False):
-        print(json.dumps(rep, indent=1, default=str, ensure_ascii=False))
-    else:
-        print("\n".join(lines(rep)))
-    return rep
+            loaded = config.pin_show(loaded, args.show)
+        return report(loaded, True)
+
+    return _without_machine_env(load_and_report)

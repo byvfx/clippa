@@ -1,6 +1,7 @@
 """clippa review load: a read-only count of what a reviewer would see. Offline fixtures only."""
 import json
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 
@@ -135,10 +136,15 @@ def test_each_column_on_the_fixture(defaults, tmp_path):
     assert row["other_voices_over_limit"] == 2
     assert "2 Shorts over the other-voices limit, 1 Short still held" in row["notes"]
     assert row["auto"]["would_approve"] == 2      # v01 and the released v04
-    assert row["auto"]["waits"] == 3              # low score, the hold, the segment floor
+    assert row["auto"]["waits"] == 5              # low score, the hold, the segment, the pick, the compilation
+    assert row["auto"]["source"] == "published"
     assert row["auto"]["reasons"] == {
         "held for other voices": 1, "score 4 under 6": 1,
-        "segments wait for a person ([review] auto_min_segment)": 1}
+        "segments wait for a person ([review] auto_min_segment)": 1,
+        # the pick and the compilation were never published, so they are judged from the cuts
+        "picks wait for a person ([review] auto_min_pick)": 1,
+        "compilations wait for a person ([review] auto_min_compilation)": 1}
+    assert any("judged from the cuts" in n for n in row["notes"])
     assert row["vision"]["calls"] == 1 and row["vision"]["usd"] == pytest.approx(0.011)
     assert row["cost"]["usd"] == pytest.approx(1.0)
     assert row["cost"]["by_stage"] == {"score": pytest.approx(0.2), "segments": pytest.approx(0.8)}
@@ -149,17 +155,18 @@ def test_each_column_on_the_fixture(defaults, tmp_path):
     quiet = _row(rep, "kick-2")
     assert quiet["items"] == {"short": 0, "pick": 0, "segment": 0, "compilation": 0}
     assert quiet["findings"]["items"] == 0 and quiet["held_other_voices"] == 0
-    assert quiet["auto"]["would_approve"] is None and quiet["vision"]["calls"] == 0
+    assert quiet["auto"]["would_approve"] == 0 and quiet["auto"]["waits"] == 0
+    assert quiet["auto"]["source"] == "cuts (unpublished)" and quiet["vision"]["calls"] == 0
     assert quiet["cost"]["usd"] == pytest.approx(0.5)
-    assert quiet["segments"] == {"longest_s": 100, "over_50min": 0, "n": 1}
-    assert any("no review_state.json" in n for n in quiet["notes"])
+    assert quiet["segments"] == {"longest_s": 100, "over_50min": 0, "n": 1, "over_s": 3000}
+    assert any("no cut items" in n for n in quiet["notes"])
 
     total = rep["total"]
     assert total["stream"] == "total"
     assert total["items"]["short"] == 4 and total["items"]["compilation"] == 1
     assert total["findings"]["items"] == 2 and total["findings"]["by_check"]["cover"]["bad"] == 1
     assert total["held_other_voices"] == 1 and total["auto"]["would_approve"] == 2
-    assert total["auto"]["waits"] == 3
+    assert total["auto"]["waits"] == 5 and total["auto"]["source"] == "mixed"
     assert total["vision"]["calls"] == 1 and total["cost"]["usd"] == pytest.approx(1.5)
     assert total["segments"]["longest_s"] == 3600 and total["segments"]["over_50min"] == 1
     assert rep["read_only"] is True
@@ -176,7 +183,7 @@ def test_length_prefers_duration_and_counts_only_past_50_minutes(tmp_path):
     ]})
     notes = []
     got = review_load.segment_stats(sd, notes)
-    assert got == {"longest_s": 3001, "over_50min": 1, "n": 3}
+    assert got == {"longest_s": 3001, "over_50min": 1, "n": 3, "over_s": 3000}
     assert notes == []
 
 
@@ -202,7 +209,7 @@ def test_hold_off_and_auto_off_are_notes_not_approvals(defaults, tmp_path):
     assert row["held_other_voices"] == 0 and row["other_voices_over_limit"] == 2
     assert any("hold_source_audio is off" in n for n in row["notes"])
     assert row["auto"]["would_approve"] == 0 and row["auto"]["waits"] == 0
-    assert row["auto"]["by_state"]["off"] == 5
+    assert row["auto"]["by_state"]["off"] == 7  # the published five, plus the pick and compilation
     assert any("auto-approve is off" in n for n in row["notes"])
 
 
@@ -251,21 +258,111 @@ def test_the_command_prints_a_table_and_json(defaults, tmp_path, capsys):
     assert "kick-1" in out and "kick-2" in out and "total" in out
     assert "findings: text warn 1, picture bad 1, cover bad 1" in out
     assert "held for other voices (1)" in out
+    assert "judged from the cuts" in out  # the pick and compilation were never published
     assert "cost by stage: score $0.20, segments $0.80" in out
     assert "1:00:00" in out  # the 3600 s segment
 
 
-def test_the_config_flag_is_that_arms_file(defaults, tmp_path, capsys):
+def test_the_config_flag_ignores_local_overrides(defaults, tmp_path, capsys, monkeypatch):
     _, _, costs = arm(defaults, tmp_path)
     path = tmp_path / "cfg7.toml"
     path.write_text('[paths]\nstreams = "streams"\n[review]\nauto_approve = true\n', encoding="utf-8")
+    # This machine would turn auto-approve off and raise the floor past every Short. The arm file wins.
+    (tmp_path / "clipper.local.toml").write_text(
+        "[review]\nauto_approve = false\nauto_min_short = 99\n", encoding="utf-8")
+    monkeypatch.setenv("CLIPPER_REVIEW_AUTO_APPROVE", "false")
+    monkeypatch.setenv("CLIPPA_REVIEW_AUTO_MIN_SHORT", "99")
     args = cli.build_parser().parse_args(
         ["review", "load", "kick-1", "--config", str(path), "--costs", str(costs), "--json"])
     review_load.run(defaults, args, now=NOW)  # the passed cfg is replaced by cfg7.toml
     doc = json.loads(capsys.readouterr().out)
     assert doc["arm"] == "cfg7" and doc["config"] == str(path.resolve())
+    assert doc["local_overrides"] is False
     assert doc["rows"][0]["stream"] == "kick-1" and doc["rows"][0]["items"]["short"] == 4
-    assert doc["rows"][0]["auto"]["would_approve"] == 2
+    assert doc["rows"][0]["auto"]["would_approve"] == 2  # floor stayed 6, auto stayed on
+    args.json = False
+    review_load.run(defaults, args, now=NOW)
+    text = capsys.readouterr().out
+    assert f"config {path.resolve()}: local overrides ignored" in text
+
+
+def _cuts(cfg, directory: Path, meta: dict | None = None):
+    """One stream of Shorts and no review_state.json: never published."""
+    cfg["paths"]["streams"] = directory.parent
+    cfg["paths"]["people"] = directory.parent / "people.json"
+    cfg["review"]["auto_approve"] = True
+    _write(directory / "segments.json", {"segments": [_segment("s01", "bit", 0, 600, 600)]})
+    (directory / "segments.mp4").unlink()
+    for key, seconds, score in (("v01_t1", 0, 7), ("v02_t2", 0, 4), ("v03_t3", 22, 8),
+                                ("v04_t4", 0, 8), ("v05_t5", 0, 8), ("v06_t6", 0, 8)):
+        _write(directory / "shorts" / f"{key}.json", _short(key, seconds, score))
+    _write(directory / "checks.json", {
+        "v01_t1": CLEAN, "v02_t2": CLEAN, "v03_t3": CLEAN,
+        "v04_t4": {"sig": "s", "findings": [{"check": "text", "level": "warn", "text": "hosts"}]},
+        "v06_t6": {"sig": "", "findings": [{"check": "run", "level": "bad", "text": "the checks didn't run"}]},
+    })
+    (directory / "checks.mp4").unlink()
+    if meta:
+        jsonstate.write(directory / "meta.json", meta)
+    return directory
+
+
+def test_unpublished_cuts_are_judged_without_a_grace_window(defaults, tmp_path):
+    sd = _cuts(defaults, tmp_path / "streams" / "kick-c")
+    row = review_load.collect(defaults, [str(sd)], None, "cfg7", now=NOW)["rows"][0]
+    assert row["auto"]["source"] == "cuts (unpublished)"
+    assert row["auto"]["would_approve"] == 1  # the clean Short; grace is not a wait
+    assert row["auto"]["waits"] == 5
+    assert row["auto"]["by_state"].get("waiting", 0) == 0
+    assert row["auto"]["reasons"] == {
+        "1 check finding(s)": 1,
+        "held for other voices": 1,
+        "its checks didn't run": 1,
+        "not checked yet": 1,
+        "score 4 under 6": 1,
+    }
+    assert any("from the cuts" in n and "no grace window" in n for n in row["notes"])
+    assert "cuts (unpublished)" in " ".join(review_load.lines(
+        review_load.collect(defaults, [str(sd)], None, "cfg7", now=NOW)))
+    # one of them published: that one keeps the real verdict, the rest stay cuts
+    jsonstate.write(sd / "review_state.json", {"v01_t1": _state("short", "7", "false", 0)})
+    jsonstate.write(sd / "review.json", {"v01_t1": _decision("7", "false", 0)})
+    mixed = review_load.collect(defaults, [str(sd)], None, "cfg7", now=NOW)["rows"][0]
+    assert mixed["auto"]["source"] == "published"
+    assert mixed["auto"]["would_approve"] == 1 and mixed["auto"]["waits"] == 5
+    assert any("5 cut items not in review_state.json" in n for n in mixed["notes"])
+
+
+def test_a_story_and_a_oneoff_wait_even_when_the_cuts_are_clean(defaults, tmp_path):
+    root = tmp_path / "streams"
+    stories = _cuts(defaults, root / "story", {"kind": "story", "started_at": "2026-11-22T00:00:00+00:00"})
+    oneoff = _cuts(defaults, root / "oneoff", {"kind": "preshow", "window": {"from": 60},
+                                               "started_at": "2026-11-22T00:00:00+00:00"})
+    # _cuts points paths.streams at the directory's parent; point it at the shared root
+    defaults["paths"]["streams"] = root
+    story = review_load.collect(defaults, ["story"], None, "arm", now=NOW)["rows"][0]
+    once = review_load.collect(defaults, ["oneoff"], None, "arm", now=NOW)["rows"][0]
+    # the other-voice hold is decided before the story/one-off rule, same as review_auto.verdict
+    assert story["auto"]["would_approve"] == 0 and story["auto"]["waits"] == 6
+    assert story["auto"]["reasons"] == {"held for other voices": 1, "storys wait for a person": 5}
+    assert once["auto"]["reasons"] == {"held for other voices": 1, "one-offs wait for a person": 5}
+    assert stories.name == "story" and oneoff.name == "oneoff"
+
+
+def test_split_over_s_sets_the_long_segment_limit(tmp_path):
+    sd = tmp_path / "kick-l"
+    sd.mkdir()
+    jsonstate.write(sd / "segments.json", {"segments": [
+        {"duration_s": 3000}, {"duration_s": 3001}, {"duration_s": 4000}]})
+    bare = review_load.segment_stats(sd, [], {})
+    assert bare["over_s"] == 3000 and bare["over_50min"] == 2  # 3000 s is not over 50 minutes
+    wider = review_load.segment_stats(sd, [], {"segments": {"split_over_s": 4000}})
+    assert wider["over_s"] == 4000 and wider["over_50min"] == 0
+    tighter = review_load.segment_stats(sd, [], {"segments": {"split_over_s": "1000"}})
+    assert tighter["over_s"] == 1000 and tighter["over_50min"] == 3
+    bad = review_load.segment_stats(sd, [], {"segments": {"split_over_s": "nope"}})
+    assert bad["over_s"] == 3000 and bad["over_50min"] == 2
+    assert review_load.segment_stats(sd, [], {"segments": {"split_over_s": 0}})["over_s"] == 3000
 
 
 def test_flags_and_a_missing_config(capsys):
