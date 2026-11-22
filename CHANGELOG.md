@@ -10,6 +10,11 @@ Developing#releases.
 
 ## Unreleased
 
+### 2026-11
+
+- 11-22: A segment longer than `[segments] split_over_s` (0, off, so a config that doesn't set
+  it is unchanged) is flagged for a re-split instead of being dropped for length. A time Clippa
+  can't read, such as `1:xx`, is a one-line error, the same as any other bad time.
 - The rename's deploy step (#286 pass 3): the NAS compose projects are `clippa-hub`, `clippa-record`
   and `clippa-claude`, and the Modal apps `clippa-whisperx` and `clippa-lipsync`. The first deploy
   of each stops the old `clipper-*` project before the new one starts (never two bots or workers

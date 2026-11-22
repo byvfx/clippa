@@ -401,6 +401,9 @@ prompt_version = "v3"          # clippa/prompts/segments_<version>.md and compil
 min_aside_s = 180              # fold shorter asides into the surrounding segment
 min_s = 180                    # only cut segments between min_s and max_s seconds
 max_s = 3600
+split_over_s = 0               # 0 = off. A segment longer than this is flagged for a re-split
+                               # (skip reason "re-split", `resplit` on the segment, a RESPLIT
+                               # line in the stage log) instead of being dropped for length
 skip_kinds = ["intro", "break", "ad_read", "outro", "gambling"]
 source_share = ["none", "some", "most"]   # drop "most" to skip watch-along segments
 compile_min_segments = 2       # topics with this many segments also get one long video

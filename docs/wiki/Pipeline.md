@@ -39,9 +39,11 @@ publish` run on the picks alone, before the slow stages do the segments and comp
   named, `[music]`), and the weekly credits a quote to whoever said it.
 - **score**: Claude reads the transcript and heat curve and proposes moments and picks. A
   rerun pays every window again, so it refuses without `--force`.
-- **segments**: Claude splits the stream into topic segments and compilations. With
-  `[segments] score = true` (off by default) one more call scores each cut segment 1-10 as its
-  own upload, from the segment and the show's record per topic; see
+- **segments**: Claude splits the stream into topic segments and compilations. A segment
+  longer than `[segments] split_over_s` (0, off) is flagged for a re-split (`resplit` on the
+  segment, skip reason `re-split`, a `RESPLIT` line in the stage log) instead of being dropped
+  for length. With `[segments] score = true` (off by default) one more call scores each cut
+  segment 1-10 as its own upload, from the segment and the show's record per topic; see
   [Segment scores](Pipeline#segment-scores).
 - **faces**: who is on screen, by face, over every keyframe (CPU, `clippa faces`): groups named
   against known faces kept for every show ([Faces](Faces)). The worker runs it after the fast

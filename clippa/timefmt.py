@@ -29,7 +29,10 @@ def parse_time(s: str) -> float:
     """H:MM:SS, H:MM (hours, minutes), 4h13m / 4h13m20s / 253m, or plain seconds."""
     s = s.strip().lower()
     if ":" in s:
-        parts = [float(x) for x in s.split(":")]
+        try:
+            parts = [float(x) for x in s.split(":")]
+        except ValueError:
+            raise ClipperError(f"not a time: {s!r} (use seconds, H:MM or H:MM:SS)") from None
         if len(parts) == 2:
             parts.append(0.0)
         if len(parts) != 3:

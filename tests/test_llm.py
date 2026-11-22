@@ -5,7 +5,7 @@ import copy
 
 import pytest
 
-from clippa import costs, doctor, llm
+from clippa import config, costs, doctor, llm
 from clippa.errors import ClipperError
 
 
@@ -43,6 +43,64 @@ def test_split_knows_openrouter_and_keeps_its_vendor_path():
     assert llm.split("openrouter:openai/gpt-5-mini") == ("openrouter", "openai/gpt-5-mini")
     assert llm.split("claude-haiku-5-5") == ("anthropic", "claude-haiku-5-5")
     assert llm.split("anthropic:claude-haiku-5-5") == ("anthropic", "claude-haiku-5-5")
+
+
+def _model_strings(node, key=""):
+    """Chat-model strings in a config tree: an is_llm value, a claude- name, or a provider prefix."""
+    if isinstance(node, dict):
+        for k, v in node.items():
+            yield from _model_strings(v, k)
+    elif isinstance(node, str) and node and (
+            llm.is_llm(key, node) or node.startswith(("claude-", "anthropic:", "openai:", "gemini:",
+                                                       "openrouter:", "local:"))):
+        yield key, node
+
+
+def test_every_default_model_string_routes_to_its_provider(defaults):
+    """defaults.toml's model strings (bare claude- names, and any provider prefix) each go to
+    the provider llm.split names. No network."""
+    expect = {"anthropic": ("claude-", "anthropic:"), "openai": ("openai:",), "gemini": ("gemini:",),
+              "openrouter": ("openrouter:",), "local": ("local:",)}
+    found = list(_model_strings(defaults))
+    assert found
+    providers = set()
+    for key, model in found:
+        prov, name = llm.split(model)
+        assert prov in expect and model.startswith(expect[prov]), (key, model, prov)
+        assert name
+        providers.add(prov)
+    assert {"anthropic", "openrouter"} <= providers   # the two prefixes defaults.toml uses today
+
+
+def test_an_all_openrouter_config_loads_and_routes(tmp_path, monkeypatch, posted, defaults):
+    """Every stage model swapped to openrouter:<vendor>/<model> still loads, and a call goes
+    to the OpenRouter client, not Claude's."""
+    lines = []
+    for section, sec in defaults.items():
+        if not isinstance(sec, dict):
+            continue
+        keys = [k for k, v in sec.items() if llm.is_llm(k, v)]
+        if not keys:
+            continue
+        lines.append(f"[{section}]")
+        for k in keys:
+            lines.append(f'{k} = "openrouter:vendor/{section}-{k}"')
+    path = tmp_path / "clipper.toml"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    cfg = config.load(path, use_local=False)
+    models = llm.configured(cfg)
+    assert models and all(llm.split(m) == ("openrouter", m.removeprefix("openrouter:")) for m in models.values())
+    monkeypatch.setenv("OPENROUTER_API_KEY", "k")
+    sent, replies = posted
+    replies.append(FakeResponse(answer("ok")))
+    client = llm.LLM(cfg)
+    model = cfg["segments"]["model"]
+    text, meta = client.text_call(model, "sys", "hi", "low")
+    assert text == "ok" and client._client is None
+    assert sent[0]["url"] == "https://openrouter.ai/api/v1/chat/completions"
+    assert sent[0]["body"]["model"] == model.removeprefix("openrouter:")
+    assert sent[0]["headers"]["Authorization"] == "Bearer k"
+    assert meta["model"].startswith("openrouter:")
 
 
 def test_openrouter_sends_reasoning_and_charges_its_reported_cost(posted, monkeypatch, defaults):

@@ -33,6 +33,15 @@ def test_parse_time_refuses(text):
         parse_time(text)
 
 
+@pytest.mark.parametrize("text", ["1:xx", ":", "1::", "abc", ""])
+def test_malformed_times_are_a_clipper_error(text):
+    """A colon with a non-number used to raise ValueError (a traceback) instead of the
+    one-line ClipperError every other bad time gets."""
+    with pytest.raises(ClipperError, match="not a time") as raised:
+        parse_time(text)
+    assert "Traceback" not in str(raised.value)
+
+
 def test_a_bad_time_is_a_clipper_error():
     with pytest.raises(ClipperError, match="not a time"):
         parse_time("abc")
