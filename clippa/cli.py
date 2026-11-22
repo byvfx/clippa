@@ -706,6 +706,13 @@ def cmd_retake(cfg: dict, args: argparse.Namespace) -> None:
                    sync=not args.no_sync and n == 0)
 
 
+def cmd_review_load(cfg: dict, args: argparse.Namespace) -> None:
+    """Reads the stream's files. Approves nothing, checks nothing, calls no model."""
+    from . import review_load
+
+    review_load.run(cfg, args)
+
+
 def cmd_review(cfg: dict, args: argparse.Namespace) -> None:
     from . import actions, notify, review
 
@@ -1506,6 +1513,19 @@ def add_review(sub) -> None:
     r.add_argument("stream", nargs="?", help="only this stream")
     r.add_argument("--dry-run", action="store_true", help="say what would approve itself and when; change nothing")
     r.add_argument("--json", action="store_true", help="{stream: [{key, state, why, at}]} for the open items")
+    r = rsub.add_parser("load", help="review load of a pipeline run: items, findings, holds, "
+                                     "auto-approve verdicts, vision cost, spend (reads files only)")
+    r.set_defaults(fn=cmd_review_load)
+    r.add_argument("streams", nargs="+", help="stream ids or directories, one row each")
+    r.add_argument("--config", dest="load_config",
+                   help="this arm's clipper.toml (default: the config already loaded, --config or "
+                        "$CLIPPER_CONFIG)")
+    r.add_argument("--costs", help="this arm's costs jsonl (default: [paths] costs); other streams' "
+                                   "lines are ignored")
+    r.add_argument("--arm", default="", help="name of this run in the table and the JSON "
+                                             "(default: the config file's name)")
+    r.add_argument("--json", action="store_true",
+                   help="JSON rows with arm, stream and config, plus a total (stream \"total\")")
     r = rsub.add_parser("status", help="decision counts per stream, and what's scheduled")
     # Reads review.json unless asked: a sync writes it and can post to Kitsu, not for a status.
     r.add_argument("--sync", action="store_true", help="read Kitsu first")
