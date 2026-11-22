@@ -4,4 +4,4 @@ __version__ is the last release's number, also in pyproject.toml (and uv.lock); 
 checks the first two agree. clippa/buildinfo.py adds the commit a copy was made from, which is
 what `clippa --version` prints. A release: Developing#releases."""
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

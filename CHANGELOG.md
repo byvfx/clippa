@@ -2,13 +2,34 @@
 
 Notable changes, newest first. A change you'd notice gets a bullet here in the PR that makes it (wiki
 Developing#changelog). The dated diary is `docs/log/<YYYY-MM>.md`; `HANDOFF.md` is the current state.
-The version is the last release's number (`clipper/__init__.py` and `pyproject.toml`, which a test
-keeps equal) and, past a release, the commit: `clipper --version` prints `0.2.0` on the tag and
-`0.2.0+3.g570bb87` after it. A release is a git tag `vX.Y.Z`; its GitHub Release shows the lead of
+The version is the last release's number (`clippa/__init__.py` and `pyproject.toml`, which a test
+keeps equal) and, past a release, the commit: `clippa --version` prints `0.3.0` on the tag and
+`0.3.0+3.g570bb87` after it. A release is a git tag `vX.Y.Z`; its GitHub Release shows the lead of
 that version's section (the lines before its first `###`) and a link to this file. The steps are wiki
 Developing#releases.
 
 ## Unreleased
+
+## 0.3.0 (2026-11-21)
+
+The app starts answering to its new name, Clippa, and looks after more of itself. The `clippa`
+command, package and texts are in; the `clipper` command, `clipper.toml`, the `CLIPPER_*` variables
+and the container names still work until the rename's deploy step (#286). After pulling, reinstall
+the project in your venv once (the "package folder is `clippa/`" note below says how).
+
+- **The rename, passes 1-2:** a `clippa` command beside `clipper`, `clippa.toml` and `CLIPPA_*`
+  accepted, the package is `clippa/`, and messages, `--help`, the war room, the bot and the wiki say
+  Clippa. Services log as `clippa.serve`, `clippa.bot` and so on.
+- **Self-maintenance:** `clippa checkup --fix` retries a run that failed on a passing error and
+  clears leftover temp files; new `tools`, `signins`, `logs` and `approvals` checks; a sign-in that
+  is gone is DMed within the hour (#287).
+- **War room:** the Schedule works on a phone (an agenda, tap to pin), Ctrl+K searches pages,
+  actions and items, each Review card says why the item was picked, and the live-show chips stop
+  spilling over the top bar.
+- **Running it:** a disk-aware prune (`[streams] keep_free_pct`), analytics that ride out Google's
+  passing errors, serve retrying a failed job in 30 minutes, and seven old bugs fixed (#366).
+
+### 2026-11
 
 - Messages, `--help`, the war room, the Discord bot's texts and the wiki say `clippa <command>` and
   Clippa now (#286, pass 2c-2); `clippa --version` prints `clippa 0.2.0`. The `clipper` command still

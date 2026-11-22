@@ -123,6 +123,13 @@ with uncommitted changes. The NAS containers have no `.git`, so `deploy/hub/depl
    `vX.Y.Z` (`vX.Y.ZrcN` is published as a pre-release).
 3. `bash deploy/hub/deploy.sh` as usual; the hub then reports the tag's version, or the commit
    past it.
+4. Close the version's milestone, if it has one (`gh api -X PATCH repos/byvfx/clipper/milestones/N
+   -f state=closed`), moving any issue still open on it to the next one first.
+
+Milestones are versions (#370): each is named `vX.Y.0 <what it is>` with a due date, and when its
+issues close, that minor version is released and the milestone closed. A patch release (`v0.4.1`)
+is a fix between milestones and has none. A new issue's milestone names the version it is meant
+for; `parked` and `waiting` issues get none.
 
 The release job runs ruff and the tests again on the tagged commit (Linux only) before it builds
 or publishes anything; it deploys nothing. Tags are `vX.Y.Z`, or `v0.3.0rc1` for a pre-release
