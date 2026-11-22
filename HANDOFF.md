@@ -165,9 +165,9 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   secrets/openrouter_secret.txt. Moving a stage to another model is a config change whenever the user wants it.
 
 ## Waiting on the user
-- v0.3.0 is cut in PR #372 (11-21, the user's word: "as is now"); tag `v0.3.0` from main right after it merges (wiki
-  Developing#releases), then the hub deploy carries the number. v0.2.0 was tagged 11-19. The recorder was redeployed 11-20 at 74be7d2 (`0.2.0+59` in its heartbeat). The hub and the
-  claude container were deployed 11-20 at bd1369b (#356); the nightly checkup is on (`CHECKUP_AT=08:30`, first real run 11-21).
+- v0.3.0 is released (PR #372, tag 11-21, the user's word: "as is now"; the Release is titled "Clippa 0.3.0"). The hub was
+  deployed at the tag 11-21 (serve and the bot report `0.3.0`). The recorder is still at 74be7d2 (`0.2.0+59`, 11-20): redeploy it
+  when no show is live. The claude container was deployed 11-20 at bd1369b (#356); the nightly checkup is on (`CHECKUP_AT=08:30`).
 - Clippa chat works on the phone (user, 11-20). `[chat] model` is Haiku (`claude-haiku-5-5`) by default; any provider's model string
   works there, so BYOK is `[chat] model = "openrouter:<vendor>/<model>"` with `OPENROUTER_API_KEY` (wiki Model-providers); the
   Discord bot doesn't use the chat. The cloud environment named "clipper" (11-18) holds an OpenRouter key for cloud Grok reviews: kept (user).
