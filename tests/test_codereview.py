@@ -29,20 +29,22 @@ def test_a_diff_over_the_limit_is_cut_and_says_so():
 
 
 def test_linked_takes_this_repos_numbers_once_in_order():
-    text = ("Closes #70, part of #66 and byvfx/clipper#12; not other/repo#5. See "
-            "https://github.com/byvfx/clipper/issues/70 and https://github.com/x/y/issues/9. "
+    text = ("Closes #70, part of #66 and byvfx/clippa#12; not other/repo#5. See "
+            "https://github.com/byvfx/clippa/issues/70 and https://github.com/x/y/issues/9. "
             "Not a ref: abc#3, a/b/#4")
-    assert codereview.linked(text, "byvfx/clipper") == [70, 66, 12]
+    assert codereview.linked(text, "byvfx/clippa") == [70, 66, 12]
     links = ("See [#5](https://github.com/other/repo/issues/5) and "
-             "[#71](https://github.com/byvfx/clipper/issues/71), and [#72]")
-    assert codereview.linked(links, "byvfx/clipper") == [72, 71]   # a link's own repo, not its label
+             "[#71](https://github.com/byvfx/clippa/issues/71), and [#72]")
+    assert codereview.linked(links, "byvfx/clippa") == [72, 71]   # a link's own repo, not its label
     more = ('[#5](https://github.com/other/repo/issues/5 "a title") [#6](https://github.com/other/repo/pull/6) '
-            "[#7](https://github.com/other/repo/blob/main/a.py) [#73](/byvfx/clipper/issues/73) "
-            "[#74](https://github.com/byvfx/clipper/blob/main/a.py#L10) [#75](https://example.com/x)")
-    assert codereview.linked(more, "byvfx/clipper") == [74, 75, 73]
-    pulls = ('[#76](https://github.com/byvfx/clipper/pull/76) [a.py](/byvfx/clipper/blob/main/a.py "fixes #77") '
-             "[#78](https://github.com/byvfx/clipper/issues/78 'also #79')")
-    assert codereview.linked(pulls, "byvfx/clipper") == [77, 79, 76, 78]
+            "[#7](https://github.com/other/repo/blob/main/a.py) [#73](/byvfx/clippa/issues/73) "
+            "[#74](https://github.com/byvfx/clippa/blob/main/a.py#L10) [#75](https://example.com/x)")
+    assert codereview.linked(more, "byvfx/clippa") == [74, 75, 73]
+    pulls = ('[#76](https://github.com/byvfx/clippa/pull/76) [a.py](/byvfx/clippa/blob/main/a.py "fixes #77") '
+             "[#78](https://github.com/byvfx/clippa/issues/78 'also #79')")
+    assert codereview.linked(pulls, "byvfx/clippa") == [77, 79, 76, 78]
+    old = "byvfx/clipper#80, [#81](https://github.com/byvfx/clipper/issues/81) and other/clipper#82"
+    assert codereview.linked(old, "byvfx/clippa") == [80, 81]   # the name before the rename is this repo
 
 
 def test_comment_bodies_start_with_their_marker_and_digest():

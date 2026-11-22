@@ -26,23 +26,27 @@ RUN echo "claude code build $CLAUDE_CODE_BUILD" \
     && ln -sf "$(readlink -f /opt/claude/.local/bin/claude)" /usr/local/bin/claude \
     && claude --version
 
-COPY entrypoint.sh /usr/local/bin/clipper-claude
+COPY entrypoint.sh /usr/local/bin/clippa-claude
 # The nightly checkup (#185): the script and its prompt as deployed, not the clone's (a phone
 # session may have /app on any branch).
-COPY checkup.sh /usr/local/bin/clipper-checkup
+COPY checkup.sh /usr/local/bin/clippa-checkup
 COPY checkup-git.sh /usr/local/bin/checkup-git
 COPY checkup-pr.sh /usr/local/bin/checkup-pr
-COPY checkup.md /usr/local/share/clipper/checkup.md
-COPY audit.sh /usr/local/bin/clipper-audit
-COPY audit-deep.md /usr/local/share/clipper/audit-deep.md
-RUN chmod 755 /usr/local/bin/clipper-claude /usr/local/bin/clipper-checkup /usr/local/bin/checkup-git /usr/local/bin/checkup-pr \
-        /usr/local/bin/clipper-audit \
-    && chmod 644 /usr/local/share/clipper/checkup.md /usr/local/share/clipper/audit-deep.md
+COPY checkup.md /usr/local/share/clippa/checkup.md
+COPY audit.sh /usr/local/bin/clippa-audit
+COPY audit-deep.md /usr/local/share/clippa/audit-deep.md
+# The old names (clipper-checkup, clipper-audit) answer too until #286's last pass.
+RUN chmod 755 /usr/local/bin/clippa-claude /usr/local/bin/clippa-checkup /usr/local/bin/checkup-git /usr/local/bin/checkup-pr \
+        /usr/local/bin/clippa-audit \
+    && chmod 644 /usr/local/share/clippa/checkup.md /usr/local/share/clippa/audit-deep.md \
+    && ln -s clippa-checkup /usr/local/bin/clipper-checkup && ln -s clippa-audit /usr/local/bin/clipper-audit
 
 # /app is the clone, /home/claude Claude Code's home (both volumes). The config and every
-# relative [paths] entry live in /data, as in the hub; prompts come with the clone.
+# relative [paths] entry live in /data, as in the hub; prompts come with the clone. Both spellings
+# of the config variable: the clone may be on a branch from before #286 pass 1, which reads only CLIPPER_*.
 ENV HOME=/home/claude \
     PATH=/app/.venv/bin:$PATH \
+    CLIPPA_CONFIG=/data/clipper.toml \
     CLIPPER_CONFIG=/data/clipper.toml \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never \
@@ -53,4 +57,4 @@ ENV HOME=/home/claude \
     PYTHONIOENCODING=utf-8
 WORKDIR /app
 
-ENTRYPOINT ["clipper-claude"]
+ENTRYPOINT ["clippa-claude"]

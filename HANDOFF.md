@@ -8,7 +8,7 @@ lists every entry by date; grep the log, don't read it whole). At the end of a s
 changed here, then add a dated entry at the end of the log.
 
 Stream Clippa for Kino Casino (Kick channel `kinocasinogaming`), Channel 404 News and ChudLogic → YouTube
-channel **Lolcow Cinema**. Repo `C:\clipper`, remote https://github.com/byvfx/clipper (public, on purpose:
+channel **Lolcow Cinema**. Repo `C:\clipper`, remote https://github.com/byvfx/clippa (public, on purpose:
 the user said so 2026-11-10; every tracked file, issue and PR comment is readable by anyone).
 Python package `clippa/` (`clippa/defaults.toml` is every setting, documented; prompts in `clippa/prompts/`),
 config `clipper.toml` (gitignored, on the NAS; `clipper.example.toml` is a tracked starter). The user docs are
@@ -51,9 +51,22 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   checkup read both) and has the bootstrap add a `clippa` command to ~/.local/bin; 2c-2 the text:
   messages, help, the war room, the wiki and notes say `clippa <cmd>` and Clippa (not the versioned
   prompts, `deploy/`, CI, history, or any machine name: `clipper.toml`, `CLIPPER_*`, containers, the
-  tailnet name, the `firefox:clipper` profile). Then pass 3 (deploy
-  day: compose projects, Modal apps, `deploy/` env names; stop the old compose project first), 4 the
-  repo name, 5 drop the fallbacks.
+  tailnet name, the `firefox:clipper` profile). **Pass 3** (PR #375, deployed 11-22 03:36-03:38, all
+  six steps): compose projects `clippa-hub`/`clippa-record`/`clippa-claude` (the first deploy of each
+  stops the old `clipper-*` project and renames its compose.yaml, `deploy/retire.sh`; tailscale keeps
+  `clipper-hub_tailscale-state`), Modal apps `clippa-whisperx`/`clippa-lipsync` (lookups fall back to
+  the old app until deployed), `CLIPPA_DATA`/`CLIPPA_REPO`/`CLIPPA_TOML` with the old names read.
+  The old `clipper-*` folders on the NAS keep a `compose.yaml.retired-20261122-*`; `clipper-whisperx`
+  is stopped on Modal, `clipper-lipsync` still deployed (stop it once `clippa-lipsync` is, by
+  hand); clipper.toml's backup is `backups/clipper.toml.before_hub_rename_2026-11-22`. Kept for the last pass (user, 11-22: "get rid of all of
+  clipper eventually"): the data folder `/volume1/docker/clipper` and `clipper.toml`, CLAUDE_DIR,
+  the tailscale volume and `TS_HOSTNAME=clipper`, the Kitsu deploy's `env.clipper`, the Windows tasks,
+  the NAS cut container name `clipper-cut-<id>` (the lock old and new code share) and the claude container's
+  `CLIPPER_*` twins of its `CLIPPA_*` settings (for a session on a pre-rename branch).
+  **Pass 4** (11-22): the user renamed the repo to `byvfx/clippa` (GitHub redirects the old name;
+  never make a new `byvfx/clipper`, which would end the redirect); the laptop checkout and the NAS
+  claude clone point at it, and the links, docs and user agents name it. Next, 5: drop the fallbacks
+  once `clippa doctor` shows no old names in use.
 - Titles/descriptions/cut points approved as-is; fun descriptions are liked. Long video per recurring topic
   (compilations) plus segments plus short picks. `third_party_audio = "allow_reactions"`,
   `audience_knowledge = "fans"`, Victor/blackjack segments stay; Kino's gambling is commentary, not play
@@ -165,8 +178,9 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   secrets/openrouter_secret.txt. Moving a stage to another model is a config change whenever the user wants it.
 
 ## Waiting on the user
-- v0.2.0 is released (tag 11-19). The recorder was redeployed 11-20 at 74be7d2 (`0.2.0+59` in its heartbeat). The hub and the
-  claude container were deployed 11-20 at bd1369b (#356); the nightly checkup is on (`CHECKUP_AT=08:30`, first real run 11-21).
+- v0.3.0 is released (PR #372, tag 11-21, the user's word: "as is now"; the Release is titled "Clippa 0.3.0"). The hub was
+  deployed at the tag 11-21 (serve and the bot report `0.3.0`). The recorder is still at 74be7d2 (`0.2.0+59`, 11-20): redeploy it
+  when no show is live. The claude container was deployed 11-20 at bd1369b (#356); the nightly checkup is on (`CHECKUP_AT=08:30`).
 - Clippa chat works on the phone (user, 11-20). `[chat] model` is Haiku (`claude-haiku-5-5`) by default; any provider's model string
   works there, so BYOK is `[chat] model = "openrouter:<vendor>/<model>"` with `OPENROUTER_API_KEY` (wiki Model-providers); the
   Discord bot doesn't use the chat. The cloud environment named "clipper" (11-18) holds an OpenRouter key for cloud Grok reviews: kept (user).
@@ -212,11 +226,19 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
 - `ANTHROPIC_ADMIN_KEY` for Claude's own usage count on Costs, if wanted.
 
 ## Open work
+- **Long segments (config-7 prep, not in production):** `[segments] split_over_s` defaults to 0
+  (off). A negative value is off too; a non-number is a one-line error. The NAS `clipper.toml` does
+  not set it, and `max_s` is still 3600. Turn it on (3000, the upcoming segments prompt's 50 minutes)
+  only together with that prompt.
+
 **Priority labels (user, 2026-11-13):** every open issue carries one: `p1-now` (the queue, `gh issue list --label p1-now`),
 `p2-dated` (#258, #259, #158), `p3-track` (one big track at a time, the user picks: desktop install #46 →
 #44/#47/#45/#78; Udder Truth #58-#60; archive tooling #221-#227 before the next mini-doc; b-roll #229), `waiting` (#80, #48,
-#45), `parked` (the rest). **Milestones are versions (user, 11-21):** one minor version per milestone, v0.4.0 Runs itself to v1.0.0 Clippa 1.0, with targets: the plan and the GitHub checklist are #370. A new issue gets a priority label, and the milestone of the version it is meant for.
-Write "#77 L6" rather than "fix #77" in commit messages: GitHub closes the issue on "fix". Roadmaps are issues only (byvfx/clipper):
+#45), `parked` (the rest). **Milestones are versions (#370, set up 11-21):** v0.4.0 Runs itself (12-06), v0.5.0 Review and retakes (12-20), v0.6.0
+Agent-first (01-15), v0.7.0 Second channel (02-05), v0.8.0 Next mini-doc toolkit (02-26), v0.9.0 The Udder Truth (03-31), v1.0.0
+Clippa 1.0 (05-31); #370 lists the issues. A release closes its milestone (wiki Developing#releases). A new issue gets a priority
+label, and the milestone of the version it is meant for (none for `parked` and `waiting`).
+Write "#77 L6" rather than "fix #77" in commit messages: GitHub closes the issue on "fix". Roadmaps are issues only (byvfx/clippa):
 Instagram Reels #39, lore-order playlists #43, archive fun #63, crisis mode #73, setup #78, live clips #81,
 blind items #111, investigate anyone #138, meaning search #53, P&L revenue #50 (the cost ledger is built). Old-issue triage
 11-20: #36 closed (its Posts parents #30/#32 went 11-09), #56 folded into #48 as a checkbox; the rest checked and kept. **Transcript-framed edits #66** (one issue; sections
@@ -383,7 +405,8 @@ no secrets). Copy one off the NAS now and then. Not in it: `deploy/*/env.local` 
 - Kino's pre-shows are on the main channel @TheKinoCasino since 11-04 (`clipper.toml` since 11-06). That
   feed's RSS 404s from the NAS, so the check reads yt-dlp's undated listing: entries below a grabbed pre-show
   count as older (#162). After a channel switch, grab the latest by hand.
-- A cut killed half way can leave `clipper-cut-<id>` running on the NAS: `ssh nas docker rm -f clipper-cut-<id>`.
+- A cut killed half way can leave `clipper-cut-<id>` running on the NAS (the name stays until #286's last pass: it is the lock
+  old and new code share): `ssh nas docker rm -f clipper-cut-<id>`.
 - `uv sync` can't replace a running clipper.exe (`uv pip install` instead, and include `--extra modal`
   later). yt-dlp needs deno for YouTube.
 - The worker runs the code of the last hub deploy, not the checkout: a merged change reaches the containers

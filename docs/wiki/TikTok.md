@@ -12,7 +12,7 @@ else the `[record]` alert webhook or channel) and keeps it in schedule.json.
    products **Login Kit** (redirect URI `http://localhost:3455/callback/`, the port is
    `[tiktok] redirect_port`) and **Content Posting API** (leave Direct Post off), scopes
    `user.info.basic` and `video.upload`. It needs a website, privacy and terms URL; ours are
-   pages on byvfx.com ([docs/tiktok-app-pages.md](https://github.com/byvfx/clipper/blob/main/docs/tiktok-app-pages.md)). Testing works in **Sandbox** with the TikTok
+   pages on byvfx.com ([docs/tiktok-app-pages.md](https://github.com/byvfx/clippa/blob/main/docs/tiktok-app-pages.md)). Testing works in **Sandbox** with the TikTok
    account added as a target user.
 2. **Keys**: save `{"client_key": "...", "client_secret": "..."}` as `secrets/tiktok_client.json`.
 3. **Sign in** once, as the TikTok account: `clippa tiktok --sign-in`. The token lands in

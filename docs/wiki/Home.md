@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/byvfx/clipper/wiki/images/banner.png" alt="Clippa: long Kick streams in, reviewed YouTube videos out" width="100%">
+  <img src="https://github.com/byvfx/clippa/wiki/images/banner.png" alt="Clippa: long Kick streams in, reviewed YouTube videos out" width="100%">
 </p>
 
 **Clippa** turns long Kick streams into YouTube uploads: full-length segments, topic

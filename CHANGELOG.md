@@ -2,16 +2,66 @@
 
 Notable changes, newest first. A change you'd notice gets a bullet here in the PR that makes it (wiki
 Developing#changelog). The dated diary is `docs/log/<YYYY-MM>.md`; `HANDOFF.md` is the current state.
-The version is the last release's number (`clipper/__init__.py` and `pyproject.toml`, which a test
-keeps equal) and, past a release, the commit: `clipper --version` prints `0.2.0` on the tag and
-`0.2.0+3.g570bb87` after it. A release is a git tag `vX.Y.Z`; its GitHub Release shows the lead of
+The version is the last release's number (`clippa/__init__.py` and `pyproject.toml`, which a test
+keeps equal) and, past a release, the commit: `clippa --version` prints `0.3.0` on the tag and
+`0.3.0+3.g570bb87` after it. A release is a git tag `vX.Y.Z`; its GitHub Release shows the lead of
 that version's section (the lines before its first `###`) and a link to this file. The steps are wiki
 Developing#releases.
 
 ## Unreleased
 
+### 2026-11
+
+- 11-22: The checkup no longer reports the bot's Discord reconnects after a short network drop as
+  "the same error 6 times": discord.py's own "Attempting a reconnect" lines are left out of the logs
+  check (a bot that stays down still shows in the services check). A card refresh that finds Kitsu
+  down says so once and tries again on the next pass, instead of a warning for every stream. The
+  bot's heartbeat now pauses while it is off Discord, so one that can't reconnect shows as down in
+  Health and the checkup after 3 minutes.
+- 11-22: The repo is `byvfx/clippa` (#286 pass 4). GitHub redirects the old `byvfx/clipper` links,
+  clones and wiki pages, so nothing breaks; message links, the docs and the image-search user agents
+  name the new one. Point an existing clone at it with `git remote set-url origin
+  https://github.com/byvfx/clippa.git`.
+- 11-22: A segment longer than `[segments] split_over_s` (0, off, so a config that doesn't set
+  it is unchanged) is flagged for a re-split instead of being dropped for length. A time Clippa
+  can't read, such as `1:xx`, is a one-line error, the same as any other bad time.
+- 11-22: `[segments] split_over_s` below 0 is off, the same as 0. A value that is not a number,
+  such as `fifty`, is a one-line error naming the setting.
+- The rename's deploy step (#286 pass 3): the NAS compose projects are `clippa-hub`, `clippa-record`
+  and `clippa-claude`, and the Modal apps `clippa-whisperx` and `clippa-lipsync`. The first deploy
+  of each stops the old `clipper-*` project before the new one starts (never two bots or workers
+  at once); tailscale keeps its sign-in. Transcription uses the old Modal app until `clippa
+  transcribe --deploy` makes the new one, and `clippa doctor` says so. The `deploy/` scripts read
+  `CLIPPA_DATA`, `CLIPPA_REPO` and `CLIPPA_TOML`, and an older `env.local`'s `CLIPPER_*` the same;
+  the alert webhook is `CLIPPA_ALERT_WEBHOOK` (`[record] alert_webhook_env`), the old name still read.
+  Set `[serve] hub = "clippa-hub"` after the hub deploy (`clippa services` copes until then).
+  A NAS cut (`[cut] backend = "nas"`) reads the config it sends, as before, and keeps running as
+  `clipper-cut-<id>` until the last pass: that name is the lock old and new code share. A second cut
+  of a stream that is still being cut there says to wait for it.
+
+## 0.3.0 (2026-11-21)
+
+The app starts answering to its new name, Clippa, and looks after more of itself. The `clippa`
+command, package and texts are in; the `clipper` command, `clipper.toml` and the `CLIPPER_*`
+variables still work, and the containers keep their names (`clipper-hub`), until the rename's
+deploy step (#286). After pulling, reinstall the project in your venv once (the "package folder is `clippa/`" note below says how).
+
+- **The rename, passes 1-2:** a `clippa` command beside `clipper`, `clippa.toml` and `CLIPPA_*`
+  accepted, the package is `clippa/`, and messages, `--help`, the war room, the bot and the wiki say
+  Clippa. Services log as `clippa.serve`, `clippa.bot` and so on.
+- **Self-maintenance:** `clippa checkup --fix` retries a run that failed on a passing error and
+  clears leftover temp files; new `tools`, `signins`, `logs` and `approvals` checks; a sign-in that
+  is gone is DMed within the hour (#287).
+- **War room:** the Schedule works on a phone (an agenda, tap to pin), Ctrl+K searches pages,
+  actions and items, each Review card says why the item was picked, and the live-show chips stop
+  spilling over the top bar.
+- **Running it:** a disk-aware prune (`[streams] keep_free_pct`), analytics that ride out Google's
+  passing errors, serve retrying a failed job in 30 minutes, and eight old bugs fixed (#366).
+
+### 2026-11
+
 - Messages, `--help`, the war room, the Discord bot's texts and the wiki say `clippa <command>` and
-  Clippa now (#286, pass 2c-2); `clippa --version` prints `clippa 0.2.0`. The `clipper` command still
+  Clippa now (#286, pass 2c-2); `clippa --version` prints `clippa 0.3.0`. The `clipper` command still
   works: use it where `clippa` isn't found yet (rerun the bootstrap to add it, or `uv sync` an older
   venv). Tab completion answers to both once you make its script again (`clippa completion bash` or
   `powershell`, wherever your profile loads it). File, setting and container names (`clipper.toml`,
@@ -20,7 +70,7 @@ Developing#releases.
   (#286, pass 2c): grep for `clipp` to catch lines from before and after. The war room's last-upload
   box and checkup's repeated-error count read both. The bootstrap now adds a `clippa` command to
   `~/.local/bin` beside `clipper` (run it again to get one), and doctor's `command` line checks both.
-- Seven old bugs Grok found while reviewing the rename (#366): a video YouTube lists again after a
+- Eight old bugs Grok found while reviewing the rename (#366): a video YouTube lists again after a
   spell as private counts in Pass B's feedback and the monthly report again; the report's weakest
   list no longer repeats videos from its best list (9-12 videos); `clipper archive add` skips an
   unavailable video in a channel listing instead of crashing; `clipper archive transcribe` no longer

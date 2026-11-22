@@ -23,7 +23,7 @@ weekly digest and the monthly deep [audit](Audit).
 ## Deploy
 
 `bash deploy/claude/deploy.sh` from the repo root (Git Bash; ssh alias `nas`). Its own compose
-project (`clipper-claude`): it never restarts the recorder or the hub, and a hub deploy never
+project (`clippa-claude`; `clipper-claude` before the rename's pass 3): it never restarts the recorder or the hub, and a hub deploy never
 ends a Claude session. Re-running it rebuilds the image (a newer Claude Code at most once a day)
 and restarts the container, which ends the session open in the app; the clone and the sign-in
 stay.
@@ -36,10 +36,10 @@ stops. Fill in:
   ([NAS-hub](NAS-hub#deploy));
 - `GH_TOKEN`: a GitHub fine-grained token for this repo only, with Contents and Pull requests
   read and write, so it can push branches and open PRs (and clone the repo, if yours is private);
-- `CLIPPER_REPO`, `GIT_USER_NAME`, `GIT_USER_EMAIL` can stay empty: the deploy fills them from
+- `CLIPPA_REPO`, `GIT_USER_NAME`, `GIT_USER_EMAIL` can stay empty: the deploy fills them from
   the checkout it runs in.
 
-On the NAS, `CLAUDE_DIR` (`/volume1/docker/clipper-claude`) holds `repo/` (the clone, made on
+On the NAS, `CLAUDE_DIR` (`/volume1/docker/clipper-claude`, which keeps its name for now) holds `repo/` (the clone, made on
 the first start and left alone after that) and `home/` (Claude Code's sign-in, settings and
 memory, and the uv cache).
 
@@ -53,10 +53,10 @@ uses the subscription.
 
 Once, after the first deploy. The container waits until it is signed in:
 
-1. `ssh -t nas 'cd clipper-claude && docker compose exec claude claude auth login'`. Open the
+1. `ssh -t nas 'cd clippa-claude && docker compose exec claude claude auth login'`. Open the
    link it prints on the laptop or phone, sign in to claude.ai, and paste the code it shows
    back into the terminal.
-2. `ssh -t nas 'docker attach clipper-claude'`. The first start asks to enable Remote Control
+2. `ssh -t nas 'docker attach clippa-claude'`. The first start asks to enable Remote Control
    and to trust `/app`: answer `y` to both, then detach with Ctrl-P Ctrl-Q (Ctrl-C would stop it).
 3. In the Claude app on the phone (or claude.ai/code), the session "Clippa on the NAS" is in
    the session list. Ask it to run something small, e.g. `clippa doctor --role claude`.
@@ -75,12 +75,12 @@ Session transcripts are plaintext in `home/.claude/projects` on the NAS, like on
 ## Check
 
 ```bash
-ssh nas 'cd clipper-claude && docker compose exec claude clipper doctor --role claude'
+ssh nas 'cd clippa-claude && docker compose exec claude clippa doctor --role claude'
 ```
 
 It checks what a worker needs (keys, ffmpeg and QSV, Modal, Kitsu) plus Claude Code itself:
 installed, signed in, the clone on a branch with nothing left uncommitted, and the streams
-writable. Logs: `ssh nas 'cd clipper-claude && docker compose logs -f claude'`.
+writable. Logs: `ssh nas 'cd clippa-claude && docker compose logs -f claude'`.
 
 If the app can't reach it, `ssh nas` from the laptop still works, and the [war room](War-room)
 is still on the phone through the tailnet ([Phone access](Phone-access)).

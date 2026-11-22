@@ -29,7 +29,7 @@ clippa checkup --alert          # DM a sign-in that is gone, once (serve does, h
 | auto | an item that [approved itself](Review#approval-by-silence) in the last 14 days and that a person then rejected, reopened, held or sent back for changes | `[review] auto_min_*`, `auto_grace_minutes` |
 | tools | yt-dlp is older than `ytdlp_days` (its version is its release date): downloads break as YouTube and Kick change | `ytdlp_days` (60; 0 = off) |
 | signins | a cookies file (YouTube's, Twitch's, HEI's) holds no live sign-in, or its sign-in cookie expires within `signin_days`; the YouTube export hasn't been written for a day; a TikTok or X sign-in expires within `signin_days`. YouTube's own token doesn't expire; a revoked one shows up in the logs | `signin_days` (7; 0 = off) |
-| logs | the same error, give or take ids and numbers, at least `repeat_errors` times in serve's or the bot's log in the last `repeat_hours`: an alert fires once, a loop keeps failing | `repeat_errors` (5; 0 = off), `repeat_hours` (24) |
+| logs | the same error, give or take ids and numbers, at least `repeat_errors` times in serve's or the bot's log in the last `repeat_hours`: an alert fires once, a loop keeps failing. discord.py's own "Attempting a reconnect" lines don't count: a network drop writes several and it keeps trying by itself, and a bot that stays down is the services check's | `repeat_errors` (5; 0 = off), `repeat_hours` (24) |
 | approvals | an item approved at least `approved_hours` ago that the plan neither scheduled nor skipped with a reason (budget, stale, hold): the replan never saw it; or a plan older than that while serve should replan hourly | `approved_hours` (3; 0 = off) |
 | housekeeping | temp files (`<file>.<pid>.<thread>.tmp`) a killed write left beside a state file, a day old or more; and the share's free space under `[streams] keep_free_pct` (off at 0; a warning, bad under half of it; [Backups](Backups#disk-clippa-streams) has what prune then takes) | - |
 
@@ -130,7 +130,7 @@ or Copilot); nothing merges or deploys it: you review, merge and run the hub dep
 It runs `main`'s code from its own worktree (`~/checkup-src` in the container, updated every
 run), not the clone, which a phone session may have on any branch; `CHECKUP_REF` in
 `env.local` picks another branch. Run it by hand with
-`ssh nas 'cd clipper-claude && docker compose exec claude clipper-checkup --dry-run'`
+`ssh nas 'cd clippa-claude && docker compose exec claude clippa-checkup --dry-run'`
 (`--dry-run` prints the DM instead of sending it and doesn't `--mark`); the timer's output is in
 `/tmp/checkup.log` in the container. The bot sends `checkup` DMs only once the hub runs code
 that has the kind (deployed after 2026-11-09).

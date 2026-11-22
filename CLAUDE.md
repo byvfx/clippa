@@ -84,7 +84,7 @@ the same PR as the change.
   and clipper reads it from the registry when a shell didn't inherit it; a `./clipper.toml` in
   the checkout would win, so don't make one.
 - `clippa serve` (the war room and every background job), the Discord bot and the worker run
-  as containers on the NAS (`deploy/hub`, compose project `clipper-hub`), not on the laptop.
+  as containers on the NAS (`deploy/hub`, compose project `clippa-hub`), not on the laptop.
   `clippa services status|stop|restart serve|bot|worker|all` runs `docker compose` there over
   ssh (`[serve] hub`). Code changes reach them with `bash deploy/hub/deploy.sh` from a checkout
   of main (Git Bash): that replaces restarting serve or the bot, and never touches the recorder.

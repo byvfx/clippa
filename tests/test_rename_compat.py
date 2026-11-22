@@ -84,6 +84,9 @@ def test_the_alert_webhook_in_either_spelling(defaults, monkeypatch):
     assert alerts.Alerts(defaults).webhook == "https://old.invalid/hook"
     monkeypatch.setenv("CLIPPA_ALERT_WEBHOOK", "https://new.invalid/hook")
     assert alerts.Alerts(defaults).webhook == "https://new.invalid/hook"
+    # a config that still names the old variable (pass 3 made CLIPPA_ALERT_WEBHOOK the default)
+    old_name = {**defaults, "record": {**defaults["record"], "alert_webhook_env": "CLIPPER_ALERT_WEBHOOK"}}
+    assert alerts.Alerts(old_name).webhook == "https://new.invalid/hook"
 
 
 def test_bot_notes_in_either_prefix_are_not_reviewer_comments():

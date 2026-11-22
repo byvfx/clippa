@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import modal
 
-APP_NAME = "clipper-lipsync"
+APP_NAME = "clippa-lipsync"   # was clipper-lipsync (#286 pass 3)
 REPO = "/opt/LatentSync"
 GPU = "L40S"
 

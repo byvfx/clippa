@@ -3,7 +3,7 @@
 # "clipper-worker" scheduled task (worker-task.ps1 -Install); you can also run it by hand.
 # Logs: logs\worker.log (the worker's console), logs\worker-supervisor.log (restarts).
 # Each stage of a run also logs into its stream folder (run_<stage>.log, run.json).
-# Failure alerts use CLIPPER_ALERT_WEBHOOK, else the recorder's webhook from
+# Failure alerts use CLIPPA_ALERT_WEBHOOK (or the old CLIPPER_ALERT_WEBHOOK), else the recorder's webhook from
 # deploy\record\env.local; the supervisor log says which.
 param([int]$MaxDelay = 300)
 

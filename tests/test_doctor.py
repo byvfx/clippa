@@ -157,3 +157,12 @@ def test_doctor_checks_the_hubs_cookies_file(tmp_path, monkeypatch):
     f.write_text(ytdl.netscape_text([ytdl.Row(".youtube.com", "/", True, None, "PREF", "x")]), encoding="utf-8")
     doctor.check_youtube_cookies(cfg)
     assert last() == "FAIL YouTube cookies youtube_cookies.txt hold no live sign-in"
+
+
+def test_doctor_names_settings_still_at_their_pre_rename_value(defaults):
+    # #286 pass 3: an explicit old value keeps working but goes stale (nothing rebuilds it).
+    from clippa import doctor
+    cfg = {**defaults, "cut": {**defaults["cut"], "nas_image": "clipper-record:latest"},
+           "transcribe": {**defaults["transcribe"], "modal_app": "clipper-whisperx"}}
+    assert [w for w, *_ in doctor.old_names_set(cfg)] == ["[cut] nas_image", "[transcribe] modal_app"]
+    assert doctor.old_names_set(defaults) == []

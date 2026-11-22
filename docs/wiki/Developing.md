@@ -93,8 +93,7 @@ becomes the release's section ([Releases](#releases)). `tests/test_changelog.py`
 
 ## Releases
 
-Each minor version has a milestone (`v0.5.0 Review and retakes`) holding the issues meant for it; the release
-closes it. Patch releases get none. A release is a git tag `vX.Y.Z` on main. Pushing the tag makes the GitHub Release
+A release is a git tag `vX.Y.Z` on main. Pushing the tag makes the GitHub Release
 (`.github/workflows/release.yml`): the wheel and sdist, with the **lead** of that version's
 section of `CHANGELOG.md` (its lines before the first `###`: a sentence on what the release is
 and a short list of highlights) as the notes, and a link to the whole file for the detail by date.
@@ -124,6 +123,13 @@ with uncommitted changes. The NAS containers have no `.git`, so `deploy/hub/depl
    `vX.Y.Z` (`vX.Y.ZrcN` is published as a pre-release).
 3. `bash deploy/hub/deploy.sh` as usual; the hub then reports the tag's version, or the commit
    past it.
+4. Close the version's milestone, if it has one (`gh api -X PATCH repos/{owner}/{repo}/milestones/N
+   -f state=closed`), moving any issue still open on it to the next one first.
+
+Milestones are versions (#370): each is named `vX.Y.0 <what it is>` with a due date, and when its
+issues close, that minor version is released and the milestone closed. A patch release (`v0.4.1`)
+is a fix between milestones and has none. A new issue's milestone names the version it is meant
+for; `parked` and `waiting` issues get none.
 
 The release job runs ruff and the tests again on the tagged commit (Linux only) before it builds
 or publishes anything; it deploys nothing. Tags are `vX.Y.Z`, or `v0.3.0rc1` for a pre-release
@@ -206,7 +212,7 @@ output on thinking and wrote nothing, as `deepseek/deepseek-v4-pro` did at mediu
 
 The `wiki` workflow (`.github/workflows/wiki.yml`) pushes the pages to the wiki when a change
 lands on main. Images go in `docs/wiki/images/` and are linked by their full wiki address
-(`https://github.com/byvfx/clipper/wiki/images/<file>`). Callouts (`> [!TIP]`, `> [!WARNING]`),
+(`https://github.com/byvfx/clippa/wiki/images/<file>`). Callouts (`> [!TIP]`, `> [!WARNING]`),
 Mermaid diagrams and `<kbd>` keys all render.
 
 - One file per page, flat: `Install-Windows.md` is the page "Install Windows". `_Sidebar.md`

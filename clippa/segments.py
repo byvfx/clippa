@@ -69,20 +69,59 @@ def slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:50]
 
 
+def _split_limit(seg_cfg: dict) -> float:
+    """[segments] split_over_s in seconds. Missing, 0 and negative are off (0.0).
+
+    bool is rejected on purpose: it is an int, so float(True) would be 1.0 and flag
+    every segment longer than a second."""
+    raw = seg_cfg.get("split_over_s")
+    if raw is None:
+        return 0.0
+    limit = None
+    if not isinstance(raw, bool):
+        try:
+            limit = float(raw)
+        except (TypeError, ValueError):
+            limit = None
+    if limit is None:
+        raise ClipperError(f"[segments] split_over_s must be a number of seconds, not {raw!r}")
+    return limit if limit > 0 else 0.0
+
+
 def apply_filters(segs: list[dict], seg_cfg: dict) -> None:
+    """Mark each segment cut, or say why not. With [segments] split_over_s set, one longer
+    than that is `resplit` (skip reason "re-split") instead of the length drop, so the
+    footage stays visible for a re-split. 0 (the default) and a negative leave the length
+    drop as it is. A value that is not a number is an error."""
     allowed = set(seg_cfg["source_share"])
+    limit = _split_limit(seg_cfg)
     for s in segs:
         reasons = []
+        s.pop("resplit", None)  # a rerun with the setting off clears a flag from before
         if not s["standalone"]:
             reasons.append("not standalone")
         if s["kind"] in seg_cfg["skip_kinds"]:
             reasons.append(f"kind {s['kind']}")
         if s["source_share"] not in allowed:
             reasons.append(f"source_share {s['source_share']}")
-        if not seg_cfg["min_s"] <= s["duration_s"] <= seg_cfg["max_s"]:
+        if limit and s["duration_s"] > limit:
+            reasons.append("re-split")
+            s["resplit"] = True
+        elif not seg_cfg["min_s"] <= s["duration_s"] <= seg_cfg["max_s"]:
             reasons.append(f"{s['duration_s'] / 60:.0f} min")
         s["cut"] = not reasons
         s["skip_reasons"] = reasons
+
+
+def report_resplits(segs: list[dict], limit: float) -> None:
+    """One line per segment flagged for a re-split. Stages print; the worker copies stdout
+    into the stage log, which is where this is read."""
+    if not limit:
+        return
+    for s in segs:
+        if s.get("resplit"):
+            print(f"RESPLIT {s['id']} is {s['duration_s'] / 60:.0f} min, over "
+                  f"[segments] split_over_s ({limit / 60:.0f} min): flagged for a re-split")
 
 
 def split(stream_dir: Path, cfg: dict, claude: Claude, prompts: Prompts) -> dict:
@@ -203,6 +242,7 @@ def run(stream_dir: Path, cfg: dict, force: bool = False, dry_run: bool = False,
         data = split(stream_dir, cfg, claude, prompts)
     segs = data["segments"]
     apply_filters(segs, seg_cfg)
+    report_resplits(segs, _split_limit(seg_cfg))
     data["compilations"] = compilations(data, cfg, claude, prompts)
     if scoring:
         from .segscore import score_stream

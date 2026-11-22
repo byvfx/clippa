@@ -1,6 +1,6 @@
 # A GitHub Release for each version tag: pushing the tag is the release (wiki Developing#releases).
 #
-#   git tag -a v0.3.0 -m "clipper 0.3.0" && git push origin v0.3.0
+#   git tag -a v0.3.0 -m "Clippa 0.3.0" && git push origin v0.3.0
 #
 # Checks the tag against the code and the changelog, runs ruff and the tests on the tagged commit
 # (as check.yml does, on Linux only), builds the wheel and sdist, and publishes them with the lead
@@ -56,4 +56,4 @@ jobs:
         run: |
           # shellcheck disable=SC2086  # PRERELEASE is "--prerelease" or empty
           gh release create "$GITHUB_REF_NAME" dist/* --verify-tag ${PRERELEASE:-} \
-            --title "clipper $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+            --title "Clippa $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
