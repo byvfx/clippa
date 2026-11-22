@@ -25,7 +25,8 @@ Developing#releases.
   and stays off: `[segments] prompt_version` is still `v3` and `max_s` is still 3600. v4 asks the
   model to keep a segment under 50 minutes; that cap is the prompt only. Set `prompt_version = "v4"`
   only after those files are deployed. The model mix from the same trial is
-  `docs/config-7-hybrid-segv4.toml` (paste it into one stream's `config.toml`).
+  `docs/config-7-hybrid-segv4.toml`, and `docs/config-7-hybrid-segv4-openrouter.toml` is the
+  same mix with Claude sent through OpenRouter (paste either into one stream's `config.toml`).
 
 ## 0.3.0 (2026-11-21)
 

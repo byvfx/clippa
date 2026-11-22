@@ -112,26 +112,58 @@ def test_big_story_preset_only_has_known_settings():
     assert not unknown, "docs/big-story.toml: " + ", ".join(unknown)
 
 
+# Clipper's Claude ids use hyphens. OpenRouter's catalog lists the same models with dots.
+CLAUDE_ON_OPENROUTER = {
+    "claude-haiku-5-5": "openrouter:anthropic/claude-haiku-5.5",
+    "claude-sonnet-5-5": "openrouter:anthropic/claude-sonnet-5.5",
+    "claude-opus-5-5": "openrouter:anthropic/claude-opus-5.5",
+}
+
+
+def _model_values(data: dict) -> dict[str, str]:
+    return {f"{s}.{k}": v for s, vals in data.items() if isinstance(vals, dict)
+            for k, v in vals.items() if isinstance(v, str) and (
+                v.startswith("claude-") or v.startswith("openrouter:"))}
+
+
 def test_hybrid_segv4_example_parses(tmp_path):
-    """docs/config-7-hybrid-segv4.toml is an opt-in overlay: it parses, every key is a real
-    setting, and pasting it onto a stream selects prompt v4 without moving max_s."""
-    text = (ROOT / "docs" / "config-7-hybrid-segv4.toml").read_text(encoding="utf-8")
-    data = tomllib.loads(text)
-    unknown = [f"[{s}] {k}" for s, v in data.items() if isinstance(v, dict)
-               for k in v if k not in config.DEFAULTS.get(s, {})]
-    assert not unknown, "docs/config-7-hybrid-segv4.toml: " + ", ".join(unknown)
-    assert data["segments"]["prompt_version"] == "v4"
-    assert "max_s" not in data["segments"]
+    """Both config-7 overlays parse, use only real settings, and select prompt v4 without
+    moving max_s. The OpenRouter file is the direct one with each bare claude-* model rewritten
+    to OpenRouter's catalog id. Neither repeats a [llm.prices] key defaults.toml already has."""
+    direct = tomllib.loads((ROOT / "docs" / "config-7-hybrid-segv4.toml").read_text(encoding="utf-8"))
+    routed = tomllib.loads(
+        (ROOT / "docs" / "config-7-hybrid-segv4-openrouter.toml").read_text(encoding="utf-8"))
+    for name, data in (("config-7-hybrid-segv4.toml", direct),
+                       ("config-7-hybrid-segv4-openrouter.toml", routed)):
+        unknown = [f"[{s}] {k}" for s, v in data.items() if isinstance(v, dict)
+                   for k in v if k not in config.DEFAULTS.get(s, {})]
+        assert not unknown, f"docs/{name}: " + ", ".join(unknown)
+        assert data["segments"]["prompt_version"] == "v4"
+        assert "max_s" not in data["segments"]
+        repeated = set(config.DEFAULTS["llm"]["prices"]) & set(data["llm"]["prices"])
+        assert not repeated, f"docs/{name} repeats default prices: {sorted(repeated)}"
+
+    direct_models, routed_models = _model_values(direct), _model_values(routed)
+    assert direct_models.keys() == routed_models.keys()
+    for key, model in direct_models.items():
+        expect = CLAUDE_ON_OPENROUTER.get(model, model)
+        assert routed_models[key] == expect, (key, model, routed_models[key])
+    assert routed["segments"]["effort"] == direct["segments"]["effort"] == "medium"
+    assert routed["llm"]["prices"]["openrouter:anthropic/claude-opus-5.5"] == [4, 20]
 
     cfg = config.load(tmp_path / "clipper.toml", use_local=False)
     assert cfg["segments"]["prompt_version"] == "v3" and cfg["segments"]["max_s"] == 3600
-    sdir = tmp_path / "kick-1"
-    sdir.mkdir()
-    (sdir / config.STREAM_CONFIG).write_text(text, encoding="utf-8")
-    one = config.for_stream(cfg, sdir)
-    assert one["segments"]["prompt_version"] == "v4"
-    assert one["segments"]["max_s"] == 3600
-    assert one["segments"]["model"] == "claude-opus-5-5"
+    for name, model in (("config-7-hybrid-segv4.toml", "claude-opus-5-5"),
+                        ("config-7-hybrid-segv4-openrouter.toml",
+                         "openrouter:anthropic/claude-opus-5.5")):
+        sdir = tmp_path / name
+        sdir.mkdir()
+        (sdir / config.STREAM_CONFIG).write_text(
+            (ROOT / "docs" / name).read_text(encoding="utf-8"), encoding="utf-8")
+        one = config.for_stream(cfg, sdir)
+        assert one["segments"]["prompt_version"] == "v4"
+        assert one["segments"]["max_s"] == 3600
+        assert one["segments"]["model"] == model
 
 
 def test_opencode_keeps_deploy_locks_and_the_reviewer_model():

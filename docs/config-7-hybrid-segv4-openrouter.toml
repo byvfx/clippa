@@ -1,0 +1,129 @@
+# Config 7, Claude via OpenRouter: docs/config-7-hybrid-segv4.toml with every bare claude-*
+# model sent as openrouter:anthropic/<OpenRouter's id>. Clipper's Claude ids use hyphens
+# (claude-opus-5-5). OpenRouter's public model list does not include that hyphen form; it lists
+# anthropic/claude-opus-5.5, anthropic/claude-sonnet-5.5 and anthropic/claude-haiku-5.5. This
+# file uses those catalog ids (checked against GET /api/v1/models, no inference call).
+# Opt-in. Defaults stay [segments] prompt_version = "v3" and max_s = 3600. The 50-minute cap
+# is only clippa/prompts/segments_v4.md. Set prompt_version = "v4" only after segments_v4.md
+# and compilation_v4.md are deployed (containers read the prompts shipped in the image).
+# Effort is passed through. clippa/llm.py sends every OpenRouter model's effort, Anthropic
+# included, as reasoning.effort. OpenRouter maps that to Anthropic's output_config.effort.
+# low, medium and high (the values in this file) are in each model's supported efforts.
+# Opus 5.5 and Sonnet 5.5 reject effort "none" (reasoning is mandatory); this file does not
+# use it. llm.py is unchanged.
+# Needs OPENROUTER_API_KEY (or [paths] openrouter_key). Paste into one stream's
+# streams/<id>/config.toml. clipper.local.toml and CLIPPER_* env vars still win.
+# Same stage mix as config-7-hybrid-segv4.toml. Published token prices match defaults.toml,
+# so the direct overlay's ~$2.54 per 8 h (score+segments+meta+thumbs) is the same table;
+# confirm with each stage's --dry-run.
+
+[llm.prices]   # $ per 1M in/out. defaults.toml prices the bare claude-* names, and price_of
+# does not match those keys to openrouter:anthropic/..., so dry-run would count these three as $0.
+# Real OpenRouter calls still report their own cost. Token rates match defaults.toml.
+"openrouter:anthropic/claude-haiku-5.5" = [0.1, 0.5]
+"openrouter:anthropic/claude-sonnet-5.5" = [2, 10]
+"openrouter:anthropic/claude-opus-5.5" = [4, 20]
+"openrouter:google/gemini-3.8-flash" = [0.825, 4.125]
+"openrouter:openai/gpt-6-luna" = [0.1, 0.5]
+"openrouter:openai/gpt-6.1-terra" = [1, 5]
+"openrouter:openai/gpt-6.2-sol" = [2, 10]
+
+[scoring]
+model_a = "openrouter:anthropic/claude-haiku-5.5"
+effort_a = "medium"
+model_b = "openrouter:anthropic/claude-sonnet-5.5"
+effort_b = "high"
+
+[segments]
+model = "openrouter:anthropic/claude-opus-5.5"
+effort = "medium"
+prompt_version = "v4"   # round 2: caps segments at 50 min; v3 runs gave 48-71 min longest
+score_model = "openrouter:openai/gpt-6.1-terra"
+score_effort = "medium"
+
+[meta]
+model = "openrouter:openai/gpt-6.2-sol"
+effort = "medium"
+
+[thumbnail]
+model = "openrouter:openai/gpt-6.2-sol"   # needs vision
+effort = "medium"
+
+[shorts]
+layout_model = "openrouter:openai/gpt-6-luna"   # needs vision
+layout_effort = "low"
+
+[review]
+check_model = "openrouter:google/gemini-3.8-flash"   # needs vision
+check_effort = "low"
+
+[cast]
+label_model = "openrouter:anthropic/claude-haiku-5.5"   # needs vision
+label_effort = "low"
+
+[preshow]
+model = "openrouter:anthropic/claude-sonnet-5.5"
+effort = "medium"
+
+[retake]
+model = "openrouter:anthropic/claude-sonnet-5.5"
+effort = "medium"
+
+[pick]
+model = "openrouter:anthropic/claude-sonnet-5.5"
+effort = "high"
+locate_model = "openrouter:anthropic/claude-haiku-5.5"
+locate_effort = "medium"
+
+[receipts]
+model = "openrouter:anthropic/claude-sonnet-5.5"
+effort = "medium"
+script_model = "openrouter:openai/gpt-6.2-sol"
+script_effort = "medium"
+
+[investigate]
+leads_model = "openrouter:anthropic/claude-sonnet-5.5"
+leads_effort = "medium"
+facts_model = "openrouter:anthropic/claude-haiku-5.5"
+facts_effort = "low"
+check_model = "openrouter:anthropic/claude-haiku-5.5"
+check_effort = "low"
+
+[swarm]
+planner_model = "openrouter:anthropic/claude-sonnet-5.5"
+planner_effort = "low"
+worker_model = "openrouter:anthropic/claude-haiku-5.5"
+worker_effort = "low"
+
+[story]
+dossier_model = "openrouter:anthropic/claude-sonnet-5.5"
+dossier_effort = "medium"
+edit_model = "openrouter:anthropic/claude-sonnet-5.5"
+edit_effort = "medium"
+triage_model = "openrouter:anthropic/claude-haiku-5.5"
+triage_effort = "low"
+find_model = "openrouter:anthropic/claude-haiku-5.5"
+find_effort = "low"
+
+[weekly]
+model = "openrouter:openai/gpt-6.2-sol"
+effort = "high"
+
+[news]
+judge_model = "openrouter:anthropic/claude-haiku-5.5"
+judge_effort = "low"
+
+[blinds]
+clues_model = "openrouter:anthropic/claude-haiku-5.5"
+clues_effort = "low"
+
+[chat]
+model = "openrouter:anthropic/claude-haiku-5.5"
+effort = "low"
+
+[archive]
+ask_model = "openrouter:anthropic/claude-haiku-5.5"
+ask_effort = "low"
+
+[codereview]
+reviewer = "openrouter:x-ai/grok-4.7"   # unchanged: his 13-model bake-off winner

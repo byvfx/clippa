@@ -9,10 +9,7 @@
 # clipper.local.toml and CLIPPER_<SECTION>_<KEY> env vars still win: check with `clippa config get meta.model --stream <id>`.
 # Rough cost per 8 h stream (score+segments+meta+thumbs): ~$2.54 (baseline ~$3.50); confirm with each stage's --dry-run.
 
-[llm.prices]   # $ per 1M in/out, so --dry-run estimates and cost lines aren't $0
-"claude-haiku-5-5" = [0.1, 0.5]
-"claude-sonnet-5-5" = [2, 10]
-"claude-opus-5-5" = [4, 20]
+[llm.prices]   # $ per 1M in/out. The three Claude models are already priced in defaults.toml.
 "openrouter:google/gemini-3.8-flash" = [0.825, 4.125]
 "openrouter:openai/gpt-6-luna" = [0.1, 0.5]
 "openrouter:openai/gpt-6.1-terra" = [1, 5]
