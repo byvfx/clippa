@@ -49,6 +49,7 @@ COPILOT_POLL_S = 20
 REF = re.compile(r"(?<![\w/])(?:([\w.-]+/[\w.-]+))?#(\d+)\b")
 URL = re.compile(r"github\.com/([\w.-]+/[\w.-]+)/(?:issues|pull)/(\d+)")
 MDLINK = re.compile(r"\[([^\]\n]*)\]\(([^)\s]+)(?:\s+(?:\"([^\"\n]*)\"|'([^'\n]*)'))?\)")  # [label](target "title")
+RENAMED = {"byvfx/clippa": "byvfx/clipper"}  # #286 pass 4: GitHub redirects the old name, so its refs are this repo's
 ROOTED = re.compile(r"^/(?=[\w.-]+/[\w.-]+/(?:issues|pull)/\d)")  # /owner/name/issues/N, within GitHub
 NOTHING = "No correctness bugs found."
 FINDING = re.compile(r"^### \d+\.\s+\S.*\n+\s*\S", re.MULTILINE)  # a numbered finding with text under it
@@ -181,6 +182,12 @@ def is_review(text: str) -> bool:
     return NOTHING.rstrip(".") in lines or bool(FINDING.search(text))
 
 
+def _same(ref: str, repo: str) -> bool:
+    """ref (owner/name) is repo, or the name repo had before a rename (RENAMED)."""
+    ref, repo = ref.lower(), repo.lower()
+    return ref == repo or ref == RENAMED.get(repo, "")
+
+
 def _unlink(m: re.Match, repo: str) -> str:
     """[label](target) as plain text for linked. The label goes when the target says which
     issue it is (an issue or PR link) or is in another repo; a link elsewhere in this repo, or
@@ -188,7 +195,7 @@ def _unlink(m: re.Match, repo: str) -> str:
     target = ROOTED.sub("github.com/", m[2])
     title = m[3] or m[4] or ""
     on = re.search(r"github\.com/([\w.-]+/[\w.-]+)(/(?:issues|pull)/\d)?", target)
-    drop = on and (on[2] or on[1].lower() != repo.lower())
+    drop = on and (on[2] or not _same(on[1], repo))
     return f" {target} {title} " if drop else f" {m[1]} {target} {title} "
 
 
@@ -204,8 +211,8 @@ def review(cfg: dict, base: str = "origin/main", head: str = "HEAD", root: Path 
 def linked(text: str, repo: str) -> list[int]:
     """Issue or PR numbers text names in this repo (#12, owner/name#12, an issue link), in order."""
     text = MDLINK.sub(lambda m: _unlink(m, repo), text)
-    nums = [int(n) for r, n in REF.findall(text) if not r or r.lower() == repo.lower()]
-    nums += [int(n) for r, n in URL.findall(text) if r.lower() == repo.lower()]
+    nums = [int(n) for r, n in REF.findall(text) if not r or _same(r, repo)]
+    nums += [int(n) for r, n in URL.findall(text) if _same(r, repo)]
     return list(dict.fromkeys(nums))
 
 

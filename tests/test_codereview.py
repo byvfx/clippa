@@ -43,6 +43,8 @@ def test_linked_takes_this_repos_numbers_once_in_order():
     pulls = ('[#76](https://github.com/byvfx/clippa/pull/76) [a.py](/byvfx/clippa/blob/main/a.py "fixes #77") '
              "[#78](https://github.com/byvfx/clippa/issues/78 'also #79')")
     assert codereview.linked(pulls, "byvfx/clippa") == [77, 79, 76, 78]
+    old = "byvfx/clipper#80, [#81](https://github.com/byvfx/clipper/issues/81) and other/clipper#82"
+    assert codereview.linked(old, "byvfx/clippa") == [80, 81]   # the name before the rename is this repo
 
 
 def test_comment_bodies_start_with_their_marker_and_digest():
