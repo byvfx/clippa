@@ -32,6 +32,46 @@
     { "action": "shell", "resource": "clipper thumbs*", "effect": "ask" }
   ],
   "agents": {
+    "build": {
+      "model": "anthropic/claude-opus-5-5"
+    },
+    "plan": {
+      "model": "anthropic/claude-opus-5-5#high"
+    },
+    "explore": {
+      "model": "anthropic/claude-haiku-5-5"
+    },
+    "reviewer": {
+      "mode": "subagent",
+      "description": "Pre-push correctness review of the branch against main",
+      "model": "openrouter/x-ai/grok-4.7",
+      "permissions": [
+        {
+          "action": "edit",
+          "resource": "*",
+          "effect": "deny"
+        }
+      ]
+    },
+    "checkup": {
+      "mode": "primary",
+      "description": "Nightly checkup (deploy/claude/checkup.md): read logs, one DM, at most one small PR",
+      "model": "anthropic/claude-sonnet-5-5",
+      "steps": 40
+    },
+    "audit": {
+      "mode": "primary",
+      "description": "Monthly deep audit (deploy/claude/audit-deep.md), read-only",
+      "model": "anthropic/claude-sonnet-5-5#high",
+      "steps": 80,
+      "permissions": [
+        {
+          "action": "edit",
+          "resource": "*",
+          "effect": "deny"
+        }
+      ]
+    },
     "oss-reviewer": {
       "description": "DeepSeek code reviewer (free tier)",
       "model": "openrouter/deepseek/deepseek-v4.1-flash-1017",

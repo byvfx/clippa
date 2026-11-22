@@ -1,0 +1,119 @@
+# Config 7: config 6 plus the segments v4 prompt (50-minute cap) from gauntlet round 2.
+# Opt-in overlay, not a default. [segments] prompt_version stays "v3" and max_s stays 3600
+# until this file is pasted over a config. The 50-minute cap is only the text of
+# clippa/prompts/segments_v4.md; this file does not set max_s. Set prompt_version = "v4"
+# only after segments_v4.md and compilation_v4.md are deployed (containers read the prompts
+# shipped in the image).
+# Goal: Haiku Pass A + Sonnet Pass B + Opus segments (only Opus/Sol kept the 2.5 h Quartering block cuttable); GPT-6.2 Sol meta/thumbs, cheap vision checks.
+# Paste into a test stream's streams/<id>/config.toml (that stream only), or into clipper.toml (everything).
+# clipper.local.toml and CLIPPER_<SECTION>_<KEY> env vars still win: check with `clippa config get meta.model --stream <id>`.
+# Rough cost per 8 h stream (score+segments+meta+thumbs): ~$2.54 (baseline ~$3.50); confirm with each stage's --dry-run.
+
+[llm.prices]   # $ per 1M in/out, so --dry-run estimates and cost lines aren't $0
+"claude-haiku-5-5" = [0.1, 0.5]
+"claude-sonnet-5-5" = [2, 10]
+"claude-opus-5-5" = [4, 20]
+"openrouter:google/gemini-3.8-flash" = [0.825, 4.125]
+"openrouter:openai/gpt-6-luna" = [0.1, 0.5]
+"openrouter:openai/gpt-6.1-terra" = [1, 5]
+"openrouter:openai/gpt-6.2-sol" = [2, 10]
+
+[scoring]
+model_a = "claude-haiku-5-5"
+effort_a = "medium"
+model_b = "claude-sonnet-5-5"
+effort_b = "high"
+
+[segments]
+model = "claude-opus-5-5"
+effort = "medium"
+prompt_version = "v4"   # round 2: caps segments at 50 min; v3 runs gave 48-71 min longest
+score_model = "openrouter:openai/gpt-6.1-terra"
+score_effort = "medium"
+
+[meta]
+model = "openrouter:openai/gpt-6.2-sol"
+effort = "medium"
+
+[thumbnail]
+model = "openrouter:openai/gpt-6.2-sol"   # needs vision
+effort = "medium"
+
+[shorts]
+layout_model = "openrouter:openai/gpt-6-luna"   # needs vision
+layout_effort = "low"
+
+[review]
+check_model = "openrouter:google/gemini-3.8-flash"   # needs vision
+check_effort = "low"
+
+[cast]
+label_model = "claude-haiku-5-5"   # needs vision
+label_effort = "low"
+
+[preshow]
+model = "claude-sonnet-5-5"
+effort = "medium"
+
+[retake]
+model = "claude-sonnet-5-5"
+effort = "medium"
+
+[pick]
+model = "claude-sonnet-5-5"
+effort = "high"
+locate_model = "claude-haiku-5-5"
+locate_effort = "medium"
+
+[receipts]
+model = "claude-sonnet-5-5"
+effort = "medium"
+script_model = "openrouter:openai/gpt-6.2-sol"
+script_effort = "medium"
+
+[investigate]
+leads_model = "claude-sonnet-5-5"
+leads_effort = "medium"
+facts_model = "claude-haiku-5-5"
+facts_effort = "low"
+check_model = "claude-haiku-5-5"
+check_effort = "low"
+
+[swarm]
+planner_model = "claude-sonnet-5-5"
+planner_effort = "low"
+worker_model = "claude-haiku-5-5"
+worker_effort = "low"
+
+[story]
+dossier_model = "claude-sonnet-5-5"
+dossier_effort = "medium"
+edit_model = "claude-sonnet-5-5"
+edit_effort = "medium"
+triage_model = "claude-haiku-5-5"
+triage_effort = "low"
+find_model = "claude-haiku-5-5"
+find_effort = "low"
+
+[weekly]
+model = "openrouter:openai/gpt-6.2-sol"
+effort = "high"
+
+[news]
+judge_model = "claude-haiku-5-5"
+judge_effort = "low"
+
+[blinds]
+clues_model = "claude-haiku-5-5"
+clues_effort = "low"
+
+[chat]
+model = "claude-haiku-5-5"
+effort = "low"
+
+[archive]
+ask_model = "claude-haiku-5-5"
+ask_effort = "low"
+
+[codereview]
+reviewer = "openrouter:x-ai/grok-4.7"   # unchanged: his 13-model bake-off winner

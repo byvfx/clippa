@@ -112,6 +112,51 @@ def test_big_story_preset_only_has_known_settings():
     assert not unknown, "docs/big-story.toml: " + ", ".join(unknown)
 
 
+def test_hybrid_segv4_example_parses(tmp_path):
+    """docs/config-7-hybrid-segv4.toml is an opt-in overlay: it parses, every key is a real
+    setting, and pasting it onto a stream selects prompt v4 without moving max_s."""
+    text = (ROOT / "docs" / "config-7-hybrid-segv4.toml").read_text(encoding="utf-8")
+    data = tomllib.loads(text)
+    unknown = [f"[{s}] {k}" for s, v in data.items() if isinstance(v, dict)
+               for k in v if k not in config.DEFAULTS.get(s, {})]
+    assert not unknown, "docs/config-7-hybrid-segv4.toml: " + ", ".join(unknown)
+    assert data["segments"]["prompt_version"] == "v4"
+    assert "max_s" not in data["segments"]
+
+    cfg = config.load(tmp_path / "clipper.toml", use_local=False)
+    assert cfg["segments"]["prompt_version"] == "v3" and cfg["segments"]["max_s"] == 3600
+    sdir = tmp_path / "kick-1"
+    sdir.mkdir()
+    (sdir / config.STREAM_CONFIG).write_text(text, encoding="utf-8")
+    one = config.for_stream(cfg, sdir)
+    assert one["segments"]["prompt_version"] == "v4"
+    assert one["segments"]["max_s"] == 3600
+    assert one["segments"]["model"] == "claude-opus-5-5"
+
+
+def test_opencode_keeps_deploy_locks_and_the_reviewer_model():
+    """The recommended agents sit beside the permissions already in opencode.json. Reviewer
+    stays on the owner's model; oss-reviewer keeps its empty permission list."""
+    data = json.loads((ROOT / "opencode.json").read_text(encoding="utf-8"))
+    rules = {(p["action"], p["resource"], p["effect"]) for p in data["permissions"]}
+    assert ("shell", "bash deploy/*", "deny") in rules
+    assert ("shell", "clipper services restart*", "deny") in rules
+    assert ("shell", "clipper services stop*", "deny") in rules
+    assert ("shell", "clipper upload*", "ask") in rules
+    assert ("shell", "clipper review publish*", "ask") in rules
+    agents = data["agents"]
+    assert agents["reviewer"]["model"] == "openrouter/x-ai/grok-4.7"
+    assert any(p.get("action") == "edit" and p.get("effect") == "deny"
+               for p in agents["reviewer"]["permissions"])
+    assert agents["oss-reviewer"]["model"] == "openrouter/deepseek/deepseek-v4.1-flash-1017"
+    assert agents["oss-reviewer"]["permissions"] == []
+    assert agents["build"]["model"] == "anthropic/claude-opus-5-5"
+    assert agents["plan"]["model"] == "anthropic/claude-opus-5-5#high"
+    assert agents["explore"]["model"] == "anthropic/claude-haiku-5-5"
+    assert agents["checkup"]["model"] == "anthropic/claude-sonnet-5-5"
+    assert agents["audit"]["model"] == "anthropic/claude-sonnet-5-5#high"
+
+
 def test_example_loads(tmp_path):
     cfg = config.load(ROOT / "clipper.example.toml", use_local=False)
     for key in cfg["shows"]:
