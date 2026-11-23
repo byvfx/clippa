@@ -12,6 +12,8 @@ Developing#releases.
 
 ### 2026-11
 
+- 11-22: The war room's show chips say whether each show approves its clips by itself: **AUTO**
+  when `[review] auto_approve` is on for it, *manual* when not; hover it for the kinds and score floors.
 - 11-22: The checkup no longer reports the bot's Discord reconnects after a short network drop as
   "the same error 6 times": discord.py's own "Attempting a reconnect" lines are left out of the logs
   check (a bot that stays down still shows in the services check). A card refresh that finds Kitsu

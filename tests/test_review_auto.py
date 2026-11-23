@@ -520,3 +520,11 @@ def test_the_mirror_leaves_a_newer_decision_alone(cfg, tmp_path, monkeypatch):
     jsonstate.write(review_auto.path(sd), {"v02_t2": {"approved_at": T0.isoformat()}})
     review_auto._mirror(sd, "v02_t2")
     assert jsonstate.read(sd / "review.json")["v02_t2"]["decision"] == "approved"
+
+
+def test_summary_is_what_the_show_chip_shows(cfg):
+    s = review_auto.summary(cfg["review"])
+    assert s == {"on": True, "kinds": {"short": 6.0}, "grace": 120, "preshow": "now"}
+    cfg["review"].update(auto_approve=False, auto_min_segment="7.5")
+    assert review_auto.summary(cfg["review"])["on"] is False
+    assert review_auto.summary(cfg["review"])["kinds"] == {"short": 6.0, "segment": 7.5}
