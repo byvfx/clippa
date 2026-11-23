@@ -37,6 +37,27 @@ def test_describe_builds_a_row_from_the_local_files(defaults, tmp_path, monkeypa
     assert row["why"] == "Don's own take" and row["score"] == "8"   # #324: the card's badge and line
 
 
+def test_describe_flags_a_long_segment_for_resplit(defaults, tmp_path, monkeypatch):
+    sdir = tmp_path / "kick-3"
+    sdir.mkdir()
+    state = {"s06_topic": {"kind": "segment", "id": "s06", "file": "segments/s06_topic.mp4",
+                           "task_id": "T", "entity_id": "E", "kitsu_url": "http://k/t",
+                           "episode_url": "", "fields": {"YouTube title": "The long one"}}}
+    jsonstate.write(sdir / "review_state.json", state)
+    jsonstate.write(sdir / "segments.json", {"segments": [
+        {"id": "s06", "resplit": True, "duration_s": 4200, "title": "The long one"}]})
+    defaults["segments"]["split_over_s"] = 3000
+    monkeypatch.setattr(actions, "for_stream", lambda cfg, d: cfg)
+    monkeypatch.setattr(review, "ensure_links", lambda d, cfg, gazu=None: state)
+    monkeypatch.setattr(review, "items", lambda d, include, cfg: [{"key": "s06_topic", "duration_s": 4200}])
+    monkeypatch.setattr(actions, "schedule_entries", lambda cfg: {})
+    monkeypatch.setattr(actions, "schedule_dropped", lambda cfg: {})
+    row = actions.describe(defaults, sdir)["s06_topic"]
+    assert row["resplit"] is True and row["resplit_limit_s"] == 3000
+    defaults["segments"]["split_over_s"] = 0
+    assert actions.describe(defaults, sdir)["s06_topic"]["resplit"] is False
+
+
 def test_describe_defaults_for_an_item_nobody_decided_on(defaults, tmp_path, monkeypatch):
     sdir = tmp_path / "kick-2"
     sdir.mkdir()

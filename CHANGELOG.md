@@ -25,14 +25,21 @@ repo is `byvfx/clippa` (the old links redirect). The `clipper` command, `clipper
 - **Blind items:** reveals are matched to the blinds they answer and your guesses scored
   (`clippa blinds reveals`); Discord and the war room show who it was and how you did; the
   blinds store is in `clippa backup`.
-- **Review:** the war room's show chips say which shows approve their clips by themselves (AUTO
-  or manual, with the score floors on hover).
+- **Review:** Discord cards in the Night Watch look (a status icon and word in the title,
+  Findings, a live grace countdown, a Re-split button), and the war room's show chips say which
+  shows approve their clips by themselves (AUTO or manual, with the score floors on hover).
 - **Running it:** the checkup stops counting the bot's Discord reconnects as a repeated error,
   the bot shows as down when it can't get back on Discord, and a too-long segment is flagged for
   a re-split instead of dropped (`[segments] split_over_s`, off by default).
 
 ### 2026-11
 
+- 11-23: Discord review cards use the Night Watch palette and voice. The title leads with a status
+  icon and a word (approve green matches the logo, so it is never color alone). The Checks field
+  is now Findings, the grace countdown is a live Discord timestamp, and a segment over
+  `[segments] split_over_s` shows as Re-split with a button on its own row. Stream-ready, Modal
+  spend and error DMs are embeds. The bot sets a status line. Its name, avatar and about line
+  are unchanged (those are set in the Discord Developer Portal).
 - 11-23: Dependencies: anthropic 2.10, numpy 2.5.5, opencv-python-headless 5.1 and the latest
   yt-dlp (#345).
 - 11-23: The conventions file for contributors and coding agents is `AGENTS.md`; `CLAUDE.md`

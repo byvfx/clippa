@@ -38,5 +38,12 @@ to fit; `thread_name` names the threads; `replan` reruns the schedule after each
 `refresh_minutes` keeps the cards in step with decisions made in Kitsu or the war room, and with
 items that [approved themselves](Review#approval-by-silence).
 
+Cards use the Night Watch colors in `brand/` (approve `#5EA88A`, hold `#D4A054`, finding
+`#D07070`, pending `#6B8FD4`, re-split `#A992D4`, accent `#7EB8C9`). `clippa bot` sets its own
+status line: On watch, Watching a show, how many items are in review, Waiting on you, or Quiet
+board. The name, the avatar and the about line are not set by the bot. In the Developer Portal
+they stay: name Clippa, avatar `brand/png/clippa-discord-avatar-512.png`, about "Clippa stays up.
+You stay in charge."
+
 The bot also posts the [news watcher](News-watcher)'s stories and asks you about gossip
 [blind items](Blind-items#discord), each in a channel of its own.

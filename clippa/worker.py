@@ -33,7 +33,6 @@ import subprocess
 import sys
 import threading
 import time
-from datetime import datetime
 from pathlib import Path
 
 from . import jsonstate, stages
@@ -419,18 +418,14 @@ def since_end(stream_dir: Path, t: float) -> str:
     return f"{(time.time() - t) / 60:.0f} min"
 
 
-def ready_text(cfg: dict, d: Path, what: str) -> str:
-    """'Kino Casino 10/22: 31 items ready for review' for the DM."""
-    from zoneinfo import ZoneInfo
-
+def ready_text(cfg: dict, d: Path, what: str) -> tuple[str, str]:
+    """(sentence, show name) for the in-review DM. 'Kino Casino finished processing. 7 cuts in review.'"""
     meta = jsonstate.read_or(d / "meta.json", {})
     show = for_stream(cfg, d)["meta"]["show_name"] or meta.get("channel", d.name)
-    when = ""
-    if meta.get("started_at"):
-        t = datetime.fromisoformat(meta["started_at"]).astimezone(ZoneInfo(cfg["schedule"]["timezone"]))
-        when = f" {t.month}/{t.day}"
     n = len(jsonstate.read_or(d / "review_state.json", {}))
-    return f"{show}{when}: {what}" + (f" ({n} items in Kitsu)" if n else "") + f", {d.name}"
+    count = f" {n} cuts in review." if n else ""
+    tail = " Segments next." if "segments next" in what else ""
+    return f"{show} finished processing.{count}{tail}", show
 
 
 def watch(cfg: dict, config_path: str | None = None, once: bool = False) -> None:  # noqa: C901
@@ -455,12 +450,13 @@ def watch(cfg: dict, config_path: str | None = None, once: bool = False) -> None
                     if run.get("nothing_cut") else "is in review")
                     + f" ({since_end(d, t)})", level=logging.INFO, kind=None)
                 if not run.get("nothing_cut"):
-                    alerts.send(cfg, "ready", ready_text(cfg, d, "ready for review"), key=f"ready:{d.name}")
+                    text, show = ready_text(cfg, d, "ready for review")
+                    alerts.send(cfg, "ready", text, key=f"ready:{d.name}", title=show, short=d.name)
             elif lane == "fast" and run.get("clips_ready") and cut_videos(d, ("clips",)):
                 alert(f"clippa worker: {d.name} clips and Shorts are in review ({since_end(d, t)});"
                       " segments next", level=logging.INFO, kind=None)
-                alerts.send(cfg, "ready", ready_text(cfg, d, "clips and Shorts ready for review, "
-                                                     "segments next"), key=f"clips:{d.name}")
+                text, show = ready_text(cfg, d, "clips and Shorts ready for review, segments next")
+                alerts.send(cfg, "ready", text, key=f"clips:{d.name}", title=show, short=d.name)
         except Busy as e:
             log.info("%s", e)
         except Exception as e:
