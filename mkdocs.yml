@@ -50,6 +50,7 @@ nav:
       - Configuration: configuration.md
       - Adding a show: adding-a-show.md
       - Model providers: model-providers.md
+      - Model rollout: model-rollout.md
   - On watch:
       - Pipeline: pipeline.md
       - Review: review.md
