@@ -55,4 +55,5 @@ clippa run <stream id>
 - `HANDOFF.md`: current state between work sessions; `docs/log/` has the dated diary
 - `CLAUDE.md`: rules for code sessions
 - `studio/`: the studio's working files (mockups, research notes, media-heavy reports); not part of the package
+- `brand/`: the mark, lockups and app icon ([BRAND.md](brand/BRAND.md))
 - `LICENSE`: MIT
