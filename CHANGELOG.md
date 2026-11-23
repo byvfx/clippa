@@ -13,7 +13,8 @@ Developing#releases.
 ### 2026-11
 
 - 11-23: `clippa review check` stops when OpenCV isn't installed, instead of saving a bad-cover
-  finding for every item (a later run then skipped them). `uv sync --extra faces` installs it.
+  finding for every item (a later run then skipped them). Items that don't need it are still
+  checked. `uv sync --extra faces` installs it.
 
 ## 0.4.0 (2026-11-23)
 
