@@ -12,6 +12,8 @@ Developing#releases.
 
 ### 2026-11
 
+- 11-22: The blind items' store (your answers, the reveals) goes into `clippa backup` as a checked snapshot, and the
+  retention rule no longer forgets reveals or "no idea" blinds after `keep_days`.
 - 11-22: The checkup no longer reports the bot's Discord reconnects after a short network drop as
   "the same error 6 times": discord.py's own "Attempting a reconnect" lines are left out of the logs
   check (a bot that stays down still shows in the services check). A card refresh that finds Kitsu

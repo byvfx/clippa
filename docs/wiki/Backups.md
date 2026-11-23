@@ -24,6 +24,7 @@ What goes in, relative to the config file's folder (`/data` on the NAS hub):
 | Cast photos | `[thumbnail] photos`, with each person's `cast.json` |
 | Your own prompts | `[paths] prompts`, if set |
 | Each stream | `config.toml`, `meta.json`, `review.json`, `review_state.json`, `thumbnails.json`, `retakes.json` |
+| Blind items | `blinds/blinds.sqlite` (your answers, the reveals and the blinds), a snapshot checked with `integrity_check`; the live file is never copied |
 | Secrets | `secrets/`, only with `--with-secrets` or `[backup] with_secrets` |
 
 These stay out: the recordings and cuts (the videos are on YouTube), the transcripts (Modal can

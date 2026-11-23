@@ -8,7 +8,9 @@ What goes in, each relative to the config file's folder (the NAS share's /data):
     schedule.json, people.json, logs/costs.jsonl, faces/ (not the downloaded models),
     voices/, layouts/, [thumbnail] photos, [paths] prompts if set, and each stream's
     config.toml, meta.json, review.json, review_state.json, thumbnails.json, retakes.json
-secrets/ only with --with-secrets ([backup] with_secrets for serve's run).
+secrets/ only with --with-secrets ([backup] with_secrets for serve's run), and the blinds
+store as blinds/blinds.sqlite: a snapshot of the blind items, your answers and the reveals
+(#111), checked with integrity_check before it goes in.
 
 Not in it: the recordings and cuts (prune keeps their JSON; the videos are on YouTube), the
 transcripts (Modal can redo them), the Kitsu database (its Docker volumes on the NAS: wiki
@@ -19,11 +21,12 @@ every_days (0 = only by hand); `clippa audit` and doctor say when the newest is 
 from __future__ import annotations
 
 import os
+import tempfile
 import zipfile
 from datetime import datetime
 from pathlib import Path
 
-from . import jsonstate
+from . import blinds, jsonstate
 from .config import base, for_show, for_stream
 from .errors import ClipperError
 
@@ -71,8 +74,10 @@ def photo_dirs(cfg: dict) -> list[str]:
     return [str(p) for p in dict.fromkeys(out) if p]
 
 
-def plan(cfg: dict, with_secrets: bool = False, dest: Path | None = None) -> list[tuple[str, Path]]:
-    """(name in the zip, file) for everything a backup takes."""
+def plan(cfg: dict, with_secrets: bool = False, dest: Path | None = None,
+         snap_dir: Path | None = None) -> list[tuple[str, Path]]:
+    """(name in the zip, file) for everything a backup takes. The blinds store is copied into
+    snap_dir first (a consistent snapshot); without one, its live file is listed for sizing."""
     cfg = base(cfg)
     root = Path(cfg["_dir"])
     paths = cfg["paths"]
@@ -114,16 +119,32 @@ def plan(cfg: dict, with_secrets: bool = False, dest: Path | None = None) -> lis
                     add(d / name)
     if with_secrets:
         add(root / "secrets")
+    out += _blinds_store(cfg, snap_dir)
     return out
+
+
+def _blinds_store(cfg: dict, snap_dir: Path | None) -> list[tuple[str, Path]]:
+    """The blind items' store: your answers and the reveals, research nothing can rebuild."""
+    if snap_dir is not None:
+        snap = blinds.snapshot(cfg, snap_dir)
+        return [("blinds/blinds.sqlite", snap)] if snap else []
+    store = blinds.store_path(cfg)
+    return [("blinds/blinds.sqlite", store)] if store.is_file() else []
 
 
 def run(cfg: dict, to: str | Path | None = None, with_secrets: bool | None = None,
         dry_run: bool = False) -> list[str]:
     """Write the zip (or, with dry_run, say what would go in it) and drop the old ones."""
+    with tempfile.TemporaryDirectory(prefix="clippa-backup-") as tmp:
+        return _run(cfg, to, with_secrets, dry_run, Path(tmp))
+
+
+def _run(cfg: dict, to: str | Path | None, with_secrets: bool | None, dry_run: bool,
+         snap_dir: Path) -> list[str]:
     cfg = base(cfg)
     dest = folder(cfg, to)
     secrets = cfg["backup"]["with_secrets"] if with_secrets is None else with_secrets
-    files = plan(cfg, secrets, dest)
+    files = plan(cfg, secrets, dest, snap_dir)
     if not files:
         raise ClipperError(f"nothing to back up under {cfg['_dir']}")
     size = sum(f.stat().st_size for _, f in files)

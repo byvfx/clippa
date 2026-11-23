@@ -124,3 +124,24 @@ def test_one_backup_at_a_time(cfg):
     (dest / "backup.lock").write_text("someone else\n", encoding="utf-8")   # fresh: not stale
     with pytest.raises(ClipperError, match="another backup is writing"):
         backup.run(cfg)
+
+
+def test_the_blinds_store_goes_in_as_a_checked_snapshot(cfg, tmp_path):
+    import sqlite3
+
+    from clippa import blinds
+
+    cfg["paths"]["news"] = cfg["_dir"] / "news"
+    db = blinds.connect(cfg)
+    db.execute("INSERT INTO blinds (id, status, title) VALUES ('cdan-x', 'answered', 'Blind Item #9')")
+    db.commit()
+    db.close()
+    assert any(line.strip().startswith("blinds") for line in backup.run(cfg, dry_run=True))
+    backup.run(cfg)
+    (z,) = (cfg["_dir"] / "backups" / "taste").glob("taste-*.zip")
+    assert "blinds/blinds.sqlite" in names(z)
+    copy = tmp_path / "restored.sqlite"
+    with zipfile.ZipFile(z) as zf:
+        copy.write_bytes(zf.read("blinds/blinds.sqlite"))
+    with sqlite3.connect(copy) as c:
+        assert c.execute("SELECT status FROM blinds WHERE id = 'cdan-x'").fetchone() == ("answered",)

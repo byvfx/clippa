@@ -121,6 +121,35 @@ def home(cfg: dict) -> Path:
     return d
 
 
+def store_path(cfg: dict) -> Path:
+    """Where blinds.sqlite is, without creating its folder (backup reads it, may find none)."""
+    return Path(cfg["paths"]["news"]) / "blinds" / "blinds.sqlite"
+
+
+def snapshot(cfg: dict, dest: Path) -> Path | None:
+    """A consistent copy of the store, taken with SQLite's backup API (safe while serve writes),
+    checked with integrity_check. None when there is no store yet."""
+    src = store_path(cfg)
+    if not src.is_file():
+        return None
+    out = dest / "blinds.sqlite"
+    out.unlink(missing_ok=True)
+    a = sqlite3.connect(src, timeout=30)
+    try:
+        b = sqlite3.connect(out)
+        try:
+            a.backup(b)
+            ok = b.execute("PRAGMA integrity_check").fetchone()[0]
+        finally:
+            b.close()
+    finally:
+        a.close()
+    if ok != "ok":
+        out.unlink(missing_ok=True)
+        raise ClipperError(f"the blinds store failed its integrity check ({ok}); not backed up")
+    return out
+
+
 def connect(cfg: dict) -> sqlite3.Connection:
     db = sqlite3.connect(home(cfg) / "blinds.sqlite", timeout=30)
     db.row_factory = sqlite3.Row
@@ -571,9 +600,12 @@ def check(cfg: dict, backfill_days: float = 0, clues: bool = True, claude=None, 
 
 
 def prune(cfg: dict, db: sqlite3.Connection) -> int:
-    """Forget what is older than keep_days, except blinds the user answered (the scorecard's)."""
+    """Forget what is older than keep_days, except what the user engaged with (answered, no idea)
+    and reveals: the ground truth the scorecard is built on. Their text can't be fetched again
+    once a source takes a post down."""
     cut = news.iso(news.now() - timedelta(days=cfg["blinds"]["keep_days"]))
-    n = db.execute("DELETE FROM blinds WHERE published < ? AND status != 'answered'", (cut,)).rowcount
+    n = db.execute("DELETE FROM blinds WHERE published < ? AND status NOT IN ('answered', 'no_idea', 'reveal')",
+                   (cut,)).rowcount
     if n:  # a twin left on its own is unpaired
         db.execute("UPDATE blinds SET pair = NULL, pair_why = NULL WHERE pair IS NOT NULL AND pair IN "
                    "(SELECT pair FROM blinds WHERE pair IS NOT NULL GROUP BY pair HAVING COUNT(*) = 1)")

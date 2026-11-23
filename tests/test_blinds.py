@@ -502,6 +502,25 @@ def test_hide_and_the_listing_filters(cfg, monkeypatch):
         blinds.listing(cfg, status="maybe")
 
 
+def test_prune_keeps_reveals_and_no_idea_answers(cfg, monkeypatch):
+    feeds(monkeypatch, {"cdan.example": atom(("Blind Item #1", iso_days_ago(400), "old, no idea"),
+                                             ("Blind Items Revealed #1", iso_days_ago(400), "the reveal"),
+                                             ("Blind Item #2", iso_days_ago(400), "old, untouched")),
+                        "bg.example": rss()})
+    db = blinds.connect(cfg)
+    blinds.store(db, blinds.source_list(cfg)[0], blinds.entries(atom(
+        ("Blind Item #1", iso_days_ago(400), "old, no idea"),
+        ("Blind Items Revealed #1", iso_days_ago(400), "the reveal"),
+        ("Blind Item #2", iso_days_ago(400), "old, untouched"))))
+    db.commit()
+    db.close()
+    no_idea = next(b["id"] for b in blinds.listing(cfg, days=500, everything=True) if b["id"].endswith("b1"))
+    blinds.answer(cfg, no_idea, none=True)  # "no idea" is an answer too
+    blinds.check(cfg, clues=False)
+    kept = {b["status"] for b in blinds.listing(cfg, days=500, everything=True)}
+    assert kept == {"no_idea", "reveal"}
+
+
 def test_prune_forgets_old_blinds_but_keeps_answered_ones(cfg, monkeypatch):
     feeds(monkeypatch, {"cdan.example": atom(("Blind Item #1", iso_days_ago(400), "old"),
                                              ("Blind Item #2", iso_days_ago(400), "old, answered")),
@@ -539,7 +558,8 @@ def test_blinds_never_reach_anything_published():
     the war room's Blinds window and the bot's alerts read them."""
     allowed = {"blinds.py", "cli.py", "doctor.py",  # doctor reads the source settings only
                "warroom/blinds.py", "warroom/__init__.py", "warroom/httpd.py",  # the window and its routes
-               "bot.py"}  # asks you in Discord
+               "bot.py",  # asks you in Discord
+               "backup.py"}  # copies the store into the taste backup: a private zip, never published
     src = ROOT / "clippa"
     readers = sorted(p.relative_to(src).as_posix() for p in src.rglob("*.py")
                      if p.relative_to(src).as_posix() not in allowed

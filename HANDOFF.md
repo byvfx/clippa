@@ -304,7 +304,9 @@ of phone use; #300 (access levels, a local Jev-like classifier in front of the m
 - **Blind items #111 (wiki Blind-items), steps 1-2 live since 11-16:** the NAS clipper.toml has one source, CDAN (add Blind Gossip's
   site when it's back), `[blinds] check_minutes = 30`, `sensitive_alerts = true`, a private `#blinds` with `alert = "digest"`. Not
   built: typed answers in the thread, a Hide this kind button. **Next: step 3**, investigate after the answer; step 4, reveals and the
-  scorecard. Flow: https://claude.ai/artifact/1m3obUigUkkA5ZVdmmiLWn
+  scorecard. **Custody (11-22, branch `blinds/custody`, not pushed):** the store is in `clippa backup` as a checked snapshot
+  (`blinds/blinds.sqlite`), and `keep_days` keeps reveals and "no idea" blinds. The store held only the live file before, so a lost
+  disk would have taken every answer. Copy the newest taste zip off the NAS by hand. Flow: https://claude.ai/artifact/1m3obUigUkkA5ZVdmmiLWn
 - **News watcher #110:** off since 2026-11-03 at the user's word (`[news] check_minutes = 0`, no terms); `auto_watch = true` brings back
   the cast/figures/library list; `#news` exists in Discord.
 - **Older notes not on an issue:** republish the 2026-10-19 re-cut streams to Kitsu (user said not yet); Blade compilation's Discord
