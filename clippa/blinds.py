@@ -742,10 +742,19 @@ def grade(b: dict, people_map: dict | None = None) -> str:
     return "late" if not status and b["guesses"] else ""
 
 
-def scorecard(cfg: dict, match: bool = True, say=print) -> dict:
-    """How the reveals stand: matched or not (and why not), and your guesses on revealed blinds."""
+def _people_map(cfg: dict) -> dict | None:
+    """The people records for grading, or None where they can't be read (a machine without the
+    share): a guess is then graded on its own words."""
     from . import people
 
+    try:
+        return people.load(cfg)
+    except (OSError, ValueError):
+        return None
+
+
+def scorecard(cfg: dict, match: bool = True, say=print) -> dict:
+    """How the reveals stand: matched or not (and why not), and your guesses on revealed blinds."""
     db = connect(cfg)
     try:
         if match:
@@ -761,7 +770,9 @@ def scorecard(cfg: dict, match: bool = True, say=print) -> dict:
     for r in reveals:
         d = split_reveal(r["text"])[0]
         older += bool(not r["reveal_of"] and d and r["source"] in oldest and d < oldest[r["source"]])
-    pm = people.load(cfg)
+    pm = _people_map(cfg)
+    if pm is None:
+        say("people.json couldn't be read: guesses are graded on their own words, without aliases")
     graded = []
     for b in rows:   # the guess shown is the one scored: yours when the reveal was posted
         at, g = answer_at_reveal(b)
@@ -993,8 +1004,7 @@ def one(cfg: dict, bid: str) -> dict:
         db.close()
     b["tags"], b["hidden"] = tags(b), hidden(cfg, b)
     if b.get("revealed"):
-        from . import people
-        b["grade"] = grade(b, people.load(cfg))
+        b["grade"] = grade(b, _people_map(cfg))
         _, g = answer_at_reveal(b)
         b["scored_guess"] = g["name"] if g else ""
     return b

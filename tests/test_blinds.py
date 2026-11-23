@@ -1104,3 +1104,18 @@ def test_reveals_json_is_json(cfg, monkeypatch, capsys):
     args.fn(cfg, args)
     out = capsys.readouterr()
     assert json.loads(out.out)["matched"] == 1 and "matched" in out.err
+
+
+def test_a_revealed_blind_still_shows_when_the_people_records_cant_be_read(cfg, monkeypatch):
+    """Grok on #384: a share that's down or a broken people.json grades on the guess's own words."""
+    from clippa import people
+
+    def gone(cfg):
+        raise OSError("share unreachable")
+    test_check_matches_a_reveal_to_its_blind_and_grades_your_guess(cfg, monkeypatch)
+    monkeypatch.setattr(people, "load", gone)
+    said = []
+    sc = blinds.scorecard(cfg, say=said.append)
+    assert (sc["right"], sc["wrong"]) == (1, 1) and any("people.json couldn't be read" in s for s in said)
+    right = next(x["id"] for x in sc["graded"] if x["guess"] == "Example")   # a surname, no aliases needed
+    assert blinds.one(cfg, right)["grade"] == "right"

@@ -260,7 +260,8 @@ or weekly issue can pick one up.
 the backup's output says so: a damaged copy beats none for a repair, and the rest of the backup
 isn't held up. That backup drops no older zip (`[backup] keep` waits), so the last good copy
 survives. A store still locked by a long write after 30 s is left out of that one backup,
-with a line saying so, rather than copied half-written. `--dry-run` lists it without the snapshot. An older zip may hold a good copy. The zip is private, like the rest of the taste
+with a line saying so, rather than copied half-written, and that backup drops no older zip
+either. `--dry-run` lists it without the snapshot. The zip is private, like the rest of the taste
 layer: it is copied off the NAS by hand, never published.
 
 When a source edits a post, the blind's text is updated and the text it had goes into its

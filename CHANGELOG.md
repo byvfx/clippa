@@ -14,6 +14,7 @@ Developing#releases.
 
 - 11-22: The blind items' store (your answers, the reveals) goes into `clippa backup` as a checked snapshot, and no
   blind is forgotten any more by default (`[blinds] keep_days = 0`); a number of days still forgets old untouched ones.
+  A backup whose blinds store is damaged or was busy keeps every older zip and says so.
 - 11-22: Blind items: each check matches reveal posts to the blinds they answer, in code, and scores your guess
   against the answer; `clippa blinds reveals` prints the scorecard.
 - 11-22: The war room's show chips say whether each show approves its clips by itself: **AUTO**

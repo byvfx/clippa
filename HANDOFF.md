@@ -304,17 +304,18 @@ of phone use; #300 (access levels, a local Jev-like classifier in front of the m
 - **Blind items #111 (wiki Blind-items), steps 1-2 live since 11-16:** the NAS clipper.toml has one source, CDAN (add Blind Gossip's
   site when it's back), `[blinds] check_minutes = 30`, `sensitive_alerts = true`, a private `#blinds` with `alert = "digest"`. Not
   built: typed answers in the thread, a Hide this kind button. **Next: step 3**, investigate after the answer; step 4, reveals and the
-  scorecard. **Custody (11-22, branch `blinds/custody`, not pushed):** the store is in `clippa backup` as a checked snapshot
-  (`blinds/blinds.sqlite`; a damaged one goes in as `blinds.damaged.sqlite`), nothing is forgotten (user: "def keep all this
-  data", a treasure trove: `keep_days` default 0 = keep everything; nothing had been pruned yet, the store starts 10-17), and
-  an edited post's old text goes into its history (5 edits had already overwritten theirs). On 11-22 the store held 706 blinds
-  (2 answered), 198 reveals, no pairs. 105 blinds' opening text appears verbatim in a reveal, so step 4's matching can start in code,
-  with no model call. Copy the newest taste zip off the NAS by hand.
-  **Step 4 part 1 on the same branch:** every check matches reveals to blinds in code (3-gram overlap ≥ 0.6, 0.3 ahead of the next
-  blind within a day of the date line) and stores the answer line; `clippa blinds reveals` scores your guesses (right / wrong /
-  late). On a copy of the 11-22 store: 106 matched, 90 wait for blinds older than the store (a `check --backfill` would bring them
-  in, at ~$0.0002 a blind for clues, or free with `--no-clues`), 2 have garbled dates and no stored blind. Neither answered blind
-  is revealed yet. Not built: the Discord follow-up, the war room scorecard, `calibrate`. Flow: https://claude.ai/artifact/1m3obUigUkkA5ZVdmmiLWn
+  scorecard. **Custody and step 4 part 1 merged 11-22 (#384; follow-up #387 for Grok's last two findings), deploy pending:**
+  the store is in `clippa backup` as a checked snapshot (a damaged one goes in as `blinds.damaged.sqlite`; a damaged or busy store
+  drops no older zip), nothing is forgotten (user: "def keep all this data": `keep_days` default 0), an edited post's old text goes
+  into its history. Every check matches reveals to blinds in code (3-gram overlap >= 0.6, 0.3 ahead of the next, within a day of the
+  date line) and stores the answer; `clippa blinds reveals` scores your guesses (right / wrong / late); `list` and the war room say
+  [revealed] without the name. **Backfilled 11-22** in serve (`check --backfill 326 --no-clues`, backups in `/data/backups/blinds.sqlite.before_*`):
+  6,144 posts back to 2026-01-01. On a copy with the new code: 1,572 of 1,852 reveals match, 0 doubles; 193 wait for blinds before
+  2026 (143 from 2025), 48 quote a blind the feed never had, 35 are 2012-13 "Revealed <date>" posts. **Deploy before 2027-01-02:**
+  the deployed code still forgets non-answered blinds after 365 days. After the deploy, backfill further back (needs
+  `CLIPPER_BLINDS_BACKFILL_PAGES`, ~16 pages a quarter). Clues for the backfill (~$0.70) are read by serve's checks, 100 a pass.
+  Not built: the Discord follow-up, the war room scorecard, `calibrate`, step 3 (user: eventually check all data it can grab, not
+  only the cast). Copy the newest taste zip off the NAS by hand. Flow: https://claude.ai/artifact/1m3obUigUkkA5ZVdmmiLWn
 - **News watcher #110:** off since 2026-11-03 at the user's word (`[news] check_minutes = 0`, no terms); `auto_watch = true` brings back
   the cast/figures/library list; `#news` exists in Discord.
 - **Older notes not on an issue:** republish the 2026-10-19 re-cut streams to Kitsu (user said not yet); Blade compilation's Discord

@@ -187,3 +187,20 @@ def test_a_damaged_blinds_store_keeps_every_older_zip(cfg):
     old.rename(dest / "taste-2000-01-01-0000.zip")  # older by name, as a real earlier run's
     out = backup.run(cfg)
     assert len(list(dest.glob("taste-*.zip"))) == 2 and any("kept every older backup" in x for x in out)
+
+
+def test_a_busy_blinds_store_keeps_every_older_zip(cfg, monkeypatch):
+    """Grok on #384: the zip that still holds the store must survive a run that left it out."""
+    from clippa import blinds
+
+    cfg["backup"]["keep"] = 1
+    dest = cfg["_dir"] / "backups" / "taste"
+    dest.mkdir(parents=True)
+    (dest / "taste-2000-01-01-0000.zip").write_bytes(b"")   # an earlier run's, with the store
+
+    def busy(cfg, dest):
+        raise blinds.BlindsBusy("database is locked")
+    monkeypatch.setattr(blinds, "snapshot", busy)
+    out = backup.run(cfg)
+    assert len(list(dest.glob("taste-*.zip"))) == 2
+    assert any("kept every older backup: the blinds store was left out" in x for x in out)
