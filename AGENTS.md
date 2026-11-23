@@ -5,7 +5,9 @@ decided, what is waiting on them, open work, recipes, gotchas), kept under ~300 
 session diary is `docs/log/<YYYY-MM>.md`: grep it for history, don't read it whole. The user
 docs are the GitHub wiki, built from `docs/wiki/` (one flat page per file, `Home.md` first,
 `_Sidebar.md` lists every page); `.github/workflows/wiki.yml` pushes it on every push to main,
-so edit the pages there, never in the wiki itself. Link pages wiki-style (`[Faces](Faces)`,
+so edit the pages there, never in the wiki itself. The same pages build the MkDocs site
+(`mkdocs.yml`, `docs_site/`); `mkdocs build --strict` is in CI. `byvfx/clippa-docs` publishes
+<https://byvfx.github.io/clippa-docs/> from this repo's main. Don't edit a generated `docs-site/*.md`. Link pages wiki-style (`[Faces](Faces)`,
 `[x](War-room#faces)`); `tests/test_wiki.py` checks the links and the sidebar. Messages link a page with
 `wiki.page("Name", "heading")` (`clippa/wiki.py`; the test checks those too). README.md is a
 short pointer and SETUP.md maps its old sections to wiki pages. At the end of a session update HANDOFF.md in place (no diaries there) and add a dated
@@ -128,7 +130,7 @@ Windows notes above don't apply.
 
 - `clippa doctor --role gpu --offline` after changing config, ffmpeg, fonts or dependencies.
 - Try risky changes on the test stream `kick-131151926` before a real one.
-- Before committing: `uvx ruff@0.17.3 check clippa tests` and `.venv/Scripts/python.exe -m pytest -q`.
+- Before committing: `uvx ruff@0.17.3 check clippa tests docs_site` and `.venv/Scripts/python.exe -m pytest -q`.
   The rules are ruff's defaults plus the few in pyproject's `[tool.ruff.lint]` (import order,
   bugbear, pyupgrade, blind excepts, stale noqa, McCabe over 15), pinned to the version in
   `required-version`; bump the pin there and in the dev group together. Tests are offline and

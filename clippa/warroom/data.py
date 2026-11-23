@@ -133,11 +133,15 @@ def kick_live(cfg: dict) -> list[dict]:
 
     if time.time() - LIVE_CACHE["at"] < 60:
         return LIVE_CACHE["data"]
+    from ..config import for_show
+    from ..review_auto import summary
+
     out = []
     for key, show in shown_shows(cfg).items():
         name = for_stream_show_name(cfg, key)
+        auto = summary(for_show(cfg, key)["review"])   # the chip's AUTO tag
         for ch in show["channels"]:
-            item = {"show": key, "show_name": name, "channel": ch, "live": False}
+            item = {"show": key, "show_name": name, "channel": ch, "live": False, "auto": auto}
             try:
                 r = requests.get(f"https://kick.com/api/v2/channels/{ch}", timeout=8,
                                  headers={"User-Agent": cfg["kick"]["user_agent"]})

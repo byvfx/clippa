@@ -8,7 +8,7 @@ lists every entry by date; grep the log, don't read it whole). At the end of a s
 changed here, then add a dated entry at the end of the log.
 
 Stream Clippa for Kino Casino (Kick channel `kinocasinogaming`), Channel 404 News and ChudLogic → YouTube
-channel **Lolcow Cinema**. Repo `C:\clipper`, remote https://github.com/byvfx/clipper (public, on purpose:
+channel **Lolcow Cinema**. Repo `C:\clipper`, remote https://github.com/byvfx/clippa (public, on purpose:
 the user said so 2026-11-10; every tracked file, issue and PR comment is readable by anyone).
 Python package `clippa/` (`clippa/defaults.toml` is every setting, documented; prompts in `clippa/prompts/`),
 config `clipper.toml` (gitignored, on the NAS; `clipper.example.toml` is a tracked starter). The user docs are
@@ -21,6 +21,11 @@ Project memory (`~/.claude/projects/C--clipper/memory/`, MEMORY.md first) holds 
   Overview" (https://claude.ai/artifact/HTF3noAawBG1M1JNYsLAMS): edit that, splice `<div class="figures">` to `<footer` into the
   site page, and carry the text to the wiki's `Overview.md` too. No show names on the page; its documentary case study names no
   subject, channel or title. The figures (347 videos, 799 tests) are dated 11-13; the 11-11 log has the re-render recipe.
+  Docs site (11-23, not live until clippa-docs Pages is GitHub Actions): MkDocs Material from `docs/wiki/`
+  (`mkdocs.yml`, site https://byvfx.github.io/clippa-docs/). The case study stays at https://byvfx.github.io/clippa/.
+  Do not enable Pages on `byvfx/clippa`, and do not edit `byvfx/byvfx.github.io`. Publishing is the `docs` workflow
+  in `byvfx/clippa-docs` (every 30 minutes, plus a manual run). That repo is not created yet: this agent's token
+  cannot create org repos. Go-live steps are on PR #390.
 - Keys are Windows **User** env vars (ANTHROPIC_API_KEY, KITSU_TOKEN, ...); agent shells must load them:
   `export KITSU_TOKEN="$(powershell.exe -NoProfile -Command "[Environment]::GetEnvironmentVariable('KITSU_TOKEN','User')" | tr -d '\r')"`
 
@@ -63,7 +68,10 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   the tailscale volume and `TS_HOSTNAME=clipper`, the Kitsu deploy's `env.clipper`, the Windows tasks,
   the NAS cut container name `clipper-cut-<id>` (the lock old and new code share) and the claude container's
   `CLIPPER_*` twins of its `CLIPPA_*` settings (for a session on a pre-rename branch).
-  Then 4 the repo name, 5 drop the fallbacks.
+  **Pass 4** (11-22): the user renamed the repo to `byvfx/clippa` (GitHub redirects the old name;
+  never make a new `byvfx/clipper`, which would end the redirect); the laptop checkout and the NAS
+  claude clone point at it, and the links, docs and user agents name it. Next, 5: drop the fallbacks
+  once `clippa doctor` shows no old names in use.
 - Titles/descriptions/cut points approved as-is; fun descriptions are liked. Long video per recurring topic
   (compilations) plus segments plus short picks. `third_party_audio = "allow_reactions"`,
   `audience_knowledge = "fans"`, Victor/blackjack segments stay; Kino's gambling is commentary, not play
@@ -221,6 +229,11 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
 - `ANTHROPIC_ADMIN_KEY` for Claude's own usage count on Costs, if wanted.
 
 ## Open work
+- **Long segments (config-7 prep, not in production):** `[segments] split_over_s` defaults to 0
+  (off). A negative value is off too; a non-number is a one-line error. The NAS `clipper.toml` does
+  not set it, and `max_s` is still 3600. Turn it on (3000, the upcoming segments prompt's 50 minutes)
+  only together with that prompt.
+
 **Priority labels (user, 2026-11-13):** every open issue carries one: `p1-now` (the queue, `gh issue list --label p1-now`),
 `p2-dated` (#258, #259, #158), `p3-track` (one big track at a time, the user picks: desktop install #46 →
 #44/#47/#45/#78; Udder Truth #58-#60; archive tooling #221-#227 before the next mini-doc; b-roll #229), `waiting` (#80, #48,
@@ -228,7 +241,7 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
 Agent-first (01-15), v0.7.0 Second channel (02-05), v0.8.0 Next mini-doc toolkit (02-26), v0.9.0 The Udder Truth (03-31), v1.0.0
 Clippa 1.0 (05-31); #370 lists the issues. A release closes its milestone (wiki Developing#releases). A new issue gets a priority
 label, and the milestone of the version it is meant for (none for `parked` and `waiting`).
-Write "#77 L6" rather than "fix #77" in commit messages: GitHub closes the issue on "fix". Roadmaps are issues only (byvfx/clipper):
+Write "#77 L6" rather than "fix #77" in commit messages: GitHub closes the issue on "fix". Roadmaps are issues only (byvfx/clippa):
 Instagram Reels #39, lore-order playlists #43, archive fun #63, crisis mode #73, setup #78, live clips #81,
 blind items #111, investigate anyone #138, meaning search #53, P&L revenue #50 (the cost ledger is built). Old-issue triage
 11-20: #36 closed (its Posts parents #30/#32 went 11-09), #56 folded into #48 as a checkbox; the rest checked and kept. **Transcript-framed edits #66** (one issue; sections
@@ -294,7 +307,20 @@ of phone use; #300 (access levels, a local Jev-like classifier in front of the m
 - **Blind items #111 (wiki Blind-items), steps 1-2 live since 11-16:** the NAS clipper.toml has one source, CDAN (add Blind Gossip's
   site when it's back), `[blinds] check_minutes = 30`, `sensitive_alerts = true`, a private `#blinds` with `alert = "digest"`. Not
   built: typed answers in the thread, a Hide this kind button. **Next: step 3**, investigate after the answer; step 4, reveals and the
-  scorecard. Flow: https://claude.ai/artifact/1m3obUigUkkA5ZVdmmiLWn
+  scorecard. **Custody and step 4 part 1 merged 11-22 (#384; follow-up #387 for Grok's last two findings), deploy pending:**
+  the store is in `clippa backup` as a checked snapshot (a damaged one goes in as `blinds.damaged.sqlite`; a damaged or busy store
+  drops no older zip), nothing is forgotten (user: "def keep all this data": `keep_days` default 0), an edited post's old text goes
+  into its history. Every check matches reveals to blinds in code (3-gram overlap >= 0.6, 0.3 ahead of the next, within a day of the
+  date line) and stores the answer; `clippa blinds reveals` scores your guesses (right / wrong / late); `list` and the war room say
+  [revealed] without the name. **Backfilled 11-22** in serve (`check --backfill 326 --no-clues`, backups in `/data/backups/blinds.sqlite.before_*`):
+  6,144 posts back to 2026-01-01. On a copy with the new code: 1,572 of 1,852 reveals match, 0 doubles; 193 wait for blinds before
+  2026 (143 from 2025), 48 quote a blind the feed never had, 35 are 2012-13 "Revealed <date>" posts. **Deploy before 2027-01-02:**
+  the deployed code still forgets non-answered blinds after 365 days. After the deploy, backfill further back (needs
+  `CLIPPER_BLINDS_BACKFILL_PAGES`, ~16 pages a quarter). Clues for the backfill (~$0.70) are read by serve's checks, 100 a pass.
+  **Reveal follow-up (11-23, branch `blinds/reveal-followup`):** a blind you answered, once revealed, gets a Discord
+  reply (its alert, its digest's thread, or the channel) with who and right/wrong/late; the war room shows who only on a blind
+  you answered, with the grade, and the scorecard in the window's header. Not built: `calibrate`, step 3 (user: eventually check all data it can grab, not
+  only the cast). Copy the newest taste zip off the NAS by hand. Flow: https://claude.ai/artifact/1m3obUigUkkA5ZVdmmiLWn
 - **News watcher #110:** off since 2026-11-03 at the user's word (`[news] check_minutes = 0`, no terms); `auto_watch = true` brings back
   the cast/figures/library list; `#news` exists in Discord.
 - **Older notes not on an issue:** republish the 2026-10-19 re-cut streams to Kitsu (user said not yet); Blade compilation's Discord

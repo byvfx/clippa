@@ -40,10 +40,14 @@ function blindCard(b) {
     ...b.sensitive.map(x => `<span class="tag bs" title="A sensitive claim">${esc(x)}</span>`),
     b.private ? `<span class="tag bp" title="Points at a private person: not looked into">private</span>` : "",
     b.hidden ? `<span class="tag" title="Hidden by [blinds] hide">hidden</span>` : "",
+    // revealed, never who: a guess made now isn't counted ("late"); `clippa blinds show` has the answer
+    b.revealed ? `<span class="tag" title="A source has revealed who it is: a guess now isn't counted">revealed</span>` : "",
     ...b.fields.map(f => `<span class="tag">${esc(f)}</span>`)].join("");
   const clues = b.clues.map(c => `<span class="bclue" title="${esc(c.type)}, weight ${c.weight}"><i>${esc(c.type)}</i>${esc(c.text)}</span>`).join("");
   const g = b.guesses[0];
   const guess = g ? `<div class="bguess">Your guess: <b>${esc(g.name)}</b>${g.person ? "" : ` <span class="by">(not in clippa people)</span>`}${g.why ? ` · because ${esc(g.why)}` : ""} <span class="by">${ago(g.at)}${g.who ? " · " + esc(g.who) : ""}</span>${g.note ? ` <span class="by">[${esc(g.note)}]</span>` : ""}</div>` : "";
+  // the answer shows only on a blind you answered (serve sends `true` for the rest)
+  const reveal = typeof b.revealed === "string" ? `<div class="bguess">Revealed: <b>${esc(b.revealed)}</b>${b.grade ? ` · ${esc(BGRADE[b.grade] || b.grade)}` : ""}${b.scored_guess && b.scored_guess !== g?.name ? ` <span class="by">(scored: ${esc(b.scored_guess)}, your guess when it was revealed)</span>` : ""}</div>` : "";
   const answer = b.kind === "reveal" ? "" : `<div class="nbar ba">
       <input class="search bname" list="blindsPeople" maxlength="120" placeholder="Who do you think it is?" value="${esc(g?.as_written || "")}" aria-label="Your guess">
       <input class="search bwhy" maxlength="500" placeholder="Why (optional)" value="${esc(g?.why || "")}" aria-label="Why">
@@ -57,7 +61,7 @@ function blindCard(b) {
     ${b.claim ? `<div class="nctx">${esc(b.claim)}</div>` : ""}
     ${clues ? `<div class="bclues">${clues}</div>` : ""}
     ${b.twin_id ? `<div class="by">Twin: <button class="lnk" data-bjump="${esc(b.twin_id)}">${esc(b.twin_id)}</button>${b.pair_why ? " · " + esc(b.pair_why) : ""}</div>` : ""}
-    ${guess}${answer}
+    ${reveal}${guess}${answer}
   </div>`;
 }
 
@@ -70,6 +74,12 @@ function blindsTyped() {
   });
   out[""] = $("#blindsText")?.value;
   return out;
+}
+const BGRADE = { right: "your guess was right", wrong: "your guess was wrong", late: "guessed after the reveal (not counted)" };
+function blindsScore(sc) {
+  if (!sc || !sc.matched) return "";
+  const judged = sc.right + sc.wrong;
+  return ` · ${sc.revealed_blinds} revealed · your guesses: ${sc.right} right, ${sc.wrong} wrong${judged ? ` (${Math.round(100 * sc.right / judged)}%)` : ""}${sc.late ? `, ${sc.late} late` : ""}`;
 }
 function renderBlinds() {
   const { data } = BS, job = data.job, c = data.counts, typed = blindsTyped(), focus = document.activeElement;
@@ -84,7 +94,7 @@ function renderBlinds() {
     .map(([v, l]) => `<option value="${esc(v)}"${v === BS.source ? " selected" : ""}>${esc(l)}</option>`).join("");
   const days = [1, 3, 7, 14, 30, 90, 365].map(x => `<option value="${x}"${x == BS.days ? " selected" : ""}>${x} day${x > 1 ? "s" : ""}</option>`).join("");
   const log = job.running || job.error || job.result ? `<div class="nctx blog">${job.running ? "Checking… " : job.error ? `<span style="color:var(--red)">${esc(job.error)}</span> ` : "Last check: "}${job.result ? esc(`${job.result.new} new, ${job.result.read} read, ${job.result.paired} paired`) : ""} <span class="by">${ago(job.at)}</span>${job.log.length ? `<pre>${esc(job.log.slice(-8).join("\n"))}</pre>` : ""}</div>` : "";
-  $("#tool").innerHTML = `<div class="m-head"><b>Blinds</b><span style="color:var(--faint);font-size:12px">${head} · clues by ${esc(data.clues_model)}${data.hidden ? ` · ${data.hidden} hidden by [blinds] hide` : ""}</span><button class="x" aria-label="Close" title="Close (Esc)" data-close>${ic("close")}</button></div>
+  $("#tool").innerHTML = `<div class="m-head"><b>Blinds</b><span style="color:var(--faint);font-size:12px">${head} · clues by ${esc(data.clues_model)}${esc(blindsScore(data.scorecard))}${data.hidden ? ` · ${data.hidden} hidden by [blinds] hide` : ""}</span><button class="x" aria-label="Close" title="Close (Esc)" data-close>${ic("close")}</button></div>
     <div class="news blinds">
       <div class="nbar"><div class="seg">${tabs}</div>
         <select id="blindsDays" aria-label="How far back">${days}</select><select id="blindsSource" aria-label="Source">${srcOpts}</select>

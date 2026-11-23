@@ -124,3 +124,83 @@ def test_one_backup_at_a_time(cfg):
     (dest / "backup.lock").write_text("someone else\n", encoding="utf-8")   # fresh: not stale
     with pytest.raises(ClipperError, match="another backup is writing"):
         backup.run(cfg)
+
+
+def test_the_blinds_store_goes_in_as_a_checked_snapshot(cfg, tmp_path):
+    import sqlite3
+
+    from clippa import blinds
+
+    cfg["paths"]["news"] = cfg["_dir"] / "news"
+    db = blinds.connect(cfg)
+    db.execute("INSERT INTO blinds (id, status, title) VALUES ('cdan-x', 'answered', 'Blind Item #9')")
+    db.commit()
+    db.close()
+    assert any(line.strip().startswith("blinds") for line in backup.run(cfg, dry_run=True))
+    backup.run(cfg)
+    (z,) = (cfg["_dir"] / "backups" / "taste").glob("taste-*.zip")
+    assert "blinds/blinds.sqlite" in names(z)
+    copy = tmp_path / "restored.sqlite"
+    with zipfile.ZipFile(z) as zf:
+        copy.write_bytes(zf.read("blinds/blinds.sqlite"))
+    with sqlite3.connect(copy) as c:
+        assert c.execute("SELECT status FROM blinds WHERE id = 'cdan-x'").fetchone() == ("answered",)
+
+
+def test_a_damaged_blinds_store_goes_in_under_its_own_name_and_the_rest_still_backs_up(cfg):
+    from clippa import blinds
+
+    cfg["paths"]["news"] = cfg["_dir"] / "news"
+    store = blinds.store_path(cfg)
+    store.parent.mkdir(parents=True)
+    store.write_bytes(b"not a database at all")
+    out = backup.run(cfg)
+    (z,) = (cfg["_dir"] / "backups" / "taste").glob("taste-*.zip")
+    got = names(z)
+    assert "blinds/blinds.damaged.sqlite" in got and "blinds/blinds.sqlite" not in got
+    assert "clipper.toml" in got and out[-1].startswith("WARNING: the blinds store")
+
+
+def test_a_busy_blinds_store_is_left_out_and_the_rest_backs_up(cfg, monkeypatch):
+    from clippa import blinds
+
+    def busy(cfg, dest):
+        raise blinds.BlindsBusy("database is locked")
+    monkeypatch.setattr(blinds, "snapshot", busy)
+    out = backup.run(cfg)
+    (z,) = (cfg["_dir"] / "backups" / "taste").glob("taste-*.zip")
+    assert not any(n.startswith("blinds/") for n in names(z)) and "clipper.toml" in names(z)
+    assert "the blinds store was busy" in out[-1]
+
+
+def test_a_damaged_blinds_store_keeps_every_older_zip(cfg):
+    from clippa import blinds
+
+    cfg["backup"]["keep"] = 1
+    backup.run(cfg)  # a good one first
+    cfg["paths"]["news"] = cfg["_dir"] / "news"
+    store = blinds.store_path(cfg)
+    store.parent.mkdir(parents=True)
+    store.write_bytes(b"not a database at all")
+    dest = cfg["_dir"] / "backups" / "taste"
+    (old,) = dest.glob("taste-*.zip")
+    old.rename(dest / "taste-2000-01-01-0000.zip")  # older by name, as a real earlier run's
+    out = backup.run(cfg)
+    assert len(list(dest.glob("taste-*.zip"))) == 2 and any("kept every older backup" in x for x in out)
+
+
+def test_a_busy_blinds_store_keeps_every_older_zip(cfg, monkeypatch):
+    """Grok on #384: the zip that still holds the store must survive a run that left it out."""
+    from clippa import blinds
+
+    cfg["backup"]["keep"] = 1
+    dest = cfg["_dir"] / "backups" / "taste"
+    dest.mkdir(parents=True)
+    (dest / "taste-2000-01-01-0000.zip").write_bytes(b"")   # an earlier run's, with the store
+
+    def busy(cfg, dest):
+        raise blinds.BlindsBusy("database is locked")
+    monkeypatch.setattr(blinds, "snapshot", busy)
+    out = backup.run(cfg)
+    assert len(list(dest.glob("taste-*.zip"))) == 2
+    assert any("kept every older backup: the blinds store was left out" in x for x in out)

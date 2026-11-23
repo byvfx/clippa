@@ -1,0 +1,150 @@
+site_name: clippa
+site_description: Clippa keeps watch. You keep the final cut.
+site_url: https://byvfx.github.io/clippa-docs/
+repo_url: https://github.com/byvfx/clippa
+repo_name: byvfx/clippa
+edit_uri: ""
+copyright: Clippa keeps watch. You keep the final cut.
+docs_dir: docs-site
+site_dir: site
+
+watch:
+  - docs/wiki
+  - docs_site
+  - overrides
+
+theme:
+  name: material
+  custom_dir: overrides
+  logo: assets/clippa-mark.svg
+  favicon: assets/favicon.ico
+  font: false
+  palette:
+    - scheme: slate
+      toggle:
+        icon: material/white-balance-sunny
+        name: Switch to light
+    - scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark
+  features:
+    - navigation.sections
+    - navigation.tracking
+    - navigation.top
+    - navigation.footer
+    - toc.follow
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+
+nav:
+  - Home: index.md
+  - Start here:
+      - Overview: overview.md
+      - Getting started: getting-started.md
+      - Install: install.md
+      - Install checklist: install-checklist.md
+      - Windows: install-windows.md
+      - macOS: install-macos.md
+      - Configuration: configuration.md
+      - Adding a show: adding-a-show.md
+      - Model providers: model-providers.md
+  - On watch:
+      - Pipeline: pipeline.md
+      - Review: review.md
+      - War room: war-room.md
+      - Reviewing: reviewing.md
+      - Roles and services: roles-and-services.md
+      - Clippa messenger: clippa-messenger.md
+      - Scheduling and uploads: scheduling-and-uploads.md
+      - Pre-shows: pre-shows.md
+      - Costs: costs.md
+      - Checkup: checkup.md
+      - Audit: audit.md
+      - Backups: backups.md
+  - Connect:
+      - Discord app: discord-app.md
+      - Kitsu: kitsu.md
+      - YouTube sign-in: youtube-sign-in.md
+      - YouTube channel: youtube-channel.md
+      - Transcribe on Modal: transcribe-on-modal.md
+      - NAS recorder: nas-recorder.md
+      - NAS hub: nas-hub.md
+      - Claude on the NAS: claude-on-the-nas.md
+      - Phone access: phone-access.md
+  - Cuts and covers:
+      - Fetching VODs: fetching-vods.md
+      - Speakers: speakers.md
+      - Faces: faces.md
+      - Covers: covers.md
+      - Cast library: cast-library.md
+      - B-roll: b-roll.md
+      - Clip art: clip-art.md
+      - Weekly issue: weekly-issue.md
+      - X posts: x-posts.md
+      - TikTok: tiktok.md
+      - News watcher: news-watcher.md
+      - Character pieces: character-pieces.md
+      - Documentaries: documentaries.md
+  - Research:
+      - Archives: archives.md
+      - People: people.md
+      - Receipts: receipts.md
+      - Investigations: investigations.md
+      - Search swarm: search-swarm.md
+      - Story dossiers: story-dossiers.md
+      - Blind items: blind-items.md
+  - Working on Clippa:
+      - Developing: developing.md
+      - How the processes talk: how-the-processes-talk.md
+      - Model trials: model-trials.md
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 2-6
+      # slugify is docs_site.convert.github_slugify, set from docs_site/hooks.py
+      # so the build does not depend on the repo being on PYTHONPATH.
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/extra.js
+
+extra:
+  generator: false
+
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+    absolute_links: warn
+  links:
+    not_found: warn
+    anchors: warn
+    absolute_links: warn
+    unrecognized_links: warn
+
+hooks:
+  - docs_site/hooks.py

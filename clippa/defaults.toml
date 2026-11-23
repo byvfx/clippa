@@ -312,7 +312,7 @@ prompt_version = "v1"      # clippa/prompts/blinds_{clues,pair}_<v>.md
 max_clues = 100            # most blinds read per check (newest first; the rest wait)
 pair_days = 14             # a twin from another source this many days apart is paired
 backfill_pages = 20        # `check --backfill DAYS`: at most this many pages back per source
-keep_days = 365            # older blinds are forgotten (reveals can come months later); answered ones kept
+keep_days = 0              # 0 = keep every blind (they are small: ~1 MB a month); N = forget older ones, except answered, no idea, reveals and revealed
 hide = []                  # tags never shown or alerted, e.g. ["sensitive:health", "source:cdan", "field:sports"]
 # How much each kind of clue counts when a guess is scored (a table here replaces this one;
 # kinds left out keep these).
@@ -401,6 +401,9 @@ prompt_version = "v3"          # clippa/prompts/segments_<version>.md and compil
 min_aside_s = 180              # fold shorter asides into the surrounding segment
 min_s = 180                    # only cut segments between min_s and max_s seconds
 max_s = 3600
+split_over_s = 0               # 0 = off. A segment longer than this is flagged for a re-split
+                               # (skip reason "re-split", `resplit` on the segment, a RESPLIT
+                               # line in the stage log) instead of being dropped for length
 skip_kinds = ["intro", "break", "ad_read", "outro", "gambling"]
 source_share = ["none", "some", "most"]   # drop "most" to skip watch-along segments
 compile_min_segments = 2       # topics with this many segments also get one long video

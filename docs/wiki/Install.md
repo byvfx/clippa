@@ -13,17 +13,17 @@ Per platform: [Windows](Install-Windows) (GPU worker, serve, bot), [macOS](Insta
 ## A release on a new machine
 
 Check out a tagged release, not main's tip: each is on the
-[Releases](https://github.com/byvfx/clipper/releases) page with what changed. You need git
+[Releases](https://github.com/byvfx/clippa/releases) page with what changed. You need git
 (`winget install Git.Git` on a Windows machine without it), then:
 
 ```powershell
-git clone https://github.com/byvfx/clipper.git C:\clipper
+git clone https://github.com/byvfx/clippa.git C:\clipper
 git -C C:\clipper checkout (git -C C:\clipper describe --tags --abbrev=0 --match 'v[0-9]*')
 powershell -ExecutionPolicy Bypass -File C:\clipper\deploy\bootstrap.ps1
 ```
 
 ```bash
-git clone https://github.com/byvfx/clipper.git ~/clipper && cd ~/clipper
+git clone https://github.com/byvfx/clippa.git ~/clipper && cd ~/clipper
 git checkout "$(git describe --tags --abbrev=0 --match 'v[0-9]*')"
 bash deploy/bootstrap.sh
 ```

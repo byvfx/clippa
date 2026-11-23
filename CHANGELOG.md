@@ -10,6 +10,35 @@ Developing#releases.
 
 ## Unreleased
 
+### 2026-11
+
+- 11-23: The docs site is an MkDocs Material build of the wiki pages (`mkdocs build --strict` in CI).
+  It is published from `byvfx/clippa-docs` at <https://byvfx.github.io/clippa-docs/>. The case study
+  stays at <https://byvfx.github.io/clippa/>. The wiki workflow is unchanged.
+- 11-22: The blind items' store (your answers, the reveals) goes into `clippa backup` as a checked snapshot, and no
+  blind is forgotten any more by default (`[blinds] keep_days = 0`); a number of days still forgets old untouched ones.
+  A backup whose blinds store is damaged or was busy keeps every older zip and says so.
+- 11-22: Blind items: each check matches reveal posts to the blinds they answer, in code, and scores your guess
+  against the answer; `clippa blinds reveals` prints the scorecard.
+- 11-23: Blind items: when a blind you answered is revealed, Discord replies with who the source says it
+  is and how your guess did, and the war room's Blinds window shows it on the card, with the scorecard in its header.
+- 11-22: The war room's show chips say whether each show approves its clips by itself: **AUTO**
+  when `[review] auto_approve` is on for it, *manual* when not; hover the chip for the kinds and score floors.
+- 11-22: The checkup no longer reports the bot's Discord reconnects after a short network drop as
+  "the same error 6 times": discord.py's own "Attempting a reconnect" lines are left out of the logs
+  check (a bot that stays down still shows in the services check). A card refresh that finds Kitsu
+  down says so once and tries again on the next pass, instead of a warning for every stream. The
+  bot's heartbeat now pauses while it is off Discord, so one that can't reconnect shows as down in
+  Health and the checkup after 3 minutes.
+- 11-22: The repo is `byvfx/clippa` (#286 pass 4). GitHub redirects the old `byvfx/clipper` links,
+  clones and wiki pages, so nothing breaks; message links, the docs and the image-search user agents
+  name the new one. Point an existing clone at it with `git remote set-url origin
+  https://github.com/byvfx/clippa.git`.
+- 11-22: A segment longer than `[segments] split_over_s` (0, off, so a config that doesn't set
+  it is unchanged) is flagged for a re-split instead of being dropped for length. A time Clippa
+  can't read, such as `1:xx`, is a one-line error, the same as any other bad time.
+- 11-22: `[segments] split_over_s` below 0 is off, the same as 0. A value that is not a number,
+  such as `fifty`, is a one-line error naming the setting.
 - The rename's deploy step (#286 pass 3): the NAS compose projects are `clippa-hub`, `clippa-record`
   and `clippa-claude`, and the Modal apps `clippa-whisperx` and `clippa-lipsync`. The first deploy
   of each stops the old `clipper-*` project before the new one starts (never two bots or workers

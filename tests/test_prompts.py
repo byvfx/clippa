@@ -90,6 +90,14 @@ def test_every_prompt_is_registered_and_its_default_version_is_on_file(defaults)
         assert (PROMPTS / f"{name}_{prompts.version_of(defaults, name)}.md").exists(), name
 
 
+def test_a_missing_prompt_version_names_the_file(defaults):
+    """[segments] prompt_version v99 has no file: one ClipperError naming it, not a traceback."""
+    cfg = {**defaults, "segments": {**defaults["segments"], "prompt_version": "v99"}}
+    with pytest.raises(ClipperError, match="segments_v99.md") as raised:
+        prompts.Prompts(cfg).get("segments")
+    assert "Traceback" not in str(raised.value)
+
+
 def test_get_reads_each_stages_own_version(defaults):
     p = prompts.Prompts(defaults)
     assert p.version_of("meta") == defaults["meta"]["prompt_version"] != p.version   # not scoring's

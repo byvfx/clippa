@@ -41,6 +41,33 @@ def test_do_decides_through_actions_and_replans_through_serve(defaults, monkeypa
     assert b.do("hold", "s/c01", "", "Discord @me") == ({"short": "s/c01"}, "")   # no note when nothing moved
 
 
+def test_heartbeat_pauses_while_discord_is_disconnected(defaults, monkeypatch):
+    b = make_bot(defaults)
+    beats = []
+    monkeypatch.setattr(bot.daemon, "beat", lambda *a, **k: beats.append(a[1]))
+    monkeypatch.setattr(bot.daemon, "BEAT_S", 0)
+
+    async def ready():
+        return None
+
+    monkeypatch.setattr(b, "wait_until_ready", ready)
+
+    async def two_beats():   # beat_loop runs while the client isn't closed: two turns, then stop
+        turns = iter([False, False, True])
+        monkeypatch.setattr(b, "is_closed", lambda: next(turns))
+        await b.beat_loop()
+
+    async def run():
+        await b.on_disconnect()
+        await two_beats()
+        assert beats == []   # discord.py still retrying: no heartbeat, so it goes stale
+        await b.on_resumed()
+        await two_beats()
+
+    asyncio.run(run())
+    assert beats == ["bot", "bot"] and b.offline_since is None
+
+
 class FakeResponse:
     def __init__(self, done: bool):
         self.done, self.sent = done, []

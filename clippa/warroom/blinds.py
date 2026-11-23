@@ -45,9 +45,11 @@ def blinds_get(cfg: dict, days: str | float = "", view: str = "", source: str = 
         except ClipperError:
             pass  # gone (pruned): the window just doesn't jump
     twins = blinds.twins(cfg, {b["pair"] for b in rows if b["pair"]})  # whatever the filters left out
+    sc, graded = _scorecard(cfg)
     for b in rows:
         b.pop("twin", None)
         b["twin_id"] = next((i for i in twins.get(b["pair"] or "", []) if i != b["id"]), "")
+        _reveal(b, graded)
     try:
         srcs, src_error = blinds.sources_report(cfg), ""
     except ClipperError as e:
@@ -55,8 +57,40 @@ def blinds_get(cfg: dict, days: str | float = "", view: str = "", source: str = 
     return {"blinds": rows, "more": more, "counts": counts, "hidden": sum(1 for b in every if b["hidden"]),
             "view": view, "days": d, "source": source, "sources": srcs, "sources_error": src_error,
             "people": blinds.followed(cfg), "hide": cfg["blinds"]["hide"],
-            "clues_model": cfg["blinds"]["clues_model"],
+            "clues_model": cfg["blinds"]["clues_model"], "scorecard": sc,
             "job": {k: BLINDS_JOB[k] for k in ("running", "error", "result", "at")} | {"log": BLINDS_JOB["log"][-30:]}}
+
+
+SCORE: dict = {"key": None}  # the scorecard, until the store changes (a window polls every 3 s in a check)
+
+
+def _scorecard(cfg: dict) -> tuple[dict, dict]:
+    """(the scorecard's counts, its graded rows by id), kept while the store and people.json are
+    unchanged."""
+    from .. import blinds, people
+
+    def mtime(p) -> float:
+        try:
+            return p.stat().st_mtime
+        except OSError:
+            return 0.0
+    key = (str(blinds.store_path(cfg)), mtime(blinds.store_path(cfg)), mtime(people.path(cfg)))
+    if SCORE["key"] != key:
+        sc = blinds.scorecard(cfg, match=False, say=lambda m: None)
+        SCORE.update(key=key, graded={x["id"]: x for x in sc.pop("graded")}, counts=sc)
+    return SCORE["counts"], SCORE["graded"]
+
+
+def _reveal(b: dict, graded: dict) -> dict:
+    """Who a source says, only on a blind you answered (a guess or No idea), with its grade;
+    any other revealed blind says only that it is revealed."""
+    if b.get("revealed") and b["status"] not in ("answered", "no_idea"):
+        b["revealed"] = True
+        b.pop("grade", None)
+        b.pop("scored_guess", None)
+    elif b.get("revealed") and b["id"] in graded:
+        b["grade"], b["scored_guess"] = graded[b["id"]]["grade"], graded[b["id"]]["guess"]
+    return b
 
 
 def _id(body: dict) -> str:
@@ -73,7 +107,7 @@ def blinds_answer(cfg: dict, body: dict) -> dict:
     name = str(body.get("name") or "")[:120]
     b = blinds.answer(cfg, _id(body), name, str(body.get("why") or "")[:500], bool(body.get("none")),
                       bool(body.get("not_ours")), who="war room")
-    return {"blind": {**b, "tags": blinds.tags(b), "hidden": blinds.hidden(cfg, b)}}
+    return {"blind": _reveal({**b, "tags": blinds.tags(b), "hidden": blinds.hidden(cfg, b)}, _scorecard(cfg)[1])}
 
 
 def blinds_paste(cfg: dict, body: dict) -> dict:

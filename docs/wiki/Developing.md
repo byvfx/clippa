@@ -212,8 +212,14 @@ output on thinking and wrote nothing, as `deepseek/deepseek-v4-pro` did at mediu
 
 The `wiki` workflow (`.github/workflows/wiki.yml`) pushes the pages to the wiki when a change
 lands on main. Images go in `docs/wiki/images/` and are linked by their full wiki address
-(`https://github.com/byvfx/clipper/wiki/images/<file>`). Callouts (`> [!TIP]`, `> [!WARNING]`),
+(`https://github.com/byvfx/clippa/wiki/images/<file>`). Callouts (`> [!TIP]`, `> [!WARNING]`),
 Mermaid diagrams and `<kbd>` keys all render.
+
+The same pages build the [docs site](https://byvfx.github.io/clippa-docs/). `mkdocs build --strict`
+(in CI) reads this folder through `docs_site/` and converts wiki-style links and these callouts at
+build time; the files here stay as they are, and the `wiki` workflow is unchanged. Publishing is a
+workflow in `byvfx/clippa-docs`: it checks out this repo's main and deploys there. The case study
+stays at <https://byvfx.github.io/clippa/>.
 
 - One file per page, flat: `Install-Windows.md` is the page "Install Windows". `_Sidebar.md`
   and `_Footer.md` are on every page.
@@ -221,6 +227,8 @@ Mermaid diagrams and `<kbd>` keys all render.
   repo files with their full GitHub URL.
 - `tests/test_wiki.py` checks that every page link resolves and that the sidebar lists every
   page.
-- Keep the look plain: no emoji in headings or the sidebar, and no colours of our own in the
-  Mermaid diagrams (GitHub's theme handles light and dark). The tabloid style belongs to the
-  covers and the weekly, not to these pages.
+- The Night Watch images are the look: Home uses `images/banner-dark.png` and
+  `images/banner-light.png`, and the sidebar starts with `images/sidebar-mark.png`. No emoji in
+  headings or the sidebar, and no colours of our own in the Mermaid diagrams (GitHub's theme
+  handles light and dark). The tabloid style belongs to the covers and the weekly, not to these
+  pages.

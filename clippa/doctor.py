@@ -1258,8 +1258,7 @@ def check_auto_approve(cfg: dict) -> None:
     for key in cfg["shows"] or {"": None}:
         rc = for_show(cfg, key)["review"]
         if rc["auto_approve"]:
-            floors = ", ".join(f"{k}s from {review_auto.floor_of(rc, k):g}" for k in review_auto.KINDS
-                               if review_auto.floor_of(rc, k))
+            floors = ", ".join(f"{k}s from {f:g}" for k, f in review_auto.summary(rc)["kinds"].items())
             on.append(f"{key or 'all'} ({floors or 'pre-shows only'}; {rc['auto_grace_minutes']} min)")
     ok("review", "auto-approve on: " + "; ".join(on))
     hb = daemon.heartbeat(cfg, "serve")

@@ -54,7 +54,7 @@ from zoneinfo import ZoneInfo
 from . import jsonstate
 from .errors import ClipperError
 
-UA = "clipper-news/1.0 (headline watch; https://github.com/byvfx/clipper)"
+UA = "clippa-news/1.0 (headline watch; https://github.com/byvfx/clippa)"
 GOOGLE = "https://news.google.com/rss/search?q={q}&hl=en-US&gl=US&ceid=US:en"
 REDDIT = "https://www.reddit.com/r/{sub}/new/.rss"
 RATINGS = ("strong", "maybe", "no")

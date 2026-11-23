@@ -352,6 +352,17 @@ def test_repeated_errors_group_lines_that_differ_only_in_ids():
     assert checkup.repeated_errors(text, since + timedelta(hours=11), 1, tz)[0][1] == 4   # 11:00 is before
 
 
+def test_discord_reconnects_are_not_a_repeated_error():
+    tz = checkup.ZoneInfo("America/Los_Angeles")
+    since = datetime(2026, 11, 22, 0, 0, tzinfo=tz)
+    text = "\n".join([   # a two-minute network drop, as the bot logged it on 11-22
+        *(f"2026-11-22 05:0{i}:51 ERROR   discord.client: Attempting a reconnect in {i}.67s" for i in range(6)),
+        *(f"2026-11-22 05:0{i}:52 ERROR   discord.gateway: Attempting a reconnect in {i}.2s" for i in range(5)),
+        *(f"2026-11-22 06:0{i}:00 ERROR   clippa.bot: Attempting a reconnect to Kitsu failed {i}" for i in range(5))])
+    (row,) = checkup.repeated_errors(text, since, 5, tz)
+    assert row[2].startswith("clippa.bot:")   # only discord.py's own retries are left out
+
+
 def test_logs_check_reads_serves_and_the_bots_log(defaults, tmp_path):
     cfg = in_tmp(defaults, tmp_path)
     now = datetime.now(UTC)

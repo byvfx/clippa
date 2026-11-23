@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://github.com/byvfx/clippa/wiki/images/sidebar-mark.png" alt="Clippa" width="64">
+</p>
+
 ### [Clippa](Home)
 
 **Run it**
