@@ -89,8 +89,8 @@ and `latest:<show>`. Write it to a file once and load that from your profile, an
 again after an update that adds commands:
 
 ```powershell
-clipper completion powershell > ~/clipper-completion.ps1
-Add-Content $PROFILE '. ~/clipper-completion.ps1'
+clippa completion powershell > $HOME\clipper-completion.ps1
+Add-Content $PROFILE '. $HOME\clipper-completion.ps1'
 ```
 
 (bash: `clippa completion bash > ~/.clipper-completion.bash` and source it from `~/.bashrc`.)

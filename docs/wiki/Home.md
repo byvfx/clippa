@@ -59,7 +59,7 @@ flowchart TB
 [NAS recorder](NAS-recorder) · [NAS hub](NAS-hub)<br>
 [Claude on the NAS](Claude-on-the-NAS)<br>
 [Phone access](Phone-access)<br>
-[Model providers](Model-providers)<br>
+[Model providers](Model-providers) · [Model rollout](Model-rollout)<br>
 [Adding a show](Adding-a-show) · [YouTube channel](YouTube-channel)
 
 </td>

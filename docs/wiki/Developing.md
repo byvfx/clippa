@@ -1,4 +1,4 @@
-Working on Clippa itself. `CLAUDE.md` in the repo has the full set of rules for code sessions;
+Working on Clippa itself. `AGENTS.md` in the repo has the full set of rules for code sessions;
 this page is the short version.
 
 ## Layout

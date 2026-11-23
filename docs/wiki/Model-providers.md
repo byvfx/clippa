@@ -9,6 +9,8 @@ its provider by prefix; a bare name like `claude-sonnet-5-5` is Claude, as befor
 | `openrouter:<vendor>/<model>` | OpenRouter: one key for most vendors' models, e.g. `openrouter:openai/gpt-5-mini` | `OPENROUTER_API_KEY`, or the key in `secrets/openrouter_secret.txt` (`[paths] openrouter_key`) |
 | `local:<model>` | Ollama, vLLM, LM Studio or any OpenAI-compatible server | `[llm] local_base_url` in clipper.toml (e.g. `http://<host>:11434/v1`); `LOCAL_LLM_API_KEY` if it wants one |
 
+Trying config-7, one stage at a time, is [Model rollout](Model-rollout).
+
 Add prices under `[llm.prices]` (`"openai:gpt-5-mini" = [0.25, 2.00]`, $ per 1M input/output
 tokens) so the cost lines stay right; an unlisted model counts as $0, except on OpenRouter,
 which reports what each call cost ([its own count](Costs#the-providers-own-numbers) is in the war room). `clippa doctor` checks the key or URL for every provider in

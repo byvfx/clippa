@@ -42,6 +42,7 @@ TITLES: dict[str, str] = {
     "Investigations": "Investigations",
     "Kitsu": "Kitsu",
     "Model-providers": "Model providers",
+    "Model-rollout": "Model rollout",
     "Model-trials": "Model trials",
     "NAS-hub": "NAS hub",
     "NAS-recorder": "NAS recorder",
