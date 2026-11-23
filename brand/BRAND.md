@@ -35,6 +35,12 @@ Review tools and the war room take these values from [tokens/nightwatch.css](tok
 
 Approve must always have an icon and a label, because the logo color and the approve color are both `#5EA88A`.
 
+## Voice and tagline
+
+The main tagline is "Clippa keeps watch. You keep the final cut." The secondary is "Clippa stays up. You stay in charge." The full guide is [VOICE.md](VOICE.md).
+
+Never use "we". Clippa is a tool, not a team.
+
 ## Type
 
 - UI and wordmark: **IBM Plex Sans**, medium (weight 500), from Google Fonts. The wordmark is lowercase `clippa` with `0.04em` tracking. Do not stretch, outline, or set it in another face or in uppercase.
