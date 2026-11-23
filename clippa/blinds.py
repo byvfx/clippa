@@ -351,7 +351,7 @@ def store(db: sqlite3.Connection, src: dict, items: list[dict], since: datetime 
                 db.execute("UPDATE blinds SET reveal_of = NULL, reveal_score = NULL WHERE id = ?", (bid,))
                 db.execute("UPDATE blinds SET history = json_insert(COALESCE(history, '[]'), '$[#]', "
                            "json_object('at', ?, 'what', 'unrevealed', 'reveal', ?, 'was', revealed)), "
-                           "revealed = NULL, reveal_id = NULL, revealed_at = NULL WHERE reveal_id = ?", (t, bid, bid))
+                           "revealed = NULL, reveal_id = NULL, revealed_at = NULL, reveal_told = NULL WHERE reveal_id = ?", (t, bid, bid))
     return new, edited
 
 
@@ -1316,7 +1316,7 @@ def reveal_follow_ups(cfg: dict) -> list[dict]:
     for r in raw:
         b = as_dict(r)  # it drops the alert columns: where comes from the row
         b["grade"] = grade(b, pm)
-        _, g = answer_at_reveal(b)
+        b["at_reveal"], g = answer_at_reveal(b)
         b["scored_guess"] = g["name"] if g else ""
         msg, day = r["alert_msg"] or "", r["digest_day"] or ""
         b["where"] = ({"reply": msg} if re.fullmatch(r"\d+/\d+", msg)
@@ -1326,15 +1326,22 @@ def reveal_follow_ups(cfg: dict) -> list[dict]:
 
 
 def reveal_text(b: dict) -> str:
-    """The follow-up: who the source says it is, and how your guess did."""
+    """The follow-up: who the source says it is, and how your answer did, as it was scored: your
+    answer when the reveal was posted; a name given only after it is said to be uncounted."""
     src = b["source"].upper() if len(b["source"]) <= 5 else b["source"].title()
-    head = f"🔓 **Revealed:** {src} {md(b['title'] or b['id'])} · {b['day']}"
+    again = any(h.get("what") == "unrevealed" for h in b["history"])  # the source corrected its reveal
+    head = f"🔓 **Revealed{' (corrected)' if again else ''}:** {src} {md(b['title'] or b['id'])} · {b['day']}"
     said = f"The source says: **{md(' '.join((b['revealed'] or '').split())[:300])}**"
-    if b["status"] == "no_idea" and not b["scored_guess"]:
-        return f"{head}\n{said}\nYou had no idea on this one."
-    mine = b["scored_guess"] or (b["guesses"][0]["name"] if b["guesses"] else "")
-    how = GRADE_SAYS.get(b["grade"], "")
-    return f"{head}\n{said}\nYou said **{md(mine)}**" + (f": {how}." if how else ".")
+    now = b["guesses"][0]["name"] if b["guesses"] else ""
+    at = b.get("at_reveal", "")
+    if at == "answered" and b["scored_guess"]:
+        how = GRADE_SAYS.get(b["grade"], "")
+        return f"{head}\n{said}\nYou said **{md(b['scored_guess'])}**" + (f": {how}." if how else ".")
+    line = {"no_idea": "You had no idea when it was revealed", "not_ours": "You had marked it Not ours"}.get(at, "")
+    if now and b["status"] == "answered":
+        later = f"You said **{md(now)}** after the reveal, so it isn't counted."
+        return f"{head}\n{said}\n" + (f"{line}. {later}" if line else later)
+    return f"{head}\n{said}\n{line or 'You had no idea'}."
 
 
 def mark_told(cfg: dict, bid: str) -> None:
