@@ -305,8 +305,10 @@ of phone use; #300 (access levels, a local Jev-like classifier in front of the m
   site when it's back), `[blinds] check_minutes = 30`, `sensitive_alerts = true`, a private `#blinds` with `alert = "digest"`. Not
   built: typed answers in the thread, a Hide this kind button. **Next: step 3**, investigate after the answer; step 4, reveals and the
   scorecard. **Custody (11-22, branch `blinds/custody`, not pushed):** the store is in `clippa backup` as a checked snapshot
-  (`blinds/blinds.sqlite`), and `keep_days` keeps reveals and "no idea" blinds. The store held only the live file before, so a lost
-  disk would have taken every answer. Copy the newest taste zip off the NAS by hand. Flow: https://claude.ai/artifact/1m3obUigUkkA5ZVdmmiLWn
+  (`blinds/blinds.sqlite`; a damaged one goes in as `blinds.damaged.sqlite`), `keep_days` keeps reveals and "no idea" blinds, and
+  an edited post's old text goes into its history (5 edits had already overwritten theirs). On 11-22 the store held 706 blinds
+  (2 answered), 198 reveals, no pairs. 105 blinds' opening text appears verbatim in a reveal, so step 4's matching can start in code,
+  with no model call. Copy the newest taste zip off the NAS by hand. Flow: https://claude.ai/artifact/1m3obUigUkkA5ZVdmmiLWn
 - **News watcher #110:** off since 2026-11-03 at the user's word (`[news] check_minutes = 0`, no terms); `auto_watch = true` brings back
   the cast/figures/library list; `#news` exists in Discord.
 - **Older notes not on an issue:** republish the 2026-10-19 re-cut streams to Kitsu (user said not yet); Blade compilation's Discord

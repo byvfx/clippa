@@ -26,7 +26,7 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
-from . import blinds, jsonstate
+from . import blinds, jsonstate, wiki
 from .config import base, for_show, for_stream
 from .errors import ClipperError
 
@@ -125,9 +125,12 @@ def plan(cfg: dict, with_secrets: bool = False, dest: Path | None = None,
 
 def _blinds_store(cfg: dict, snap_dir: Path | None) -> list[tuple[str, Path]]:
     """The blind items' store: your answers and the reveals, research nothing can rebuild."""
-    if snap_dir is not None:
+    if snap_dir is not None:   # a damaged store still goes in, under a name that says so
         snap = blinds.snapshot(cfg, snap_dir)
-        return [("blinds/blinds.sqlite", snap)] if snap else []
+        if not snap:
+            return []
+        path, problem = snap
+        return [(f"blinds/blinds{'.damaged' if problem else ''}.sqlite", path)]
     store = blinds.store_path(cfg)
     return [("blinds/blinds.sqlite", store)] if store.is_file() else []
 
@@ -165,7 +168,11 @@ def _run(cfg: dict, to: str | Path | None, with_secrets: bool | None, dry_run: b
         # one backup at a time per folder (serve's and one by hand): a .part left behind is
         # then a killed run's, and the newest-keep count sees every finished zip
         with jsonstate.locked(dest / "backup", wait_s=5):
-            return _write(cfg, dest, target, files, secrets)
+            lines = _write(cfg, dest, target, files, secrets)
+            if any(name == "blinds/blinds.damaged.sqlite" for name, _ in files):
+                lines.append("WARNING: the blinds store failed its check; it went in as blinds.damaged.sqlite. "
+                             f"An older zip may hold a good copy: {wiki.page('Blind-items', 'where-it-lives')}")
+            return lines
     except TimeoutError:
         raise ClipperError(f"another backup is writing to {dest} now; try again when it is done") from None
 

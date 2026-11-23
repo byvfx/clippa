@@ -145,3 +145,17 @@ def test_the_blinds_store_goes_in_as_a_checked_snapshot(cfg, tmp_path):
         copy.write_bytes(zf.read("blinds/blinds.sqlite"))
     with sqlite3.connect(copy) as c:
         assert c.execute("SELECT status FROM blinds WHERE id = 'cdan-x'").fetchone() == ("answered",)
+
+
+def test_a_damaged_blinds_store_goes_in_under_its_own_name_and_the_rest_still_backs_up(cfg):
+    from clippa import blinds
+
+    cfg["paths"]["news"] = cfg["_dir"] / "news"
+    store = blinds.store_path(cfg)
+    store.parent.mkdir(parents=True)
+    store.write_bytes(b"not a database at all")
+    out = backup.run(cfg)
+    (z,) = (cfg["_dir"] / "backups" / "taste").glob("taste-*.zip")
+    got = names(z)
+    assert "blinds/blinds.damaged.sqlite" in got and "blinds/blinds.sqlite" not in got
+    assert "clipper.toml" in got and out[-1].startswith("WARNING: the blinds store")

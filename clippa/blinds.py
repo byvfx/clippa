@@ -44,6 +44,7 @@ import html
 import json
 import os
 import re
+import shutil
 import sqlite3
 import time
 import xml.etree.ElementTree as ET
@@ -126,28 +127,32 @@ def store_path(cfg: dict) -> Path:
     return Path(cfg["paths"]["news"]) / "blinds" / "blinds.sqlite"
 
 
-def snapshot(cfg: dict, dest: Path) -> Path | None:
-    """A consistent copy of the store, taken with SQLite's backup API (safe while serve writes),
-    checked with integrity_check. None when there is no store yet."""
+def snapshot(cfg: dict, dest: Path) -> tuple[Path, str] | None:
+    """A consistent copy of the store, taken with SQLite's backup API (safe while serve writes)
+    and checked with integrity_check -> (copy, problem), problem "" when the check passed. When
+    SQLite can't read the store at all, the copy is the raw file. A damaged copy is still
+    returned: for a repair, it beats none. None when there is no store yet."""
     src = store_path(cfg)
     if not src.is_file():
         return None
     out = dest / "blinds.sqlite"
     out.unlink(missing_ok=True)
-    a = sqlite3.connect(src, timeout=30)
     try:
-        b = sqlite3.connect(out)
+        a = sqlite3.connect(src, timeout=30)
         try:
-            a.backup(b)
-            ok = b.execute("PRAGMA integrity_check").fetchone()[0]
+            b = sqlite3.connect(out)
+            try:
+                a.backup(b)
+                ok = b.execute("PRAGMA integrity_check").fetchone()[0]
+            finally:
+                b.close()
         finally:
-            b.close()
-    finally:
-        a.close()
-    if ok != "ok":
+            a.close()
+    except sqlite3.Error as e:
         out.unlink(missing_ok=True)
-        raise ClipperError(f"the blinds store failed its integrity check ({ok}); not backed up")
-    return out
+        shutil.copy2(src, out)
+        return out, f"SQLite couldn't read it ({e}); the raw file is copied"
+    return out, "" if ok == "ok" else f"integrity_check: {ok}"
 
 
 def connect(cfg: dict) -> sqlite3.Connection:
@@ -307,7 +312,8 @@ def blind_id(src: dict, kind: str, e: dict) -> str:
 
 def store(db: sqlite3.Connection, src: dict, items: list[dict], since: datetime | None = None) -> tuple[int, int]:
     """New blinds and reveals from one source -> (new, edited). An entry seen before whose text
-    changed is updated (an answer added to a blind later is how some sources reveal)."""
+    changed is updated (an answer added to a blind later is how some sources reveal); the text it
+    had goes into its history, in the same statement, so a concurrent answer's entry isn't lost."""
     t, new, edited = news.iso(news.now()), 0, 0
     for e in items:
         kind = classify(src, e["title"])
@@ -325,8 +331,9 @@ def store(db: sqlite3.Connection, src: dict, items: list[dict], since: datetime 
                       (bid, src["name"], kind, e["title"], e["url"], published, day_of(e["published"]), t, text,
                        "reveal" if kind == "reveal" else "unread")).rowcount:
             new += 1
-        elif db.execute("UPDATE blinds SET text = ?, edited_at = ? WHERE id = ? AND text != ?",
-                        (text, t, bid, text)).rowcount:
+        elif db.execute("UPDATE blinds SET history = json_insert(COALESCE(history, '[]'), '$[#]', "
+                        "json_object('at', ?, 'what', 'edited', 'text', text)), text = ?, edited_at = ? "
+                        "WHERE id = ? AND text != ?", (t, text, t, bid, text)).rowcount:
             edited += 1
     return new, edited
 

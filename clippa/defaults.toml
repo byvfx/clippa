@@ -312,7 +312,7 @@ prompt_version = "v1"      # clippa/prompts/blinds_{clues,pair}_<v>.md
 max_clues = 100            # most blinds read per check (newest first; the rest wait)
 pair_days = 14             # a twin from another source this many days apart is paired
 backfill_pages = 20        # `check --backfill DAYS`: at most this many pages back per source
-keep_days = 365            # older blinds are forgotten (reveals can come months later); answered ones kept
+keep_days = 365            # older blinds are forgotten (reveals can come months later); kept: answered, no idea, reveals
 hide = []                  # tags never shown or alerted, e.g. ["sensitive:health", "source:cdan", "field:sports"]
 # How much each kind of clue counts when a guess is scored (a table here replaces this one;
 # kinds left out keep these).

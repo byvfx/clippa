@@ -131,7 +131,11 @@ def test_blogger_entries_become_blinds_and_reveals_by_day_and_number(cfg, monkey
                         "bg.example": rss()})
     n = blinds.check(cfg, clues=False)
     assert (n["new"], n["edited"]) == (0, 1)
-    assert "Answer: X" in blinds.one(cfg, f"cdan-{day}-b16")["text"]
+    edited = blinds.one(cfg, f"cdan-{day}-b16")
+    assert "Answer: X" in edited["text"]
+    # The wording the clues were read from is kept, not overwritten.
+    assert edited["history"][-1]["what"] == "edited"
+    assert edited["history"][-1]["text"] == "This streamer was seen crying.\nLine two."
 
 
 def test_wordpress_ids_hash_the_guid(cfg, monkeypatch):
