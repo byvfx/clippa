@@ -72,6 +72,23 @@ def test_code_links_resolve():
     assert seen and not bad, "\n".join(bad)
 
 
+def test_wiki_points_readers_at_the_docs_site():
+    """Home's note, under the banner, and the sidebar and footer send readers to the docs site."""
+    pages = _pages()
+    home = pages["Home"]
+    banner = home.index("</picture>")
+    note = home.index("<!-- wiki-only -->")
+    close = home.index("<!-- /wiki-only -->")
+    intro = home.index("**Clippa**")
+    assert banner < note < close < intro
+    block = home[note:close]
+    assert "> [!NOTE]" in block
+    assert "https://byvfx.github.io/clippa-docs/" in block
+    assert "This wiki mirrors the" in block
+    for name in ("_Sidebar", "_Footer"):
+        assert "https://byvfx.github.io/clippa-docs/" in pages[name]
+
+
 def test_page_addresses_name_the_wiki():
     from clippa import wiki
 

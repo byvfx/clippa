@@ -221,6 +221,11 @@ build time; the files here stay as they are, and the `wiki` workflow is unchange
 workflow in `byvfx/clippa-docs`: it checks out this repo's main and deploys there. The case study
 stays at <https://byvfx.github.io/clippa/>.
 
+A block between `<!-- wiki-only -->` and `<!-- /wiki-only -->` stays on the GitHub wiki and is
+left out of the docs site. Home uses one for the note that sends wiki readers to the docs site.
+An unclosed block fails `mkdocs build --strict`. `_Sidebar.md` and `_Footer.md` are wiki-only
+already: the build skips a file whose name starts with `_`.
+
 - One file per page, flat: `Install-Windows.md` is the page "Install Windows". `_Sidebar.md`
   and `_Footer.md` are on every page.
 - Link pages wiki-style, without `.md`: `[Faces](Faces)`, `[a section](War-room#faces)`. Link

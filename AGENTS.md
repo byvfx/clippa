@@ -3,11 +3,13 @@
 Read HANDOFF.md first: the current state between sessions (what runs where, what the user
 decided, what is waiting on them, open work, recipes, gotchas), kept under ~300 lines. The
 session diary is `docs/log/<YYYY-MM>.md`: grep it for history, don't read it whole. The user
-docs are the GitHub wiki, built from `docs/wiki/` (one flat page per file, `Home.md` first,
-`_Sidebar.md` lists every page); `.github/workflows/wiki.yml` pushes it on every push to main,
-so edit the pages there, never in the wiki itself. The same pages build the MkDocs site
-(`mkdocs.yml`, `docs_site/`); `mkdocs build --strict` is in CI. `byvfx/clippa-docs` publishes
-<https://byvfx.github.io/clippa-docs/> from this repo's main. Don't edit a generated `docs-site/*.md`. Link pages wiki-style (`[Faces](Faces)`,
+docs are the site at <https://byvfx.github.io/clippa-docs/>, built from `docs/wiki/` (one flat page per
+file, `Home.md` first, `_Sidebar.md` lists every page). The GitHub wiki mirrors those pages
+(`.github/workflows/wiki.yml` on every push to main) and points readers at the site; edit the pages
+in the repo, never in the wiki itself. A `<!-- wiki-only -->` ... `<!-- /wiki-only -->` block stays
+on the wiki and is dropped by the site build (`docs_site/convert.py`; `mkdocs.yml`, `docs_site/`).
+`mkdocs build --strict` is in CI. `byvfx/clippa-docs` publishes the site from this repo's main.
+Don't edit a generated `docs-site/*.md`. Link pages wiki-style (`[Faces](Faces)`,
 `[x](War-room#faces)`); `tests/test_wiki.py` checks the links and the sidebar. Messages link a page with
 `wiki.page("Name", "heading")` (`clippa/wiki.py`; the test checks those too). README.md is a
 short pointer and SETUP.md maps its old sections to wiki pages. At the end of a session update HANDOFF.md in place (no diaries there) and add a dated

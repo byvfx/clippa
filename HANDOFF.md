@@ -12,7 +12,8 @@ channel **Lolcow Cinema**. Repo `C:\clipper`, remote https://github.com/byvfx/cl
 the user said so 2026-11-10; every tracked file, issue and PR comment is readable by anyone).
 Python package `clippa/` (`clippa/defaults.toml` is every setting, documented; prompts in `clippa/prompts/`),
 config `clipper.toml` (gitignored, on the NAS; `clipper.example.toml` is a tracked starter). The user docs are
-the GitHub wiki, built from `docs/wiki/` (`.github/workflows/wiki.yml` pushes it on every push to main);
+the site at https://byvfx.github.io/clippa-docs/ (MkDocs from `docs/wiki/`). The GitHub wiki mirrors those
+pages (`.github/workflows/wiki.yml` on every push to main) and points readers at the site.
 README.md and SETUP.md are short pointers; AGENTS.md the conventions; `reports/` the monthly analytics; `docs/archive/` the old audits.
 Project memory (`~/.claude/projects/C--clipper/memory/`, MEMORY.md first) holds durable preferences.
 - Plan doc: https://claude.ai/code/artifact/a9bb9e38-ced0-4455-8d8e-18a78122f45f; usage walkthrough (2026-10-27):
@@ -21,11 +22,12 @@ Project memory (`~/.claude/projects/C--clipper/memory/`, MEMORY.md first) holds 
   Overview" (https://claude.ai/artifact/HTF3noAawBG1M1JNYsLAMS): edit that, splice `<div class="figures">` to `<footer` into the
   site page, and carry the text to the wiki's `Overview.md` too. No show names on the page; its documentary case study names no
   subject, channel or title. The figures (347 videos, 799 tests) are dated 11-13; the 11-11 log has the re-render recipe.
-  Docs site (11-23, not live until clippa-docs Pages is GitHub Actions): MkDocs Material from `docs/wiki/`
-  (`mkdocs.yml`, site https://byvfx.github.io/clippa-docs/). The case study stays at https://byvfx.github.io/clippa/.
-  Do not enable Pages on `byvfx/clippa`, and do not edit `byvfx/byvfx.github.io`. Publishing is the `docs` workflow
-  in `byvfx/clippa-docs` (every 30 minutes, plus a manual run). That repo is not created yet: this agent's token
-  cannot create org repos. Go-live steps are on PR #390.
+  Docs site (11-23, live at https://byvfx.github.io/clippa-docs/): MkDocs Material from `docs/wiki/`
+  (`mkdocs.yml`), published from `byvfx/clippa-docs`. The GitHub wiki mirrors the same pages. Home has a
+  note under the banner, and the sidebar and footer link to the site. A `<!-- wiki-only -->` block is
+  dropped by `docs_site/convert.py`, so that note is not on the site. The case study stays at
+  https://byvfx.github.io/clippa/. Do not enable Pages on `byvfx/clippa`, and do not edit
+  `byvfx/byvfx.github.io`. Repo About > Website still needs setting to the docs URL (the gear next to About).
 - Keys are Windows **User** env vars (ANTHROPIC_API_KEY, KITSU_TOKEN, ...); agent shells must load them:
   `export KITSU_TOKEN="$(powershell.exe -NoProfile -Command "[Environment]::GetEnvironmentVariable('KITSU_TOKEN','User')" | tr -d '\r')"`
 

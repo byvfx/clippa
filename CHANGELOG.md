@@ -12,6 +12,9 @@ Developing#releases.
 
 ### 2026-11
 
+- 11-23: The GitHub wiki points at the docs site. Home has a note under the banner, and the
+  sidebar and footer link to <https://byvfx.github.io/clippa-docs/>. That note is left out of
+  the docs site.
 - 11-23: The docs site is an MkDocs Material build of the wiki pages (`mkdocs build --strict` in CI).
   It is published from `byvfx/clippa-docs` at <https://byvfx.github.io/clippa-docs/>. The case study
   stays at <https://byvfx.github.io/clippa/>. The wiki workflow is unchanged.

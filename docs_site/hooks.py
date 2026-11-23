@@ -1,4 +1,8 @@
-"""MkDocs hook: regenerate docs-site/*.md from docs/wiki/ before each build."""
+"""MkDocs hook: regenerate docs-site/*.md from docs/wiki/ before each build.
+
+``docs_site.convert`` drops ``<!-- wiki-only -->`` blocks, so a note can stay on the
+GitHub wiki and off this site. ``_Sidebar.md`` and ``_Footer.md`` are not copied.
+"""
 
 from __future__ import annotations
 

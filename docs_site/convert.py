@@ -1,7 +1,8 @@
 """Turn a GitHub wiki page into a MkDocs page.
 
 docs/wiki/ stays the source the GitHub wiki renders. This module rewrites links and
-callouts only in the copy MkDocs builds.
+callouts only in the copy MkDocs builds. A ``<!-- wiki-only -->`` ... ``<!-- /wiki-only -->``
+block is kept on the wiki and dropped here (HTML comments do not render on GitHub).
 """
 
 from __future__ import annotations
@@ -80,6 +81,12 @@ _ALERT = re.compile(
     re.M,
 )
 _H1 = re.compile(r"^# ", re.M)
+# One-line HTML comments. GitHub shows the block between them; the site build drops it.
+_WIKI_ONLY_BLOCK = re.compile(
+    r"(?m)^[ \t]*<!--\s*wiki-only\s*-->.*?<!--\s*/wiki-only\s*-->[ \t]*\n?",
+    re.S,
+)
+_WIKI_ONLY_MARK = re.compile(r"<!--\s*/?\s*wiki-only\s*-->")
 _ALERT_LABEL = {
     "NOTE": "Note",
     "TIP": "Tip",
@@ -114,6 +121,7 @@ def convert_page(stem: str, text: str, pages: dict[str, str], diagram: str) -> s
     if stem == "Home":
         text = _BANNER.sub("", text, count=1)
     text, slots = _mask(text)
+    text = _drop_wiki_only(text, stem)
     text = _PICTURE.sub(_picture_repl, text)
     text = _LINK.sub(lambda m: _link_repl(m, pages), text)
     text = _ALERT.sub(_alert_repl, text)
@@ -162,6 +170,14 @@ def _title(stem: str, text: str) -> str:
     if _H1.search(_mask(body)[0]):
         return body
     return f"# {TITLES[stem]}\n\n{body}"
+
+
+def _drop_wiki_only(text: str, stem: str) -> str:
+    """Drop wiki-only blocks. Inline code and fences are already masked, so a mention stays."""
+    dropped = _WIKI_ONLY_BLOCK.sub("", text)
+    if _WIKI_ONLY_MARK.search(dropped):
+        raise RuntimeError(f"{stem}: <!-- wiki-only --> markers do not pair")
+    return dropped
 
 
 def _mask(text: str) -> tuple[str, list[str]]:
