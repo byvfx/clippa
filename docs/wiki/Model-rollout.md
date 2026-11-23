@@ -4,16 +4,18 @@ The defaults stay as they are: `[segments] prompt_version` is `"v3"` until a con
 ## Config-7
 
 Config-7 is an opt-in overlay, the same kind of file as
-[`docs/big-story.toml`](https://github.com/byvfx/clipper/blob/main/docs/big-story.toml).
+[`docs/big-story.toml`](https://github.com/byvfx/clippa/blob/main/docs/big-story.toml).
 Nothing loads it on its own. Paste the tables for the stage you are turning on into
 `clipper.toml` (every stream) or into one stream's `streams/<id>/config.toml` (that stream
 only). The overlay is only those tables. Do not replace the live file with it: the live
 file still holds the shows, paths and ids.
 
-- [`docs/config-7-hybrid-segv4.toml`](https://github.com/byvfx/clipper/blob/main/docs/config-7-hybrid-segv4.toml):
+- [`docs/config-7-hybrid-segv4.toml`](https://github.com/byvfx/clippa/pull/377):
   Haiku for Pass A, Sonnet for Pass B, Opus for segments, and other models for meta, thumbnails and the cheaper checks.
-- [`docs/config-7-hybrid-segv4-openrouter.toml`](https://github.com/byvfx/clipper/blob/main/docs/config-7-hybrid-segv4-openrouter.toml):
+- [`docs/config-7-hybrid-segv4-openrouter.toml`](https://github.com/byvfx/clippa/pull/377):
   the same mix, with every bare `claude-*` name sent through OpenRouter.
+
+The config-7 overlays and the v4 prompts are on that PR's branch and not on `main` yet.
 
 `clipper.local.toml` and `CLIPPER_<SECTION>_<KEY>` still win over both.
 `clippa config get <section.key> --stream <id>` shows which layer set a value.
@@ -38,6 +40,87 @@ OpenRouter id is fine: `openrouter:anthropic/claude-opus-5.5`, and the same for
 The OpenRouter key is `OPENROUTER_API_KEY`, or the file at `[paths] openrouter_key`
 (`secrets/openrouter_secret.txt` when that path is the default). A set environment variable
 wins over the file.
+
+## Moving every Claude model to OpenRouter
+
+Move every model setting whose value is a bare `claude-...` name onto OpenRouter. Same
+model, same effort. The name changes: `claude-sonnet-5-5` becomes
+`openrouter:anthropic/claude-sonnet-5.5`, and the same for Haiku and Opus
+(`openrouter:anthropic/claude-haiku-5.5`, `openrouter:anthropic/claude-opus-5.5`).
+
+`clippa/defaults.toml` has 29 of these settings:
+
+| Section | Settings |
+|---|---|
+| `[scoring]` | `model_a`, `model_b` |
+| `[segments]` | `model`, `score_model` |
+| `[meta]` | `model` |
+| `[thumbnail]` | `model` |
+| `[shorts]` | `layout_model` |
+| `[review]` | `check_model` |
+| `[preshow]` | `model` |
+| `[chat]` | `model` |
+| `[retake]` | `model` |
+| `[pick]` | `model`, `locate_model` |
+| `[cast]` | `label_model` |
+| `[news]` | `judge_model` |
+| `[blinds]` | `clues_model` |
+| `[archive]` | `ask_model` |
+| `[receipts]` | `model`, `script_model` |
+| `[investigate]` | `facts_model`, `leads_model`, `check_model` |
+| `[swarm]` | `planner_model`, `worker_model` |
+| `[story]` | `triage_model`, `find_model`, `dossier_model`, `edit_model` |
+| `[weekly]` | `model` |
+
+Leave every setting that is not Claude as it is: Whisper (`[transcribe] model`,
+`mlx_model`, `diarize_model`, `[doc] words_model`), ElevenLabs (`[narrate] model_id`,
+`tts_model`), sync.so (`[perform] sync_model`), and `[paths]` entries. The `[llm.prices]`
+table also names `claude-haiku-5-5`, `claude-sonnet-5-5` and `claude-opus-5-5`. Those
+three rows are prices. OpenRouter reports each call's cost, so leave them.
+
+The live `clipper.toml` (its `[shows.<key>]` tables included), `clipper.local.toml` and a
+stream's `streams/<id>/config.toml` win over the defaults. After the live file is
+replaced, `clipper.local.toml`, a stream's `config.toml` and `CLIPPER_<SECTION>_<KEY>`
+(or `CLIPPA_<SECTION>_<KEY>`) still win, so a bare `claude-` name left in any of them
+keeps that call on Anthropic. From the data folder that holds the live file (`/data` in
+the containers, `/volume1/docker/clipper` on the NAS), search the files that are there:
+
+```bash
+rg -n 'claude-' clipper.toml clipper.local.toml streams/*/config.toml
+```
+
+Show tables are inside `clipper.toml`, so that file's hits cover them. When `clippa.toml`
+or `clippa.local.toml` is the file in use, search that name too (the new spelling wins
+when both are there). Leave out a path that has no file. `clippa config diff` lists
+`clipper.toml`, each show table, `clipper.local.toml` and `CLIPPER_*` / `CLIPPA_*`
+variables. A stream's `config.toml` is absent from that list.
+
+Set `OPENROUTER_API_KEY` before the swap, or put the key in the file at `[paths]
+openrouter_key` (`secrets/openrouter_secret.txt` when that path is the default). A set
+environment variable wins over the file.
+
+Do this between streams. `clippa worker --status` prints `run=running` while a stream's
+pipeline holds its lock. Wait until `clippa worker --status` shows no `run=running`.
+
+1. Copy the live file to `clipper.toml.<date>.bak` beside it (use the date you do it).
+2. `clippa doctor`.
+3. Put the all-OpenRouter file at the live path. The dated copy stays beside it.
+4. `clippa services restart all` restarts the worker, serve and the bot. It does not restart the recorder.
+5. `clippa doctor` again.
+6. After the first stream, read that stream's lines in `[paths] costs` (`logs/costs.jsonl`).
+   A model call is one line: `kind` is `llm`, `stream` is the stream id, `provider` is who
+   was billed, and `model` is the model string from the config. A call still billed
+   straight to Anthropic has `provider` `anthropic` and a `model` without the
+   `openrouter:` prefix.
+
+`clippa doctor` checks that each provider in use has its key. A bare `claude-` name still
+counts as Claude, and the Anthropic key satisfies that check. With that key still set, a
+passing doctor says nothing about a leftover name. The cost log shows a call billed
+straight to Anthropic.
+
+Rollback is [Putting it back](#putting-it-back): between streams, put the dated copy back at the live path, then `clippa services restart all` and `clippa doctor`.
+
+The NAS Claude container (`deploy/claude`, Claude Code) is separate and this swap does not cover it.
 
 ## Before a stage moves
 
