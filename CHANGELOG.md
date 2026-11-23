@@ -10,6 +10,28 @@ Developing#releases.
 
 ## Unreleased
 
+## 0.4.0 (2026-11-23)
+
+The rename reaches the NAS and the repo, the docs get a site of their own, and blind items learn
+their answers. The containers run as `clippa-hub`, `clippa-record` and `clippa-claude`, and the
+repo is `byvfx/clippa` (the old links redirect). The `clipper` command, `clipper.toml` and the
+`CLIPPER_*` variables still work until the rename's last pass (#286).
+
+- **The rename, passes 3-4:** compose projects and Modal apps named `clippa-*` (the first deploy
+  stops the old project, so there are never two bots or workers at once), `CLIPPA_*` in `deploy/`,
+  and the repo moved to `byvfx/clippa`.
+- **Docs site:** the wiki pages also build as an MkDocs Material site at
+  <https://byvfx.github.io/clippa-docs/>, checked in CI; the GitHub wiki points at it.
+- **Blind items:** reveals are matched to the blinds they answer and your guesses scored
+  (`clippa blinds reveals`); Discord and the war room show who it was and how you did; the
+  blinds store is in `clippa backup`.
+- **Review:** Discord cards in the Night Watch look (a status icon and word in the title,
+  Findings, a live grace countdown, a Re-split button), and the war room's show chips say which
+  shows approve their clips by themselves (AUTO or manual, with the score floors on hover).
+- **Running it:** the checkup stops counting the bot's Discord reconnects as a repeated error,
+  the bot shows as down when it can't get back on Discord, and a too-long segment is flagged for
+  a re-split instead of dropped (`[segments] split_over_s`, off by default).
+
 ### 2026-11
 
 - 11-23: Discord review cards use the Night Watch palette and voice. The title leads with a status
@@ -18,6 +40,12 @@ Developing#releases.
   `[segments] split_over_s` shows as Re-split with a button on its own row. Stream-ready, Modal
   spend and error DMs are embeds. The bot sets a status line. Its name, avatar and about line
   are unchanged (those are set in the Discord Developer Portal).
+- 11-23: Dependencies: anthropic 2.10, numpy 2.5.5, opencv-python-headless 5.1 and the latest
+  yt-dlp (#345).
+- 11-23: The conventions file for contributors and coding agents is `AGENTS.md`; `CLAUDE.md`
+  imports it, so either name finds the same rules.
+- 11-23: Blind items: when a blind you answered is revealed, Discord replies with who the source says it
+  is and how your guess did, and the war room's Blinds window shows it on the card, with the scorecard in its header.
 - 11-23: Wiki voice. The pages no longer say we, us or our. A reviewer's note is a retake;
   re-split stays the flag for a segment that needs splitting again.
 - 11-23: The GitHub wiki points at the docs site. Home has a note under the banner, and the
@@ -31,8 +59,6 @@ Developing#releases.
   A backup whose blinds store is damaged or was busy keeps every older zip and says so.
 - 11-22: Blind items: each check matches reveal posts to the blinds they answer, in code, and scores your guess
   against the answer; `clippa blinds reveals` prints the scorecard.
-- 11-23: Blind items: when a blind you answered is revealed, Discord replies with who the source says it
-  is and how your guess did, and the war room's Blinds window shows it on the card, with the scorecard in its header.
 - 11-22: The war room's show chips say whether each show approves its clips by itself: **AUTO**
   when `[review] auto_approve` is on for it, *manual* when not; hover the chip for the kinds and score floors.
 - 11-22: The checkup no longer reports the bot's Discord reconnects after a short network drop as
@@ -50,7 +76,7 @@ Developing#releases.
   can't read, such as `1:xx`, is a one-line error, the same as any other bad time.
 - 11-22: `[segments] split_over_s` below 0 is off, the same as 0. A value that is not a number,
   such as `fifty`, is a one-line error naming the setting.
-- The rename's deploy step (#286 pass 3): the NAS compose projects are `clippa-hub`, `clippa-record`
+- 11-22: The rename's deploy step (#286 pass 3): the NAS compose projects are `clippa-hub`, `clippa-record`
   and `clippa-claude`, and the Modal apps `clippa-whisperx` and `clippa-lipsync`. The first deploy
   of each stops the old `clipper-*` project before the new one starts (never two bots or workers
   at once); tailscale keeps its sign-in. Transcription uses the old Modal app until `clippa
