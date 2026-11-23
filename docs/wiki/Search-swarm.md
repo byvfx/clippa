@@ -4,7 +4,7 @@ A planner (Sonnet) turns the goal (a story brief, a lead) into up to 16 first ta
 8 at a time) each run one tool in code and read its numbered results: YouTube search (bounded to
 the run's week, month or year, approximate dates), a YouTube channel's uploads and streams, a Kick
 channel's VODs, an Odysee channel, Reddit and the web (Brave), an archive subject's transcripts and
-our own streams' segments. Each worker marks the results that fit (strong or maybe) and proposes up to 3 follow-ups (a clip channel
+your recorded streams' segments. Each worker marks the results that fit (strong or maybe) and proposes up to 3 follow-ups (a clip channel
 that keeps covering it, another person, a quote to search). The coordinator merges findings by
 platform id, queues follow-ups it hasn't seen as the next round, and stops at `[swarm]
 max_rounds`, `max_tasks`, `budget_usd` or `max_wall_s`. A channel task lists up to `channel_depth`

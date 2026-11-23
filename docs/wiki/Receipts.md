@@ -14,7 +14,7 @@ The edit is `streams/<id>/receipts/receipts.json`: flip `use`, reorder, trim `st
 (seconds in the source video), rewrite a story card (`story`, `now`) or the `title` /
 `description`, then `cut` again. Each clip carries the channel and date on screen and its
 source link at that moment in the description, with chapters per story. Clips are bleeped
-from the archive's word timings like our own cuts. With a script, the open, each story card
+from the archive's word timings like Clippa's own cuts. With a script, the open, each story card
 and a "THEN / date" card before each clip carry the read (`[narrate] voice_id`, Mother Moo);
 edit any line in receipts.json and `cut` re-voices only that one. Every part is normalized to
 `[receipts] lufs`. It needs `ELEVENLABS_API_KEY` ([Character pieces](Character-pieces#narration-voice-elevenlabs)) only when there is a

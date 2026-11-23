@@ -13,7 +13,7 @@ flowchart TB
   subgraph ship ["3. Ship"]
     direction LR
     rv{{"review<br/>Kitsu · Discord · war room"}} -->|approved| sch["schedule"] --> up["upload to YouTube"]
-    rv -. "note" .-> rt["retake<br/>re-cut or re-cover, back to review"]
+    rv -. "note" .-> rt["retake<br/>cut again or re-cover, back to review"]
   end
   find --> make --> ship
 ```

@@ -7,13 +7,13 @@ model spend earlier runs wrote into their output files (score, segments, receipt
 
 ```bash
 clippa costs [--month 2026-10]     # month's spend: models + Modal + fixed, by stage/show/stream
-clippa costs --providers           # the Claude API's and OpenRouter's own count, next to our log
+clippa costs --providers           # the Claude API's and OpenRouter's own count, next to Clippa's log
 clippa modal                       # GPUs up, runs, spend, archive ETA
 ```
 
 ## The providers' own numbers
 
-Our log prices each call from `[llm] prices` (OpenRouter reports its own cost). `clippa costs
+Clippa's log prices each call from `[llm] prices` (OpenRouter reports its own cost). `clippa costs
 --providers` and the war room's [API usage panel](War-room#modal-costs-and-analytics) ask the
 providers instead, so spend the log missed (another tool on the same key, the Console's
 workbench, a crash before the line was written) shows up too. Each is asked at most every 5
@@ -24,7 +24,7 @@ minutes.
   individual accounts): set `ANTHROPIC_ADMIN_KEY`, or put it in
   `secrets/anthropic_admin_secret.txt` (`[paths] anthropic_admin_key`). The normal
   `ANTHROPIC_API_KEY` can't read it. Costs appear about 5 minutes after a call. Without the key
-  the panel shows our log for Claude and says what to set; `clippa doctor` warns.
+  the panel shows Clippa's log for Claude and says what to set; `clippa doctor` warns.
 - **OpenRouter**: the key Clippa uses (`OPENROUTER_API_KEY` or `secrets/openrouter_secret.txt`):
   today, this week, this month, all time, what's left of the key's limit if it has one, and
   the account balance when the key may read it.
@@ -35,7 +35,7 @@ the bot DMs each time the month passes a multiple of `[modal] alert_every_usd`.
 ## What things cost
 
 > [!NOTE]
-> Rough figures measured on our own runs; `--dry-run` gives the real estimate where a
+> Rough figures measured on this install's runs; `--dry-run` gives the real estimate where a
 > command offers it.
 
 | Job | Cost |

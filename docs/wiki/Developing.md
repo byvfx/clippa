@@ -234,6 +234,6 @@ already: the build skips a file whose name starts with `_`.
   page.
 - The Night Watch images are the look: Home uses `images/banner-dark.png` and
   `images/banner-light.png`, and the sidebar starts with `images/sidebar-mark.png`. No emoji in
-  headings or the sidebar, and no colours of our own in the Mermaid diagrams (GitHub's theme
+  headings or the sidebar, and no colours of your own in the Mermaid diagrams (GitHub's theme
   handles light and dark). The tabloid style belongs to the covers and the weekly, not to these
   pages.

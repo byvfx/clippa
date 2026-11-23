@@ -1,4 +1,4 @@
-What we have tried in place of Claude, what it cost and what came of it. The tools are on
+What has been tried in place of Claude, what it cost and what came of it. The tools are on
 [Model providers](Model-providers); this page is the record, newest first. Nothing here changed
 a default: Pass A is still Haiku, Pass B still Sonnet.
 

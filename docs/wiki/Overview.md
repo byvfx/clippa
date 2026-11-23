@@ -30,7 +30,7 @@ uploads that read as if a person wrote them.
 Clippa does the finding, cutting and packaging automatically and leaves one decision to people:
 whether each piece goes out. Every item arrives in review with its video, title, description,
 chapters and cover. A reviewer approves it, rejects it, or leaves a note, and a note triggers a
-re-cut.
+retake.
 
 ## The pipeline
 
@@ -85,7 +85,7 @@ The main flows:
 
 - The recorder finishes a show, and the worker runs the stages.
 - Items are ready for review, and they appear in Kitsu and as Discord cards.
-- A reviewer approves or leaves a note, and serve replans, or re-cuts on a note.
+- A reviewer approves or leaves a note, and serve replans, or starts a retake on a note.
 - Each hour, the schedule is replanned and the uploads go to YouTube.
 
 How the processes share state is [How the processes talk](How-the-processes-talk).

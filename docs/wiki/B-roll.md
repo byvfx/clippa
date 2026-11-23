@@ -65,7 +65,7 @@ is never kept, whatever else the licence says, even "public domain, non-commerci
 - **Credits.** Put the clip's credit line in the description of any video that uses it.
 - **Sound.** Clips have no sound unless `[broll] audio = true`. NASA videos often carry
   licensed music; with the sound on, a NASA clip whose credits mention music is skipped.
-- **No endorsement.** Nothing may suggest an agency endorses us: no insignia or recognizable
+- **No endorsement.** Nothing may suggest an agency endorses you: no insignia or recognizable
   service member on a cover or as the subject of a title.
 - **Pixabay's limits.** Its licence needs no credit (the uploader's name is kept anyway), but it
   bans selling a clip unaltered, using one that shows a brand or a logo commercially, and

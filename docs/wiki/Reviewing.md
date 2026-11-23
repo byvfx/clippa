@@ -26,7 +26,7 @@ found (a face cut off, the wrong person on the cover, a title naming someone the
 mentions): look there first. When the show [approves by silence](Review#approval-by-silence), an
 **Auto-approve** field says when the item approves itself unless you act, or why it waits for you;
 any button you press leaves it to you. **Approve**. **Reject…** with a reason. **Changes…** says what to change:
-the item is re-cut or re-covered and comes back as a new card. **Hold** keeps it out of the
+Clippa starts a retake: the item is cut again or re-covered and comes back as a new card. **Hold** keeps it out of the
 schedule until you unhold it. **Reopen** undoes a decision. **Pin time…** sets its publish time.
 **Retitle…** edits the YouTube title, description, hashtags, tags and playlist in one form.
 **Thumbnail text…** changes the cover's words; the new cover replaces the old one. Slash
