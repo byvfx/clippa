@@ -3,6 +3,7 @@
 import re
 from pathlib import Path
 
+import pytest
 from conftest import ROOT
 from test_wiki import _prose
 
@@ -98,6 +99,45 @@ def test_home_drops_the_banner_and_uses_the_pipeline_figure():
     assert '<table markdown="block">' in out
     body = out.split("---", 2)[-1]
     assert not body.lstrip().startswith("# ")
+    # The GitHub-wiki note under the banner is marked wiki-only and does not ship.
+    assert "wiki-only" not in out
+    assert "This wiki mirrors" not in out
+    assert "byvfx.github.io/clippa-docs" not in out
+    assert '!!! tip "Tip"' in out
+
+
+def test_wiki_only_block_is_dropped_and_a_mention_in_code_stays():
+    text = (
+        "See `<!-- wiki-only -->` in the source.\n\n"
+        "<!-- wiki-only -->\n"
+        "> [!NOTE]\n"
+        "> Only on the wiki.\n"
+        "<!-- /wiki-only -->\n\n"
+        "After [Install](Install)\n"
+    )
+    out = convert_page("Install", text, {"Install": text}, "")
+    assert "Only on the wiki" not in out
+    assert "> [!" not in out
+    assert "`<!-- wiki-only -->`" in out
+    assert "\nAfter " in out
+    assert "](install.md)" in out
+    assert out.startswith("# Install\n")
+
+
+def test_unclosed_wiki_only_block_fails():
+    pages = {"Install": ""}
+    with pytest.raises(RuntimeError, match="wiki-only"):
+        convert_page("Install", "<!-- wiki-only -->\n> [!NOTE]\n> Hi\n", pages, "")
+    with pytest.raises(RuntimeError, match="wiki-only"):
+        convert_page("Install", "Before\n<!-- /wiki-only -->\n", pages, "")
+
+
+def test_wiki_only_markers_inside_a_fence_stay():
+    text = "```\n<!-- wiki-only -->\nkeep\n<!-- /wiki-only -->\n```\n\nAfter\n"
+    out = convert_page("Install", text, {"Install": text}, "")
+    assert "<!-- wiki-only -->" in out
+    assert "keep" in out
+    assert "\nAfter\n" in out
 
 
 def test_overview_picture_follows_the_theme_toggle():

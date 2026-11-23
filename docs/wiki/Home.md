@@ -5,6 +5,15 @@
   </picture>
 </p>
 
+<!-- wiki-only -->
+
+> [!NOTE]
+> The full docs, with search and the Night Watch look, are at
+> [byvfx.github.io/clippa-docs](https://byvfx.github.io/clippa-docs/). This wiki mirrors the
+> same pages.
+
+<!-- /wiki-only -->
+
 **Clippa** turns long Kick streams into YouTube uploads: full-length segments, topic
 compilations, Shorts, titles, descriptions, chapters and thumbnails, with a person approving
 every one before it goes out. Everything is a `clippa <stage>` command, and the always-on

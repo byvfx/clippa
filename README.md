@@ -26,10 +26,10 @@ fetch / record -> signals -> transcribe -> score -> segments -> faces -> cut -> 
                         upload <- schedule <- review (Kitsu, Discord, war room) <- review publish
 ```
 
-**The docs are in the [wiki](https://github.com/byvfx/clippa/wiki)**, built from
-[docs/wiki/](docs/wiki/) on every push to main. The same pages are the
-[docs site](https://byvfx.github.io/clippa-docs/) (`mkdocs build --strict`). New here:
-[Getting started](https://github.com/byvfx/clippa/wiki/Getting-started).
+**The docs are at [byvfx.github.io/clippa-docs](https://byvfx.github.io/clippa-docs/)**,
+built from [docs/wiki/](docs/wiki/) (`mkdocs build --strict`). The
+[wiki](https://github.com/byvfx/clippa/wiki) mirrors the same pages. New here:
+[Getting started](https://byvfx.github.io/clippa-docs/getting-started/).
 
 ## Quick start
 
