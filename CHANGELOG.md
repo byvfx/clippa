@@ -16,6 +16,8 @@ Developing#releases.
   blind is forgotten any more by default (`[blinds] keep_days = 0`); a number of days still forgets old untouched ones.
 - 11-22: Blind items: each check matches reveal posts to the blinds they answer, in code, and scores your guess
   against the answer; `clippa blinds reveals` prints the scorecard.
+- 11-22: The war room's show chips say whether each show approves its clips by itself: **AUTO**
+  when `[review] auto_approve` is on for it, *manual* when not; hover the chip for the kinds and score floors.
 - 11-22: The checkup no longer reports the bot's Discord reconnects after a short network drop as
   "the same error 6 times": discord.py's own "Attempting a reconnect" lines are left out of the logs
   check (a bot that stays down still shows in the services check). A card refresh that finds Kitsu
