@@ -157,7 +157,7 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   821.7 s before 7:28, so don't `clippa run` it until fetch is fixed. dsp and blade are config-only tests;
   `trish` is a placeholder for the 2026-10-27 one-off; trish and blade are off the war room (`[warroom] hide_shows`).
 - **Schedule** (October check-in, 11-02): `stream_budget = { segment = 10, short = 10, compilation = 0 }` per
-  8 h, Channel 404 `segment = 6`; slots a day: 9 Shorts (09/11/13/15/16/18/19/20/21), 6 segments
+  8 h, Channel 404 `segment = 9` (6 until the 11-22 check-in; Chud stays off); slots a day: 9 Shorts (09/11/13/15/16/18/19/20/21), 6 segments
   (08/10/12/14/17/22), compilation 23:00 for big-story nights only (`docs/big-story.toml` into the stream's
   config.toml). If good items keep going stale while streams overlap, try `stale_days = 4`.
 - **Chud overnight test: over (11-20).** All 71 chud segments pinned 23:00-07:00 went out on time with no `uploadLimitExceeded`
