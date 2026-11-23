@@ -1,0 +1,100 @@
+<div class="nw-pipeline" role="figure" aria-label="Pipeline: find the moments, make the videos, then ship.">
+<svg class="nw-pipeline-svg" viewBox="0 0 720 430" width="100%" aria-hidden="true">
+  <style>
+    .nw-pipeline-svg { font-family: "IBM Plex Sans", "Helvetica Neue", Helvetica, Arial, sans-serif; }
+    .nw-pipeline-svg .row { fill: var(--nw-surface); stroke: var(--nw-border); stroke-width: 1; }
+    .nw-pipeline-svg .label { fill: var(--nw-text-muted); font-size: 13px; font-weight: 500; letter-spacing: 0.08em; }
+    .nw-pipeline-svg .node { fill: var(--nw-bg); stroke: var(--nw-border); stroke-width: 1.25; }
+    .nw-pipeline-svg .node-text { fill: var(--nw-text); font-size: 14px; font-weight: 400; }
+    .nw-pipeline-svg .node-sub { fill: var(--nw-text-muted); font-size: 12px; font-weight: 400; }
+    .nw-pipeline-svg .arrow { stroke: var(--nw-accent); stroke-width: 1.75; fill: none; }
+    .nw-pipeline-svg .arrow-head { fill: var(--nw-accent); }
+    .nw-pipeline-svg .arrow-hold { stroke: var(--nw-hold); fill: none; stroke-width: 1.75; stroke-dasharray: 5 4; }
+    .nw-pipeline-svg .arrow-head-hold { fill: var(--nw-hold); }
+    .nw-pipeline-svg .edge-label { fill: var(--nw-approve); font-size: 12px; font-weight: 500; }
+    .nw-pipeline-svg .edge-label-hold { fill: var(--nw-hold); font-size: 12px; font-weight: 500; }
+    .nw-pipeline-svg .node-review { stroke: var(--nw-accent); }
+  </style>
+
+  <rect class="row" x="0" y="0" width="720" height="116" rx="8"/>
+  <rect class="row" x="0" y="132" width="720" height="116" rx="8"/>
+  <rect class="row" x="0" y="264" width="720" height="166" rx="8"/>
+
+  <text class="label" x="16" y="26">1. FIND THE MOMENTS</text>
+  <text class="label" x="16" y="158">2. MAKE THE VIDEOS</text>
+  <text class="label" x="16" y="288">3. SHIP</text>
+
+  <!-- row 1: 5 nodes, width 124, gap 16, total 684, origin 18 -->
+  <rect class="node" x="18" y="46" width="124" height="46" rx="7"/>
+  <text class="node-text" x="80" y="74" text-anchor="middle">fetch / record</text>
+  <line class="arrow" x1="142" y1="69" x2="150" y2="69"/>
+  <polygon class="arrow-head" points="158,69 149,64.5 149,73.5"/>
+
+  <rect class="node" x="158" y="46" width="124" height="46" rx="7"/>
+  <text class="node-text" x="220" y="74" text-anchor="middle">signals</text>
+  <line class="arrow" x1="282" y1="69" x2="290" y2="69"/>
+  <polygon class="arrow-head" points="298,69 289,64.5 289,73.5"/>
+
+  <rect class="node" x="298" y="46" width="124" height="46" rx="7"/>
+  <text class="node-text" x="360" y="74" text-anchor="middle">transcribe</text>
+  <line class="arrow" x1="422" y1="69" x2="430" y2="69"/>
+  <polygon class="arrow-head" points="438,69 429,64.5 429,73.5"/>
+
+  <rect class="node" x="438" y="46" width="124" height="46" rx="7"/>
+  <text class="node-text" x="500" y="74" text-anchor="middle">score</text>
+  <line class="arrow" x1="562" y1="69" x2="570" y2="69"/>
+  <polygon class="arrow-head" points="578,69 569,64.5 569,73.5"/>
+
+  <rect class="node" x="578" y="46" width="124" height="46" rx="7"/>
+  <text class="node-text" x="640" y="74" text-anchor="middle">segments</text>
+
+  <!-- row 2 -->
+  <rect class="node" x="18" y="178" width="124" height="46" rx="7"/>
+  <text class="node-text" x="80" y="206" text-anchor="middle">faces</text>
+  <line class="arrow" x1="142" y1="201" x2="150" y2="201"/>
+  <polygon class="arrow-head" points="158,201 149,196.5 149,205.5"/>
+
+  <rect class="node" x="158" y="178" width="124" height="46" rx="7"/>
+  <text class="node-text" x="220" y="206" text-anchor="middle">cut</text>
+  <line class="arrow" x1="282" y1="201" x2="290" y2="201"/>
+  <polygon class="arrow-head" points="298,201 289,196.5 289,205.5"/>
+
+  <rect class="node" x="298" y="178" width="124" height="46" rx="7"/>
+  <text class="node-text" x="360" y="206" text-anchor="middle">meta</text>
+  <line class="arrow" x1="422" y1="201" x2="430" y2="201"/>
+  <polygon class="arrow-head" points="438,201 429,196.5 429,205.5"/>
+
+  <rect class="node" x="438" y="178" width="124" height="46" rx="7"/>
+  <text class="node-text" x="500" y="206" text-anchor="middle">thumbs</text>
+  <line class="arrow" x1="562" y1="201" x2="570" y2="201"/>
+  <polygon class="arrow-head" points="578,201 569,196.5 569,205.5"/>
+
+  <rect class="node" x="578" y="178" width="124" height="46" rx="7"/>
+  <text class="node-text" x="640" y="206" text-anchor="middle">shorts</text>
+
+  <!-- row 3 -->
+  <rect class="node node-review" x="18" y="310" width="210" height="54" rx="7"/>
+  <text class="node-text" x="123" y="332" text-anchor="middle">review</text>
+  <text class="node-sub" x="123" y="350" text-anchor="middle">Kitsu · Discord · war room</text>
+
+  <line class="arrow" x1="228" y1="337" x2="268" y2="337"/>
+  <polygon class="arrow-head" points="276,337 267,332.5 267,341.5"/>
+  <text class="edge-label" x="252" y="328" text-anchor="middle">approved</text>
+
+  <rect class="node" x="276" y="316" width="140" height="42" rx="7"/>
+  <text class="node-text" x="346" y="342" text-anchor="middle">schedule</text>
+
+  <line class="arrow" x1="416" y1="337" x2="454" y2="337"/>
+  <polygon class="arrow-head" points="462,337 453,332.5 453,341.5"/>
+
+  <rect class="node" x="462" y="316" width="240" height="42" rx="7"/>
+  <text class="node-text" x="582" y="342" text-anchor="middle">upload to YouTube</text>
+
+  <path class="arrow-hold" d="M123 364 L123 396 L276 396"/>
+  <polygon class="arrow-head-hold" points="276,396 267,391.5 267,400.5"/>
+  <text class="edge-label-hold" x="200" y="388" text-anchor="middle">note</text>
+
+  <rect class="node" x="276" y="376" width="426" height="42" rx="7"/>
+  <text class="node-text" x="489" y="402" text-anchor="middle">retake · re-cut or re-cover, back to review</text>
+</svg>
+</div>

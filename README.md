@@ -27,7 +27,8 @@ fetch / record -> signals -> transcribe -> score -> segments -> faces -> cut -> 
 ```
 
 **The docs are in the [wiki](https://github.com/byvfx/clippa/wiki)**, built from
-[docs/wiki/](docs/wiki/) on every push to main. New here: [Getting started](https://github.com/byvfx/clippa/wiki/Getting-started).
+[docs/wiki/](docs/wiki/) on every push to main. The same pages build the docs site
+(`mkdocs build --strict`). New here: [Getting started](https://github.com/byvfx/clippa/wiki/Getting-started).
 
 ## Quick start
 

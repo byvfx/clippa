@@ -21,6 +21,9 @@ Project memory (`~/.claude/projects/C--clipper/memory/`, MEMORY.md first) holds 
   Overview" (https://claude.ai/artifact/HTF3noAawBG1M1JNYsLAMS): edit that, splice `<div class="figures">` to `<footer` into the
   site page, and carry the text to the wiki's `Overview.md` too. No show names on the page; its documentary case study names no
   subject, channel or title. The figures (347 videos, 799 tests) are dated 11-13; the 11-11 log has the re-render recipe.
+  Docs site (11-23, draft, not live): MkDocs Material from `docs/wiki/` (`mkdocs.yml`). Do not enable Pages on
+  `byvfx/clippa` until `clippa/` in `byvfx/byvfx.github.io` is renamed. A project site at that URL replaces the case
+  study; GitHub does not merge the two. Go-live steps are on the docs-site PR.
 - Keys are Windows **User** env vars (ANTHROPIC_API_KEY, KITSU_TOKEN, ...); agent shells must load them:
   `export KITSU_TOKEN="$(powershell.exe -NoProfile -Command "[Environment]::GetEnvironmentVariable('KITSU_TOKEN','User')" | tr -d '\r')"`
 

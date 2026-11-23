@@ -12,6 +12,10 @@ Developing#releases.
 
 ### 2026-11
 
+- 11-23: The docs site is an MkDocs Material build of the wiki pages (`mkdocs build --strict` in CI).
+  `.github/workflows/docs.yml` publishes it once GitHub Pages is set to GitHub Actions. The wiki
+  workflow is unchanged. `https://byvfx.github.io/clippa/` still serves the case study until that
+  folder is moved and Pages is turned on.
 - 11-22: The blind items' store (your answers, the reveals) goes into `clippa backup` as a checked snapshot, and no
   blind is forgotten any more by default (`[blinds] keep_days = 0`); a number of days still forgets old untouched ones.
   A backup whose blinds store is damaged or was busy keeps every older zip and says so.

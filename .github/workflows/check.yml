@@ -49,6 +49,22 @@ jobs:
       - name: Install (base dependencies + dev group + the discord extra for the bot's tests; no GPU extras)
         run: uv sync --locked --extra discord
       - name: Ruff
-        run: uv run ruff check clippa tests
+        run: uv run ruff check clippa tests docs_site
       - name: Tests
         run: uv run pytest -q
+
+  # Broken docs links fail here. The deploy workflow publishes the same build, and only once
+  # Pages is set to GitHub Actions (it does not change that setting).
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install MkDocs Material
+        run: pip install -r requirements-docs.txt
+      - name: Build the docs site
+        env:
+          NO_MKDOCS_2_WARNING: "1"
+        run: mkdocs build --strict

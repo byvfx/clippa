@@ -215,6 +215,11 @@ lands on main. Images go in `docs/wiki/images/` and are linked by their full wik
 (`https://github.com/byvfx/clippa/wiki/images/<file>`). Callouts (`> [!TIP]`, `> [!WARNING]`),
 Mermaid diagrams and `<kbd>` keys all render.
 
+The same pages build the docs site. `mkdocs build --strict` (in CI) reads this folder through
+`docs_site/` and converts wiki-style links and these callouts at build time; the files here stay
+as they are, and the `wiki` workflow is unchanged. `.github/workflows/docs.yml` publishes the
+site once GitHub Pages is set to GitHub Actions.
+
 - One file per page, flat: `Install-Windows.md` is the page "Install Windows". `_Sidebar.md`
   and `_Footer.md` are on every page.
 - Link pages wiki-style, without `.md`: `[Faces](Faces)`, `[a section](War-room#faces)`. Link
