@@ -1,1 +1,1 @@
-<sub>[Home](Home) · [Getting started](Getting-started) · `clippa doctor` · These pages are built from `docs/wiki/` in the repo, so edits made here are overwritten: [how to edit them](Developing#editing-these-docs)</sub>
+<sub>Clippa keeps watch. You keep the final cut. · [Home](Home) · [Getting started](Getting-started) · `clippa doctor` · These pages are built from `docs/wiki/` in the repo, so edits made here are overwritten: [how to edit them](Developing#editing-these-docs)</sub>
