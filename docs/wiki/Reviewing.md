@@ -20,12 +20,21 @@ lands in Kitsu whichever surface you make it on. Three surfaces; pick what fits 
 
 ## The card (Discord)
 
-Each item is one card: the preview (480p, the first 60 s of a long item), title, hook, the Kitsu
-link, and buttons. A **Checks** field lists what the [pre-flight checks](Review#pre-flight-checks)
+Each item is one card: the preview (480p, the first 60 s of a long item), the Kitsu link, and
+buttons. The title leads with the status and a word, then the YouTube title (`⏸ Held · …`,
+`⚠ Finding · …`, `⏱ Auto-approve · …`, `✓ Approved · …`, `✓ Auto-approved · …`,
+`✂ Re-split · …`, `✕ Rejected · …`, `✎ Changes · …`). Approve green is the same green as the
+logo, so the card always shows the icon and the word as well as the color. The first line of
+the card is that status in a sentence. Times and scores render in a mono face. The footer is
+`clippa`, the item, and "Clippa stays up. You stay in charge."
+
+A **Findings** field lists what the [pre-flight checks](Review#pre-flight-checks)
 found (a face cut off, the wrong person on the cover, a title naming someone the item never
 mentions): look there first. When the show [approves by silence](Review#approval-by-silence), an
-**Auto-approve** field says when the item approves itself unless you act, or why it waits for you;
-any button you press leaves it to you. **Approve**. **Reject…** with a reason. **Changes…** says what to change:
+**Auto-approve** field counts down with a live timestamp, or says why the item waits for you;
+any button you press leaves it to you. A segment longer than `[segments] split_over_s` (0, off,
+unless a config sets it) is marked **Re-split**, and its Re-split button sits on a third row.
+**Approve**. **Reject…** with a reason. **Changes…** says what to change:
 Clippa starts a retake: the item is cut again or re-covered and comes back as a new card. **Hold** keeps it out of the
 schedule until you unhold it. **Reopen** undoes a decision. **Pin time…** sets its publish time.
 **Retitle…** edits the YouTube title, description, hashtags, tags and playlist in one form.

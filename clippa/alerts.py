@@ -53,7 +53,7 @@ def outbox(cfg: dict) -> Path:
     return Path(cfg["paths"]["streams"]) / ".notify" / "outbox"
 
 
-def send(cfg: dict, kind: str, text: str, key: str = "") -> bool:
+def send(cfg: dict, kind: str, text: str, key: str = "", title: str = "", short: str = "") -> bool:
     """Queue a notification for the bot. Never raises: a lost alert mustn't stop the caller;
     False when it couldn't be queued.
     key: what counts as "the same problem" for cooldown_hours (default: the text, digits
@@ -63,7 +63,7 @@ def send(cfg: dict, kind: str, text: str, key: str = "") -> bool:
         d.mkdir(parents=True, exist_ok=True)
         ev = {"kind": kind, "text": text, "key": key or f"{kind}:{re.sub(r'[0-9]+', '#', text)[:80]}",
               "at": datetime.now().astimezone().isoformat(timespec="seconds"),
-              "host": socket.gethostname()}
+              "host": socket.gethostname(), "title": title, "short": short}
         # Sorts by time (then order within this process); unique across machines.
         name = f"{time.time_ns()}-{os.getpid()}-{next(_SEQ):06d}-{os.urandom(2).hex()}.json"
         tmp = d / f"{name}.tmp"  # whole files only: other machines read this folder
@@ -97,12 +97,16 @@ class Alerts:
         body = f"{self.mention} {text}".strip() if level >= logging.WARNING else text
         try:
             if self.webhook:
+                # A webhook post, as sent here, is content only: no side color and no buttons.
                 requests.post(self.webhook, json={"content": body[:1900]}, timeout=20)
             elif self.channel:
                 from . import notify
 
-                notify.Rest(self.cfg)("POST", f"/channels/{self.channel}/messages",
-                                      {"content": body[:1900]})
+                embed = notify.dm_embed(kind or "", text) if kind else None
+                payload = {"embeds": [embed]} if embed else {"content": body[:1900]}
+                if embed and level >= logging.WARNING and self.mention:
+                    payload["content"] = self.mention
+                notify.Rest(self.cfg)("POST", f"/channels/{self.channel}/messages", payload)
         except (requests.RequestException, ClipperError) as e:
             log.error("alert not delivered: %s", e)
 
@@ -186,9 +190,13 @@ def checks(cfg: dict, st: dict, now: datetime, digest=None) -> None:
             log.debug("modal spend check: %s", e)
 
 
-def pending(cfg: dict, link: str = "", digest=None) -> tuple[list[str], list[Path], dict]:
-    """What to DM now: the messages (each under Discord's 2000 characters), the outbox files
-    they cover and the state to save once they're sent. Nothing during quiet hours.
+# Ready, spend and errors go out as embeds. A digest or a test stays text.
+EMBED_KINDS = {"ready", "spend", "failure", "upload", "recorder", "disk", "checkup"}
+
+
+def pending(cfg: dict, link: str = "", digest=None) -> tuple[list[dict], list[Path], dict]:
+    """What to DM now: payloads ({content, embed}, each content under 2000 characters), the
+    outbox files they cover and the state to save once they're sent. Nothing during quiet hours.
     digest: see checks()."""
     nc, tz = cfg["notify"], _tz(cfg)
     now = datetime.now(tz)
@@ -199,7 +207,26 @@ def pending(cfg: dict, link: str = "", digest=None) -> tuple[list[str], list[Pat
     if not files or quiet(cfg, now):
         save_state(cfg, st)
         return [], [], st
-    lines, linked = [], False
+    payloads, linked = _payloads(files, nc, st, now, tz)
+    if linked and link:
+        _attach_link(payloads, link)
+    return payloads, files, st
+
+
+def _payloads(files: list[Path], nc: dict, st: dict, now: datetime, tz: ZoneInfo) -> tuple[list[dict], bool]:
+    """One payload per embed, text kinds batched. Marks each sent key on st."""
+    from .notify import dm_embed
+
+    payloads: list[dict] = []
+    text: list[str] = []
+    linked = False
+
+    def flush() -> None:
+        nonlocal text
+        if text:
+            payloads.extend({"content": m} for m in _batch(text))
+            text = []
+
     for f in files:
         try:
             ev = jsonstate.load(f)
@@ -212,12 +239,21 @@ def pending(cfg: dict, link: str = "", digest=None) -> tuple[list[str], list[Pat
                 and now - datetime.fromisoformat(last) < timedelta(hours=nc["cooldown_hours"]):
             continue
         st["sent"][ev["key"]] = now.isoformat(timespec="seconds")
-        at = datetime.fromisoformat(ev["at"]).astimezone(tz)
-        when = f"[{at:%a %H:%M}] " if now - at > timedelta(minutes=10) else ""  # held or late
-        lines.append(f"{ICON.get(ev['kind'], '•')} {when}{ev['text']}")
+        embed = (dm_embed(ev["kind"], ev["text"], ev.get("title") or "", ev.get("short") or "")
+                 if ev["kind"] in EMBED_KINDS else None)
+        if embed:
+            flush()
+            payloads.append({"embed": embed})
+        else:
+            at = datetime.fromisoformat(ev["at"]).astimezone(tz)
+            when = f"[{at:%a %H:%M}] " if now - at > timedelta(minutes=10) else ""  # held or late
+            text.append(f"{ICON.get(ev['kind'], '•')} {when}{ev['text']}")
         linked |= ev["kind"] in ("ready", "digest", "test")
-    if lines and link and linked:
-        lines.append(f"War room: {link}")
+    flush()
+    return payloads, linked
+
+
+def _batch(lines: list[str]) -> list[str]:
     msgs, cur = [], ""
     for line in lines:
         line = line[:1900]
@@ -227,7 +263,18 @@ def pending(cfg: dict, link: str = "", digest=None) -> tuple[list[str], list[Pat
         cur = f"{cur}\n{line}" if cur else line
     if cur:
         msgs.append(cur)
-    return msgs, files, st
+    return msgs
+
+
+def _attach_link(payloads: list[dict], link: str) -> None:
+    """The war room URL once, on the last DM."""
+    if not payloads:
+        return
+    line = f"War room: {link}"
+    last = payloads[-1]
+    if last.get("content") and line in last["content"]:
+        return
+    last["content"] = f"{last['content']}\n{line}"[:1900] if last.get("content") else line
 
 
 def done(cfg: dict, files: list[Path], st: dict) -> None:

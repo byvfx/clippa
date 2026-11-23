@@ -2,11 +2,14 @@
 notify.py) and a few slash commands, for [discord] allowed_user_ids only.
 
     buttons   Approve, Reject…, Changes…, Hold / unhold, Reopen, Pin time…, Retitle…,
-              Thumbnail text… ("…" opens a form). Each writes to Kitsu through
-              clippa/actions.py, then (with [discord] replan) reruns `clippa schedule`,
-              and updates the card; Thumbnail text also swaps in the re-rendered .jpg.
-              Retitle… edits the YouTube title, description, hashtags, tags and
-              playlist in one form.
+              Thumbnail text… ("…" opens a form), and Re-split on a segment over
+              [segments] split_over_s (its own row; a webhook message cannot carry it).
+              Each writes to Kitsu through clippa/actions.py, then (with [discord] replan)
+              reruns `clippa schedule`, and updates the card; Thumbnail text also swaps
+              in the re-rendered .jpg. Retitle… edits the YouTube title, description,
+              hashtags, tags and playlist in one form. Re-split leaves a Kitsu comment
+              and does not run the segments model. The bot also sets a presence line
+              (On watch, Watching {show}, N in review, Waiting on you, Quiet board).
     /status   decision counts per stream and what's scheduled
     /pending  items waiting on a decision (all=True: every item), with Kitsu links
     /item     show one item's card with its buttons (preview=True attaches the preview)
@@ -75,11 +78,31 @@ NEWS_POST_S = 300  # how often the bot posts what `clippa news check` (a serve j
 BLINDS_POST_S = 300  # ...and asks about the blinds `clippa blinds check` (a serve job) stored
 DONE = {"approve": "Approved", "reject": "Rejected", "changes": "Changes requested for",
         "reopen": "Reopened", "hold": "Hold toggled on", "pin": "Pinned",
-        "thumbtext": "New thumbnail text for"}
+        "thumbtext": "New thumbnail text for", "resplit": "Flagged for re-split"}
 
 
 class UserError(Exception):
     pass
+
+
+def _activity(line: str):
+    """A custom status. Bots cannot set the name, avatar or about line from here."""
+    activity = getattr(discord, "CustomActivity", None)
+    if activity is not None:
+        return activity(name=line)
+    return discord.Activity(type=discord.ActivityType.custom, name=line, state=line)
+
+
+def _dm_kwargs(message) -> dict:
+    """A queued DM: a string from older callers, or {content, embed} from alerts.pending."""
+    if isinstance(message, str):
+        return {"content": message}
+    kwargs = {}
+    if message.get("content"):
+        kwargs["content"] = message["content"]
+    if message.get("embed"):
+        kwargs["embed"] = discord.Embed.from_dict(message["embed"])
+    return kwargs or {"content": ""}
 
 
 def chunks(lines: list[str], size: int = 3900) -> list[str]:
@@ -218,6 +241,7 @@ class Bot(discord.Client):
         self.tree = app_commands.CommandTree(self)
         self.lock = asyncio.Lock()  # one Kitsu job at a time
         self.started_at = datetime.now(UTC).isoformat(timespec="seconds")
+        self._presence = ""
         self.public_warned: set[int] = set()  # #blinds channels found public, warned about this run
         self.offline_since: float | None = None  # when the gateway dropped (monotonic); None = connected
         register_commands(self)
@@ -252,6 +276,19 @@ class Bot(discord.Client):
         self.offline_since = None
         log.info(f"clippa bot ready as {self.user} in guild {self.guild_id}; "
                  f"{len(self.allowed)} allowed user(s)")
+        await self.refresh_presence()
+
+    async def refresh_presence(self) -> None:
+        """Night Watch status line. Name, avatar and about stay in the Developer Portal."""
+        try:
+            line = await asyncio.to_thread(notify.presence_for, self.cfg)
+            if line == self._presence:
+                return
+            await self.change_presence(activity=_activity(line))
+            self._presence = line
+            log.info("presence: %s", line)
+        except Exception:  # a presence failure must not stop the heartbeat
+            log.warning("presence not updated", exc_info=True)
 
     async def refresh_cards(self) -> None:
         """Edit cards whose Kitsu state changed outside Discord, every refresh_minutes."""
@@ -287,6 +324,7 @@ class Bot(discord.Client):
             if self.offline_since is None:
                 await asyncio.to_thread(daemon.beat, self.cfg, "bot", self.started_at,
                                         user=str(self.user), guild=self.guild_id)
+                await self.refresh_presence()
             await asyncio.sleep(daemon.BEAT_S)
 
     async def news_loop(self) -> None:
@@ -452,7 +490,7 @@ class Bot(discord.Client):
                 if msgs:
                     user = self.get_user(uid) or await self.fetch_user(uid)
                     for m in msgs:
-                        await user.send(m)
+                        await user.send(**_dm_kwargs(m))
                     log.info(f"notify: sent {len(files)} notification(s) in {len(msgs)} DM(s)")
                 if files:  # sent, or skipped (kind off, cooldown): either way handled
                     await asyncio.to_thread(alerts.done, self.cfg, files, st)
@@ -463,7 +501,10 @@ class Bot(discord.Client):
                     share_down = time.monotonic()
                     try:
                         user = self.get_user(uid) or await self.fetch_user(uid)
-                        await user.send(f"❌ The Clippa bot can't read the streams share: {e}")
+                        embed = notify.dm_embed(
+                            "failure", f"The Clippa bot can't read the streams share: {e}",
+                            title="Streams share")
+                        await user.send(embed=discord.Embed.from_dict(embed))
                     except Exception:
                         log.exception("notify: DM failed")
             except (Exception, SystemExit):  # SystemExit would stop the event loop, and the bot
@@ -652,6 +693,13 @@ class Bot(discord.Client):
 
     def do(self, action: str, ref: str, text, who: str) -> tuple[dict, str]:
         """text: what the form said; for "details", {Kitsu column: new value}."""
+        if action == "resplit":
+            try:
+                item = actions.resolve(self.cfg, ref)
+            except ClipperError:
+                # Not a review item: the notice button. Record the ask, no model call.
+                return {"unreviewed": True, "short": ref}, actions.ask_resplit(self.cfg, ref, who)
+            return actions.resplit(self.cfg, item, who), ""
         item = actions.resolve(self.cfg, ref)
         if action == "details":  # the bot's name for an edit; its form gives {column: value}
             row = actions.decide(self.cfg, item, "edit", who, values=text)
@@ -667,6 +715,9 @@ class Bot(discord.Client):
             row, note = await self.blocking(self.do, action, ref, text, who)
         except UserError as e:
             await interaction.followup.send(f"Nothing changed: {e}", ephemeral=True)
+            return
+        if row.get("unreviewed"):
+            await interaction.followup.send(note, ephemeral=True)
             return
         embed, _ = notify.card(row)
         if interaction.message:
@@ -736,7 +787,7 @@ def register_commands(bot: Bot) -> None:  # noqa: C901
                      + (f"\nNext: {nxt['publish_at'][:16].replace('T', ' ')} · {nxt['title']}"
                         if nxt else ""))
         await interaction.followup.send(embed=discord.Embed(
-            title="Clippa status", description="\n".join(lines)[:4096], color=0x5865F2))
+            title="Clippa status", description="\n".join(lines)[:4096], color=notify.COLORS["accent"]))
 
     @tree.command(description="Items waiting on a decision, with Kitsu links")
     @app_commands.describe(stream="only this stream", all="every item, decided or not")
@@ -756,7 +807,7 @@ def register_commands(bot: Bot) -> None:  # noqa: C901
         for i in range(0, len(pages), 10):
             await interaction.followup.send(embeds=[
                 discord.Embed(title=f"{len(rows)} items" if i + j == 0 else None,
-                              description=p, color=0x5865F2)
+                              description=p, color=notify.COLORS["accent"])
                 for j, p in enumerate(pages[i:i + 10])])
 
     @tree.command(description="Show one item's card and buttons")
@@ -795,7 +846,7 @@ def register_commands(bot: Bot) -> None:  # noqa: C901
         pages = chunks(lines or ["Nothing scheduled."])
         await interaction.followup.send(embeds=[
             discord.Embed(title=f"Next {days} days ({cfg['schedule']['timezone']})" if i == 0 else None,
-                          description=p, color=0x57F287) for i, p in enumerate(pages[:10])])
+                          description=p, color=notify.COLORS["accent"]) for i, p in enumerate(pages[:10])])
 
     @tree.command(description="Post a stream's review cards to the review channel")
     @app_commands.describe(stream="stream id", force="repost items already posted")

@@ -12,6 +12,12 @@ Developing#releases.
 
 ### 2026-11
 
+- 11-23: Discord review cards use the Night Watch palette and voice. The title leads with a status
+  icon and a word (approve green matches the logo, so it is never color alone). The Checks field
+  is now Findings, the grace countdown is a live Discord timestamp, and a segment over
+  `[segments] split_over_s` shows as Re-split with a button on its own row. Stream-ready, Modal
+  spend and error DMs are embeds. The bot sets a status line. Its name, avatar and about line
+  are unchanged (those are set in the Discord Developer Portal).
 - 11-23: Wiki voice. The pages no longer say we, us or our. A reviewer's note is a retake;
   re-split stays the flag for a segment that needs splitting again.
 - 11-23: The GitHub wiki points at the docs site. Home has a note under the banner, and the
