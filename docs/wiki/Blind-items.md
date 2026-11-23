@@ -105,7 +105,7 @@ with other sources' unpaired blinds published within `pair_days` of it (prompt `
 the same model), so a backfill pairs old twins too. A pair becomes one event: asked once, and
 answered by either source's reveal. A pairing call that fails is made again on the next check.
 With only one feed source, no pairing call is made. Blinds pasted by hand aren't paired yet. A pair whose
-other half is forgotten (`keep_days`) is unpaired.
+other half is forgotten (only when `keep_days` is set) is unpaired.
 
 ## Tags and hiding
 
@@ -236,10 +236,13 @@ reads them.
 ## Where it lives
 
 Everything is in `[paths] news/blinds/blinds.sqlite`. The blind's text is kept, because it is
-short and it is what the clue pass reads. Linked articles are never fetched. Blinds older than
-`keep_days` (365) are forgotten, except the ones you engaged with (answered, **no idea**), every
-**reveal**, and every blind a reveal answered (a reveal's text can't be fetched again once a source takes the post down, and the
-scorecard needs it). A test checks that nothing but the command, the war room's window, the bot's
+short and it is what the clue pass reads. Linked articles are never fetched.
+
+**Nothing is forgotten by default** (`[blinds] keep_days = 0`): the store is research worth
+keeping, and it is small (about 1 MB a month from one busy source). A source can take a post
+down, and its text can't be fetched again. With `keep_days` set to a number of days, older blinds
+are forgotten, except the ones you engaged with (answered, **no idea**), every **reveal**, and
+every blind a reveal answered. A test checks that nothing but the command, the war room's window, the bot's
 questions and the [taste backup](Backups) reads the blinds, so no title, description, cover, post
 or weekly issue can pick one up.
 

@@ -775,9 +775,12 @@ def check(cfg: dict, backfill_days: float = 0, clues: bool = True, claude=None, 
 
 
 def prune(cfg: dict, db: sqlite3.Connection) -> int:
-    """Forget what is older than keep_days, except what the user engaged with (answered, no idea),
-    reveals and the blinds they answered: the ground truth the scorecard is built on. Their text can't be fetched again
+    """keep_days 0 (the default): forget nothing, the store is research to keep. Otherwise forget
+    what is older, except what the user engaged with (answered, no idea), reveals and the blinds
+    they answered: the ground truth the scorecard is built on. Their text can't be fetched again
     once a source takes a post down."""
+    if cfg["blinds"]["keep_days"] <= 0:
+        return 0
     cut = news.iso(news.now() - timedelta(days=cfg["blinds"]["keep_days"]))
     n = db.execute("DELETE FROM blinds WHERE published < ? AND status NOT IN ('answered', 'no_idea', 'reveal') "
                    "AND revealed IS NULL", (cut,)).rowcount

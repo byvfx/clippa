@@ -333,6 +333,7 @@ def test_twins_from_two_sources_become_one_event(cfg, monkeypatch):
     db = blinds.connect(cfg)
     db.execute("UPDATE blinds SET published = '2020-01-01T00:00:00+00:00' WHERE id = ?", (older,))
     db.commit()
+    cfg["blinds"]["keep_days"] = 365
     blinds.prune(cfg, db)
     db.close()
     assert blinds.one(cfg, newer["id"])["pair"] is None
@@ -507,6 +508,7 @@ def test_hide_and_the_listing_filters(cfg, monkeypatch):
 
 
 def test_prune_keeps_reveals_and_no_idea_answers(cfg, monkeypatch):
+    cfg["blinds"]["keep_days"] = 365  # forgetting on; the default keeps everything
     feeds(monkeypatch, {"cdan.example": atom(("Blind Item #1", iso_days_ago(400), "old, no idea"),
                                              ("Blind Items Revealed #1", iso_days_ago(400), "the reveal"),
                                              ("Blind Item #2", iso_days_ago(400), "old, untouched")),
@@ -526,6 +528,7 @@ def test_prune_keeps_reveals_and_no_idea_answers(cfg, monkeypatch):
 
 
 def test_prune_forgets_old_blinds_but_keeps_answered_ones(cfg, monkeypatch):
+    cfg["blinds"]["keep_days"] = 365  # forgetting on; the default keeps everything
     feeds(monkeypatch, {"cdan.example": atom(("Blind Item #1", iso_days_ago(400), "old"),
                                              ("Blind Item #2", iso_days_ago(400), "old, answered")),
                         "bg.example": rss()})
@@ -981,6 +984,7 @@ def test_a_guess_made_after_the_reveal_is_late_and_a_twin_is_revealed_too(cfg, m
 
 
 def test_prune_keeps_a_revealed_blind(cfg, monkeypatch):
+    cfg["blinds"]["keep_days"] = 365  # forgetting on; the default keeps everything
     a, _ = two_blinds(cfg, monkeypatch)
     feeds(monkeypatch, {"cdan.example": atom(
         ("Blind Items Revealed #1", TODAY, reveal_html(a["day"], BLIND_A, "Pat Example"))), "bg.example": rss()})
@@ -1004,3 +1008,14 @@ def test_the_reveals_command_prints_the_scorecard(cfg, monkeypatch, capsys):
     args.fn(cfg, args)
     out = capsys.readouterr().out
     assert "1 reveals: 1 matched" in out and "1 right, 0 wrong" in out and "hit rate 100% of 1" in out
+
+
+def test_by_default_no_blind_is_ever_forgotten(cfg, monkeypatch):
+    assert cfg["blinds"]["keep_days"] == 0
+    feeds(monkeypatch, {"cdan.example": atom(("Blind Item #1", iso_days_ago(3000), "very old, untouched")),
+                        "bg.example": rss()})
+    blinds.check(cfg, clues=False)
+    db = blinds.connect(cfg)
+    assert blinds.prune(cfg, db) == 0
+    db.close()
+    assert len(blinds.listing(cfg, days=4000, everything=True)) == 1
