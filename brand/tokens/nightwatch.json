@@ -1,0 +1,303 @@
+{
+  "name": "Night Watch",
+  "product": "Clippa",
+  "version": "1.0",
+  "notes": [
+    "Dark is the primary theme.",
+    "The logo mark is always #5EA88A (--nw-mark). In dark theme --nw-approve is the same hex. Approve status must never rely on color alone: always show an icon and a label.",
+    "Light-mode status hues are deeper than the dark set so body text meets WCAG AA. They are not a simple invert.",
+    "--nw-border is a decorative hairline and does not meet 3:1. Use --nw-focus or a status token for any outline that conveys state.",
+    "PANTONE 556 C is the print specification for the mark. Confirm it against a physical Solid Coated swatch book before printing. The sRGB reference for that ink is #6FA287.",
+    "On-screen figures and copy in this kit are examples of the review flow (cuts, findings, grace auto-approve, approve, hold, re-split)."
+  ],
+  "font": {
+    "sans": "IBM Plex Sans",
+    "mono": "IBM Plex Mono",
+    "wordmark": {
+      "family": "IBM Plex Sans",
+      "weight": 500,
+      "text": "clippa",
+      "letterSpacing": "0.04em",
+      "case": "lowercase"
+    }
+  },
+  "typeScale": [
+    {
+      "token": "--nw-text-title",
+      "role": "Page title",
+      "size": 24,
+      "lineHeight": 32,
+      "weight": 500,
+      "family": "sans"
+    },
+    {
+      "token": "--nw-text-section",
+      "role": "Section title",
+      "size": 18,
+      "lineHeight": 24,
+      "weight": 500,
+      "family": "sans"
+    },
+    {
+      "token": "--nw-text-body",
+      "role": "Body and row title",
+      "size": 14,
+      "lineHeight": 20,
+      "weight": 400,
+      "family": "sans"
+    },
+    {
+      "token": "--nw-text-ui",
+      "role": "Buttons and controls",
+      "size": 13,
+      "lineHeight": 18,
+      "weight": 500,
+      "family": "sans"
+    },
+    {
+      "token": "--nw-text-label",
+      "role": "Badge and field label",
+      "size": 12,
+      "lineHeight": 16,
+      "weight": 500,
+      "family": "sans"
+    },
+    {
+      "token": "--nw-text-caption",
+      "role": "Caption and hint",
+      "size": 11,
+      "lineHeight": 16,
+      "weight": 400,
+      "family": "sans"
+    },
+    {
+      "token": "--nw-text-mono",
+      "role": "Timecodes, scores, IDs, grace timers",
+      "size": 13,
+      "lineHeight": 20,
+      "weight": 400,
+      "family": "mono",
+      "numeric": "tabular-nums"
+    }
+  ],
+  "space": {
+    "1": 4,
+    "2": 8,
+    "3": 12,
+    "4": 16,
+    "5": 24,
+    "6": 32,
+    "7": 48,
+    "unit": "px"
+  },
+  "radius": {
+    "control": 6,
+    "card": 8,
+    "panel": 12,
+    "pill": 9999,
+    "unit": "px"
+  },
+  "motion": {
+    "duration": "160ms",
+    "ease": "ease-out",
+    "reducedMotion": "Set duration to 0. Do not use motion to convey state. The grace countdown is a changing number, not a pulse."
+  },
+  "themes": {
+    "dark": {
+      "primary": true,
+      "tokens": {
+        "--nw-bg": "#0B1220",
+        "--nw-surface": "#141C2B",
+        "--nw-surface-raised": "#1C2636",
+        "--nw-border": "#2A3548",
+        "--nw-text": "#E8EEF6",
+        "--nw-text-muted": "#8B9BB4",
+        "--nw-accent": "#7EB8C9",
+        "--nw-focus": "#7EB8C9",
+        "--nw-ink": "#0B1220",
+        "--nw-mark": "#5EA88A",
+        "--nw-approve": "#5EA88A",
+        "--nw-hold": "#D4A054",
+        "--nw-finding": "#D07070",
+        "--nw-pending": "#6B8FD4",
+        "--nw-resplit": "#A992D4"
+      },
+      "contrast": {
+        "--nw-text": {
+          "onBg": "16.04:1",
+          "onSurface": "14.62:1",
+          "onRaised": "13.04:1",
+          "aa": "pass"
+        },
+        "--nw-text-muted": {
+          "onBg": "6.64:1",
+          "onSurface": "6.05:1",
+          "onRaised": "5.40:1",
+          "aa": "pass"
+        },
+        "--nw-accent": {
+          "onBg": "8.55:1",
+          "onSurface": "7.79:1",
+          "onRaised": "6.95:1",
+          "aa": "pass",
+          "ui": "pass"
+        },
+        "--nw-approve": {
+          "onBg": "6.64:1",
+          "onSurface": "6.05:1",
+          "onRaised": "5.39:1",
+          "aa": "pass",
+          "ui": "pass",
+          "inkOnFill": "6.64:1"
+        },
+        "--nw-hold": {
+          "onBg": "7.98:1",
+          "onSurface": "7.28:1",
+          "onRaised": "6.49:1",
+          "aa": "pass",
+          "ui": "pass",
+          "inkOnFill": "7.98:1"
+        },
+        "--nw-finding": {
+          "onBg": "5.56:1",
+          "onSurface": "5.06:1",
+          "onRaised": "4.52:1",
+          "aa": "pass",
+          "ui": "pass",
+          "inkOnFill": "5.56:1"
+        },
+        "--nw-pending": {
+          "onBg": "5.80:1",
+          "onSurface": "5.29:1",
+          "onRaised": "4.71:1",
+          "aa": "pass",
+          "ui": "pass",
+          "inkOnFill": "5.80:1"
+        },
+        "--nw-resplit": {
+          "onBg": "6.91:1",
+          "onSurface": "6.30:1",
+          "onRaised": "5.62:1",
+          "aa": "pass",
+          "ui": "pass",
+          "inkOnFill": "6.91:1"
+        },
+        "--nw-mark": {
+          "onBg": "6.64:1",
+          "onSurface": "6.05:1",
+          "ui": "pass",
+          "note": "Same hex as --nw-approve in dark. Do not use the mark color alone to mean approve."
+        },
+        "--nw-border": {
+          "onBg": "1.52:1",
+          "onSurface": "1.38:1",
+          "ui": "fail",
+          "note": "Decorative hairline only."
+        },
+        "--nw-focus": {
+          "onBg": "8.55:1",
+          "onSurface": "7.79:1",
+          "ui": "pass"
+        }
+      }
+    },
+    "light": {
+      "primary": false,
+      "tokens": {
+        "--nw-bg": "#F4F6FA",
+        "--nw-surface": "#E6EAF2",
+        "--nw-surface-raised": "#FFFFFF",
+        "--nw-border": "#C5CDD8",
+        "--nw-text": "#121826",
+        "--nw-text-muted": "#4E5C73",
+        "--nw-accent": "#1F6F82",
+        "--nw-focus": "#1F6F82",
+        "--nw-ink": "#FFFFFF",
+        "--nw-mark": "#5EA88A",
+        "--nw-approve": "#1F6B52",
+        "--nw-hold": "#8A5A12",
+        "--nw-finding": "#9B2E2E",
+        "--nw-pending": "#1E5A8A",
+        "--nw-resplit": "#5A4A9A"
+      },
+      "contrast": {
+        "--nw-text": {
+          "onBg": "16.39:1",
+          "onSurface": "14.70:1",
+          "onRaised": "17.73:1",
+          "aa": "pass"
+        },
+        "--nw-text-muted": {
+          "onBg": "6.26:1",
+          "onSurface": "5.61:1",
+          "onRaised": "6.77:1",
+          "aa": "pass"
+        },
+        "--nw-accent": {
+          "onBg": "5.31:1",
+          "onSurface": "4.77:1",
+          "onRaised": "5.75:1",
+          "aa": "pass",
+          "ui": "pass"
+        },
+        "--nw-approve": {
+          "onBg": "5.91:1",
+          "onSurface": "5.30:1",
+          "onRaised": "6.40:1",
+          "aa": "pass",
+          "ui": "pass",
+          "inkOnFill": "6.40:1"
+        },
+        "--nw-hold": {
+          "onBg": "5.46:1",
+          "onSurface": "4.90:1",
+          "onRaised": "5.91:1",
+          "aa": "pass",
+          "ui": "pass",
+          "inkOnFill": "5.91:1"
+        },
+        "--nw-finding": {
+          "onBg": "6.87:1",
+          "onSurface": "6.17:1",
+          "onRaised": "7.44:1",
+          "aa": "pass",
+          "ui": "pass",
+          "inkOnFill": "7.44:1"
+        },
+        "--nw-pending": {
+          "onBg": "6.73:1",
+          "onSurface": "6.04:1",
+          "onRaised": "7.28:1",
+          "aa": "pass",
+          "ui": "pass",
+          "inkOnFill": "7.28:1"
+        },
+        "--nw-resplit": {
+          "onBg": "6.74:1",
+          "onSurface": "6.05:1",
+          "onRaised": "7.29:1",
+          "aa": "pass",
+          "ui": "pass",
+          "inkOnFill": "7.29:1"
+        },
+        "--nw-mark": {
+          "onBg": "2.61:1",
+          "onSurface": "2.34:1",
+          "ui": "fail",
+          "note": "The locked logo fill fails 3:1 on light paper. Sit the mark on a dark tile, or use mono black. Never use #5EA88A alone as the approve state on light UI; use --nw-approve #1F6B52 with an icon and a label."
+        },
+        "--nw-border": {
+          "onBg": "1.48:1",
+          "onSurface": "1.33:1",
+          "ui": "fail",
+          "note": "Decorative hairline only."
+        },
+        "--nw-focus": {
+          "onBg": "5.31:1",
+          "onSurface": "4.77:1",
+          "ui": "pass"
+        }
+      }
+    }
+  }
+}

@@ -29,6 +29,12 @@ Light mode uses deeper semantic hues, not a simple invert of the dark palette.
 
 `#5EA88A` and `#D4A054` were mixed for dark UI. Both pass 3:1 non-text contrast on the dark background and surface, and both fail 3:1 on the light paper and surface.
 
+## UI tokens
+
+Review tools and the war room take these values from [tokens/nightwatch.css](tokens/nightwatch.css) (CSS custom properties) and [tokens/nightwatch.json](tokens/nightwatch.json) (the same values as JSON). Dark is the primary theme.
+
+Approve must always have an icon and a label, because the logo color and the approve color are both `#5EA88A`.
+
 ## Type
 
 - UI and wordmark: **IBM Plex Sans**, medium (weight 500), from Google Fonts. The wordmark is lowercase `clippa` with `0.04em` tracking. Do not stretch, outline, or set it in another face or in uppercase.

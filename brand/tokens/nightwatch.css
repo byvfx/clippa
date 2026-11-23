@@ -1,0 +1,94 @@
+/* Night Watch tokens for Clippa review tools and the war room.
+   Dark is the primary theme. Switch to light with data-theme="light". */
+
+:root {
+  --nw-bg: #0b1220;
+  --nw-surface: #141c2b;
+  --nw-surface-raised: #1c2636;
+  --nw-border: #2a3548;
+  --nw-text: #e8eef6;
+  --nw-text-muted: #8b9bb4;
+  --nw-accent: #7eb8c9;
+  --nw-focus: #7eb8c9;
+  --nw-ink: #0b1220;
+  --nw-mark: #5ea88a;
+  --nw-approve: #5ea88a;
+  --nw-hold: #d4a054;
+  --nw-finding: #d07070;
+  --nw-pending: #6b8fd4;
+  --nw-resplit: #a992d4;
+
+  --nw-font-sans: "IBM Plex Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --nw-font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --nw-text-title: 500 24px/32px var(--nw-font-sans);
+  --nw-text-section: 500 18px/24px var(--nw-font-sans);
+  --nw-text-body: 400 14px/20px var(--nw-font-sans);
+  --nw-text-ui: 500 13px/18px var(--nw-font-sans);
+  --nw-text-label: 500 12px/16px var(--nw-font-sans);
+  --nw-text-caption: 400 11px/16px var(--nw-font-sans);
+  --nw-text-mono: 400 13px/20px var(--nw-font-mono);
+
+  --nw-space-1: 4px;
+  --nw-space-2: 8px;
+  --nw-space-3: 12px;
+  --nw-space-4: 16px;
+  --nw-space-5: 24px;
+  --nw-space-6: 32px;
+  --nw-space-7: 48px;
+
+  --nw-radius-control: 6px;
+  --nw-radius-card: 8px;
+  --nw-radius-panel: 12px;
+  --nw-radius-pill: 9999px;
+
+  --nw-duration: 160ms;
+  --nw-ease: ease-out;
+  --nw-focus-width: 2px;
+  --nw-focus-offset: 2px;
+}
+
+[data-theme="light"] {
+  --nw-bg: #f4f6fa;
+  --nw-surface: #e6eaf2;
+  --nw-surface-raised: #ffffff;
+  --nw-border: #c5cdd8;
+  --nw-text: #121826;
+  --nw-text-muted: #4e5c73;
+  --nw-accent: #1f6f82;
+  --nw-focus: #1f6f82;
+  --nw-ink: #ffffff;
+  --nw-mark: #5ea88a;
+  --nw-approve: #1f6b52;
+  --nw-hold: #8a5a12;
+  --nw-finding: #9b2e2e;
+  --nw-pending: #1e5a8a;
+  --nw-resplit: #5a4a9a;
+}
+
+.nw-tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+*:focus {
+  outline: none;
+}
+
+*:focus-visible {
+  outline: var(--nw-focus-width) solid var(--nw-focus);
+  outline-offset: var(--nw-focus-offset);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --nw-duration: 0s;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition-duration: 0s !important;
+  }
+}
