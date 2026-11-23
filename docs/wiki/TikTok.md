@@ -1,5 +1,5 @@
 > [!CAUTION]
-> **Parked (2026-11-01).** We post to TikTok by hand. Auto-send is off (TikTok flagged the drafts as
+> **Parked (2026-11-01).** You post to TikTok by hand. Auto-send is off (TikTok flagged the drafts as
 > bot activity), and direct posting is dropped: TikTok's app audit refuses tools that only post to
 > your own accounts (issues #62, #116). The steps below still work if this is ever picked up again.
 
@@ -11,8 +11,8 @@ else the `[record]` alert webhook or channel) and keeps it in schedule.json.
 1. **Developer app** at developers.tiktok.com, owned by an organization: platform Desktop,
    products **Login Kit** (redirect URI `http://localhost:3455/callback/`, the port is
    `[tiktok] redirect_port`) and **Content Posting API** (leave Direct Post off), scopes
-   `user.info.basic` and `video.upload`. It needs a website, privacy and terms URL; ours are
-   pages on byvfx.com ([docs/tiktok-app-pages.md](https://github.com/byvfx/clippa/blob/main/docs/tiktok-app-pages.md)). Testing works in **Sandbox** with the TikTok
+   `user.info.basic` and `video.upload`. It needs a website, privacy and terms URL; the pages are
+   on byvfx.com ([docs/tiktok-app-pages.md](https://github.com/byvfx/clippa/blob/main/docs/tiktok-app-pages.md)). Testing works in **Sandbox** with the TikTok
    account added as a target user.
 2. **Keys**: save `{"client_key": "...", "client_secret": "..."}` as `secrets/tiktok_client.json`.
 3. **Sign in** once, as the TikTok account: `clippa tiktok --sign-in`. The token lands in
@@ -22,7 +22,7 @@ else the `[record]` alert webhook or channel) and keeps it in schedule.json.
    without `--dry-run` it sends. `clippa tiktok` lists what was sent and marks drafts you
    posted as posted. The draft arrives as a notification in the TikTok app's **Inbox**
    (System notifications), not under Profile > Drafts; it becomes a draft once opened.
-5. **Captions**: create a Discord text channel (ours is #tiktok; the bot can't create channels)
+5. **Captions**: create a Discord text channel (this install uses #tiktok; the bot can't create channels)
    and set `[tiktok] caption_channel_id`. Each send posts a note and then the bare caption, so
    Copy Text on the phone copies just the caption. `clippa tiktok --caption <item>` posts it again.
    A draft left unposted expires in the app (TikTok's status still says it is in the inbox):

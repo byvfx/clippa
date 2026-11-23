@@ -12,7 +12,7 @@ A brief in, a research dossier out, then a video of it for review. The people
 the brief names (by name, nickname, alias or id, from [`clippa people`](People); `--person`
 adds one) seed the swarm with their YouTube, Kick and Odysee channels. Triage
 (Haiku) picks the videos worth transcribing within `--max-videos` / `--max-hours`, the people's own
-uploads first, and prints the Modal estimate; our own recorded streams are linked, not transcribed
+uploads first, and prints the Modal estimate; your recorded streams are linked, not transcribed
 again. Ingest transcribes on Modal (YouTube audio, Kick VOD audio, Odysee) into the archive subject
 `story-<slug>` and indexes it. Find (Haiku) searches that index and any archive subject the swarm
 found something in, picks the moments (event, reaction, context) and keeps only quotes that are in
@@ -26,10 +26,10 @@ nothing is uploaded until a video of it is approved.
 `story plan` (Sonnet) orders the moments into an edit under a show (`--show`, `[story] show`, or
 the only one): a title and description, and the moments as parts with a chapter each. Code bounds
 each part around its quote (`[story] lead_s` / `tail_s` / `max_clip_s`, at sentence edges), drops a
-part that repeats an earlier one's words (a re-upload, our stream playing the video), merges
+part that repeats an earlier one's words (a re-upload, your stream playing the video), merges
 overlaps and stops at `[story] max_minutes`; what it left out stays in `story.json` with
 `use: false` and a note. Edit `story.json` by hand (use, order, start/end, chapter, the lower
-third's channel, title), then `story cut` renders it: each part from our own source video on the
+third's channel, title), then `story cut` renders it: each part from your source video on the
 share or a yt-dlp section of the original, re-encoded with the channel and date on a lower third
 and bleeped (the `[receipts]` renderer), joined into one segment of the stream `story-<slug>`
 (meta.json kind "story", on the show's Kick channel). Meta takes its chapters from the parts and
@@ -81,6 +81,6 @@ archive`): the videos it picks are transcribed there, on `[story] gpu` (L4). Kic
 downloaded here at their smallest variant (`[archive] kick_format`) for their audio; YouTube audio
 uses the archive's cookies retry. People and their channels come from [`clippa people`](People) (`people.json`, with
 `studio/research_notes/streamers.json`, `[story] people` and the cast library folded in). `story cut` renders
-with `[receipts]`'s fonts (Impact and Arial Bold, as receipts need) and reads our own streams'
+with `[receipts]`'s fonts (Impact and Arial Bold, as receipts need) and reads your recorded streams'
 source videos from `paths.streams`, so it runs on a machine that sees the share; with several
 shows, set `[story] show` or pass `clippa --show <key>` to `story plan`.

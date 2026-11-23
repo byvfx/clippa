@@ -27,7 +27,7 @@ convergence (personal remarks from several videos close together); Sonnet reads 
 writes the lead or rejects it, and the rejected ones and why are kept in `leads.json` too.
 `check` runs the search swarm on each kept lead, seeded with the lead's search words on YouTube
 (titles only), the web and Reddit (Brave, the `clippa cast` key; without one, Reddit's own feed,
-which often refuses) and our own streams' segments; its planner adds searches and its workers
+which often refuses) and your recorded streams' segments; its planner adds searches and its workers
 follow up, within `[investigate] swarm` (small: ~$0.01-0.03 a lead). With his own video titles,
 Haiku labels each lead fresh, partly covered or covered. The results and verdict are in
 `investigate/swarm/<lead>.json`, the task tree in `<lead>.trail.json` (`--trail` prints both). Edit `leads.json` to flip `keep`, change a headline or add

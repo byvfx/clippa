@@ -1,4 +1,4 @@
-What we learned bringing up a new channel (October 2026): it is held back in
+What bringing up a new channel showed (October 2026): it is held back in
 ways the API reports badly, so do these before the first big upload run.
 
 1. **Sign in** ([YouTube sign-in](YouTube-sign-in)): `clippa upload --sign-in` once, on the machine that uploads. The token
@@ -10,7 +10,7 @@ ways the API reports badly, so do these before the first big upload run.
 2. **Verify the channel** at https://www.youtube.com/verify (phone). Without it custom
    thumbnails are refused (403); videos still go up, and `clippa upload --thumbnails` sets
    the covers afterwards. Verification can take more than one round: if Studio later
-   refuses an upload, it may offer another verification link. Follow it. On our channel
+   refuses an upload, it may offer another verification link. Follow it. On this channel
    that second verification lifted the cap for Studio *and* the API: uploads went through
    again right away.
 3. **Expect a small daily upload cap.** `uploadLimitExceeded` ("The user has exceeded the
@@ -28,7 +28,7 @@ ways the API reports badly, so do these before the first big upload run.
    `clippa upload --attach <item> <link>` sets the title, description and tags, adds
    the thumbnail, captions, playlist and Kitsu link, and records the video as uploaded so
    Clippa never sends it twice.
-5. **Publishing through the API** (`videos.update` to public) worked on our Cloud project
+5. **Publishing through the API** (`videos.update` to public) worked on this Cloud project
    before any API audit, so `[youtube] manual_publish` can be turned off once you trust
    the uploads. Before that, check the first private uploads for Content ID claims in
    Studio. The Data API can't see claims; it only shows region blocks.

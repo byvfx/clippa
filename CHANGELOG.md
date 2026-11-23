@@ -12,6 +12,8 @@ Developing#releases.
 
 ### 2026-11
 
+- 11-23: Wiki voice. The pages no longer say we, us or our. A reviewer's note is a retake;
+  re-split stays the flag for a segment that needs splitting again.
 - 11-23: The GitHub wiki points at the docs site. Home has a note under the banner, and the
   sidebar and footer link to <https://byvfx.github.io/clippa-docs/>. That note is left out of
   the docs site.

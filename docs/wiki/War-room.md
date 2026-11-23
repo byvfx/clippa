@@ -349,7 +349,7 @@ The Money page has the first three, the Stats page the analytics.
   stage and stream), Modal runs, and `[costs] monthly` fixed costs, by stage and show.
   `clippa costs` prints the same; revenue joins it once the channel is monetized.
 - **API usage**: the month by the Claude API's and OpenRouter's own count,
-  today, by model, OpenRouter's week, limit and balance, each next to what our log recorded.
+  today, by model, OpenRouter's week, limit and balance, each next to what Clippa's log recorded.
   Claude's needs an Admin API key ([Costs](Costs#the-providers-own-numbers));
   `clippa costs --providers` prints the same.
 - **Analytics**: a month of YouTube. Views, watch time and
