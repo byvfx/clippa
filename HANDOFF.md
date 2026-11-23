@@ -308,7 +308,12 @@ of phone use; #300 (access levels, a local Jev-like classifier in front of the m
   (`blinds/blinds.sqlite`; a damaged one goes in as `blinds.damaged.sqlite`), `keep_days` keeps reveals and "no idea" blinds, and
   an edited post's old text goes into its history (5 edits had already overwritten theirs). On 11-22 the store held 706 blinds
   (2 answered), 198 reveals, no pairs. 105 blinds' opening text appears verbatim in a reveal, so step 4's matching can start in code,
-  with no model call. Copy the newest taste zip off the NAS by hand. Flow: https://claude.ai/artifact/1m3obUigUkkA5ZVdmmiLWn
+  with no model call. Copy the newest taste zip off the NAS by hand.
+  **Step 4 part 1 on the same branch:** every check matches reveals to blinds in code (3-gram overlap ≥ 0.6, 0.3 ahead of the next
+  blind within a day of the date line) and stores the answer line; `clippa blinds reveals` scores your guesses (right / wrong /
+  late). On a copy of the 11-22 store: 106 matched, 90 wait for blinds older than the store (a `check --backfill` would bring them
+  in, at ~$0.0002 a blind for clues, or free with `--no-clues`), 2 have garbled dates and no stored blind. Neither answered blind
+  is revealed yet. Not built: the Discord follow-up, the war room scorecard, `calibrate`. Flow: https://claude.ai/artifact/1m3obUigUkkA5ZVdmmiLWn
 - **News watcher #110:** off since 2026-11-03 at the user's word (`[news] check_minutes = 0`, no terms); `auto_watch = true` brings back
   the cast/figures/library list; `#news` exists in Discord.
 - **Older notes not on an issue:** republish the 2026-10-19 re-cut streams to Kitsu (user said not yet); Blade compilation's Discord

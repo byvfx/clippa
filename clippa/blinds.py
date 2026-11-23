@@ -79,7 +79,8 @@ CREATE TABLE IF NOT EXISTS sources (name TEXT PRIMARY KEY, etag TEXT, modified T
     error TEXT, items INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS digests (day TEXT PRIMARY KEY, posted_at TEXT, thread TEXT, blinds INTEGER DEFAULT 0);
 """
-ADDED = ("paired_at", "alerted_at", "alert_msg", "digest_day")  # columns a store from before them lacks
+ADDED = ("paired_at", "alerted_at", "alert_msg", "digest_day",  # columns a store from before them lacks
+         "revealed", "reveal_id", "revealed_at", "reveal_of", "reveal_score")  # step 4's: added by connect()
 
 CLUES_SCHEMA = {
     "type": "object",
@@ -577,6 +578,172 @@ def apply_pairs(db: sqlite3.Connection, batch: list, pool: dict, pairs: list[dic
     return made
 
 
+# ---------- reveals (step 4) ----------
+# A reveal post quotes the blind it answers and adds one line with the answer:
+#     November 7, 2026            <- the day the blind was posted
+#     The reality star with ...   <- the blind's text, as posted
+#     Name One/Name Two           <- the answer
+# It is matched to a stored blind in code, by how much of the blind's wording it repeats.
+
+MATCH_MIN = 0.6      # share of the blind's word 3-grams the reveal repeats
+MATCH_MARGIN = 0.3   # and that far ahead of the next-best blind, or it is left unmatched
+MATCH_DAYS = 1       # the date line may be a day off the blind's own day (time zones)
+DATE_LINE = re.compile(r"^[A-Z][a-z]+ \d{1,2}, [\d ]{4,6}$")   # "October 6, 22026" too: a typo'd date
+
+
+def _words(text: str) -> list[str]:
+    return re.findall(r"[a-z0-9]+", text.lower())
+
+
+def _grams(words: list[str], n: int = 3) -> set[tuple[str, ...]]:
+    return {tuple(words[i:i + n]) for i in range(len(words) - n + 1)}
+
+
+def split_reveal(text: str) -> tuple[str, str, str]:
+    """A reveal post -> (the blind's day, ISO, or "" when the date line is missing or garbled;
+    the quoted blind; the answer line)."""
+    lines = [x.strip() for x in text.splitlines() if x.strip()]
+    day = ""
+    if lines and DATE_LINE.match(lines[0]):
+        try:
+            day = datetime.strptime(lines[0], "%B %d, %Y").date().isoformat()
+        except ValueError:
+            pass
+        lines = lines[1:]
+    if len(lines) < 2:
+        return day, "\n".join(lines), ""
+    return day, "\n".join(lines[:-1]), lines[-1]
+
+
+def revealed_names(answer: str) -> list[str]:
+    """ "A Name/B Name (and a note)" -> ["A Name", "B Name"]."""
+    bare = re.sub(r"\(.*?\)", "", answer)
+    return [n.strip(" .,;") for n in bare.split("/") if n.strip(" .,;")]
+
+
+def best_blind(quoted: str, cands: list, grams: dict) -> tuple[str, float, float]:
+    """(id, score, next-best score) of the stored blind the quoted text repeats most."""
+    rg = _grams(_words(quoted))
+    scored = []
+    for b in cands:
+        g = grams.setdefault(b["id"], _grams(_words(b["text"])))
+        scored.append((len(g & rg) / len(g) if g else 0.0, b["id"]))
+    scored.sort(reverse=True)
+    if not scored:
+        return "", 0.0, 0.0
+    return scored[0][1], scored[0][0], scored[1][0] if len(scored) > 1 else 0.0
+
+
+def _candidates(db: sqlite3.Connection, r: sqlite3.Row, day: str) -> list:
+    if not day:   # no usable date line: every earlier blind of the source
+        return db.execute("SELECT id, text FROM blinds WHERE kind = 'blind' AND source = ? AND published <= ?",
+                          (r["source"], r["published"])).fetchall()
+    d = datetime.fromisoformat(day)
+    lo, hi = ((d + timedelta(days=k)).date().isoformat() for k in (-MATCH_DAYS, MATCH_DAYS))
+    return db.execute("SELECT id, text FROM blinds WHERE kind = 'blind' AND source = ? AND day BETWEEN ? AND ?",
+                      (r["source"], lo, hi)).fetchall()
+
+
+def match_reveals(db: sqlite3.Connection, say=print) -> int:
+    """Link each unmatched reveal to the blind it answers, and that blind (and its twin) to the
+    answer. Code only, no model call. A reveal left unmatched (its blind is older than the store,
+    say) is tried again on the next check, so a backfill can still link it."""
+    todo = db.execute("SELECT * FROM blinds WHERE kind = 'reveal' AND reveal_of IS NULL").fetchall()
+    grams: dict = {}
+    made = 0
+    for r in todo:
+        day, quoted, answer = split_reveal(r["text"])
+        if not answer:
+            continue
+        bid, score, second = best_blind(quoted, _candidates(db, r, day), grams)
+        if not bid or score < MATCH_MIN or score - second < MATCH_MARGIN:
+            continue
+        b = get(db, bid)
+        db.execute("UPDATE blinds SET reveal_of = ?, reveal_score = ? WHERE id = ?", (bid, f"{score:.2f}", r["id"]))
+        ids = [bid] + ([x["id"] for x in db.execute("SELECT id FROM blinds WHERE pair = ? AND id != ?",
+                                                     (b["pair"], bid))] if b["pair"] else [])
+        for i in ids:  # a twin is answered by either source's reveal; the first reveal stays
+            db.execute("UPDATE blinds SET revealed = ?, reveal_id = ?, revealed_at = ?, "
+                       "history = json_insert(COALESCE(history, '[]'), '$[#]', "
+                       "json_object('at', ?, 'what', 'revealed', 'reveal', ?)) WHERE id = ? AND revealed IS NULL",
+                       (answer, r["id"], r["published"], news.iso(news.now()), r["id"], i))
+        made += 1
+    db.commit()
+    if made:
+        say(f"  {made} reveal{'s' if made != 1 else ''} matched to {'their blinds' if made != 1 else 'its blind'}")
+    return made
+
+
+def _when(iso: str) -> datetime:
+    t = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    return t if t.tzinfo else t.replace(tzinfo=news.now().tzinfo)
+
+
+def grade(b: dict, people_map: dict | None = None) -> str:
+    """Your guess against the source's reveal: "right", "wrong", "late" (you guessed after the
+    reveal was posted, so it isn't counted), or "" (not revealed, or no name guessed). Right
+    when every word of your guess, or of a name the matched person answers to, is in one
+    revealed name: "Affleck" and "Zac Affleck" both fit "Zac Affleck"."""
+    if not b.get("revealed") or not b["guesses"] or b["status"] != "answered":
+        return ""
+    g = b["guesses"][0]
+    if b.get("revealed_at") and g.get("at") and _when(g["at"]) >= _when(b["revealed_at"]):
+        return "late"
+    mine = {g.get("name") or "", g.get("as_written") or ""}
+    if g.get("person") and people_map and g["person"] in people_map:
+        from .people import names
+        mine |= names(people_map[g["person"]], g["person"])
+    theirs = [set(_words(n)) for n in revealed_names(b["revealed"])]
+    hit = any(w and any(w <= t for t in theirs) for w in (set(_words(m)) for m in mine))
+    return "right" if hit else "wrong"
+
+
+def scorecard(cfg: dict, match: bool = True, say=print) -> dict:
+    """How the reveals stand: matched or not (and why not), and your guesses on revealed blinds."""
+    from . import people
+
+    db = connect(cfg)
+    try:
+        if match:
+            match_reveals(db, say)
+        oldest = {r["source"]: r["day"] for r in db.execute(
+            "SELECT source, MIN(day) AS day FROM blinds WHERE kind = 'blind' GROUP BY source")}
+        reveals = db.execute("SELECT source, text, reveal_of FROM blinds WHERE kind = 'reveal'").fetchall()
+        rows = [as_dict(r) for r in db.execute("SELECT * FROM blinds WHERE kind = 'blind' AND revealed IS NOT NULL "
+                                               "ORDER BY published DESC")]
+    finally:
+        db.close()
+    older = 0
+    for r in reveals:
+        d = split_reveal(r["text"])[0]
+        older += bool(not r["reveal_of"] and d and r["source"] in oldest and d < oldest[r["source"]])
+    pm = people.load(cfg)
+    graded = [{"id": b["id"], "day": b["day"], "status": b["status"],
+               "guess": b["guesses"][0]["name"] if b["guesses"] else "", "revealed": b["revealed"],
+               "grade": grade(b, pm)} for b in rows]
+    count = {k: sum(1 for x in graded if x["grade"] == k) for k in ("right", "wrong", "late")}
+    matched = sum(1 for r in reveals if r["reveal_of"])
+    return {"reveals": len(reveals), "matched": matched, "unmatched_older": older,
+            "unmatched_other": len(reveals) - matched - older, "revealed_blinds": len(rows),
+            "no_idea": sum(1 for x in graded if x["status"] == "no_idea"), **count, "graded": graded}
+
+
+def scorecard_text(sc: dict) -> list[str]:
+    out = [f"{sc['reveals']} reveals: {sc['matched']} matched to a stored blind, "
+           f"{sc['unmatched_older']} for blinds older than the store (a backfill can bring them in), "
+           f"{sc['unmatched_other']} not matched",
+           f"{sc['revealed_blinds']} revealed blinds. Your guesses: {sc['right']} right, {sc['wrong']} wrong"
+           + (f", {sc['late']} after the reveal (not counted)" if sc["late"] else "")
+           + (f"; no idea on {sc['no_idea']}" if sc["no_idea"] else "")]
+    judged = sc["right"] + sc["wrong"]
+    if judged:
+        out.append(f"hit rate {sc['right'] / judged:.0%} of {judged} (\"right\" means it matches the source's reveal)")
+    for x in sc["graded"]:
+        if x["grade"]:
+            out.append(f"  {x['id']:<26} {x['grade']:<6} you: {x['guess']}  revealed: {x['revealed']}")
+    return out
+
+
 # ---------- check ----------
 
 def check(cfg: dict, backfill_days: float = 0, clues: bool = True, claude=None, say=print) -> dict:
@@ -593,6 +760,7 @@ def check(cfg: dict, backfill_days: float = 0, clues: bool = True, claude=None, 
             say(f"  {src['name']}: {n} new" + (f", {ed} edited" if ed else ""))
             new, edited = new + n, edited + ed
         prune(cfg, db)
+        revealed = match_reveals(db, say)
         read, paired, tried = [], 0, set()
         if clues and cfg["blinds"]["clues_model"]:
             while True:  # max_clues a pass; a backfill reads everything it brought in, past refusals
@@ -601,18 +769,18 @@ def check(cfg: dict, backfill_days: float = 0, clues: bool = True, claude=None, 
                 if not backfill_days or len(tried) == before:
                     break
             paired = pair(cfg, db, claude, say)
-        return {"new": new, "edited": edited, "read": len(read), "paired": paired}
+        return {"new": new, "edited": edited, "read": len(read), "paired": paired, "revealed": revealed}
     finally:
         db.close()
 
 
 def prune(cfg: dict, db: sqlite3.Connection) -> int:
-    """Forget what is older than keep_days, except what the user engaged with (answered, no idea)
-    and reveals: the ground truth the scorecard is built on. Their text can't be fetched again
+    """Forget what is older than keep_days, except what the user engaged with (answered, no idea),
+    reveals and the blinds they answered: the ground truth the scorecard is built on. Their text can't be fetched again
     once a source takes a post down."""
     cut = news.iso(news.now() - timedelta(days=cfg["blinds"]["keep_days"]))
-    n = db.execute("DELETE FROM blinds WHERE published < ? AND status NOT IN ('answered', 'no_idea', 'reveal')",
-                   (cut,)).rowcount
+    n = db.execute("DELETE FROM blinds WHERE published < ? AND status NOT IN ('answered', 'no_idea', 'reveal') "
+                   "AND revealed IS NULL", (cut,)).rowcount
     if n:  # a twin left on its own is unpaired
         db.execute("UPDATE blinds SET pair = NULL, pair_why = NULL WHERE pair IS NOT NULL AND pair IN "
                    "(SELECT pair FROM blinds WHERE pair IS NOT NULL GROUP BY pair HAVING COUNT(*) = 1)")
@@ -772,6 +940,9 @@ def one(cfg: dict, bid: str) -> dict:
     finally:
         db.close()
     b["tags"], b["hidden"] = tags(b), hidden(cfg, b)
+    if b.get("revealed"):
+        from . import people
+        b["grade"] = grade(b, people.load(cfg))
     return b
 
 
@@ -798,7 +969,9 @@ def mark_of(b: dict) -> str:
 def line(b: dict) -> str:
     gist = b["claim"] or b["text"].replace("\n", " ")
     guess = f"  -> {b['guesses'][0]['name']}" if b["guesses"] else ""
-    return f"{b['id']:<26} {mark_of(b)} {b['status']:<9} {gist[:90]}{guess}"
+    # revealed, not who: the list shouldn't spoil a blind you haven't guessed (`show` names them)
+    told = "  [revealed]" if b.get("revealed") else ""
+    return f"{b['id']:<26} {mark_of(b)} {b['status']:<9} {gist[:90]}{guess}{told}"
 
 
 def show_text(b: dict) -> str:
@@ -813,6 +986,14 @@ def show_text(b: dict) -> str:
     for g in b["guesses"]:
         out.append(f"your guess: {g['name']}" + (f" ({g['person']})" if g["person"] else " (not in clippa people)")
                    + (f", because {g['why']}" if g["why"] else "") + (f"  [{g['note']}]" if g.get("note") else ""))
+    if b.get("revealed"):
+        out.append(f"revealed ({b['source']}, {b['reveal_id']}, the source's word): {b['revealed']}")
+        if b.get("grade"):
+            out.append(f"your guess was {b['grade']}" + (" (made after the reveal, not counted)"
+                                                        if b["grade"] == "late" else ""))
+    if b["kind"] == "reveal":
+        out.append(f"answers: {b['reveal_of']} (match {b['reveal_score']})" if b.get("reveal_of")
+                   else "answers: no stored blind yet (its blind may be older than the store)")
     return "\n".join(x for x in out if x is not None)
 
 

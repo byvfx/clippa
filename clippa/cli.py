@@ -398,7 +398,8 @@ def cmd_blinds(cfg: dict, args: argparse.Namespace) -> None:
             return
         n = blinds.check(cfg, args.backfill or 0, clues=not args.no_clues)
         print(f"{n['new']} new, {n['read']} read" + (f", {n['edited']} edited" if n["edited"] else "")
-              + (f", {n['paired']} paired" if n["paired"] else ""))
+              + (f", {n['paired']} paired" if n["paired"] else "")
+              + (f", {n['revealed']} revealed" if n["revealed"] else ""))
     elif a == "list":
         rows = blinds.listing(cfg, args.days, args.status or "", args.source or "", args.all)
         if args.json:
@@ -423,6 +424,12 @@ def cmd_blinds(cfg: dict, args: argparse.Namespace) -> None:
         for s in blinds.sources_report(cfg):
             print(f"{s['name']} ({s['kind']}): {s['items'] or 0} stored, fetched {s['fetched_at'] or 'never'}"
                   + (f", {s['error']}" if s["error"] else ""))
+    elif a == "reveals":
+        sc = blinds.scorecard(cfg)
+        if args.json:
+            print_json(sc)
+            return
+        print("\n".join(blinds.scorecard_text(sc)))
 
 
 def cmd_compare(cfg: dict, args: argparse.Namespace) -> None:
@@ -2159,6 +2166,8 @@ def add_extras(sub) -> None:
     r.add_argument("--none", action="store_true", help="no idea")
     r.add_argument("--not-ours", action="store_true", help="not one to look into")
     bsub.add_parser("sources", help="each source: last fetch, error, how many stored")
+    r = bsub.add_parser("reveals", help="match reveals to their blinds (code, no model call) and score your guesses")
+    r.add_argument("--json", action="store_true", help="the scorecard as JSON")
 
     p = sub.add_parser("costs", help="what Clippa spent this month: models, Modal, fixed costs (#50)")
     p.add_argument("--month", help="YYYY-MM (default: this month, UTC)")

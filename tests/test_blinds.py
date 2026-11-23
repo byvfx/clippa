@@ -890,3 +890,117 @@ def test_a_multiline_why_is_replaced_whole(cfg):
     assert once.endswith("because first line second line")
     again = blinds.answered_text(once, blinds.answer(cfg, "a", none=True))
     assert again == f"{text}\n→ No idea."
+
+
+# ---------- reveals (step 4) ----------
+
+BLIND_A = "This reality star with the famous last name got a fan pregnant and his wife keeps finding him jobs."
+BLIND_B = "The singer with the purple tour bus skipped the awards show because the label pulled her budget."
+
+
+def reveal_html(day: str, blind: str, answer: str) -> str:
+    """A reveal post as the source writes it: the blind's date, its text, the answer."""
+    stamp = datetime.fromisoformat(day).strftime("%B %-d, %Y") if sys.platform != "win32" else \
+        datetime.fromisoformat(day).strftime("%B %#d, %Y")
+    return f"<p>{stamp}</p><p>{blind}</p><p>{answer}</p>"
+
+
+def two_blinds(cfg, monkeypatch, when=None):
+    when = when or iso_days_ago(10)
+    feeds(monkeypatch, {"cdan.example": atom(("Blind Item #1", when, BLIND_A), ("Blind Item #2", when, BLIND_B)),
+                        "bg.example": rss()})
+    blinds.check(cfg, clues=False)
+    rows = {b["id"][-2:]: b for b in blinds.listing(cfg, days=500, everything=True)}
+    return rows["b1"], rows["b2"]
+
+
+def test_a_reveal_splits_into_its_day_the_quoted_blind_and_the_answer():
+    assert blinds.split_reveal("November 7, 2026\nThe star did a thing.\nMore of it.\nPat Example/Sam Sample") == (
+        "2026-11-07", "The star did a thing.\nMore of it.", "Pat Example/Sam Sample")
+    day, quoted, answer = blinds.split_reveal("October 6, 22026\nThe star did a thing.\nPat Example")
+    assert (day, quoted, answer) == ("", "The star did a thing.", "Pat Example")  # a garbled date: no day
+    assert blinds.split_reveal("Just one line") == ("", "Just one line", "")
+    assert blinds.revealed_names("Pat Example/Sam Sample (and a note about it)") == ["Pat Example", "Sam Sample"]
+
+
+def test_check_matches_a_reveal_to_its_blind_and_grades_your_guess(cfg, monkeypatch):
+    a, b = two_blinds(cfg, monkeypatch)
+    blinds.answer(cfg, a["id"], "Example")       # a surname is enough
+    blinds.answer(cfg, b["id"], "Somebody Else")
+    feeds(monkeypatch, {"cdan.example": atom(
+        ("Blind Item #1", iso_days_ago(10), BLIND_A), ("Blind Item #2", iso_days_ago(10), BLIND_B),
+        ("Blind Items Revealed #1", TODAY, reveal_html(a["day"], BLIND_A, "Pat Example/Sam Sample (they split)")),
+        ("Blind Items Revealed #2", TODAY, reveal_html(b["day"], BLIND_B, "Jo Singer"))),
+        "bg.example": rss()})
+    assert blinds.check(cfg, clues=False)["revealed"] == 2
+    got = blinds.one(cfg, a["id"])
+    assert got["revealed"] == "Pat Example/Sam Sample (they split)" and got["grade"] == "right"
+    assert got["history"][-1]["what"] == "revealed"
+    assert blinds.one(cfg, b["id"])["grade"] == "wrong"
+    assert "revealed (cdan" in blinds.show_text(got) and "your guess was right" in blinds.show_text(got)
+    # the list says a blind is revealed, never who
+    assert "[revealed]" in blinds.line(got) and "Pat Example" not in blinds.line(got)
+    sc = blinds.scorecard(cfg)
+    assert (sc["matched"], sc["right"], sc["wrong"], sc["revealed_blinds"]) == (2, 1, 1, 2)
+    assert blinds.check(cfg, clues=False)["revealed"] == 0  # matched once
+
+
+def test_a_reveal_whose_blind_is_older_than_the_store_waits_for_a_backfill(cfg, monkeypatch):
+    two_blinds(cfg, monkeypatch, when=iso_days_ago(5))
+    feeds(monkeypatch, {"cdan.example": atom(
+        ("Blind Items Revealed #1", TODAY, reveal_html(iso_days_ago(90)[:10], "An actor nobody here stored.",
+                                                        "Pat Example"))), "bg.example": rss()})
+    assert blinds.check(cfg, clues=False)["revealed"] == 0
+    sc = blinds.scorecard(cfg)
+    assert (sc["reveals"], sc["matched"], sc["unmatched_older"]) == (1, 0, 1)
+
+
+def test_a_reveal_too_close_to_two_blinds_is_left_unmatched(cfg, monkeypatch):
+    twin_text = BLIND_A + " Again."
+    when = iso_days_ago(3)
+    feeds(monkeypatch, {"cdan.example": atom(("Blind Item #1", when, BLIND_A), ("Blind Item #2", when, twin_text),
+                                             ("Blind Items Revealed #1", TODAY,
+                                              reveal_html(when[:10], BLIND_A, "Pat Example"))),
+                        "bg.example": rss()})
+    assert blinds.check(cfg, clues=False)["revealed"] == 0  # both repeat it: no guessing which
+
+
+def test_a_guess_made_after_the_reveal_is_late_and_a_twin_is_revealed_too(cfg, monkeypatch):
+    a, b = two_blinds(cfg, monkeypatch)
+    db = blinds.connect(cfg)
+    db.execute("UPDATE blinds SET pair = 'e-1' WHERE id IN (?, ?)", (a["id"], b["id"]))
+    db.commit()
+    db.close()
+    feeds(monkeypatch, {"cdan.example": atom(
+        ("Blind Items Revealed #1", iso_days_ago(1), reveal_html(a["day"], BLIND_A, "Pat Example"))),
+        "bg.example": rss()})
+    blinds.check(cfg, clues=False)
+    blinds.answer(cfg, a["id"], "Pat Example")  # after the reveal was posted
+    assert blinds.one(cfg, a["id"])["grade"] == "late"
+    assert blinds.one(cfg, b["id"])["revealed"] == "Pat Example"  # either source's reveal answers the pair
+
+
+def test_prune_keeps_a_revealed_blind(cfg, monkeypatch):
+    a, _ = two_blinds(cfg, monkeypatch)
+    feeds(monkeypatch, {"cdan.example": atom(
+        ("Blind Items Revealed #1", TODAY, reveal_html(a["day"], BLIND_A, "Pat Example"))), "bg.example": rss()})
+    blinds.check(cfg, clues=False)
+    db = blinds.connect(cfg)  # a year and more goes by
+    db.execute("UPDATE blinds SET published = ? WHERE kind = 'blind'", (news.iso(news.now() - timedelta(days=400)),))
+    db.commit()
+    db.close()
+    blinds.check(cfg, clues=False)
+    left = [b["id"] for b in blinds.listing(cfg, days=500, everything=True) if b["kind"] == "blind"]
+    assert left == [a["id"]]  # the unrevealed one is forgotten, the revealed one kept
+
+
+def test_the_reveals_command_prints_the_scorecard(cfg, monkeypatch, capsys):
+    a, _ = two_blinds(cfg, monkeypatch)
+    blinds.answer(cfg, a["id"], "Pat Example")
+    feeds(monkeypatch, {"cdan.example": atom(
+        ("Blind Items Revealed #1", TODAY, reveal_html(a["day"], BLIND_A, "Pat Example"))), "bg.example": rss()})
+    blinds.check(cfg, clues=False)
+    args = cli.build_parser().parse_args(["blinds", "reveals"])
+    args.fn(cfg, args)
+    out = capsys.readouterr().out
+    assert "1 reveals: 1 matched" in out and "1 right, 0 wrong" in out and "hit rate 100% of 1" in out

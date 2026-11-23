@@ -6,8 +6,9 @@ install follows. It is research for you alone: nothing in it is ever published (
 
 It is built in steps. **In so far:** the sources, storage, the clue pass, pairing twins,
 answering from the command line, the war room's Blinds window, serve's regular check and the
-questions in [Discord](#discord). Still to come: the investigation after your answer (step 3),
-and reveals with the scorecard (step 4).
+questions in [Discord](#discord), and [reveals](#reveals) matched to their blinds with your
+guesses scored (step 4, from the command line). Still to come: the investigation after your
+answer (step 3), and the reveal's follow-up in Discord and the war room.
 
 ## Sources
 
@@ -57,6 +58,7 @@ clippa blinds answer <blind> "<name>" [--why "..."]
 clippa blinds answer <blind> --none           # no idea
 clippa blinds answer <blind> --not-ours       # not one to look into
 clippa blinds sources                         # each source: last fetch, error, how many stored
+clippa blinds reveals [--json]                # match reveals to their blinds, score your guesses
 ```
 
 A blind's status:
@@ -68,7 +70,7 @@ A blind's status:
 | answered | you guessed |
 | no_idea | you said you had no idea |
 | not_ours | you said it isn't one to look into |
-| reveal | a reveal post, kept for step 4 |
+| reveal | a reveal post (see [Reveals](#reveals)) |
 
 `list` leaves out not-ours blinds, reveals and hidden blinds unless you pass `--all` or ask for
 that status. In its list, `*` marks a blind that could be about someone you follow, `!` a
@@ -123,6 +125,38 @@ Discord. A hidden blind is kept, and `--all` shows it.
 record's id is kept. A name nobody answers to, or one that matches two records, is kept as you
 wrote it. Answering again replaces your last answer; the old one stays in the blind's history.
 The war room and Discord answer through the same function.
+
+## Reveals
+
+A reveal post quotes the blind it answers and adds the answer on a last line of its own:
+
+```text
+November 7, 2026               the day the blind was posted
+The reality star with...       the blind, as posted
+Name One/Name Two              the answer
+```
+
+Every `check` (and `clippa blinds reveals`) matches each new reveal to a stored blind, in code
+with no model call. A blind matches when the reveal repeats at least 60% of its wording (word
+triples), and at least 30 points more than any other blind posted within a day of the date line.
+A reveal whose date line is missing or garbled is compared with every earlier blind of its
+source. Anything less clear is left unmatched rather than guessed. On the 11-22 store, every
+dated reveal whose blind was stored matched, and no blind was matched twice.
+
+- **The match** puts the answer line on the blind (and its twin, if it has one), with the reveal's
+  id and the day it was posted, and logs it in the blind's history. `show` prints it, labelled
+  as the source's word. `list` only marks a revealed blind `[revealed]`, so browsing never
+  spoils one you haven't guessed.
+- **Unmatched reveals** are tried again on every check. Most are for blinds older than the store:
+  `check --backfill DAYS` brings those blinds in, and the next check links them.
+- **Your guess is scored** against the names in the answer line (split on `/`, notes in brackets
+  left out). It is **right** when every word of your guess, or of a name its [People](People)
+  record answers to, is in one revealed name: "Example" and "Pat Example" both fit "Pat Example".
+  A guess made after the reveal was posted is **late** and isn't counted. No idea isn't scored.
+- **Right means matches the reveal, not true.** Sources sometimes take each other's stories.
+
+`clippa blinds reveals` prints how many reveals matched, how many wait for older blinds, and
+each scored guess with your hit rate.
 
 ## Discord
 
@@ -203,8 +237,8 @@ reads them.
 
 Everything is in `[paths] news/blinds/blinds.sqlite`. The blind's text is kept, because it is
 short and it is what the clue pass reads. Linked articles are never fetched. Blinds older than
-`keep_days` (365) are forgotten, except the ones you engaged with: answered, **no idea**, and every
-**reveal** (a reveal's text can't be fetched again once a source takes the post down, and the
+`keep_days` (365) are forgotten, except the ones you engaged with (answered, **no idea**), every
+**reveal**, and every blind a reveal answered (a reveal's text can't be fetched again once a source takes the post down, and the
 scorecard needs it). A test checks that nothing but the command, the war room's window, the bot's
 questions and the [taste backup](Backups) reads the blinds, so no title, description, cover, post
 or weekly issue can pick one up.
