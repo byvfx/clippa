@@ -150,9 +150,13 @@ dated reveal whose blind was stored matched, and no blind was matched twice.
 - **Unmatched reveals** are tried again on every check. Most are for blinds older than the store:
   `check --backfill DAYS` brings those blinds in, and the next check links them.
 - **Your guess is scored** against the names in the answer line (split on `/`, notes in brackets
-  left out). It is **right** when every word of your guess, or of a name its [People](People)
-  record answers to, is in one revealed name: "Example" and "Pat Example" both fit "Pat Example".
-  A guess made after the reveal was posted is **late** and isn't counted. No idea isn't scored.
+  left out). The guess scored is the one you had when the reveal was posted: changing it
+  afterwards doesn't turn a miss into anything else. It is **right** when every word of it, or of
+  the full name or an alias of its [People](People) record, is in one revealed name. One word fits
+  only as a surname: "Example" and "Pat Example" fit "Pat Example", "Pat" doesn't. A guess whose
+  only name came after the reveal is **late** and isn't counted. No idea isn't scored.
+- **The war room** tags a revealed blind `revealed` (never who), so you know a guess there
+  wouldn't count.
 - **Right means matches the reveal, not true.** Sources sometimes take each other's stories.
 
 `clippa blinds reveals` prints how many reveals matched, how many wait for older blinds, and
@@ -250,7 +254,8 @@ or weekly issue can pick one up.
 `blinds/blinds.sqlite`, a snapshot taken with SQLite's backup API and checked with
 `integrity_check`. A store that fails the check still goes in, as `blinds.damaged.sqlite`, and
 the backup's output says so: a damaged copy beats none for a repair, and the rest of the backup
-isn't held up. An older zip may hold a good copy. The zip is private, like the rest of the taste
+isn't held up. A store still locked by a long write after 30 s is left out of that one backup,
+with a line saying so, rather than copied half-written. `--dry-run` lists it without the snapshot. An older zip may hold a good copy. The zip is private, like the rest of the taste
 layer: it is copied off the NAS by hand, never published.
 
 When a source edits a post, the blind's text is updated and the text it had goes into its

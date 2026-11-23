@@ -149,11 +149,21 @@ def snapshot(cfg: dict, dest: Path) -> tuple[Path, str] | None:
                 b.close()
         finally:
             a.close()
-    except sqlite3.Error as e:
+    except sqlite3.OperationalError as e:
+        out.unlink(missing_ok=True)
+        if re.search(r"locked|busy", str(e), re.I):   # a long write by serve: next time, not a torn raw copy
+            raise BlindsBusy(str(e)) from None
+        shutil.copy2(src, out)
+        return out, f"SQLite couldn't read it ({e}); the raw file is copied"
+    except sqlite3.DatabaseError as e:   # not a database, malformed: the raw file beats nothing for a repair
         out.unlink(missing_ok=True)
         shutil.copy2(src, out)
         return out, f"SQLite couldn't read it ({e}); the raw file is copied"
     return out, "" if ok == "ok" else f"integrity_check: {ok}"
+
+
+class BlindsBusy(ClipperError):
+    """The store stayed locked past the timeout: left out of this backup, nothing wrong with it."""
 
 
 def connect(cfg: dict) -> sqlite3.Connection:
@@ -635,9 +645,10 @@ def best_blind(quoted: str, cands: list, grams: dict) -> tuple[str, float, float
 
 
 def _candidates(db: sqlite3.Connection, r: sqlite3.Row, day: str) -> list:
-    if not day:   # no usable date line: every earlier blind of the source
-        return db.execute("SELECT id, text FROM blinds WHERE kind = 'blind' AND source = ? AND published <= ?",
-                          (r["source"], r["published"])).fetchall()
+    if not day:   # no usable date line: the source's blinds from the year before it (kept bounded: nothing is forgotten)
+        since = news.iso(_when(r["published"]) - timedelta(days=366))
+        return db.execute("SELECT id, text FROM blinds WHERE kind = 'blind' AND source = ? AND published <= ? "
+                          "AND published >= ?", (r["source"], r["published"], since)).fetchall()
     d = datetime.fromisoformat(day)
     lo, hi = ((d + timedelta(days=k)).date().isoformat() for k in (-MATCH_DAYS, MATCH_DAYS))
     return db.execute("SELECT id, text FROM blinds WHERE kind = 'blind' AND source = ? AND day BETWEEN ? AND ?",
@@ -679,23 +690,49 @@ def _when(iso: str) -> datetime:
     return t if t.tzinfo else t.replace(tzinfo=news.now().tzinfo)
 
 
+def answer_at_reveal(b: dict) -> tuple[str, dict | None]:
+    """Your answer as it stood when the reveal was posted: ("answered", the guess), ("no_idea" or
+    "not_ours", None), or ("", None) when you hadn't answered yet. A guess changed after the reveal
+    doesn't replace the one you made before it (the history keeps the replaced ones)."""
+    cut = _when(b["revealed_at"]) if b.get("revealed_at") else None
+    before = [h for h in b["history"] if h.get("what") in ("answered", "no_idea", "not_ours")
+              and (cut is None or _when(h["at"]) < cut)]
+    if not before:
+        return "", None
+    last = before[-1]
+    if last["what"] != "answered":
+        return last["what"], None
+    pool = [g for h in b["history"] if h.get("what") == "replaced" for g in h.get("guesses", [])] + b["guesses"]
+    return "answered", next((g for g in reversed(pool) if g.get("at") == last["at"]), None)
+
+
+def _fits(guess: str, theirs: list[list[str]]) -> bool:
+    """One word fits a revealed name only as its last word (a surname): "Example" fits "Pat
+    Example", "Pat" doesn't. More words fit when all of them are in one revealed name."""
+    w = _words(guess)
+    if not w:
+        return False
+    if len(w) == 1:
+        return any(t and t[-1] == w[0] for t in theirs)
+    return any(set(w) <= set(t) for t in theirs)
+
+
 def grade(b: dict, people_map: dict | None = None) -> str:
-    """Your guess against the source's reveal: "right", "wrong", "late" (you guessed after the
-    reveal was posted, so it isn't counted), or "" (not revealed, or no name guessed). Right
-    when every word of your guess, or of a name the matched person answers to, is in one
-    revealed name: "Affleck" and "Zac Affleck" both fit "Zac Affleck"."""
-    if not b.get("revealed") or not b["guesses"] or b["status"] != "answered":
+    """Your guess against the source's reveal: "right", "wrong", "late" (your only named guess
+    came after the reveal was posted, so it isn't counted), or "" (not revealed, or no name
+    guessed). The guess scored is the one you had when the reveal was posted. It is right when it,
+    or the full name or an alias of the People record it matched, fits a revealed name."""
+    if not b.get("revealed"):
         return ""
-    g = b["guesses"][0]
-    if b.get("revealed_at") and g.get("at") and _when(g["at"]) >= _when(b["revealed_at"]):
-        return "late"
-    mine = {g.get("name") or "", g.get("as_written") or ""}
-    if g.get("person") and people_map and g["person"] in people_map:
-        from .people import names
-        mine |= names(people_map[g["person"]], g["person"])
-    theirs = [set(_words(n)) for n in revealed_names(b["revealed"])]
-    hit = any(w and any(w <= t for t in theirs) for w in (set(_words(m)) for m in mine))
-    return "right" if hit else "wrong"
+    status, g = answer_at_reveal(b)
+    if status == "answered" and g:
+        mine = [g.get("name") or "", g.get("as_written") or ""]
+        rec = (people_map or {}).get(g.get("person") or "")
+        if rec:
+            mine += [re.sub(r"\(.*?\)", "", n) for n in [rec.get("name") or "", *rec.get("aliases", [])]]
+        theirs = [_words(n) for n in revealed_names(b["revealed"])]
+        return "right" if any(_fits(m, theirs) for m in mine) else "wrong"
+    return "late" if not status and b["guesses"] else ""
 
 
 def scorecard(cfg: dict, match: bool = True, say=print) -> dict:
@@ -759,8 +796,8 @@ def check(cfg: dict, backfill_days: float = 0, clues: bool = True, claude=None, 
             n, ed = fetch_source(db, src, backfill_days, cfg["blinds"]["backfill_pages"], say)
             say(f"  {src['name']}: {n} new" + (f", {ed} edited" if ed else ""))
             new, edited = new + n, edited + ed
+        revealed = match_reveals(db, say)  # before prune: a blind its reveal answers is kept
         prune(cfg, db)
-        revealed = match_reveals(db, say)
         read, paired, tried = [], 0, set()
         if clues and cfg["blinds"]["clues_model"]:
             while True:  # max_clues a pass; a backfill reads everything it brought in, past refusals

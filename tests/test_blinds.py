@@ -1019,3 +1019,40 @@ def test_by_default_no_blind_is_ever_forgotten(cfg, monkeypatch):
     assert blinds.prune(cfg, db) == 0
     db.close()
     assert len(blinds.listing(cfg, days=4000, everything=True)) == 1
+
+
+def test_a_guess_changed_after_the_reveal_is_scored_as_it_stood_before(cfg, monkeypatch):
+    a, _ = two_blinds(cfg, monkeypatch)
+    blinds.answer(cfg, a["id"], "Sam Sample")
+    early = news.iso(news.now() - timedelta(days=5))  # the guess was made five days ago, before the reveal
+    db = blinds.connect(cfg)
+    row = blinds.get(db, a["id"])
+    db.execute("UPDATE blinds SET guesses = ?, history = ? WHERE id = ?",
+               (json.dumps([{**g, "at": early} for g in row["guesses"]]),
+                json.dumps([{**h, "at": early} for h in row["history"]]), a["id"]))
+    db.commit()
+    db.close()
+    feeds(monkeypatch, {"cdan.example": atom(("Blind Items Revealed #1", iso_days_ago(2),
+                                              reveal_html(a["day"], BLIND_A, "Pat Example"))), "bg.example": rss()})
+    blinds.check(cfg, clues=False)
+    blinds.answer(cfg, a["id"], "Pat Example")  # changed after: the scorecard keeps the miss
+    assert blinds.one(cfg, a["id"])["grade"] == "wrong"
+
+
+def test_one_word_fits_only_as_a_surname():
+    theirs = [blinds._words("Pat Example"), blinds._words("Sam Sample")]
+    assert blinds._fits("Example", theirs) and blinds._fits("pat example", theirs)
+    assert not blinds._fits("Pat", theirs) and not blinds._fits("Pat Sample", theirs) and not blinds._fits("", theirs)
+
+
+def test_a_reveal_is_matched_before_prune_can_forget_its_blind(cfg, monkeypatch):
+    cfg["blinds"]["keep_days"] = 365
+    a, _ = two_blinds(cfg, monkeypatch)
+    db = blinds.connect(cfg)
+    db.execute("UPDATE blinds SET published = ? WHERE kind = 'blind'", (news.iso(news.now() - timedelta(days=400)),))
+    db.commit()
+    db.close()
+    feeds(monkeypatch, {"cdan.example": atom(("Blind Items Revealed #1", TODAY,
+                                              reveal_html(a["day"], BLIND_A, "Pat Example"))), "bg.example": rss()})
+    assert blinds.check(cfg, clues=False)["revealed"] == 1
+    assert blinds.one(cfg, a["id"])["revealed"] == "Pat Example"

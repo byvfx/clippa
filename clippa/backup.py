@@ -75,9 +75,10 @@ def photo_dirs(cfg: dict) -> list[str]:
 
 
 def plan(cfg: dict, with_secrets: bool = False, dest: Path | None = None,
-         snap_dir: Path | None = None) -> list[tuple[str, Path]]:
+         snap_dir: Path | None = None, notes: list[str] | None = None) -> list[tuple[str, Path]]:
     """(name in the zip, file) for everything a backup takes. The blinds store is copied into
-    snap_dir first (a consistent snapshot); without one, its live file is listed for sizing."""
+    snap_dir first (a consistent snapshot); without one (a dry run), its live file is listed for
+    sizing. What went wrong with it is added to notes."""
     cfg = base(cfg)
     root = Path(cfg["_dir"])
     paths = cfg["paths"]
@@ -119,17 +120,25 @@ def plan(cfg: dict, with_secrets: bool = False, dest: Path | None = None,
                     add(d / name)
     if with_secrets:
         add(root / "secrets")
-    out += _blinds_store(cfg, snap_dir)
+    out += _blinds_store(cfg, snap_dir, [] if notes is None else notes)
     return out
 
 
-def _blinds_store(cfg: dict, snap_dir: Path | None) -> list[tuple[str, Path]]:
+def _blinds_store(cfg: dict, snap_dir: Path | None, notes: list[str]) -> list[tuple[str, Path]]:
     """The blind items' store: your answers and the reveals, research nothing can rebuild."""
     if snap_dir is not None:   # a damaged store still goes in, under a name that says so
-        snap = blinds.snapshot(cfg, snap_dir)
+        try:
+            snap = blinds.snapshot(cfg, snap_dir)
+        except blinds.BlindsBusy as e:
+            notes.append(f"the blinds store was busy ({e}); left out of this backup, the next one takes it")
+            return []
         if not snap:
             return []
         path, problem = snap
+        if problem:
+            notes.append(f"WARNING: the blinds store failed its check ({problem}); it went in as "
+                         f"blinds.damaged.sqlite. An older zip may hold a good copy: "
+                         f"{wiki.page('Blind-items', 'where-it-lives')}")
         return [(f"blinds/blinds{'.damaged' if problem else ''}.sqlite", path)]
     store = blinds.store_path(cfg)
     return [("blinds/blinds.sqlite", store)] if store.is_file() else []
@@ -147,7 +156,8 @@ def _run(cfg: dict, to: str | Path | None, with_secrets: bool | None, dry_run: b
     cfg = base(cfg)
     dest = folder(cfg, to)
     secrets = cfg["backup"]["with_secrets"] if with_secrets is None else with_secrets
-    files = plan(cfg, secrets, dest, snap_dir)
+    notes: list[str] = []
+    files = plan(cfg, secrets, dest, None if dry_run else snap_dir, notes)
     if not files:
         raise ClipperError(f"nothing to back up under {cfg['_dir']}")
     size = sum(f.stat().st_size for _, f in files)
@@ -168,11 +178,7 @@ def _run(cfg: dict, to: str | Path | None, with_secrets: bool | None, dry_run: b
         # one backup at a time per folder (serve's and one by hand): a .part left behind is
         # then a killed run's, and the newest-keep count sees every finished zip
         with jsonstate.locked(dest / "backup", wait_s=5):
-            lines = _write(cfg, dest, target, files, secrets)
-            if any(name == "blinds/blinds.damaged.sqlite" for name, _ in files):
-                lines.append("WARNING: the blinds store failed its check; it went in as blinds.damaged.sqlite. "
-                             f"An older zip may hold a good copy: {wiki.page('Blind-items', 'where-it-lives')}")
-            return lines
+            return _write(cfg, dest, target, files, secrets) + notes
     except TimeoutError:
         raise ClipperError(f"another backup is writing to {dest} now; try again when it is done") from None
 

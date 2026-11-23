@@ -159,3 +159,15 @@ def test_a_damaged_blinds_store_goes_in_under_its_own_name_and_the_rest_still_ba
     got = names(z)
     assert "blinds/blinds.damaged.sqlite" in got and "blinds/blinds.sqlite" not in got
     assert "clipper.toml" in got and out[-1].startswith("WARNING: the blinds store")
+
+
+def test_a_busy_blinds_store_is_left_out_and_the_rest_backs_up(cfg, monkeypatch):
+    from clippa import blinds
+
+    def busy(cfg, dest):
+        raise blinds.BlindsBusy("database is locked")
+    monkeypatch.setattr(blinds, "snapshot", busy)
+    out = backup.run(cfg)
+    (z,) = (cfg["_dir"] / "backups" / "taste").glob("taste-*.zip")
+    assert not any(n.startswith("blinds/") for n in names(z)) and "clipper.toml" in names(z)
+    assert "the blinds store was busy" in out[-1]
