@@ -36,6 +36,7 @@
 - [Claude on the NAS](Claude-on-the-NAS)
 - [Phone access](Phone-access)
 - [Model providers](Model-providers)
+- [Model rollout](Model-rollout)
 - [Adding a show](Adding-a-show)
 - [YouTube channel](YouTube-channel)
 
