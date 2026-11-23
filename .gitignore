@@ -1,5 +1,7 @@
 # environments and caches
 .venv/
+# MkDocs build output. Generated pages live in docs-site/*.md (gitignored there).
+/site/
 __pycache__/
 .ruff_cache/
 # written into the staged copy by deploy/stamp.sh (the image has no .git), never the checkout

@@ -1,0 +1,21 @@
+{% extends "main.html" %}
+{% block extrahead %}
+  {{ super() }}
+  <script>document.documentElement.classList.add("nw-home");</script>
+{% endblock %}
+{% block hero %}
+  <section class="nw-hero" aria-label="Clippa">
+    <div class="nw-hero-inner md-grid">
+      <div class="nw-hero-brand">
+        <img src="{{ 'assets/clippa-mark.svg' | url }}" alt="" width="48" height="48">
+        <span class="nw-wordmark">clippa</span>
+      </div>
+      <h1 class="nw-hero-tagline">Clippa keeps watch.<br>You keep the final cut.</h1>
+      <p class="nw-hero-lead">Turns long Kick streams into YouTube uploads, with a person approving every cut before it goes out.</p>
+      <p class="nw-hero-actions">
+        <a class="nw-btn nw-btn-primary" href="{{ 'getting-started/' | url }}">Getting started</a>
+        <a class="nw-btn nw-btn-secondary" href="{{ 'overview/' | url }}">Overview</a>
+      </p>
+    </div>
+  </section>
+{% endblock %}

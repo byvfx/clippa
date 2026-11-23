@@ -12,6 +12,9 @@ Developing#releases.
 
 ### 2026-11
 
+- 11-23: The docs site is an MkDocs Material build of the wiki pages (`mkdocs build --strict` in CI).
+  It is published from `byvfx/clippa-docs` at <https://byvfx.github.io/clippa-docs/>. The case study
+  stays at <https://byvfx.github.io/clippa/>. The wiki workflow is unchanged.
 - 11-22: The blind items' store (your answers, the reveals) goes into `clippa backup` as a checked snapshot, and no
   blind is forgotten any more by default (`[blinds] keep_days = 0`); a number of days still forgets old untouched ones.
   A backup whose blinds store is damaged or was busy keeps every older zip and says so.
