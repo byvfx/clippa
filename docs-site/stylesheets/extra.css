@@ -327,11 +327,20 @@
   border: 1px solid var(--nw-border);
   border-radius: 8px;
   box-shadow: none;
+  /* Gutter for the copy button; keep overflow off pre so this padding
+     stays visible and is not at the end of a horizontal scroll. */
+  padding-right: 2.6em;
 }
 .md-typeset pre > code {
   background: transparent;
   border: 0;
-  padding: 0;
+  display: block;
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: 0.9em 1.2em;
+  font-size: 0.8em;
+  line-height: 1.5;
+  overflow-x: auto;
 }
 .md-typeset .highlight span.filename {
   background: var(--nw-surface-raised);
@@ -807,15 +816,18 @@
   }
 }
 
-/* Keep CLI tokens on one line so `clippa <stage>` does not split. */
+/* Keep CLI tokens and folder names on one line so they do not split. */
 .md-typeset p code,
-.md-typeset li code {
+.md-typeset li code,
+.md-typeset td code,
+.md-typeset th code {
   white-space: nowrap;
 }
 
-/* Long commands wrap instead of clipping under the copy button. */
+/* Long commands scroll sideways instead of wrapping. Right padding
+   on pre keeps the copy button clear of the scrolling code. */
 .md-typeset pre code {
-  white-space: pre-wrap;
+  white-space: pre;
 }
 
 /* Keep heading targets below the sticky header. */
