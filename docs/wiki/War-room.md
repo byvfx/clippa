@@ -77,7 +77,7 @@ for its first numbers it shows a grey outline of its rows.
 Click a live show's chip to watch it in a player on the page or on kick.com in a new window;
 the chip also says whether the NAS is recording it, and whether the show approves its clips
 by itself: **AUTO** in green when `[review] auto_approve` is on for it, a faint *manual* when not.
-Hover the tag for which kinds of clip approve themselves, from what score, after how long
+Hover the chip for which kinds of clip approve themselves, from what score, after how long
 ([Review](Review#approval-by-silence)).
 Shows in `[warroom] hide_shows` (e.g. `["trish", "blade"]`) are left off these chips and the
 show filter; their streams and items still appear.

@@ -118,10 +118,10 @@ function autoTip(a) {  // the show's [review] auto-approve, in words, for the ch
   if (!a?.on) return "auto-approve off: a person approves everything";
   const kinds = Object.entries(a.kinds || {}).map(([k, f]) => `${k}s from score ${f}`);
   const pre = { now: "pre-shows at publish", grace: "pre-shows after the grace", off: "pre-shows wait for a person" }[a.preshow] || "";
-  return `auto-approve on: ${[kinds.length ? `${kinds.join(", ")} after ${a.grace} min` : "no kind of clip", pre].filter(Boolean).join("; ")}`;
+  return `auto-approve on: ${[kinds.length && `${kinds.join(", ")} after ${a.grace} min`, pre].filter(Boolean).join("; ")}`;
 }
-function autoTag(a) {
-  return a ? `<span class="auto ${a.on ? "" : "off"}" title="${esc(autoTip(a))}">${a.on ? "AUTO" : "manual"}</span>` : "";
+function autoTag(a) {  // its words are in the chip's own tooltip
+  return a ? `<span class="auto ${a.on ? "" : "off"}">${a.on ? "AUTO" : "manual"}</span>` : "";
 }
 async function refreshLive() {
   try { LIVE = await api("/api/live"); renderLive(); }

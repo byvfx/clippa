@@ -528,3 +528,8 @@ def test_summary_is_what_the_show_chip_shows(cfg):
     cfg["review"].update(auto_approve=False, auto_min_segment="7.5")
     assert review_auto.summary(cfg["review"])["on"] is False
     assert review_auto.summary(cfg["review"])["kinds"] == {"short": 6.0, "segment": 7.5}
+    # on, but nothing can approve itself: no floors and pre-shows wait too
+    cfg["review"].update(auto_approve=True, auto_min_short=0, auto_min_segment=0, auto_preshow="off")
+    assert review_auto.summary(cfg["review"])["on"] is False
+    cfg["review"]["auto_preshow"] = "grace"
+    assert review_auto.summary(cfg["review"]) == {"on": True, "kinds": {}, "grace": 120, "preshow": "grace"}

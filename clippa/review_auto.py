@@ -100,11 +100,12 @@ def floor_of(rc: dict, kind: str) -> float:
 
 
 def summary(rc: dict) -> dict:
-    """A show's [review] auto-approve settings for the war room's show chip: on, each kind that
+    """A show's [review] auto-approve settings for the war room's show chip: on (something can
+    approve itself: auto_approve with a kind's floor set or pre-shows not "off"), each kind that
     approves itself with its score floor, the grace and the pre-shows' rule."""
-    return {"on": bool(rc["auto_approve"]),
-            "kinds": {k: floor_of(rc, k) for k in KINDS if floor_of(rc, k)},
-            "grace": rc["auto_grace_minutes"], "preshow": rc["auto_preshow"]}
+    kinds = {k: floor_of(rc, k) for k in KINDS if floor_of(rc, k)}
+    return {"on": bool(rc["auto_approve"]) and bool(kinds or rc["auto_preshow"] != "off"),
+            "kinds": kinds, "grace": rc["auto_grace_minutes"], "preshow": rc["auto_preshow"]}
 
 
 def enabled_anywhere(cfg: dict) -> bool:
