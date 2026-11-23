@@ -80,7 +80,8 @@ CREATE TABLE IF NOT EXISTS sources (name TEXT PRIMARY KEY, etag TEXT, modified T
 CREATE TABLE IF NOT EXISTS digests (day TEXT PRIMARY KEY, posted_at TEXT, thread TEXT, blinds INTEGER DEFAULT 0);
 """
 ADDED = ("paired_at", "alerted_at", "alert_msg", "digest_day",  # columns a store from before them lacks
-         "revealed", "reveal_id", "revealed_at", "reveal_of", "reveal_score")  # step 4's: added by connect()
+         "revealed", "reveal_id", "revealed_at", "reveal_of", "reveal_score",  # step 4's: added by connect()
+         "reveal_told")  # when the bot told you the reveal of a blind you had answered
 
 CLUES_SCHEMA = {
     "type": "object",
@@ -350,7 +351,7 @@ def store(db: sqlite3.Connection, src: dict, items: list[dict], since: datetime 
                 db.execute("UPDATE blinds SET reveal_of = NULL, reveal_score = NULL WHERE id = ?", (bid,))
                 db.execute("UPDATE blinds SET history = json_insert(COALESCE(history, '[]'), '$[#]', "
                            "json_object('at', ?, 'what', 'unrevealed', 'reveal', ?, 'was', revealed)), "
-                           "revealed = NULL, reveal_id = NULL, revealed_at = NULL WHERE reveal_id = ?", (t, bid, bid))
+                           "revealed = NULL, reveal_id = NULL, revealed_at = NULL, reveal_told = NULL WHERE reveal_id = ?", (t, bid, bid))
     return new, edited
 
 
@@ -1293,6 +1294,64 @@ def answered_text(content: str, b: dict, limit: int = 2000) -> str:
     if len(kept) > room:
         kept = kept[:room - 1].rstrip() + "…"
     return f"{kept}\n{line}" if line else kept
+
+
+GRADE_SAYS = {"right": "your guess was **right**", "wrong": "your guess was **wrong**",
+              "late": "your guess came after the reveal, so it isn't counted"}
+
+
+def reveal_follow_ups(cfg: dict) -> list[dict]:
+    """Blinds you answered (a guess or No idea) whose reveal you haven't been told yet, oldest
+    reveal first, each with its grade and where to say it: a reply to its alert, else in its
+    digest's thread, else the channel (`where`: {"reply": "<channel>/<message>"} or {"thread": id}
+    or {}). One you never answered isn't followed up: the answer stays out of Discord."""
+    db = connect(cfg)
+    try:
+        raw = db.execute("SELECT * FROM blinds WHERE kind = 'blind' AND revealed IS NOT NULL AND reveal_told IS NULL "
+                         "AND status IN ('answered', 'no_idea') ORDER BY revealed_at, id").fetchall()
+        threads = {r["day"]: r["thread"] for r in db.execute("SELECT day, thread FROM digests WHERE thread IS NOT NULL")}
+    finally:
+        db.close()
+    pm, out = _people_map(cfg), []
+    for r in raw:
+        b = as_dict(r)  # it drops the alert columns: where comes from the row
+        b["grade"] = grade(b, pm)
+        b["at_reveal"], g = answer_at_reveal(b)
+        b["scored_guess"] = g["name"] if g else ""
+        msg, day = r["alert_msg"] or "", r["digest_day"] or ""
+        b["where"] = ({"reply": msg} if re.fullmatch(r"\d+/\d+", msg)
+                      else {"thread": threads[day]} if day in threads else {})
+        out.append(b)
+    return out
+
+
+def reveal_text(b: dict) -> str:
+    """The follow-up: who the source says it is, and how your answer did, as it was scored: your
+    answer when the reveal was posted; a name given only after it is said to be uncounted."""
+    src = b["source"].upper() if len(b["source"]) <= 5 else b["source"].title()
+    again = any(h.get("what") == "unrevealed" for h in b["history"])  # the source corrected its reveal
+    head = f"🔓 **Revealed{' (corrected)' if again else ''}:** {src} {md(b['title'] or b['id'])} · {b['day']}"
+    said = f"The source says: **{md(' '.join((b['revealed'] or '').split())[:300])}**"
+    now = b["guesses"][0]["name"] if b["guesses"] else ""
+    at = b.get("at_reveal", "")
+    if at == "answered" and b["scored_guess"]:
+        how = GRADE_SAYS.get(b["grade"], "")
+        return f"{head}\n{said}\nYou said **{md(b['scored_guess'])}**" + (f": {how}." if how else ".")
+    line = {"no_idea": "You had no idea when it was revealed", "not_ours": "You had marked it Not ours"}.get(at, "")
+    if now and b["status"] == "answered":
+        later = f"You said **{md(now)}** after the reveal, so it isn't counted."
+        return f"{head}\n{said}\n" + (f"{line}. {later}" if line else later)
+    return f"{head}\n{said}\n{line or 'You had no idea'}."
+
+
+def mark_told(cfg: dict, bid: str) -> None:
+    """Its reveal was posted in Discord (or can't be: it is not asked again)."""
+    db = connect(cfg)
+    try:
+        db.execute("UPDATE blinds SET reveal_told = ? WHERE id = ?", (news.iso(news.now()), bid))
+        db.commit()
+    finally:
+        db.close()
 
 
 def digest_head(day: str, n: int, more: int) -> str:

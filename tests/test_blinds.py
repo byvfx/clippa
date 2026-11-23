@@ -576,9 +576,10 @@ def test_blinds_never_reach_anything_published():
         assert not re.search(r"from \.\. import.*\bblinds\b|\bblinds\.(listing|one|answer|get|connect)\(",
                              (src / "warroom" / name).read_text(encoding="utf-8"))
     used = set(re.findall(r"\bblinds\.(\w+)\(", (src / "bot.py").read_text(encoding="utf-8")))
-    assert used == {"alert_text", "digest_head", "answered_text"}  # the rest go through asyncio.to_thread
+    assert used == {"alert_text", "digest_head", "answered_text", "reveal_text"}  # the rest go through asyncio.to_thread
     called = set(re.findall(r"to_thread\(blinds\.(\w+)", (src / "bot.py").read_text(encoding="utf-8")))
-    assert called == {"own_alerts", "digest_due", "start_digest", "mark_alerted", "mark_digested", "answer"}
+    assert called == {"own_alerts", "digest_due", "start_digest", "mark_alerted", "mark_digested", "answer",
+                      "reveal_follow_ups", "mark_told"}
 
 
 def test_doctor_checks_the_sources(cfg, monkeypatch):
@@ -1119,3 +1120,100 @@ def test_a_revealed_blind_still_shows_when_the_people_records_cant_be_read(cfg, 
     assert (sc["right"], sc["wrong"]) == (1, 1) and any("people.json couldn't be read" in s for s in said)
     right = next(x["id"] for x in sc["graded"] if x["guess"] == "Example")   # a surname, no aliases needed
     assert blinds.one(cfg, right)["grade"] == "right"
+
+
+def reveal_both(cfg, monkeypatch, a, b):
+    feeds(monkeypatch, {"cdan.example": atom(
+        ("Blind Item #1", iso_days_ago(10), BLIND_A), ("Blind Item #2", iso_days_ago(10), BLIND_B),
+        ("Blind Items Revealed #1", TODAY, reveal_html(a["day"], BLIND_A, "Pat Example/Sam Sample")),
+        ("Blind Items Revealed #2", TODAY, reveal_html(b["day"], BLIND_B, "Jo Singer"))),
+        "bg.example": rss()})
+    assert blinds.check(cfg, clues=False)["revealed"] == 2
+
+
+def test_a_blind_you_answered_is_followed_up_where_it_was_asked_once(cfg, monkeypatch):
+    a, b = two_blinds(cfg, monkeypatch)
+    blinds.mark_alerted(cfg, a["id"], "11/22")
+    blinds.answer(cfg, a["id"], "Example")
+    reveal_both(cfg, monkeypatch, a, b)            # b was never answered: no follow-up, its answer stays out
+    (x,) = blinds.reveal_follow_ups(cfg)
+    assert x["id"] == a["id"] and x["where"] == {"reply": "11/22"} and x["grade"] == "right"
+    text = blinds.reveal_text(x)
+    assert "Pat Example/Sam Sample" in text and "**right**" in text and "Jo Singer" not in text
+    blinds.mark_told(cfg, a["id"])
+    assert blinds.reveal_follow_ups(cfg) == []
+
+
+def test_no_idea_and_a_digest_blind_are_told_in_the_digest_thread(cfg, monkeypatch):
+    a, b = two_blinds(cfg, monkeypatch)
+    db = blinds.connect(cfg)
+    db.execute("INSERT INTO digests (day, posted_at, thread) VALUES ('2026-11-01', 'x', '777')")
+    db.commit()
+    db.close()
+    blinds.mark_digested(cfg, b["id"], "2026-11-01")
+    blinds.answer(cfg, b["id"], "", none=True)
+    reveal_both(cfg, monkeypatch, a, b)
+    (x,) = blinds.reveal_follow_ups(cfg)
+    assert x["where"] == {"thread": "777"} and "You had no idea" in blinds.reveal_text(x)
+
+
+def test_the_war_room_shows_the_answer_only_on_a_blind_you_answered(cfg, monkeypatch):
+    from clippa import warroom
+
+    a, b = two_blinds(cfg, monkeypatch)
+    blinds.answer(cfg, a["id"], "Somebody Else")
+    reveal_both(cfg, monkeypatch, a, b)
+    out = warroom.blinds_get(cfg, 30, "all")
+    got = {x["id"]: x for x in out["blinds"]}
+    assert got[a["id"]]["revealed"] == "Pat Example/Sam Sample" and got[a["id"]]["grade"] == "wrong"
+    assert got[b["id"]]["revealed"] is True and "Jo Singer" not in str(got[b["id"]])  # the reveal post itself still shows in All
+    assert (out["scorecard"]["right"], out["scorecard"]["wrong"]) == (0, 1) and "graded" not in out["scorecard"]
+
+
+def test_not_ours_on_a_revealed_blind_in_the_war_room_doesnt_say_who(cfg, monkeypatch):
+    from clippa import warroom
+
+    a, b = two_blinds(cfg, monkeypatch)
+    reveal_both(cfg, monkeypatch, a, b)
+    got = warroom.blinds_answer(cfg, {"id": b["id"], "not_ours": True})["blind"]
+    assert got["revealed"] is True and "grade" not in got
+    got = warroom.blinds_answer(cfg, {"id": a["id"], "none": True})["blind"]   # answered now: it may say
+    assert got["revealed"] == "Pat Example/Sam Sample"
+
+
+def test_a_corrected_reveal_is_told_again(cfg, monkeypatch):
+    """Grok on #389: the bot said "right"; the source corrects the reveal; Discord hears the correction."""
+    a, _ = two_blinds(cfg, monkeypatch)
+    blinds.answer(cfg, a["id"], "Example")
+    feeds(monkeypatch, {"cdan.example": atom(("Blind Items Revealed #1", TODAY,
+                                              reveal_html(a["day"], BLIND_A, "Pat Example"))), "bg.example": rss()})
+    blinds.check(cfg, clues=False)
+    (x,) = blinds.reveal_follow_ups(cfg)
+    blinds.mark_told(cfg, x["id"])
+    feeds(monkeypatch, {"cdan.example": atom(("Blind Items Revealed #1", TODAY,
+                                              reveal_html(a["day"], BLIND_A, "Sam Sample"))), "bg.example": rss()})
+    blinds.check(cfg, clues=False)
+    (x,) = blinds.reveal_follow_ups(cfg)
+    text = blinds.reveal_text(x)
+    assert "(corrected)" in text and "Sam Sample" in text and "**wrong**" in text
+
+
+def test_no_idea_then_a_name_after_the_reveal_is_told_as_no_idea(cfg, monkeypatch):
+    """Grok on #389: what was scored is said, and the later name is said not to count."""
+    a, _ = two_blinds(cfg, monkeypatch)
+    blinds.answer(cfg, a["id"], "", none=True)
+    early = news.iso(news.now() - timedelta(days=5))
+    db = blinds.connect(cfg)
+    row = blinds.get(db, a["id"])
+    db.execute("UPDATE blinds SET history = ? WHERE id = ?",
+               (json.dumps([{**h, "at": early} for h in row["history"]]), a["id"]))
+    db.commit()
+    db.close()
+    feeds(monkeypatch, {"cdan.example": atom(("Blind Items Revealed #1", iso_days_ago(2),
+                                              reveal_html(a["day"], BLIND_A, "Pat Example"))), "bg.example": rss()})
+    blinds.check(cfg, clues=False)
+    blinds.answer(cfg, a["id"], "Pat Example")
+    (x,) = blinds.reveal_follow_ups(cfg)
+    text = blinds.reveal_text(x)
+    assert "no idea when it was revealed" in text and "after the reveal, so it isn't counted" in text
+    assert "**right**" not in text
