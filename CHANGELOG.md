@@ -33,6 +33,12 @@ repo is `byvfx/clippa` (the old links redirect). The `clipper` command, `clipper
 
 ### 2026-11
 
+- 11-23: Dependencies: anthropic 2.10, numpy 2.5.5, opencv-python-headless 5.1 and the latest
+  yt-dlp (#345).
+- 11-23: The conventions file for contributors and coding agents is `AGENTS.md`; `CLAUDE.md`
+  imports it, so either name finds the same rules.
+- 11-23: Blind items: when a blind you answered is revealed, Discord replies with who the source says it
+  is and how your guess did, and the war room's Blinds window shows it on the card, with the scorecard in its header.
 - 11-23: Wiki voice. The pages no longer say we, us or our. A reviewer's note is a retake;
   re-split stays the flag for a segment that needs splitting again.
 - 11-23: The GitHub wiki points at the docs site. Home has a note under the banner, and the
@@ -46,8 +52,6 @@ repo is `byvfx/clippa` (the old links redirect). The `clipper` command, `clipper
   A backup whose blinds store is damaged or was busy keeps every older zip and says so.
 - 11-22: Blind items: each check matches reveal posts to the blinds they answer, in code, and scores your guess
   against the answer; `clippa blinds reveals` prints the scorecard.
-- 11-23: Blind items: when a blind you answered is revealed, Discord replies with who the source says it
-  is and how your guess did, and the war room's Blinds window shows it on the card, with the scorecard in its header.
 - 11-22: The war room's show chips say whether each show approves its clips by itself: **AUTO**
   when `[review] auto_approve` is on for it, *manual* when not; hover the chip for the kinds and score floors.
 - 11-22: The checkup no longer reports the bot's Discord reconnects after a short network drop as
@@ -65,7 +69,7 @@ repo is `byvfx/clippa` (the old links redirect). The `clipper` command, `clipper
   can't read, such as `1:xx`, is a one-line error, the same as any other bad time.
 - 11-22: `[segments] split_over_s` below 0 is off, the same as 0. A value that is not a number,
   such as `fifty`, is a one-line error naming the setting.
-- The rename's deploy step (#286 pass 3): the NAS compose projects are `clippa-hub`, `clippa-record`
+- 11-22: The rename's deploy step (#286 pass 3): the NAS compose projects are `clippa-hub`, `clippa-record`
   and `clippa-claude`, and the Modal apps `clippa-whisperx` and `clippa-lipsync`. The first deploy
   of each stops the old `clipper-*` project before the new one starts (never two bots or workers
   at once); tailscale keeps its sign-in. Transcription uses the old Modal app until `clippa
