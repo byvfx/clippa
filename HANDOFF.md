@@ -134,17 +134,18 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   the user's word. A fork's PR: read the diff by hand, then the user's word.
 
 ## State now (2026-11-20)
-- **Hub on the NAS** since 2026-11-05 (wiki NAS-hub): compose project `clipper-hub` in `~/clipper-hub`, containers
+- **Hub on the NAS** since 2026-11-05 (wiki NAS-hub): compose project `clippa-hub` in `~/clippa-hub` (since pass 3, 11-22), containers
   `serve` (war room on 127.0.0.1:8765, on the tailnet as https://clipper.taile415cd.ts.net/; heartbeat
   `streams/.serve/status.json`), `bot` (`streams/.bot/status.json`) and `worker` (cuts with QSV on the iGPU).
   Code changes go out with `bash deploy/hub/deploy.sh` from a main checkout; `clippa services status|restart ...`
-  runs docker compose there (`[serve] hub`). Last deploy 2026-11-20 ~09:00 (user): main as of #336, the analytics fix (serve, bot and worker report `0.2.0` plus the commit; the recorder is older). **The config and
+  runs docker compose there (`[serve] hub`). Last deploy 2026-11-22 22:27 PT, after Don's stream: all three at e8f0758 (#389); then serve and the bot again at
+  0e2c797 (#378, with #345's dependency bumps), the worker held back until Don's 11-23 run finishes, then redeployed. **The config and
   all state are on the NAS:** `//192.168.0.155/docker/clipper` (`/data`) holds `clipper.toml` (the one copy;
   `CLIPPER_CONFIG` on the laptop points at it), `schedule.json`, secrets/, backups/, logs/, faces/, voices/,
   news/, weekly/, archive/, layouts/, people.json, fonts/. The laptop's old copies: `backups/laptop-state-2026-11-05/`.
   The laptop's scheduled tasks are disabled, not removed (rollback: wiki NAS-hub).
-- **NAS** (192.168.0.155) also runs the recorder container (`deploy/record`, redeployed 2026-11-20 at 74be7d2,
-  watching kinocasinogaming + donflurgundy + chudlogic), Kitsu :8090, the cut container, the streams and photos
+- **NAS** (192.168.0.155) also runs the recorder container (`deploy/record`, `clippa-record`, redeployed 11-22 at 6ac5d37,
+  watching kinocasinogaming + donflurgundy; chudlogic off since 11-10, user: catch up on Kino and Don), Kitsu :8090, the cut container, the streams and photos
   shares. `kick-138291641-2` is Kino 11-17 after the show ended early (Andy playing a game): recorded only, held
   from the worker by `run.json` `{"status": "skip"}`; delete it whenever you like. The `claude` container (`deploy/claude`, wiki Claude-on-the-NAS) drives Clippa from the phone.
 - **Mac `lofn`** (Apple Silicon, setup's `control` role, 11-07): a dev/control station that runs nothing
@@ -157,7 +158,7 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   821.7 s before 7:28, so don't `clippa run` it until fetch is fixed. dsp and blade are config-only tests;
   `trish` is a placeholder for the 2026-10-27 one-off; trish and blade are off the war room (`[warroom] hide_shows`).
 - **Schedule** (October check-in, 11-02): `stream_budget = { segment = 10, short = 10, compilation = 0 }` per
-  8 h, Channel 404 `segment = 6`; slots a day: 9 Shorts (09/11/13/15/16/18/19/20/21), 6 segments
+  8 h, Channel 404 `segment = 9` (6 until the 11-22 check-in; Chud stays off); slots a day: 9 Shorts (09/11/13/15/16/18/19/20/21), 6 segments
   (08/10/12/14/17/22), compilation 23:00 for big-story nights only (`docs/big-story.toml` into the stream's
   config.toml). If good items keep going stale while streams overlap, try `stale_days = 4`.
 - **Chud overnight test: over (11-20).** All 71 chud segments pinned 23:00-07:00 went out on time with no `uploadLimitExceeded`
@@ -184,7 +185,7 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
 
 ## Waiting on the user
 - v0.3.0 is released (PR #372, tag 11-21, the user's word: "as is now"; the Release is titled "Clippa 0.3.0"). The hub was
-  deployed at the tag 11-21 (serve and the bot report `0.3.0`). The recorder is still at 74be7d2 (`0.2.0+59`, 11-20): redeploy it
+  deployed at the tag 11-21 (serve and the bot report `0.3.0`). The recorder is at 6ac5d37 (`0.3.0+13`, 11-22): redeploy it
   when no show is live. The claude container was deployed 11-20 at bd1369b (#356); the nightly checkup is on (`CHECKUP_AT=08:30`).
 - Clippa chat works on the phone (user, 11-20). `[chat] model` is Haiku (`claude-haiku-5-5`) by default; any provider's model string
   works there, so BYOK is `[chat] model = "openrouter:<vendor>/<model>"` with `OPENROUTER_API_KEY` (wiki Model-providers); the
@@ -258,12 +259,13 @@ of phone use; #300 (access levels, a local Jev-like classifier in front of the m
 - **War room heat graph (PR #294, live 11-19):** 🔥 on a stream or item (`/api/heat`, wiki War-room#heat); not yet seen on a real phone.
 - **Review pre-flight checks and approval by silence (#259):** steps A (`clippa review check`, PR #263) and B (`clippa review
   auto`, PR #265, serve's `auto` job every 10 min), stale-finding rechecks (#270) and hardening (#273) are live (wiki Review).
-  **On for Kino since 11-15 and Channel 404 since 11-20** (`[shows.<key>.review] auto_approve = true`, Shorts only: the
-  segment and compilation floors are 0; backups `backups/clipper.toml.before_kino_auto_approve_2026-11-15`,
-  `...before_c404_auto_approve_2026-11-20`). Next: a few days of Don's Shorts with nothing undone (checkup's `auto` check),
-  then close #259. Segments (#258 A-C) are merged and deployed (PRs #260-#262). Segment floor, from 7-day views: scores 1-3
-  underperform, 4-5 are a coin flip, 6+ do better; suggested `auto_min_segment = 4` (Kino holds 63 of 183 scored, Channel 404 23
-  of 106), **not set**: after the Shorts, at the user's word (a checkbox on #259). #258 stays open for step D only,
+  **On for Kino since 11-15 and Channel 404 since 11-20** (`[shows.<key>.review] auto_approve = true`, Shorts 6+, segments
+  4+ since 11-23; the compilation floor is 0; backups `backups/clipper.toml.before_kino_auto_approve_2026-11-15`,
+  `...before_c404_auto_approve_2026-11-20`). Don's Shorts clean since 11-20 (checkup `auto` all good 11-23). Segments (#258 A-C)
+  are merged and deployed (PRs #260-#262). **Segment floor set 11-23 (user: "Yes, set 4"):** `auto_min_segment = 4` for kino
+  and c404 (from 7-day views: 1-3 underperform, 4-5 a coin flip, 6+ better; backup
+  `backups/clipper.toml.before_auto_min_segment_2026-11-23`); first applies to Channel 404's 11-23 stream. Next: a few days of
+  auto-approved segments with nothing undone, then close #259 (v0.4.0). #258 stays open for step D only,
   `[segments] min_score` (not cutting low segments at all), after two weeks of `lift` tables (~11-29), at the user's word. Shorts backtest: 105 of 181 approved Shorts would have approved themselves.
 - **Demo videos (11-16, user):** a portfolio piece first (about 5:40, real shows, none named in the narration, the user reads it live;
   on the byvfx site), then an install tutorial recorded during the desktop clean install (#46/#78). Script and checklist:
