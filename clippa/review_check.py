@@ -27,7 +27,9 @@ unless --force. `clippa review publish` runs this first ([review] checks) and pu
 summary in Kitsu's Checks column; the Discord card, the war room's ⚠ badge and `clippa
 status` read checks.json. An item with findings is one that needs a person: step B's automatic
 approval (#259) leaves it alone. A check that fails is a finding too, so a broken check never
-passes an item.
+passes an item. A missing OpenCV is not that kind of failure: the run raises before any item
+is checked and checks.json is left as it was. A result already saved from that import error
+is checked again, so it does not stay a bad cover.
 """
 from __future__ import annotations
 
@@ -635,10 +637,97 @@ def context(sdir: Path, cfg: dict) -> dict:
 
 CHECKS = ("text", "picture", "cover", "subject")
 
+# The cover's face match (faces.pick) and a Short's webcam frames (detect) import cv2. A missing
+# one used to be caught per item and saved as a cover finding, signature and all, so the next
+# run skipped it and every cover stayed "bad".
+OPENCV_MSG = "review check needs OpenCV: install opencv-python-headless"
+
+
+def missing_opencv(e: BaseException) -> bool:
+    """cv2 failed to import, or this module already raised for that. The install, not the item."""
+    if isinstance(e, ClipperError) and str(e) == OPENCV_MSG:
+        return True
+    if not isinstance(e, ImportError):
+        return False
+    return getattr(e, "name", None) == "cv2" or "No module named 'cv2'" in str(e) \
+        or 'No module named "cv2"' in str(e)
+
+
+def require_opencv() -> None:
+    """Stop before any item when cv2 will not import. Never saved, so it cannot be skipped later."""
+    try:
+        import cv2  # noqa: F401
+    except ImportError:
+        # f-string, not a bare name: tests/test_errors.py treats that as an exit status.
+        raise ClipperError(f"{OPENCV_MSG}") from None
+
+
+def stale_opencv(old: dict | None) -> bool:
+    """A saved result that is the missing-cv2 failure. Its signature matches the files, so
+    keeping it would leave the bad covers and skip them next time."""
+    blob = " ".join((f.get("text") or "") for f in (old or {}).get("findings") or [])
+    return "No module named 'cv2'" in blob or 'No module named "cv2"' in blob
+
+
+def unchanged(old: dict | None, sig: str, force: bool) -> bool:
+    """Already checked for this signature, and not a stuck missing-cv2 result."""
+    return bool(old and old.get("sig") == sig and not force and not stale_opencv(old))
+
+
+def item_imports_cv2(sdir: Path, cfg: dict, it: dict, ctx: dict) -> bool:
+    """Whether checking this item reaches `import cv2`: a Short's webcam frames, or the face
+    box on its cover. Text, the subject and a vision-only cover do not."""
+    try:
+        short = it.get("kind") == "short" and _short_imports_cv2(cfg, it)
+    except (KeyError, TypeError, AttributeError, IndexError):
+        short = False
+    try:
+        cover = _cover_imports_cv2(sdir, it, ctx)
+    except (KeyError, TypeError, AttributeError, IndexError):
+        cover = False
+    return bool(short or cover)
+
+
+def _short_imports_cv2(cfg: dict, it: dict) -> bool:
+    from . import shorts
+
+    layouts = shorts.layouts_of(cfg["shorts"])
+    scenes = short_scenes(it.get("meta") or {}, layouts)
+    return any(cam_panels(layouts[name]) for _, _, name in scenes)
+
+
+def _cover_imports_cv2(sdir: Path, it: dict, ctx: dict) -> bool:
+    """faces.pick imports cv2 when the chosen frame and its face box are on disk. The same
+    guard as cover_findings, so a cover that never imports cv2 still runs."""
+    jpg = it["file"].with_suffix(".jpg")
+    e = cover_entry(it, ctx)
+    if not jpg.exists() or not e or e.get("photo"):
+        return False
+    frames = e.get("frames") or []
+    n = e.get("frame")
+    if not (e.get("face") and n and len(frames) >= n):
+        return False
+    rel = frames[n - 1].get("path")
+    return bool(rel) and (sdir / "thumbs" / e["_key"] / rel).exists()
+
+
+def _run_needs_opencv(sdir: Path, cfg: dict, todo: list[dict], ctx: dict, have: dict,
+                      vision: bool, force: bool) -> bool:
+    """An item this run will check (not a fresh-enough cached one) imports cv2."""
+    for it in todo:
+        if unchanged(have.get(it["key"]), signature(cfg, it, ctx, vision), force):
+            continue
+        if item_imports_cv2(sdir, cfg, it, ctx):
+            return True
+    return False
+
 
 def check_item(sdir: Path, cfg: dict, it: dict, ctx: dict, claude) -> tuple[list[dict], dict]:
     """(findings, the vision answer). A check that crashes is a finding, so the rest still run
-    and the item never passes on a broken check."""
+    and the item never passes on a broken check. A missing OpenCV is raised instead: it is the
+    install, and saving it would mark the cover bad."""
+    if item_imports_cv2(sdir, cfg, it, ctx):
+        require_opencv()
     found: list[tuple[str, str, str]] = []
     vision: dict = {}
     for name in CHECKS:
@@ -654,6 +743,9 @@ def check_item(sdir: Path, cfg: dict, it: dict, ctx: dict, claude) -> tuple[list
         except Exception as e:  # one broken check mustn't pass the item
             if key_rejected(e):
                 raise  # not the item's fault: exit KEY_REJECTED, so the stream is held (#281)
+            if missing_opencv(e):
+                require_opencv()  # the same ClipperError, still not a finding
+                raise
             got = [(BAD, f"the {name} check failed: {type(e).__name__}: {str(e)[:200]}")]
         found += [(name, level, text) for level, text in got]
     return [finding(f"{name}:{it['key']}:{n}", name, level, text, stream=sdir.name)
@@ -675,13 +767,16 @@ def run(sdir: Path, cfg: dict, todo: list[dict] | None = None, keys: list[str] |
     started = datetime.now(UTC).isoformat(timespec="seconds")
     ctx = context(sdir, cfg)
     have = load(sdir)
+    # Before any item: a missing cv2 must not be caught below and saved with this run's signature.
+    if _run_needs_opencv(sdir, cfg, todo, ctx, have, vision, force):
+        require_opencv()
     done: dict[str, dict] = {}
     fresh: dict[str, dict] = {}
     claude = None
     for it in todo:
         sig = signature(cfg, it, ctx, vision)
         old = have.get(it["key"])
-        if old and old.get("sig") == sig and not force:
+        if unchanged(old, sig, force):
             done[it["key"]] = old
             continue
         if vision and claude is None:
