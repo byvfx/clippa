@@ -286,7 +286,7 @@ def test_findings_reach_describe_counts_status_and_the_card(defaults, tmp_path, 
     out = status.needs_lines({"needs_you": {"review": [counts], "findings": []}})
     assert "1 with check findings" in out[0]
     embed, _ = notify.card(row)
-    f = next(f for f in embed["fields"] if f["name"] == "Checks")
+    f = next(f for f in embed["fields"] if f["name"] == "Findings")
     assert f["value"] == "⚠ no face in the cams layout's panel 1 of 2 (a webcam)"
 
 

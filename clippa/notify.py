@@ -1,7 +1,8 @@
 """Discord review cards: a thread (or forum post) per stream in [discord]
 review_channel_id, and one message per item with a small preview, its title, hook and
 Kitsu link, plus buttons that `clippa bot` answers (Approve, Reject, Changes, Hold,
-Reopen, Pin, Retitle, Thumbnail text). The YouTube thumbnail (the .jpg beside the video)
+Reopen, Pin, Retitle, Thumbnail text, and Re-split on its own row when a segment is over
+[segments] split_over_s). The YouTube thumbnail (the .jpg beside the video)
 is attached next to the preview when there is one. Every button writes to Kitsu (clippa/actions.py), so Kitsu stays
 the record.
 
@@ -36,11 +37,28 @@ from .errors import ClipperError
 from .timefmt import length
 
 API = "https://discord.com/api/v10"
-COLORS = {"pending": 0x5865F2, "changes_requested": 0xFEE75C, "approved": 0x57F287,
-          "rejected": 0xED4245, "held": 0x99AAB5}
+# Dark Night Watch tokens (brand/tokens/nightwatch.json). Discord gets one side color.
+# --nw-approve is the same hex as the logo mark, so a card never uses that color alone:
+# the title always carries an emoji and a word.
+COLORS = {"pending": 0x6B8FD4, "changes_requested": 0xD4A054, "approved": 0x5EA88A,
+          "rejected": 0xD07070, "held": 0xD4A054, "finding": 0xD07070, "resplit": 0xA992D4,
+          "accent": 0x7EB8C9}
+# (emoji, word) for the title prefix "{emoji} {word} · ".
+MARK = {"held": ("⏸", "Held"), "finding": ("⚠", "Finding"), "auto": ("⏱", "Auto-approve"),
+        "approved": ("✓", "Approved"), "auto_approved": ("✓", "Auto-approved"),
+        "resplit": ("✂", "Re-split"), "rejected": ("✕", "Rejected"),
+        "changes_requested": ("✎", "Changes"), "pending": ("⏳", "Pending"),
+        "watch": ("📡", "On watch"), "review": ("📋", "In review"),
+        "cost": ("💸", "Cost"), "error": ("❌", "Error")}
+COLOR_OF = {"held": "held", "finding": "finding", "auto": "pending", "approved": "approved",
+            "auto_approved": "approved", "resplit": "resplit", "rejected": "rejected",
+            "changes_requested": "changes_requested", "pending": "pending"}
 KIND_LABEL = {"segment": "Segment", "pick": "Clip", "compilation": "Compilation",
               "short": "Short"}
+TAGLINE = "Clippa stays up. You stay in charge."
 # (action, label, style): 1 primary, 2 secondary, 3 success, 4 danger. "…" opens a form.
+# Row 2 is full once the link buttons are added. Re-split is a third row, and only on a
+# message the bot sends (a webhook post is content only and cannot carry a button).
 BUTTONS = [[("approve", "Approve", 3), ("reject", "Reject…", 4), ("changes", "Changes…", 2),
             ("hold", "Hold / unhold", 2), ("reopen", "Reopen", 2)],
            [("pin", "Pin time…", 2), ("retitle", "Retitle…", 2),
@@ -109,50 +127,343 @@ class Rest:
 
 # ---------- cards ----------
 
-def card(r: dict) -> tuple[dict, list[dict]]:
-    """Embed + button rows for one item (actions.describe row). Used by notify and bot."""
+def cut_label(short: str) -> str:
+    """'kick-1/c04' or 's06' as 'Cut 04'. The tail's digits are the cut number."""
+    tail = (short or "").rsplit("/", 1)[-1]
+    digits = "".join(ch for ch in tail if ch.isdigit())
+    return f"Cut {int(digits):02d}" if digits else (tail or "Cut")
+
+
+def over_phrase(limit_s: float) -> str:
+    """[segments] split_over_s as a sentence uses it: '50 minutes', or seconds."""
+    limit_s = float(limit_s or 0)
+    if limit_s and limit_s % 60 == 0:
+        n = int(limit_s // 60)
+        return f"{n} minute" if n == 1 else f"{n} minutes"
+    n = int(round(limit_s))
+    return f"{n} second" if n == 1 else f"{n} seconds"
+
+
+def footer_text(short: str = "") -> str:
+    """'clippa · {short} · Clippa stays up. You stay in charge.' when it fits Discord's footer."""
+    base = f"clippa · {short}" if short else "clippa"
+    full = f"{base} · {TAGLINE}"
+    return full if len(full) <= 2048 else base[:2048]
+
+
+def is_resplit(kind: str, key: str, duration, limit: float, flagged: set[str]) -> bool:
+    """A segment card is a re-split when the setting is on and segments.json flagged its id,
+    or its duration is over that limit. 0 (the default) is off."""
+    if kind != "segment" or not limit or limit <= 0:
+        return False
+    sid = (key or "").split("_", 1)[0]
+    if sid and sid in flagged:
+        return True
+    try:
+        return float(duration) > limit
+    except (TypeError, ValueError):
+        return False
+
+
+def unix_of(iso: str | None) -> int | None:
+    """An ISO timestamp as Discord's <t:UNIX:R> seconds, or None."""
+    if not iso:
+        return None
+    try:
+        t = datetime.fromisoformat(iso)
+    except ValueError:
+        return None
+    if t.tzinfo is None:
+        t = t.replace(tzinfo=UTC)
+    return int(t.timestamp())
+
+
+def card_status(r: dict) -> str:
+    """Which Night Watch status the card leads with. Hold wins, then the decision, then a
+    finding, a re-split flag, and an auto-approve that is still waiting."""
+    if r.get("hold"):
+        return "held"
+    decision = r.get("decision") or "pending"
+    if decision in ("rejected", "changes_requested"):
+        return decision
+    if decision == "approved":
+        auto = r.get("auto") or ""
+        if r.get("auto_state") == "approved" or "approved itself" in auto or "approved automatically" in auto:
+            return "auto_approved"
+        return "approved"
+    if r.get("checks"):
+        return "finding"
+    if r.get("resplit"):
+        return "resplit"
+    if r.get("auto_state") in ("waiting", "due") or (r.get("auto") and decision == "pending"):
+        return "auto"
+    return "pending"
+
+
+def status_line(r: dict) -> str:
+    """decision_text, plus findings and auto-approve when those apply (the side color is not enough)."""
     from .actions import decision_text
 
-    bits = [KIND_LABEL.get(r["kind"], r["kind"]), length(r["duration_s"])]
-    if r["kind"] in ("pick", "short"):
-        bits += [f"score {r['score']}" if r["score"] else "", r["category"],
-                 f"found by {r['found_by']}" if r["found_by"] else ""]
-    else:
-        bits.append(r["topic"])
-    desc = []
-    if r["hook"]:
-        desc.append(f"**Hook:** {r['hook']}")
-    desc.append(" · ".join(b for b in bits if b))
-    fields = [{"name": "Status", "value": decision_text(r), "inline": True}]
-    if r["scheduled"]:
-        when = r["scheduled"][:16].replace("T", " ")
-        fields.append({"name": "Uploaded" if r["uploaded"] else "Scheduled",
+    out = decision_text(r)
+    n = len(r.get("checks") or [])
+    if n:
+        out += ", 1 finding" if n == 1 else f", {n} findings"
+    state = r.get("auto_state") or ""
+    if state == "approved" or card_status(r) == "auto_approved":
+        if "auto-approved" not in out:
+            out += ", auto-approved"
+    elif state in ("waiting", "due", "person") or (r.get("auto") and state not in ("off", "decided")):
+        if "auto-approve" not in out and "auto-approved" not in out:
+            out += ", auto-approve"
+    return out
+
+
+def lead_line(r: dict, now: float | None = None) -> str:
+    """The VOICE.md Discord line for this card, or '' when that moment has none."""
+    status = card_status(r)
+    cut = cut_label(r.get("short") or "")
+    if status == "held":
+        return _hold_lead(r, cut)
+    if status == "auto_approved":
+        return f"{cut} auto-approved. No objection in the grace window."
+    if status == "approved":
+        return f"{cut} approved."
+    if status == "finding":
+        text = str((r.get("checks") or [""])[0]).rstrip(".")
+        return f"Finding on {cut}: {text}."
+    if status == "resplit":
+        return f"{cut} is over {over_phrase(r.get('resplit_limit_s') or 0)}. Flagged for re-split."
+    if status == "auto":
+        return _auto_lead(r, cut, now)
+    return ""
+
+
+def _hold_lead(r: dict, cut: str) -> str:
+    n = len(r.get("checks") or [])
+    if r.get("other_voices"):
+        return f"{cut} held for other voices. It stays off publish until someone releases it."
+    if n:
+        kind = KIND_LABEL.get(r.get("kind"), "item")
+        word = "finding" if n == 1 else "findings"
+        return f"{cut} held. {n} {word} on this {kind}."
+    return f"{cut} held."
+
+
+def _auto_lead(r: dict, cut: str, now: float | None) -> str:
+    unix = unix_of(r.get("auto_at"))
+    now = time.time() if now is None else now
+    if r.get("auto_state") == "due" or (unix is not None and unix <= now):
+        return f"{cut} auto-approves at the next pass unless held."
+    if unix is not None:
+        stamp = f"<t:{unix}:R>"
+        if unix - now >= 3600:
+            return f"No objection yet. {cut} auto-approves {stamp} unless held."
+        return f"{cut} auto-approves {stamp} unless held."
+    return r.get("auto") or ""
+
+
+def auto_field(r: dict, now: float | None = None) -> str:
+    """The Auto-approve field. A waiting item uses Discord's relative timestamp so the
+    countdown stays current without a card edit every minute."""
+    state = r.get("auto_state") or ""
+    if state == "approved" or card_status(r) == "auto_approved":
+        return "auto-approved; no objection in the grace window"
+    unix = unix_of(r.get("auto_at"))
+    now = time.time() if now is None else now
+    if state in ("waiting", "due") and (state == "due" or (unix is not None and unix <= now)):
+        return "approves at the next pass unless held"
+    if state == "waiting" and unix is not None:
+        return f"auto-approves <t:{unix}:R> unless held"
+    return (r.get("auto") or "")[:200]
+
+
+def _bits(r: dict) -> str:
+    """Kind, duration and score. Times and scores are inline code (a mono face)."""
+    kind = r.get("kind") or ""
+    bits = [KIND_LABEL.get(kind, kind), f"`{length(r.get('duration_s'))}`"]
+    if kind in ("pick", "short"):
+        if r.get("score"):
+            bits.append(f"score `{r['score']}`")
+        if r.get("category"):
+            bits.append(str(r["category"]))
+        if r.get("found_by"):
+            bits.append(f"found by {r['found_by']}")
+    elif r.get("topic"):
+        bits.append(str(r["topic"]))
+    return " · ".join(b for b in bits if b)
+
+
+def _fields(r: dict, now: float | None) -> list[dict]:
+    fields = [{"name": "Status", "value": status_line(r)[:1024], "inline": True}]
+    if r.get("scheduled"):
+        when = str(r["scheduled"])[:16].replace("T", " ")
+        fields.append({"name": "Uploaded" if r.get("uploaded") else "Scheduled",
                        "value": when, "inline": True})
     if r.get("thumb_text"):
-        fields.append({"name": "Thumbnail", "value": r["thumb_text"], "inline": True})
-    if r.get("other_voices"):  # held for it unless released ([shorts] hold_source_audio)
-        fields.append({"name": "Held: other voices" if r["hold"] else "Other voices",
+        fields.append({"name": "Thumbnail", "value": str(r["thumb_text"])[:1024], "inline": True})
+    if r.get("other_voices"):
+        fields.append({"name": "Held: other voices" if r.get("hold") else "Other voices",
                        "value": r["other_voices"] + (". Release the hold if the show carries it."
-                                                     if r["hold"] else ""), "inline": False})
-    if r.get("auto"):     # #259 B: approval by silence, when the show has it on
-        fields.append({"name": "Auto-approve", "value": r["auto"][:200], "inline": False})
-    if r.get("checks"):   # `clippa review check` (#259): what a person should look at
-        fields.append({"name": "Checks", "value": "\n".join(f"⚠ {c}" for c in r["checks"])[:1000],
+                                                     if r.get("hold") else ""), "inline": False})
+    auto = auto_field(r, now)
+    if auto:
+        fields.append({"name": "Auto-approve", "value": auto[:1024], "inline": False})
+    if r.get("checks"):
+        fields.append({"name": "Findings", "value": "\n".join(f"⚠ {c}" for c in r["checks"])[:1000],
                        "inline": False})
-    if r["comment"]:
-        fields.append({"name": "Note", "value": r["comment"][:1000], "inline": False})
-    color = COLORS["held"] if r["hold"] else COLORS.get(r["decision"], COLORS["pending"])
-    embed = {"title": r["title"][:256], "url": r["kitsu_url"], "description": "\n".join(desc),
-             "color": color, "fields": fields,
-             "footer": {"text": f"{r['short']} · {r['date']} · rev {r['revision']}"}}
+    if r.get("resplit"):
+        fields.append({"name": "Re-split",
+                       "value": "Flagged for re-split. Over the `[segments] split_over_s` limit.",
+                       "inline": False})
+    if r.get("comment"):
+        fields.append({"name": "Note", "value": str(r["comment"])[:1000], "inline": False})
+    return fields[:25]
+
+
+def _rows(r: dict) -> list[dict]:
+    short = r.get("short") or ""
     rows = [{"type": 1, "components": [
-        {"type": 2, "style": style, "label": label, "custom_id": f"clippa:{action}:{r['short']}"}
+        {"type": 2, "style": style, "label": label, "custom_id": f"clippa:{action}:{short}"}
         for action, label, style in row]} for row in BUTTONS]
-    links = [{"type": 2, "style": 5, "label": "Open in Kitsu", "url": r["kitsu_url"]}]
-    if r["youtube_url"]:
+    links = [{"type": 2, "style": 5, "label": "Open in Kitsu", "url": r.get("kitsu_url") or ""}]
+    if r.get("youtube_url"):
         links.append({"type": 2, "style": 5, "label": "YouTube", "url": r["youtube_url"]})
     rows[1]["components"] += links
+    if r.get("resplit"):  # row 2 is already at five components
+        rows.append({"type": 1, "components": [
+            {"type": 2, "style": 2, "label": "Re-split", "custom_id": f"clippa:resplit:{short}"}]})
+    return rows
+
+
+def card(r: dict, now: float | None = None) -> tuple[dict, list[dict]]:
+    """Embed + button rows for one item (actions.describe row). Used by notify and the bot.
+    now: the clock for the auto-approve lead (tests); the field itself uses <t:UNIX:R>."""
+    status = card_status(r)
+    emoji, word = MARK[status]
+    title = f"{emoji} {word} · {r.get('title') or ''}"[:256]
+    desc = []
+    lead = lead_line(r, now)
+    if lead:
+        desc.append(lead)
+    if r.get("hook"):
+        desc.append(f"**Hook:** {r['hook']}")
+    bits = _bits(r)
+    if bits:
+        desc.append(bits)
+    embed = {"title": title, "description": "\n".join(desc)[:4096],
+             "color": COLORS[COLOR_OF[status]], "fields": _fields(r, now),
+             "footer": {"text": footer_text(r.get("short") or "")}}
+    if r.get("kitsu_url"):
+        embed["url"] = r["kitsu_url"]
+    return embed, _rows(r)
+
+
+def in_review_embed(show: str, n: int, n_seg: int, n_clip: int, episode_url: str, short: str) -> dict:
+    """The thread starter: a stream that has finished processing."""
+    show = show or "Stream"
+    desc = f"{show} finished processing. {n} cuts in review." if n else f"{show} finished processing."
+    if n_seg or n_clip:
+        desc += f"\n{n_seg} segments and {n_clip} clips."
+    emoji, word = MARK["review"]
+    embed = {"title": f"{emoji} {word} · {show}"[:256], "description": desc[:4096],
+             "color": COLORS["accent"], "footer": {"text": footer_text(short)}}
+    if episode_url:
+        embed["url"] = episode_url
+    return embed
+
+
+def dm_embed(kind: str, text: str, title: str = "", short: str = "") -> dict | None:
+    """A Night Watch embed for a ready, spend or error DM. None for a kind that stays text
+    (a digest, a test). No buttons: a DM of this shape is also what a webhook cannot add."""
+    if kind == "ready":
+        emoji, word = MARK["review"]
+        subject, color = title or "Stream", COLORS["accent"]
+    elif kind == "spend":
+        emoji, word = MARK["cost"]
+        subject, color = "Modal", COLORS["held"]
+    elif kind in ("failure", "upload", "recorder", "disk", "checkup"):
+        emoji, word = MARK["error"]
+        subject = title or {"failure": "Worker", "upload": "Upload", "recorder": "Recorder",
+                            "disk": "Disk", "checkup": "Checkup"}[kind]
+        color = COLORS["finding"]
+    else:
+        return None
+    return {"title": f"{emoji} {word} · {subject}"[:256], "description": (text or "")[:4096],
+            "color": color, "footer": {"text": footer_text(short)}}
+
+
+def resplit_notice(seg: dict, stream: str, limit: float) -> tuple[dict, list[dict]]:
+    """A card for a segment flagged for re-split that is not in review (it was not cut).
+    One button, on its own row. Approve and the rest need a Kitsu task."""
+    sid = seg.get("id") or "segment"
+    name = seg.get("title") or seg.get("topic") or sid
+    short = f"{stream}/{sid}"
+    emoji, word = MARK["resplit"]
+    embed = {"title": f"{emoji} {word} · {name}"[:256],
+             "description": (f"{cut_label(short)} is over {over_phrase(limit)}. Flagged for re-split.")[:4096],
+             "color": COLORS["resplit"],
+             "fields": [{"name": "Status", "value": "re-split", "inline": True},
+                        {"name": "Re-split",
+                         "value": "Flagged for re-split. Over the `[segments] split_over_s` limit.",
+                         "inline": False}],
+             "footer": {"text": footer_text(short)}}
+    rows = [{"type": 1, "components": [
+        {"type": 2, "style": 2, "label": "Re-split", "custom_id": f"clippa:resplit:{short}"}]}]
     return embed, rows
+
+
+def presence_line(in_review: int, held: int, watching: list[str]) -> str:
+    """One bot status line. Counts use numerals. Never we, us, or our."""
+    if in_review and held:
+        return f"{in_review} in review, {held} held."
+    if in_review:
+        return f"{in_review} in review."
+    if held:
+        return "Waiting on you."
+    names = [n for n in watching if n]
+    if len(names) == 1:
+        return f"Watching {names[0]}."[:128]
+    if names:
+        return "On watch."
+    return "Quiet board."
+
+
+def presence_for(cfg: dict) -> str:
+    """The line for `clippa bot`: open review, holds, or the show being recorded or run."""
+    from .actions import review_dirs, stream_counts
+    from .config import for_stream
+    from .streams import LIVE
+    from .timefmt import age_s
+
+    root = Path(cfg["paths"]["streams"])
+    in_review = held = 0
+    try:
+        dirs = review_dirs(cfg)
+    except OSError:
+        return "On watch."
+    for d in dirs:
+        try:
+            counts = stream_counts(cfg, d)
+        except (OSError, ValueError, KeyError):
+            continue
+        in_review += int(counts.get("open") or 0)
+        held += int(counts.get("held") or 0)
+    watching: list[str] = []
+    if root.is_dir():
+        for d in sorted(p for p in root.iterdir() if p.is_dir() and not p.name.startswith(".")):
+            run = jsonstate.read_or(d / "run.json", {}) or {}
+            live = jsonstate.read_or(d / "live" / "state.json", {}) or {}
+            active = live.get("status") in LIVE or (
+                run.get("status") == "running" and age_s(run.get("heartbeat")) < 15 * 60)
+            if not active:
+                continue
+            try:
+                name = for_stream(cfg, d)["meta"]["show_name"] or d.name
+            except (OSError, KeyError, TypeError):
+                name = d.name
+            if name and name not in watching:
+                watching.append(name)
+    return presence_line(in_review, held, watching)
 
 
 # ---------- previews ----------
@@ -226,13 +537,12 @@ def ensure_thread(api: Rest, cfg: dict, sdir: Path, dstate: dict, rows: list[dic
             pass  # deleted: make a new one
     meta = jsonstate.load(sdir / "meta.json")
     show = cfg["meta"]["show_name"] or cfg["review"]["project"] or "Stream"
-    name = dc["thread_name"].format(show=show, date=meta["started_at"][:10],
+    name = dc["thread_name"].format(show=show, date=meta.get("started_at", "")[:10],
                                     stream_id=sdir.name, title=meta.get("title", ""))[:100]
     n_seg = sum(r["kind"] == "segment" for r in rows)
     n_clip = len(rows) - n_seg
-    header = {"content": (f"**{name}** · {meta.get('title', '')}\n"
-                          f"{n_seg} segments and {n_clip} clips for review. "
-                          f"Kitsu: <{rows[0]['episode_url']}>")[:2000]}
+    episode = rows[0]["episode_url"] if rows else ""
+    header = {"embeds": [in_review_embed(show, len(rows), n_seg, n_clip, episode, sdir.name)]}
     thread_id = open_thread(api, channel_id, name, header)
     dstate.update({"channel_id": channel_id, "thread_id": thread_id, "messages": {}})
     return thread_id
@@ -263,7 +573,8 @@ def post(sdir: Path, cfg: dict, keys: list[str] | None = None, force: bool = Fal
         raise ClipperError("set [discord] review_channel_id in clipper.toml")
     review.sync(sdir, cfg, quiet=True)
     rows = list(actions.describe(cfg, sdir).values())
-    if not rows:
+    notices = [] if keys else unreviewed_resplits(sdir, cfg, rows)
+    if not rows and not notices:
         print("nothing published to Kitsu for this stream yet")
         return 0
     want = set(keys or [])
@@ -296,7 +607,40 @@ def post(sdir: Path, cfg: dict, keys: list[str] | None = None, force: bool = Fal
         posted += 1
         print(f"discord {r['short']}: {file.stat().st_size / 1e6:.1f} MB"
               f"{' excerpt' if excerpt else ''} ({time.time() - t:.0f}s)", flush=True)
+    posted += post_resplit_notices(api, thread_id, sdir.name, notices, dstate, dpath)
     print(f"discord: {posted} cards posted to thread {thread_id}")
+    return posted
+
+
+def unreviewed_resplits(sdir: Path, cfg: dict, rows: list[dict]) -> list[tuple[dict, float]]:
+    """Segments flagged for a re-split that have no review card yet, with the limit in seconds."""
+    from .segments import _split_limit
+
+    limit = _split_limit(cfg.get("segments") or {})
+    if not limit:
+        return []
+    data = jsonstate.read_or(sdir / "segments.json", {}) or {}
+    have = {r["key"].split("_", 1)[0] for r in rows}
+    return [(s, limit) for s in data.get("segments") or []
+            if s.get("resplit") and s.get("id") and s["id"] not in have]
+
+
+def post_resplit_notices(api: Rest, thread_id: str, stream: str, notices: list[tuple[dict, float]],
+                         dstate: dict, dpath: Path) -> int:
+    """Post one Re-split card per flagged segment that is not in review. The bot token sends
+    it, so the button is allowed. A webhook post cannot carry one."""
+    posted = 0
+    for seg, limit in notices:
+        key = f"resplit:{seg['id']}"
+        if dstate.get("messages", {}).get(key):
+            continue
+        embed, components = resplit_notice(seg, stream, limit)
+        msg = api("POST", f"/channels/{thread_id}/messages",
+                  {"embeds": [embed], "components": components})
+        dstate.setdefault("messages", {})[key] = {"id": msg["id"], "revision": None}
+        save_state(dpath, dstate, key)
+        posted += 1
+        print(f"discord {stream}/{seg['id']}: re-split notice", flush=True)
     return posted
 
 

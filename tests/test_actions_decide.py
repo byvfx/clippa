@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from clippa import actions, schedule
+from clippa import actions, jsonstate, schedule
 from clippa.errors import ClipperError
 
 ITEM = SimpleNamespace(stream_dir="s", key="k")
@@ -35,6 +35,25 @@ def test_decide_dispatch(calls):
                      ("edit", ({"Playlist": "Kino Casino"}, "me"))]
     with pytest.raises(ClipperError, match="unknown action"):
         actions.decide({}, ITEM, "publish", "me")
+
+
+def test_resplit_refuses_a_segment_under_the_limit(monkeypatch):
+    monkeypatch.setattr(actions, "for_stream", lambda cfg, d: cfg)
+    monkeypatch.setattr(actions, "describe", lambda cfg, sdir: {"k": {"resplit": False, "short": "kick-1/s01"}})
+    with pytest.raises(ClipperError, match="split_over_s"):
+        actions.resplit({}, ITEM, "me")
+
+
+def test_ask_resplit_records_the_ask_and_does_not_say_we(defaults, tmp_path):
+    sdir = tmp_path / "kick-1"
+    sdir.mkdir()
+    defaults["paths"]["streams"] = tmp_path
+    defaults["segments"]["split_over_s"] = 3000
+    msg = actions.ask_resplit(defaults, "kick-1/s06", "Brandon")
+    saved = jsonstate.load(sdir / "resplit_asks.json")
+    assert saved["s06"]["who"] == "Brandon"
+    assert "Cut 06" in msg and "50 minutes" in msg and "not in review" in msg
+    assert "we" not in msg.lower() and "segments" in msg
 
 
 def test_replan_only_for_schedule_moves(monkeypatch):

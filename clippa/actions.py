@@ -17,6 +17,7 @@ in Kitsu:
               checked against YouTube's limits, never emptied (an empty column falls
               back to the generated metadata)
     thumbtext Thumbnail text column (2-4 words); the sync re-renders the .jpg
+    resplit   a comment only: the segment is over [segments] split_over_s. No model call.
 Column changes also leave a "[clippa] ..." comment on the task, so Kitsu shows who
 changed what. A person's title change on a video that's up renames it on YouTube first
 (edit_meta's rename_live, youtube.retitle): the CLI, the bot, the war room (its edits, find
@@ -32,7 +33,7 @@ from __future__ import annotations
 import re
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -344,6 +345,44 @@ def thumbtext(cfg: dict, item: Item, text: str, who: str = "") -> dict:
     return refresh(cfg, item)
 
 
+def resplit(cfg: dict, item: Item, who: str = "") -> dict:
+    """The Re-split button on a review card. A Kitsu comment, and the item waits for a person.
+    It does not run `clippa segments` (that is a model call)."""
+    cfg = for_stream(cfg, item.stream_dir)
+    row = describe(cfg, item.stream_dir)[item.key]
+    if not row.get("resplit"):
+        raise ClipperError(f"{row['short']} is not over [segments] split_over_s")
+    from .notify import over_phrase
+
+    _touched(item, "re-split", who)
+    how = over_phrase(row.get("resplit_limit_s") or 0)
+    _comment(review.connect(cfg["review"]), item, None,
+             f"{review.NOTE_PREFIX} Flagged for re-split. Over [segments] split_over_s ({how}).{_by(who)}")
+    return refresh(cfg, item)
+
+
+def ask_resplit(cfg: dict, ref: str, who: str = "") -> str:
+    """The Re-split button on a segment that is not in review. Records the ask and says the
+    next command. No model call, and no Kitsu write (there is no task yet)."""
+    from .notify import cut_label, over_phrase
+
+    stream, _, sid = ref.partition("/")
+    if not stream or not sid:
+        raise ClipperError(f"{ref!r} needs a stream and a segment id")
+    sdir = stream_dir(cfg, stream)
+    try:
+        from .segments import _split_limit
+
+        limit = _split_limit(for_stream(cfg, sdir)["segments"])
+    except (KeyError, TypeError):
+        limit = 0.0
+    with jsonstate.update(sdir / "resplit_asks.json", {}) as data:
+        data[sid] = {"at": datetime.now(UTC).isoformat(timespec="seconds"), "who": who}
+    how = over_phrase(limit) if limit else "the limit"
+    return (f"{cut_label(sid)} is over {how}. Flagged for re-split. It is not in review. "
+            f"`clippa segments {sdir.name} --force` splits it again.")
+
+
 def refresh(cfg: dict, item: Item) -> dict:
     """Re-read this one item from Kitsu into review.json; returns its card data."""
     cfg = for_stream(cfg, item.stream_dir)
@@ -353,7 +392,7 @@ def refresh(cfg: dict, item: Item) -> dict:
 
 # ---------- one entry point for the bot and the war room ----------
 
-ACTIONS = ("approve", "reject", "changes", "reopen", "hold", "pin", "edit", "thumbtext")
+ACTIONS = ("approve", "reject", "changes", "reopen", "hold", "pin", "edit", "thumbtext", "resplit")
 REPLANS = ("approve", "reject", "changes", "reopen", "hold", "pin")  # these move the schedule
 
 
@@ -378,7 +417,8 @@ def decide(cfg: dict, item: Item, action: str, who: str, text: str = "", on: boo
           "reopen": lambda: reopen(cfg, item, who),
           "pin": lambda: pin(cfg, item, text, who),
           "edit": lambda: edit_meta(cfg, item, values or {}, who, rename_live=True),
-          "thumbtext": lambda: thumbtext(cfg, item, text, who)}.get(action)
+          "thumbtext": lambda: thumbtext(cfg, item, text, who),
+          "resplit": lambda: resplit(cfg, item, who)}.get(action)
     if not fn:
         raise ClipperError(f"unknown action {action!r}")
     return fn()
@@ -434,6 +474,20 @@ def schedule_dropped(cfg: dict) -> dict[str, str]:
             if u["reason"].startswith(DROPPED)}
 
 
+def _segment_flags(cfg: dict, sdir: Path) -> tuple[float, set[str]]:
+    """([segments] split_over_s, segment ids flagged for a re-split). 0 means the flag is off."""
+    from .segments import _split_limit
+
+    limit = _split_limit(cfg.get("segments") or {})
+    flagged: set[str] = set()
+    if limit:
+        data = jsonstate.read_or(sdir / "segments.json", {}) or {}
+        for s in data.get("segments") or []:
+            if s.get("resplit") and s.get("id"):
+                flagged.add(s["id"])
+    return limit, flagged
+
+
 def other_voices(seconds, limit: float) -> str:
     """A Short's other voices as a card shows them, only when over the limit:
     "22 s of other voices (limit 5 s)"."""
@@ -469,6 +523,9 @@ def describe(cfg: dict, sdir: Path, gazu=None, links: bool = True) -> dict[str, 
 
     autos = (review_auto.verdicts(cfg, sdir, state=state, decisions=decisions, checks=checks)
              if cfg["review"]["auto_approve"] else {})
+    limit, flagged = _segment_flags(cfg, sdir)
+    from .notify import is_resplit
+
     ls = review.Listing()
     out = {}
     for key, st in state.items():
@@ -478,6 +535,8 @@ def describe(cfg: dict, sdir: Path, gazu=None, links: bool = True) -> dict[str, 
         it = outputs.get(key, {})
         entry = sched.get(f"{sdir.name}/{key}")
         jpg = (sdir / st["file"].replace("\\", "/")).with_suffix(".jpg")
+        v = autos.get(key)
+        flag = is_resplit(st["kind"], key, it.get("duration_s"), limit, flagged)
         out[key] = {
             "ref": f"{sdir.name}/{key}", "short": f"{sdir.name}/{key.split('_')[0]}",
             "stream": sdir.name, "date": meta.get("started_at", "")[:10],
@@ -512,7 +571,12 @@ def describe(cfg: dict, sdir: Path, gazu=None, links: bool = True) -> dict[str, 
             "revision": st.get("revision"), "synced_at": r.get("updated_at"),
             "checks": [f["text"] for f in review_check.findings_of(checks, key)],
             # #259 B: "approves itself Sat 14:30 unless you act", "waits for you: held"...
-            "auto": review_auto.note(autos.get(key), cfg["schedule"]["timezone"]),
+            # auto_state / auto_at let the card use a Discord <t:UNIX:R> countdown.
+            "auto": review_auto.note(v, cfg["schedule"]["timezone"]),
+            "auto_state": v.state if v else "",
+            "auto_at": v.at.isoformat(timespec="seconds") if v and v.at else "",
+            "resplit": flag,
+            "resplit_limit_s": limit if flag else 0,
         }
     return out
 
