@@ -114,6 +114,15 @@ function since(iso) {
 function recording(l) {  // the NAS recorder's stream for this channel, if it's on it now
   return (STATE?.streams || []).find(s => s.channel === l.channel && ["recording", "paused", "finalizing"].includes(s.recording));
 }
+function autoTip(a) {  // the show's [review] auto-approve, in words, for the chip's AUTO tag
+  if (!a?.on) return "auto-approve off: a person approves everything";
+  const kinds = Object.entries(a.kinds || {}).map(([k, f]) => `${k}s from score ${f}`);
+  const pre = { now: "pre-shows at publish", grace: "pre-shows after the grace", off: "pre-shows wait for a person" }[a.preshow] || "";
+  return `auto-approve on: ${[kinds.length && `${kinds.join(", ")} after ${a.grace} min`, pre].filter(Boolean).join("; ")}`;
+}
+function autoTag(a) {  // its words are in the chip's own tooltip
+  return a ? `<span class="auto ${a.on ? "" : "off"}">${a.on ? "AUTO" : "manual"}</span>` : "";
+}
 async function refreshLive() {
   try { LIVE = await api("/api/live"); renderLive(); }
   catch (e) { /* Kick unreachable: keep the last state */ }
@@ -125,10 +134,11 @@ function renderLive() {
   const ticked = $("#liveRemember")?.checked;
   $("#lives").innerHTML = LIVE.map((l, n) => {
     const rec = l.live ? recording(l) : null;
-    const tip = l.live ? `${l.title || ""}\nlive ${since(l.since)} · ${rec ? "recording " + rec.id : "NOT recording"}` : `${l.channel}: offline, click for the channel`;
+    const tip = (l.live ? `${l.title || ""}\nlive ${since(l.since)} · ${rec ? "recording " + rec.id : "NOT recording"}` : `${l.channel}: offline, click for the channel`)
+      + (l.auto ? "\n" + autoTip(l.auto) : "");
     // #206: the chip's label is a real button (keyboard, screen readers); its menu sits beside it
     return `<span class="live ${l.live ? "on" : ""}" data-live="${n}" title="${esc(tip)}"><button class="chipb" type="button"><span class="dot"></span>${esc(l.show_name)}${l.live
-      ? ` · LIVE${l.viewers != null ? " · " + l.viewers.toLocaleString() : ""}${l.since ? " · " + since(l.since) : ""} <span class="rec ${rec ? "" : "off"}">${rec ? `<i class="recdot"></i>REC` : "no rec"}</span>` : ""}</button>${LIVEMENU === n ? liveMenu(l, rec) : ""}</span>`;
+      ? ` · LIVE${l.viewers != null ? " · " + l.viewers.toLocaleString() : ""}${l.since ? " · " + since(l.since) : ""} <span class="rec ${rec ? "" : "off"}">${rec ? `<i class="recdot"></i>REC` : "no rec"}</span>` : ""}${autoTag(l.auto)}</button>${LIVEMENU === n ? liveMenu(l, rec) : ""}</span>`;
   }).join("");
   if (ticked && $("#liveRemember")) $("#liveRemember").checked = true;
   if (had != null) $(`#lives .live[data-live="${had}"] ${LIVEMENU === +had ? inMenu : ".chipb"}`)?.focus();
