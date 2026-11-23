@@ -212,7 +212,11 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
 - Approved-and-scheduled Shorts that a scene re-render would change (v06_w11, v03_w06, v03_t23) are left
   alone until the user says. The four Shorts from kick-136292920 went up with Chud's old cam crop; they stay
   that way unless deleted and re-uploaded.
-- Content ID: check new pre-show/one-off uploads in Studio (video → Copyright; the API only sees region blocks).
+- Content ID (11-23): Studio's claims read through the pane (in-page fetch of `list_creator_received_claims`, recipe in the log):
+  37 of 505 videos claimed, Free Bird in 13; the map to schedule keys is `claims/studio_2026-11-23.json` on the NAS. The 4 blocked
+  ones: Erase song applied to 3 (Lost in America and Kashmir released; Maria También and No More Tears were still processing,
+  re-check in Studio); **Hellraiser III (`kick-136479997/s16_hellraiser`) is the user's to trim**. Check new pre-show and one-off
+  uploads in Studio until #396 lands.
 - Shorts "related video" (Studio only): a weekly scheduled Claude task (`clipper-weekly-related-videos`, Sundays 10:00 while the app
   is open; switch the pane's Studio to Lolcow Cinema or every Short's page errors) sets them; `clippa upload --related` lists what's
   due and records what you set; six Shorts match no scheduled segment. Verify whether `thumbnails.set` works on Shorts before turning
@@ -240,6 +244,14 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   only together with that prompt. Discord cards can show the flag and a Re-split button once it is
   on; that bot change is a draft and is not deployed. Do not set 3000 in production `clipper.toml`
   until the segments prompt that goes with it is in.
+
+- **Music and the editor (planned 11-23, build on hold until the user says go):** v0.5.0's key feature is #396 (the music check:
+  `[music] strip = off | all | identified`, default handling per span, claims import, a Music list in the item window; step 1 is
+  `audioedit.py`, bleeps moved onto it). The editor moved to v0.6.0 as #408: one reusable Descript-style editor for one video,
+  span kinds as plugins, `spans.py`, `/api/edit/<ref>`. Under #401 in build order: #408, #309 (in/out and cut-outs, the first new
+  kinds), #403 Find a quote, #402 stream library, #404 custom cut, #405 Ask for a moment and marks, #406 GIFs, #407 paste a link.
+  Each action is also a catalog tool (#365's rules: agents propose, a person saves). Every feature gets an Options table with safe
+  defaults and a no-cost path (user: "options options options"). YouTube has no API for claims or Erase song: assisted only.
 
 **Priority labels (user, 2026-11-13):** every open issue carries one: `p1-now` (the queue, `gh issue list --label p1-now`),
 `p2-dated` (#258, #259, #158), `p3-track` (one big track at a time, the user picks: desktop install #46 →
