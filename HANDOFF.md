@@ -304,7 +304,7 @@ of phone use; #300 (access levels, a local Jev-like classifier in front of the m
 - **Blind items #111 (wiki Blind-items), steps 1-2 live since 11-16:** the NAS clipper.toml has one source, CDAN (add Blind Gossip's
   site when it's back), `[blinds] check_minutes = 30`, `sensitive_alerts = true`, a private `#blinds` with `alert = "digest"`. Not
   built: typed answers in the thread, a Hide this kind button. **Next: step 3**, investigate after the answer; step 4, reveals and the
-  scorecard. **Custody and step 4 part 1 merged 11-22 (#384; follow-up #<n> for Grok's last two findings), deploy pending:**
+  scorecard. **Custody and step 4 part 1 merged 11-22 (#384; follow-up #387 for Grok's last two findings), deploy pending:**
   the store is in `clippa backup` as a checked snapshot (a damaged one goes in as `blinds.damaged.sqlite`; a damaged or busy store
   drops no older zip), nothing is forgotten (user: "def keep all this data": `keep_days` default 0), an edited post's old text goes
   into its history. Every check matches reveals to blinds in code (3-gram overlap >= 0.6, 0.3 ahead of the next, within a day of the
