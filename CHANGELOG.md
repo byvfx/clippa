@@ -10,6 +10,27 @@ Developing#releases.
 
 ## Unreleased
 
+## 0.4.0 (2026-11-23)
+
+The rename reaches the NAS and the repo, the docs get a site of their own, and blind items learn
+their answers. The containers run as `clippa-hub`, `clippa-record` and `clippa-claude`, and the
+repo is `byvfx/clippa` (the old links redirect). The `clipper` command, `clipper.toml` and the
+`CLIPPER_*` variables still work until the rename's last pass (#286).
+
+- **The rename, passes 3-4:** compose projects and Modal apps named `clippa-*` (the first deploy
+  stops the old project, so there are never two bots or workers at once), `CLIPPA_*` in `deploy/`,
+  and the repo moved to `byvfx/clippa`.
+- **Docs site:** the wiki pages also build as an MkDocs Material site at
+  <https://byvfx.github.io/clippa-docs/>, checked in CI; the GitHub wiki points at it.
+- **Blind items:** reveals are matched to the blinds they answer and your guesses scored
+  (`clippa blinds reveals`); Discord and the war room show who it was and how you did; the
+  blinds store is in `clippa backup`.
+- **Review:** the war room's show chips say which shows approve their clips by themselves (AUTO
+  or manual, with the score floors on hover).
+- **Running it:** the checkup stops counting the bot's Discord reconnects as a repeated error,
+  the bot shows as down when it can't get back on Discord, and a too-long segment is flagged for
+  a re-split instead of dropped (`[segments] split_over_s`, off by default).
+
 ### 2026-11
 
 - 11-23: Wiki voice. The pages no longer say we, us or our. A reviewer's note is a retake;
