@@ -44,6 +44,7 @@ import html
 import json
 import os
 import re
+import shutil
 import sqlite3
 import time
 import xml.etree.ElementTree as ET
@@ -78,7 +79,8 @@ CREATE TABLE IF NOT EXISTS sources (name TEXT PRIMARY KEY, etag TEXT, modified T
     error TEXT, items INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS digests (day TEXT PRIMARY KEY, posted_at TEXT, thread TEXT, blinds INTEGER DEFAULT 0);
 """
-ADDED = ("paired_at", "alerted_at", "alert_msg", "digest_day")  # columns a store from before them lacks
+ADDED = ("paired_at", "alerted_at", "alert_msg", "digest_day",  # columns a store from before them lacks
+         "revealed", "reveal_id", "revealed_at", "reveal_of", "reveal_score")  # step 4's: added by connect()
 
 CLUES_SCHEMA = {
     "type": "object",
@@ -119,6 +121,49 @@ def home(cfg: dict) -> Path:
     d = news.home(cfg) / "blinds"
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+def store_path(cfg: dict) -> Path:
+    """Where blinds.sqlite is, without creating its folder (backup reads it, may find none)."""
+    return Path(cfg["paths"]["news"]) / "blinds" / "blinds.sqlite"
+
+
+def snapshot(cfg: dict, dest: Path) -> tuple[Path, str] | None:
+    """A consistent copy of the store, taken with SQLite's backup API (safe while serve writes)
+    and checked with integrity_check -> (copy, problem), problem "" when the check passed. When
+    SQLite can't read the store at all, the copy is the raw file. A damaged copy is still
+    returned: for a repair, it beats none. None when there is no store yet."""
+    src = store_path(cfg)
+    if not src.is_file():
+        return None
+    out = dest / "blinds.sqlite"
+    out.unlink(missing_ok=True)
+    try:
+        a = sqlite3.connect(src, timeout=30)
+        try:
+            b = sqlite3.connect(out)
+            try:
+                a.backup(b)
+                ok = b.execute("PRAGMA integrity_check").fetchone()[0]
+            finally:
+                b.close()
+        finally:
+            a.close()
+    except sqlite3.OperationalError as e:
+        out.unlink(missing_ok=True)
+        if re.search(r"locked|busy", str(e), re.I):   # a long write by serve: next time, not a torn raw copy
+            raise BlindsBusy(str(e)) from None
+        shutil.copy2(src, out)
+        return out, f"SQLite couldn't read it ({e}); the raw file is copied"
+    except sqlite3.DatabaseError as e:   # not a database, malformed: the raw file beats nothing for a repair
+        out.unlink(missing_ok=True)
+        shutil.copy2(src, out)
+        return out, f"SQLite couldn't read it ({e}); the raw file is copied"
+    return out, "" if ok == "ok" else f"integrity_check: {ok}"
+
+
+class BlindsBusy(ClipperError):
+    """The store stayed locked past the timeout: left out of this backup, nothing wrong with it."""
 
 
 def connect(cfg: dict) -> sqlite3.Connection:
@@ -278,7 +323,8 @@ def blind_id(src: dict, kind: str, e: dict) -> str:
 
 def store(db: sqlite3.Connection, src: dict, items: list[dict], since: datetime | None = None) -> tuple[int, int]:
     """New blinds and reveals from one source -> (new, edited). An entry seen before whose text
-    changed is updated (an answer added to a blind later is how some sources reveal)."""
+    changed is updated (an answer added to a blind later is how some sources reveal); the text it
+    had goes into its history, in the same statement, so a concurrent answer's entry isn't lost."""
     t, new, edited = news.iso(news.now()), 0, 0
     for e in items:
         kind = classify(src, e["title"])
@@ -296,9 +342,15 @@ def store(db: sqlite3.Connection, src: dict, items: list[dict], since: datetime 
                       (bid, src["name"], kind, e["title"], e["url"], published, day_of(e["published"]), t, text,
                        "reveal" if kind == "reveal" else "unread")).rowcount:
             new += 1
-        elif db.execute("UPDATE blinds SET text = ?, edited_at = ? WHERE id = ? AND text != ?",
-                        (text, t, bid, text)).rowcount:
+        elif db.execute("UPDATE blinds SET history = json_insert(COALESCE(history, '[]'), '$[#]', "
+                        "json_object('at', ?, 'what', 'edited', 'text', text)), text = ?, edited_at = ? "
+                        "WHERE id = ? AND text != ?", (t, text, t, bid, text)).rowcount:
             edited += 1
+            if kind == "reveal":  # a corrected reveal is matched again; the answer it gave stays in history
+                db.execute("UPDATE blinds SET reveal_of = NULL, reveal_score = NULL WHERE id = ?", (bid,))
+                db.execute("UPDATE blinds SET history = json_insert(COALESCE(history, '[]'), '$[#]', "
+                           "json_object('at', ?, 'what', 'unrevealed', 'reveal', ?, 'was', revealed)), "
+                           "revealed = NULL, reveal_id = NULL, revealed_at = NULL WHERE reveal_id = ?", (t, bid, bid))
     return new, edited
 
 
@@ -541,6 +593,206 @@ def apply_pairs(db: sqlite3.Connection, batch: list, pool: dict, pairs: list[dic
     return made
 
 
+# ---------- reveals (step 4) ----------
+# A reveal post quotes the blind it answers and adds one line with the answer:
+#     November 7, 2026            <- the day the blind was posted
+#     The reality star with ...   <- the blind's text, as posted
+#     Name One/Name Two           <- the answer
+# It is matched to a stored blind in code, by how much of the blind's wording it repeats.
+
+MATCH_MIN = 0.6      # share of the blind's word 3-grams the reveal repeats
+MATCH_MARGIN = 0.3   # and that far ahead of the next-best blind, or it is left unmatched
+MATCH_DAYS = 1       # the date line may be a day off the blind's own day (time zones)
+DATE_LINE = re.compile(r"^[A-Z][a-z]+ \d{1,2}, [\d ]{4,6}$")   # "October 6, 22026" too: a typo'd date
+
+
+def _words(text: str) -> list[str]:
+    return re.findall(r"[a-z0-9]+", text.lower())
+
+
+def _grams(words: list[str], n: int = 3) -> set[tuple[str, ...]]:
+    return {tuple(words[i:i + n]) for i in range(len(words) - n + 1)}
+
+
+def split_reveal(text: str) -> tuple[str, str, str]:
+    """A reveal post -> (the blind's day, ISO, or "" when the date line is missing or garbled;
+    the quoted blind; the answer line)."""
+    lines = [x.strip() for x in text.splitlines() if x.strip()]
+    day = ""
+    if lines and DATE_LINE.match(lines[0]):
+        try:
+            day = datetime.strptime(lines[0], "%B %d, %Y").date().isoformat()
+        except ValueError:
+            pass
+        lines = lines[1:]
+    if len(lines) < 2:
+        return day, "\n".join(lines), ""
+    return day, "\n".join(lines[:-1]), lines[-1]
+
+
+def revealed_names(answer: str) -> list[str]:
+    """ "A Name/B Name (and a note)" -> ["A Name", "B Name"]."""
+    bare = re.sub(r"\(.*?\)", "", answer)
+    return [n.strip(" .,;") for n in bare.split("/") if n.strip(" .,;")]
+
+
+def best_blind(quoted: str, cands: list, grams: dict) -> tuple[str, float, float]:
+    """(id, score, next-best score) of the stored blind the quoted text repeats most."""
+    rg = _grams(_words(quoted))
+    scored = []
+    for b in cands:
+        g = grams.setdefault(b["id"], _grams(_words(b["text"])))
+        scored.append((len(g & rg) / len(g) if g else 0.0, b["id"]))
+    scored.sort(reverse=True)
+    if not scored:
+        return "", 0.0, 0.0
+    return scored[0][1], scored[0][0], scored[1][0] if len(scored) > 1 else 0.0
+
+
+def _candidates(db: sqlite3.Connection, r: sqlite3.Row, day: str) -> list:
+    if not day:   # no usable date line: the source's blinds from the year before it (kept bounded: nothing is forgotten)
+        since = news.iso(_when(r["published"]) - timedelta(days=366))
+        return db.execute("SELECT id, text FROM blinds WHERE kind = 'blind' AND source = ? AND published <= ? "
+                          "AND published >= ?", (r["source"], r["published"], since)).fetchall()
+    d = datetime.fromisoformat(day)
+    lo, hi = ((d + timedelta(days=k)).date().isoformat() for k in (-MATCH_DAYS, MATCH_DAYS))
+    return db.execute("SELECT id, text FROM blinds WHERE kind = 'blind' AND source = ? AND day BETWEEN ? AND ?",
+                      (r["source"], lo, hi)).fetchall()
+
+
+def match_reveals(db: sqlite3.Connection, say=print) -> int:
+    """Link each unmatched reveal to the blind it answers, and that blind (and its twin) to the
+    answer. Code only, no model call. A reveal left unmatched (its blind is older than the store,
+    say) is tried again on the next check, so a backfill can still link it."""
+    todo = db.execute("SELECT * FROM blinds WHERE kind = 'reveal' AND reveal_of IS NULL").fetchall()
+    grams: dict = {}
+    made = 0
+    for r in todo:
+        if len(r["text"]) >= TEXT_MAX:  # cut at TEXT_MAX: its last line may not be the answer
+            continue
+        day, quoted, answer = split_reveal(r["text"])
+        if not answer:
+            continue
+        bid, score, second = best_blind(quoted, _candidates(db, r, day), grams)
+        if not bid or score < MATCH_MIN or score - second < MATCH_MARGIN:
+            continue
+        b = get(db, bid)
+        db.execute("UPDATE blinds SET reveal_of = ?, reveal_score = ? WHERE id = ?", (bid, f"{score:.2f}", r["id"]))
+        ids = [bid] + ([x["id"] for x in db.execute("SELECT id FROM blinds WHERE pair = ? AND id != ?",
+                                                     (b["pair"], bid))] if b["pair"] else [])
+        for i in ids:  # a twin is answered by either source's reveal; the first reveal stays
+            db.execute("UPDATE blinds SET revealed = ?, reveal_id = ?, revealed_at = ?, "
+                       "history = json_insert(COALESCE(history, '[]'), '$[#]', "
+                       "json_object('at', ?, 'what', 'revealed', 'reveal', ?)) WHERE id = ? AND revealed IS NULL",
+                       (answer, r["id"], r["published"], news.iso(news.now()), r["id"], i))
+        made += 1
+    db.commit()
+    if made:
+        say(f"  {made} reveal{'s' if made != 1 else ''} matched to {'their blinds' if made != 1 else 'its blind'}")
+    return made
+
+
+def _when(iso: str) -> datetime:
+    t = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    return t if t.tzinfo else t.replace(tzinfo=news.now().tzinfo)
+
+
+def answer_at_reveal(b: dict) -> tuple[str, dict | None]:
+    """Your answer as it stood when the reveal was posted: ("answered", the guess), ("no_idea" or
+    "not_ours", None), or ("", None) when you hadn't answered yet. A guess changed after the reveal
+    doesn't replace the one you made before it (the history keeps the replaced ones)."""
+    cut = _when(b["revealed_at"]) if b.get("revealed_at") else None
+    before = [h for h in b["history"] if h.get("what") in ("answered", "no_idea", "not_ours")
+              and (cut is None or _when(h["at"]) < cut)]
+    if not before:
+        return "", None
+    last = before[-1]
+    if last["what"] != "answered":
+        return last["what"], None
+    pool = [g for h in b["history"] if h.get("what") == "replaced" for g in h.get("guesses", [])] + b["guesses"]
+    return "answered", next((g for g in reversed(pool) if g.get("at") == last["at"]), None)
+
+
+def _fits(guess: str, theirs: list[list[str]]) -> bool:
+    """One word fits a revealed name only as its last word (a surname): "Example" fits "Pat
+    Example", "Pat" doesn't. More words fit when all of them are in one revealed name."""
+    w = _words(guess)
+    if not w:
+        return False
+    if len(w) == 1:
+        return any(t and t[-1] == w[0] for t in theirs)
+    return any(set(w) <= set(t) for t in theirs)
+
+
+def grade(b: dict, people_map: dict | None = None) -> str:
+    """Your guess against the source's reveal: "right", "wrong", "late" (your only named guess
+    came after the reveal was posted, so it isn't counted), or "" (not revealed, or no name
+    guessed). The guess scored is the one you had when the reveal was posted. It is right when it,
+    or the full name or an alias of the People record it matched, fits a revealed name."""
+    if not b.get("revealed"):
+        return ""
+    status, g = answer_at_reveal(b)
+    if status == "answered" and g:
+        mine = [g.get("name") or "", g.get("as_written") or ""]
+        rec = (people_map or {}).get(g.get("person") or "")
+        if rec:
+            mine += [re.sub(r"\(.*?\)", "", n) for n in [rec.get("name") or "", *rec.get("aliases", [])]]
+        theirs = [_words(n) for n in revealed_names(b["revealed"])]
+        return "right" if any(_fits(m, theirs) for m in mine) else "wrong"
+    return "late" if not status and b["guesses"] else ""
+
+
+def scorecard(cfg: dict, match: bool = True, say=print) -> dict:
+    """How the reveals stand: matched or not (and why not), and your guesses on revealed blinds."""
+    from . import people
+
+    db = connect(cfg)
+    try:
+        if match:
+            match_reveals(db, say)
+        oldest = {r["source"]: r["day"] for r in db.execute(
+            "SELECT source, MIN(day) AS day FROM blinds WHERE kind = 'blind' GROUP BY source")}
+        reveals = db.execute("SELECT source, text, reveal_of FROM blinds WHERE kind = 'reveal'").fetchall()
+        rows = [as_dict(r) for r in db.execute("SELECT * FROM blinds WHERE kind = 'blind' AND revealed IS NOT NULL "
+                                               "ORDER BY published DESC")]
+    finally:
+        db.close()
+    older = 0
+    for r in reveals:
+        d = split_reveal(r["text"])[0]
+        older += bool(not r["reveal_of"] and d and r["source"] in oldest and d < oldest[r["source"]])
+    pm = people.load(cfg)
+    graded = []
+    for b in rows:   # the guess shown is the one scored: yours when the reveal was posted
+        at, g = answer_at_reveal(b)
+        now = b["guesses"][0]["name"] if b["guesses"] else ""
+        graded.append({"id": b["id"], "day": b["day"], "status": b["status"], "at_reveal": at,
+                       "guess": g["name"] if g else now, "now": now, "revealed": b["revealed"], "grade": grade(b, pm)})
+    count = {k: sum(1 for x in graded if x["grade"] == k) for k in ("right", "wrong", "late")}
+    matched = sum(1 for r in reveals if r["reveal_of"])
+    return {"reveals": len(reveals), "matched": matched, "unmatched_older": older,
+            "unmatched_other": len(reveals) - matched - older, "revealed_blinds": len(rows),
+            "no_idea": sum(1 for x in graded if x["at_reveal"] == "no_idea"), **count, "graded": graded}
+
+
+def scorecard_text(sc: dict) -> list[str]:
+    out = [f"{sc['reveals']} reveals: {sc['matched']} matched to a stored blind, "
+           f"{sc['unmatched_older']} for blinds older than the store (a backfill can bring them in), "
+           f"{sc['unmatched_other']} not matched",
+           f"{sc['revealed_blinds']} revealed blinds. Your guesses: {sc['right']} right, {sc['wrong']} wrong"
+           + (f", {sc['late']} after the reveal (not counted)" if sc["late"] else "")
+           + (f"; no idea on {sc['no_idea']}" if sc["no_idea"] else "")]
+    judged = sc["right"] + sc["wrong"]
+    if judged:
+        out.append(f"hit rate {sc['right'] / judged:.0%} of {judged} (\"right\" means it matches the source's reveal)")
+    for x in sc["graded"]:
+        if x["grade"]:
+            out.append(f"  {x['id']:<26} {x['grade']:<6} you: {x['guess']}"
+                       + (f" (now {x['now']})" if x["now"] and x["now"] != x["guess"] else "")
+                       + f"  revealed: {x['revealed']}")
+    return out
+
+
 # ---------- check ----------
 
 def check(cfg: dict, backfill_days: float = 0, clues: bool = True, claude=None, say=print) -> dict:
@@ -556,6 +808,7 @@ def check(cfg: dict, backfill_days: float = 0, clues: bool = True, claude=None, 
             n, ed = fetch_source(db, src, backfill_days, cfg["blinds"]["backfill_pages"], say)
             say(f"  {src['name']}: {n} new" + (f", {ed} edited" if ed else ""))
             new, edited = new + n, edited + ed
+        revealed = match_reveals(db, say)  # before prune: a blind its reveal answers is kept
         prune(cfg, db)
         read, paired, tried = [], 0, set()
         if clues and cfg["blinds"]["clues_model"]:
@@ -565,15 +818,21 @@ def check(cfg: dict, backfill_days: float = 0, clues: bool = True, claude=None, 
                 if not backfill_days or len(tried) == before:
                     break
             paired = pair(cfg, db, claude, say)
-        return {"new": new, "edited": edited, "read": len(read), "paired": paired}
+        return {"new": new, "edited": edited, "read": len(read), "paired": paired, "revealed": revealed}
     finally:
         db.close()
 
 
 def prune(cfg: dict, db: sqlite3.Connection) -> int:
-    """Forget what is older than keep_days, except blinds the user answered (the scorecard's)."""
+    """keep_days 0 (the default): forget nothing, the store is research to keep. Otherwise forget
+    what is older, except what the user engaged with (answered, no idea), reveals and the blinds
+    they answered: the ground truth the scorecard is built on. Their text can't be fetched again
+    once a source takes a post down."""
+    if cfg["blinds"]["keep_days"] <= 0:
+        return 0
     cut = news.iso(news.now() - timedelta(days=cfg["blinds"]["keep_days"]))
-    n = db.execute("DELETE FROM blinds WHERE published < ? AND status != 'answered'", (cut,)).rowcount
+    n = db.execute("DELETE FROM blinds WHERE published < ? AND status NOT IN ('answered', 'no_idea', 'reveal') "
+                   "AND revealed IS NULL", (cut,)).rowcount
     if n:  # a twin left on its own is unpaired
         db.execute("UPDATE blinds SET pair = NULL, pair_why = NULL WHERE pair IS NOT NULL AND pair IN "
                    "(SELECT pair FROM blinds WHERE pair IS NOT NULL GROUP BY pair HAVING COUNT(*) = 1)")
@@ -733,6 +992,11 @@ def one(cfg: dict, bid: str) -> dict:
     finally:
         db.close()
     b["tags"], b["hidden"] = tags(b), hidden(cfg, b)
+    if b.get("revealed"):
+        from . import people
+        b["grade"] = grade(b, people.load(cfg))
+        _, g = answer_at_reveal(b)
+        b["scored_guess"] = g["name"] if g else ""
     return b
 
 
@@ -759,7 +1023,9 @@ def mark_of(b: dict) -> str:
 def line(b: dict) -> str:
     gist = b["claim"] or b["text"].replace("\n", " ")
     guess = f"  -> {b['guesses'][0]['name']}" if b["guesses"] else ""
-    return f"{b['id']:<26} {mark_of(b)} {b['status']:<9} {gist[:90]}{guess}"
+    # revealed, not who: the list shouldn't spoil a blind you haven't guessed (`show` names them)
+    told = "  [revealed]" if b.get("revealed") else ""
+    return f"{b['id']:<26} {mark_of(b)} {b['status']:<9} {gist[:90]}{guess}{told}"
 
 
 def show_text(b: dict) -> str:
@@ -774,6 +1040,17 @@ def show_text(b: dict) -> str:
     for g in b["guesses"]:
         out.append(f"your guess: {g['name']}" + (f" ({g['person']})" if g["person"] else " (not in clippa people)")
                    + (f", because {g['why']}" if g["why"] else "") + (f"  [{g['note']}]" if g.get("note") else ""))
+    if b.get("revealed"):
+        out.append(f"revealed ({b['source']}, {b['reveal_id']}, the source's word): {b['revealed']}")
+        if b.get("grade"):
+            now = b["guesses"][0]["name"] if b["guesses"] else ""
+            out.append(f"your guess was {b['grade']}" + (" (made after the reveal, not counted)"
+                                                        if b["grade"] == "late" else "")
+                       + (f" (scored: {b['scored_guess']}, your guess when it was revealed)"
+                          if b.get("scored_guess") and b["scored_guess"] != now else ""))
+    if b["kind"] == "reveal":
+        out.append(f"answers: {b['reveal_of']} (match {b['reveal_score']})" if b.get("reveal_of")
+                   else "answers: no stored blind yet (its blind may be older than the store)")
     return "\n".join(x for x in out if x is not None)
 
 
@@ -799,7 +1076,8 @@ MD = re.compile(r"([\\*_~`|\[\]()<])")  # what makes bold, spoilers, code or a l
 def alertable(cfg: dict, b: dict) -> bool:
     """Waiting for a guess, not about a private person, not hidden by [blinds] hide, and not
     sensitive unless [blinds] sensitive_alerts."""
-    return (b["kind"] == "blind" and b["status"] == "waiting" and not b["private"] and not hidden(cfg, b)
+    return (b["kind"] == "blind" and b["status"] == "waiting" and not b.get("revealed")  # a guess now is late
+            and not b["private"] and not hidden(cfg, b)
             and (cfg["blinds"]["sensitive_alerts"] or not b["sensitive"]))
 
 
@@ -816,7 +1094,7 @@ def _fresh(cfg: dict, db: sqlite3.Connection, where: str) -> list[dict]:
     feed's offset, so the SQL cut is a day wide and the exact one is made on the parsed times."""
     cut = news.now() - timedelta(days=ALERT_DAYS)
     rows = [as_dict(r) for r in db.execute("SELECT * FROM blinds WHERE kind = 'blind' AND status = 'waiting' "
-                                           f"AND published > ? AND {where}", (news.iso(cut - timedelta(days=1)),))]
+                                           f"AND revealed IS NULL AND published > ? AND {where}", (news.iso(cut - timedelta(days=1)),))]
     rows = sorted((b for b in rows if _published(b) > cut), key=lambda b: (_published(b), b["id"]))
     return [b for b in rows if alertable(cfg, b)]
 

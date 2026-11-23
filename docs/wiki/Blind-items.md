@@ -6,8 +6,9 @@ install follows. It is research for you alone: nothing in it is ever published (
 
 It is built in steps. **In so far:** the sources, storage, the clue pass, pairing twins,
 answering from the command line, the war room's Blinds window, serve's regular check and the
-questions in [Discord](#discord). Still to come: the investigation after your answer (step 3),
-and reveals with the scorecard (step 4).
+questions in [Discord](#discord), and [reveals](#reveals) matched to their blinds with your
+guesses scored (step 4, from the command line). Still to come: the investigation after your
+answer (step 3), and the reveal's follow-up in Discord and the war room.
 
 ## Sources
 
@@ -57,6 +58,7 @@ clippa blinds answer <blind> "<name>" [--why "..."]
 clippa blinds answer <blind> --none           # no idea
 clippa blinds answer <blind> --not-ours       # not one to look into
 clippa blinds sources                         # each source: last fetch, error, how many stored
+clippa blinds reveals [--json]                # match reveals to their blinds, score your guesses
 ```
 
 A blind's status:
@@ -68,7 +70,7 @@ A blind's status:
 | answered | you guessed |
 | no_idea | you said you had no idea |
 | not_ours | you said it isn't one to look into |
-| reveal | a reveal post, kept for step 4 |
+| reveal | a reveal post (see [Reveals](#reveals)) |
 
 `list` leaves out not-ours blinds, reveals and hidden blinds unless you pass `--all` or ask for
 that status. In its list, `*` marks a blind that could be about someone you follow, `!` a
@@ -103,7 +105,7 @@ with other sources' unpaired blinds published within `pair_days` of it (prompt `
 the same model), so a backfill pairs old twins too. A pair becomes one event: asked once, and
 answered by either source's reveal. A pairing call that fails is made again on the next check.
 With only one feed source, no pairing call is made. Blinds pasted by hand aren't paired yet. A pair whose
-other half is forgotten (`keep_days`) is unpaired.
+other half is forgotten (only when `keep_days` is set) is unpaired.
 
 ## Tags and hiding
 
@@ -123,6 +125,46 @@ Discord. A hidden blind is kept, and `--all` shows it.
 record's id is kept. A name nobody answers to, or one that matches two records, is kept as you
 wrote it. Answering again replaces your last answer; the old one stays in the blind's history.
 The war room and Discord answer through the same function.
+
+## Reveals
+
+A reveal post quotes the blind it answers and adds the answer on a last line of its own:
+
+```text
+November 7, 2026               the day the blind was posted
+The reality star with...       the blind, as posted
+Name One/Name Two              the answer
+```
+
+Every `check` (and `clippa blinds reveals`) matches each new reveal to a stored blind, in code
+with no model call. A blind matches when the reveal repeats at least 60% of its wording (word
+triples), and at least 30 points more than any other blind posted within a day of the date line.
+A reveal whose date line is missing or garbled is compared with every earlier blind of its
+source. Anything less clear is left unmatched rather than guessed. On the 11-22 store, every
+dated reveal whose blind was stored matched, and no blind was matched twice.
+
+- **The match** puts the answer line on the blind (and its twin, if it has one), with the reveal's
+  id and the day it was posted, and logs it in the blind's history. `show` prints it, labelled
+  as the source's word. `list` only marks a revealed blind `[revealed]`, so browsing never
+  spoils one you haven't guessed.
+- **A corrected reveal** (the source edits the post) is matched again. The answer it gave before
+  stays in the blind's history. A reveal longer than the stored text limit (6,000 characters) isn't
+  matched, since its answer line may be cut off.
+- **Discord** never asks about a blind that is already revealed: a guess then wouldn't count.
+- **Unmatched reveals** are tried again on every check. Most are for blinds older than the store:
+  `check --backfill DAYS` brings those blinds in, and the next check links them.
+- **Your guess is scored** against the names in the answer line (split on `/`, notes in brackets
+  left out). The guess scored is the one you had when the reveal was posted: changing it
+  afterwards doesn't turn a miss into anything else. It is **right** when every word of it, or of
+  the full name or an alias of its [People](People) record, is in one revealed name. One word fits
+  only as a surname: "Example" and "Pat Example" fit "Pat Example", "Pat" doesn't. A guess whose
+  only name came after the reveal is **late** and isn't counted. No idea isn't scored.
+- **The war room** tags a revealed blind `revealed` (never who), so you know a guess there
+  wouldn't count.
+- **Right means matches the reveal, not true.** Sources sometimes take each other's stories.
+
+`clippa blinds reveals` prints how many reveals matched, how many wait for older blinds, and
+each scored guess with your hit rate.
 
 ## Discord
 
@@ -202,7 +244,24 @@ reads them.
 ## Where it lives
 
 Everything is in `[paths] news/blinds/blinds.sqlite`. The blind's text is kept, because it is
-short and it is what the clue pass reads. Linked articles are never fetched. Blinds older than
-`keep_days` (365) are forgotten, except ones you answered. A test checks that nothing but the
-command, the war room's window and the bot's questions reads the blinds, so no title,
-description, cover, post or weekly issue can pick one up.
+short and it is what the clue pass reads. Linked articles are never fetched.
+
+**Nothing is forgotten by default** (`[blinds] keep_days = 0`): the store is research worth
+keeping, and it is small (about 1 MB a month from one busy source). A source can take a post
+down, and its text can't be fetched again. With `keep_days` set to a number of days, older blinds
+are forgotten, except the ones you engaged with (answered, **no idea**), every **reveal**, and
+every blind a reveal answered. A test checks that nothing but the command, the war room's window, the bot's
+questions and the [taste backup](Backups) reads the blinds, so no title, description, cover, post
+or weekly issue can pick one up.
+
+**Custody.** `clippa backup` (and so serve's every-`every_days` run) copies the store in as
+`blinds/blinds.sqlite`, a snapshot taken with SQLite's backup API and checked with
+`integrity_check`. A store that fails the check still goes in, as `blinds.damaged.sqlite`, and
+the backup's output says so: a damaged copy beats none for a repair, and the rest of the backup
+isn't held up. That backup drops no older zip (`[backup] keep` waits), so the last good copy
+survives. A store still locked by a long write after 30 s is left out of that one backup,
+with a line saying so, rather than copied half-written. `--dry-run` lists it without the snapshot. An older zip may hold a good copy. The zip is private, like the rest of the taste
+layer: it is copied off the NAS by hand, never published.
+
+When a source edits a post, the blind's text is updated and the text it had goes into its
+history, so the wording the clues were read from is never lost.

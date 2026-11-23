@@ -40,6 +40,8 @@ function blindCard(b) {
     ...b.sensitive.map(x => `<span class="tag bs" title="A sensitive claim">${esc(x)}</span>`),
     b.private ? `<span class="tag bp" title="Points at a private person: not looked into">private</span>` : "",
     b.hidden ? `<span class="tag" title="Hidden by [blinds] hide">hidden</span>` : "",
+    // revealed, never who: a guess made now isn't counted ("late"); `clippa blinds show` has the answer
+    b.revealed ? `<span class="tag" title="A source has revealed who it is: a guess now isn't counted">revealed</span>` : "",
     ...b.fields.map(f => `<span class="tag">${esc(f)}</span>`)].join("");
   const clues = b.clues.map(c => `<span class="bclue" title="${esc(c.type)}, weight ${c.weight}"><i>${esc(c.type)}</i>${esc(c.text)}</span>`).join("");
   const g = b.guesses[0];

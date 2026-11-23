@@ -8,7 +8,9 @@ What goes in, each relative to the config file's folder (the NAS share's /data):
     schedule.json, people.json, logs/costs.jsonl, faces/ (not the downloaded models),
     voices/, layouts/, [thumbnail] photos, [paths] prompts if set, and each stream's
     config.toml, meta.json, review.json, review_state.json, thumbnails.json, retakes.json
-secrets/ only with --with-secrets ([backup] with_secrets for serve's run).
+secrets/ only with --with-secrets ([backup] with_secrets for serve's run), and the blinds
+store as blinds/blinds.sqlite: a snapshot of the blind items, your answers and the reveals
+(#111), checked with integrity_check before it goes in.
 
 Not in it: the recordings and cuts (prune keeps their JSON; the videos are on YouTube), the
 transcripts (Modal can redo them), the Kitsu database (its Docker volumes on the NAS: wiki
@@ -19,11 +21,12 @@ every_days (0 = only by hand); `clippa audit` and doctor say when the newest is 
 from __future__ import annotations
 
 import os
+import tempfile
 import zipfile
 from datetime import datetime
 from pathlib import Path
 
-from . import jsonstate
+from . import blinds, jsonstate, wiki
 from .config import base, for_show, for_stream
 from .errors import ClipperError
 
@@ -71,8 +74,11 @@ def photo_dirs(cfg: dict) -> list[str]:
     return [str(p) for p in dict.fromkeys(out) if p]
 
 
-def plan(cfg: dict, with_secrets: bool = False, dest: Path | None = None) -> list[tuple[str, Path]]:
-    """(name in the zip, file) for everything a backup takes."""
+def plan(cfg: dict, with_secrets: bool = False, dest: Path | None = None,
+         snap_dir: Path | None = None, notes: list[str] | None = None) -> list[tuple[str, Path]]:
+    """(name in the zip, file) for everything a backup takes. The blinds store is copied into
+    snap_dir first (a consistent snapshot); without one (a dry run), its live file is listed for
+    sizing. What went wrong with it is added to notes."""
     cfg = base(cfg)
     root = Path(cfg["_dir"])
     paths = cfg["paths"]
@@ -114,16 +120,44 @@ def plan(cfg: dict, with_secrets: bool = False, dest: Path | None = None) -> lis
                     add(d / name)
     if with_secrets:
         add(root / "secrets")
+    out += _blinds_store(cfg, snap_dir, [] if notes is None else notes)
     return out
+
+
+def _blinds_store(cfg: dict, snap_dir: Path | None, notes: list[str]) -> list[tuple[str, Path]]:
+    """The blind items' store: your answers and the reveals, research nothing can rebuild."""
+    if snap_dir is not None:   # a damaged store still goes in, under a name that says so
+        try:
+            snap = blinds.snapshot(cfg, snap_dir)
+        except blinds.BlindsBusy as e:
+            notes.append(f"the blinds store was busy ({e}); left out of this backup, the next one takes it")
+            return []
+        if not snap:
+            return []
+        path, problem = snap
+        if problem:
+            notes.append(f"WARNING: the blinds store failed its check ({problem}); it went in as "
+                         f"blinds.damaged.sqlite. An older zip may hold a good copy: "
+                         f"{wiki.page('Blind-items', 'where-it-lives')}")
+        return [(f"blinds/blinds{'.damaged' if problem else ''}.sqlite", path)]
+    store = blinds.store_path(cfg)
+    return [("blinds/blinds.sqlite", store)] if store.is_file() else []
 
 
 def run(cfg: dict, to: str | Path | None = None, with_secrets: bool | None = None,
         dry_run: bool = False) -> list[str]:
     """Write the zip (or, with dry_run, say what would go in it) and drop the old ones."""
+    with tempfile.TemporaryDirectory(prefix="clippa-backup-") as tmp:
+        return _run(cfg, to, with_secrets, dry_run, Path(tmp))
+
+
+def _run(cfg: dict, to: str | Path | None, with_secrets: bool | None, dry_run: bool,
+         snap_dir: Path) -> list[str]:
     cfg = base(cfg)
     dest = folder(cfg, to)
     secrets = cfg["backup"]["with_secrets"] if with_secrets is None else with_secrets
-    files = plan(cfg, secrets, dest)
+    notes: list[str] = []
+    files = plan(cfg, secrets, dest, None if dry_run else snap_dir, notes)
     if not files:
         raise ClipperError(f"nothing to back up under {cfg['_dir']}")
     size = sum(f.stat().st_size for _, f in files)
@@ -144,12 +178,15 @@ def run(cfg: dict, to: str | Path | None = None, with_secrets: bool | None = Non
         # one backup at a time per folder (serve's and one by hand): a .part left behind is
         # then a killed run's, and the newest-keep count sees every finished zip
         with jsonstate.locked(dest / "backup", wait_s=5):
-            return _write(cfg, dest, target, files, secrets)
+            damaged = any(name == "blinds/blinds.damaged.sqlite" for name, _ in files)
+            # a damaged store: drop no older zip, one of them may hold the last good copy
+            return _write(cfg, dest, target, files, secrets, rotate=not damaged) + notes
     except TimeoutError:
         raise ClipperError(f"another backup is writing to {dest} now; try again when it is done") from None
 
 
-def _write(cfg: dict, dest: Path, target: Path, files: list[tuple[str, Path]], secrets: bool) -> list[str]:
+def _write(cfg: dict, dest: Path, target: Path, files: list[tuple[str, Path]], secrets: bool,
+           rotate: bool = True) -> list[str]:
     for left in dest.glob(f"{PREFIX}*.zip.part"):   # a run killed mid-write
         left.unlink(missing_ok=True)
     tmp = target.with_suffix(".zip.part")
@@ -160,7 +197,9 @@ def _write(cfg: dict, dest: Path, target: Path, files: list[tuple[str, Path]], s
     lines = [f"wrote {target} ({len(files)} files, {_mb(target.stat().st_size)}"
              + (", secrets included" if secrets else ", no secrets") + ")"]
     keep = cfg["backup"]["keep"]
-    old = sorted(dest.glob(f"{PREFIX}*.zip"))[:-keep] if keep > 0 else []
+    old = sorted(dest.glob(f"{PREFIX}*.zip"))[:-keep] if keep > 0 and rotate else []
+    if not rotate:
+        lines.append("kept every older backup: the blinds store is damaged, an older zip may hold a good copy")
     for p in old:
         p.unlink()
     if old:

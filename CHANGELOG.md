@@ -12,6 +12,10 @@ Developing#releases.
 
 ### 2026-11
 
+- 11-22: The blind items' store (your answers, the reveals) goes into `clippa backup` as a checked snapshot, and no
+  blind is forgotten any more by default (`[blinds] keep_days = 0`); a number of days still forgets old untouched ones.
+- 11-22: Blind items: each check matches reveal posts to the blinds they answer, in code, and scores your guess
+  against the answer; `clippa blinds reveals` prints the scorecard.
 - 11-22: The war room's show chips say whether each show approves its clips by itself: **AUTO**
   when `[review] auto_approve` is on for it, *manual* when not; hover the chip for the kinds and score floors.
 - 11-22: The checkup no longer reports the bot's Discord reconnects after a short network drop as
