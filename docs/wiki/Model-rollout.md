@@ -78,12 +78,21 @@ Leave every setting that is not Claude as it is: Whisper (`[transcribe] model`,
 table also names `claude-haiku-5-5`, `claude-sonnet-5-5` and `claude-opus-5-5`. Those
 three rows are prices. OpenRouter reports each call's cost, so leave them.
 
-The live `clipper.toml` (its `[shows.<key>]` tables included), `clipper.local.toml` and a
-stream's `streams/<id>/config.toml` win over the defaults. After the live file is
-replaced, `clipper.local.toml`, a stream's `config.toml` and `CLIPPER_<SECTION>_<KEY>`
-(or `CLIPPA_<SECTION>_<KEY>`) still win, so a bare `claude-` name left in any of them
-keeps that call on Anthropic. From the data folder that holds the live file (`/data` in
-the containers, `/volume1/docker/clipper` on the NAS), search the files that are there:
+[`docs/openrouter-claude.toml`](https://github.com/byvfx/clippa/pull/400) is the
+all-OpenRouter file: those 29 settings, and nothing else. Effort stays whatever the live
+config already has. The file is on that PR's branch and not on `main` yet. Nothing loads
+it on its own.
+
+Paste its tables into the live `clipper.toml`. Do not replace that file: it still holds
+the shows, paths and ids. A second copy of a table is a TOML error, so put each key in
+the section that is already there. Each pasted key overrides that one default. Every
+other key stays. A `[shows.<key>]` table, a
+stream's `streams/<id>/config.toml`, `clipper.local.toml` and `CLIPPER_<SECTION>_<KEY>`
+(or `CLIPPA_<SECTION>_<KEY>`) still win over the pasted keys. A bare `claude-` name in
+any of those keeps that call on Anthropic.
+
+From the data folder that holds the live file (`/data` in the containers,
+`/volume1/docker/clipper` on the NAS), search the files that are there:
 
 ```bash
 rg -n 'claude-' clipper.toml clipper.local.toml streams/*/config.toml
@@ -93,7 +102,10 @@ Show tables are inside `clipper.toml`, so that file's hits cover them. When `cli
 or `clippa.local.toml` is the file in use, search that name too (the new spelling wins
 when both are there). Leave out a path that has no file. `clippa config diff` lists
 `clipper.toml`, each show table, `clipper.local.toml` and `CLIPPER_*` / `CLIPPA_*`
-variables. A stream's `config.toml` is absent from that list.
+variables. A stream's `config.toml` is absent from that list. The overlay's test checks
+`docs/openrouter-claude.toml` against the defaults. It does not read the live file. The
+`rg` of the live `clipper.toml` is what catches a `claude-` override the test does not
+know about.
 
 Set `OPENROUTER_API_KEY` before the swap, or put the key in the file at `[paths]
 openrouter_key` (`secrets/openrouter_secret.txt` when that path is the default). A set
@@ -104,7 +116,8 @@ pipeline holds its lock. Wait until `clippa worker --status` shows no `run=runni
 
 1. Copy the live file to `clipper.toml.<date>.bak` beside it (use the date you do it).
 2. `clippa doctor`.
-3. Put the all-OpenRouter file at the live path. The dated copy stays beside it.
+3. Paste the tables from `docs/openrouter-claude.toml` into the live `clipper.toml`. Do not
+   replace that file. The dated copy stays beside it.
 4. `clippa services restart all` restarts the worker, serve and the bot. It does not restart the recorder.
 5. `clippa doctor` again.
 6. After the first stream, read that stream's lines in `[paths] costs` (`logs/costs.jsonl`).
@@ -118,7 +131,35 @@ counts as Claude, and the Anthropic key satisfies that check. With that key stil
 passing doctor says nothing about a leftover name. The cost log shows a call billed
 straight to Anthropic.
 
-Rollback is [Putting it back](#putting-it-back): between streams, put the dated copy back at the live path, then `clippa services restart all` and `clippa doctor`.
+These still reach Anthropic after the paste:
+
+- A bare `claude-*` name, or `anthropic:claude-*`. That stage uses the Anthropic SDK.
+  Those calls are the `kind` `llm` lines with `provider` `anthropic`.
+- `[scoring] workspace_id` (or `ANTHROPIC_WORKSPACE_ID`) is a header on that SDK client.
+  With no bare Claude name left, no stage builds the client, so the id sits unused until
+  one comes back. It writes no cost line.
+- The server-side refusal fallback (`json_call(..., fallback=True)`) runs on the Claude
+  API only. On an `openrouter:` model the call still runs, and is logged as `provider`
+  `openrouter`. The fallback does not run and writes no line of its own.
+- `clippa setup`'s key check (`setup.py`) calls `models.retrieve` with `claude_model(cfg)`,
+  or `claude-haiku-5-5` when no stage names Claude. That probe does not go through the
+  cost ledger, so it writes no `llm` line.
+- `clippa/usage.py` reads Claude's own bill from the Admin API. That read writes no `llm`
+  line.
+
+Keep `ANTHROPIC_API_KEY` set after the swap. The setup probe uses it, and the Admin API
+bill in `usage.py` still calls Anthropic (`ANTHROPIC_ADMIN_KEY`, or the file at
+`[paths] anthropic_admin_key`). Those two will be removed in a later pass.
+
+Step 6 is the stage calls. The workspace header, the fallback, the setup probe and the
+Admin API bill do not appear there as `provider` `anthropic`.
+
+A `--dry-run` prices from `[llm.prices]` only, so an `openrouter:` name with no row there
+counts as $0. Pricing those names from OpenRouter's list depends on #400. The overlay
+adds no price rows.
+
+Rollback is [Putting it back](#putting-it-back): between streams, put the dated copy
+back at the live path, then `clippa services restart all` and `clippa doctor`.
 
 The NAS Claude container (`deploy/claude`, Claude Code) is separate and this swap does not cover it.
 
