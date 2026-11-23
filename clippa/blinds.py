@@ -346,6 +346,11 @@ def store(db: sqlite3.Connection, src: dict, items: list[dict], since: datetime 
                         "json_object('at', ?, 'what', 'edited', 'text', text)), text = ?, edited_at = ? "
                         "WHERE id = ? AND text != ?", (t, text, t, bid, text)).rowcount:
             edited += 1
+            if kind == "reveal":  # a corrected reveal is matched again; the answer it gave stays in history
+                db.execute("UPDATE blinds SET reveal_of = NULL, reveal_score = NULL WHERE id = ?", (bid,))
+                db.execute("UPDATE blinds SET history = json_insert(COALESCE(history, '[]'), '$[#]', "
+                           "json_object('at', ?, 'what', 'unrevealed', 'reveal', ?, 'was', revealed)), "
+                           "revealed = NULL, reveal_id = NULL, revealed_at = NULL WHERE reveal_id = ?", (t, bid, bid))
     return new, edited
 
 
@@ -663,6 +668,8 @@ def match_reveals(db: sqlite3.Connection, say=print) -> int:
     grams: dict = {}
     made = 0
     for r in todo:
+        if len(r["text"]) >= TEXT_MAX:  # cut at TEXT_MAX: its last line may not be the answer
+            continue
         day, quoted, answer = split_reveal(r["text"])
         if not answer:
             continue
@@ -755,14 +762,17 @@ def scorecard(cfg: dict, match: bool = True, say=print) -> dict:
         d = split_reveal(r["text"])[0]
         older += bool(not r["reveal_of"] and d and r["source"] in oldest and d < oldest[r["source"]])
     pm = people.load(cfg)
-    graded = [{"id": b["id"], "day": b["day"], "status": b["status"],
-               "guess": b["guesses"][0]["name"] if b["guesses"] else "", "revealed": b["revealed"],
-               "grade": grade(b, pm)} for b in rows]
+    graded = []
+    for b in rows:   # the guess shown is the one scored: yours when the reveal was posted
+        at, g = answer_at_reveal(b)
+        now = b["guesses"][0]["name"] if b["guesses"] else ""
+        graded.append({"id": b["id"], "day": b["day"], "status": b["status"], "at_reveal": at,
+                       "guess": g["name"] if g else now, "now": now, "revealed": b["revealed"], "grade": grade(b, pm)})
     count = {k: sum(1 for x in graded if x["grade"] == k) for k in ("right", "wrong", "late")}
     matched = sum(1 for r in reveals if r["reveal_of"])
     return {"reveals": len(reveals), "matched": matched, "unmatched_older": older,
             "unmatched_other": len(reveals) - matched - older, "revealed_blinds": len(rows),
-            "no_idea": sum(1 for x in graded if x["status"] == "no_idea"), **count, "graded": graded}
+            "no_idea": sum(1 for x in graded if x["at_reveal"] == "no_idea"), **count, "graded": graded}
 
 
 def scorecard_text(sc: dict) -> list[str]:
@@ -777,7 +787,9 @@ def scorecard_text(sc: dict) -> list[str]:
         out.append(f"hit rate {sc['right'] / judged:.0%} of {judged} (\"right\" means it matches the source's reveal)")
     for x in sc["graded"]:
         if x["grade"]:
-            out.append(f"  {x['id']:<26} {x['grade']:<6} you: {x['guess']}  revealed: {x['revealed']}")
+            out.append(f"  {x['id']:<26} {x['grade']:<6} you: {x['guess']}"
+                       + (f" (now {x['now']})" if x["now"] and x["now"] != x["guess"] else "")
+                       + f"  revealed: {x['revealed']}")
     return out
 
 
@@ -983,6 +995,8 @@ def one(cfg: dict, bid: str) -> dict:
     if b.get("revealed"):
         from . import people
         b["grade"] = grade(b, people.load(cfg))
+        _, g = answer_at_reveal(b)
+        b["scored_guess"] = g["name"] if g else ""
     return b
 
 
@@ -1029,8 +1043,11 @@ def show_text(b: dict) -> str:
     if b.get("revealed"):
         out.append(f"revealed ({b['source']}, {b['reveal_id']}, the source's word): {b['revealed']}")
         if b.get("grade"):
+            now = b["guesses"][0]["name"] if b["guesses"] else ""
             out.append(f"your guess was {b['grade']}" + (" (made after the reveal, not counted)"
-                                                        if b["grade"] == "late" else ""))
+                                                        if b["grade"] == "late" else "")
+                       + (f" (scored: {b['scored_guess']}, your guess when it was revealed)"
+                          if b.get("scored_guess") and b["scored_guess"] != now else ""))
     if b["kind"] == "reveal":
         out.append(f"answers: {b['reveal_of']} (match {b['reveal_score']})" if b.get("reveal_of")
                    else "answers: no stored blind yet (its blind may be older than the store)")
@@ -1059,7 +1076,8 @@ MD = re.compile(r"([\\*_~`|\[\]()<])")  # what makes bold, spoilers, code or a l
 def alertable(cfg: dict, b: dict) -> bool:
     """Waiting for a guess, not about a private person, not hidden by [blinds] hide, and not
     sensitive unless [blinds] sensitive_alerts."""
-    return (b["kind"] == "blind" and b["status"] == "waiting" and not b["private"] and not hidden(cfg, b)
+    return (b["kind"] == "blind" and b["status"] == "waiting" and not b.get("revealed")  # a guess now is late
+            and not b["private"] and not hidden(cfg, b)
             and (cfg["blinds"]["sensitive_alerts"] or not b["sensitive"]))
 
 
@@ -1076,7 +1094,7 @@ def _fresh(cfg: dict, db: sqlite3.Connection, where: str) -> list[dict]:
     feed's offset, so the SQL cut is a day wide and the exact one is made on the parsed times."""
     cut = news.now() - timedelta(days=ALERT_DAYS)
     rows = [as_dict(r) for r in db.execute("SELECT * FROM blinds WHERE kind = 'blind' AND status = 'waiting' "
-                                           f"AND published > ? AND {where}", (news.iso(cut - timedelta(days=1)),))]
+                                           f"AND revealed IS NULL AND published > ? AND {where}", (news.iso(cut - timedelta(days=1)),))]
     rows = sorted((b for b in rows if _published(b) > cut), key=lambda b: (_published(b), b["id"]))
     return [b for b in rows if alertable(cfg, b)]
 

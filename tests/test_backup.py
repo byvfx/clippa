@@ -171,3 +171,19 @@ def test_a_busy_blinds_store_is_left_out_and_the_rest_backs_up(cfg, monkeypatch)
     (z,) = (cfg["_dir"] / "backups" / "taste").glob("taste-*.zip")
     assert not any(n.startswith("blinds/") for n in names(z)) and "clipper.toml" in names(z)
     assert "the blinds store was busy" in out[-1]
+
+
+def test_a_damaged_blinds_store_keeps_every_older_zip(cfg):
+    from clippa import blinds
+
+    cfg["backup"]["keep"] = 1
+    backup.run(cfg)  # a good one first
+    cfg["paths"]["news"] = cfg["_dir"] / "news"
+    store = blinds.store_path(cfg)
+    store.parent.mkdir(parents=True)
+    store.write_bytes(b"not a database at all")
+    dest = cfg["_dir"] / "backups" / "taste"
+    (old,) = dest.glob("taste-*.zip")
+    old.rename(dest / "taste-2000-01-01-0000.zip")  # older by name, as a real earlier run's
+    out = backup.run(cfg)
+    assert len(list(dest.glob("taste-*.zip"))) == 2 and any("kept every older backup" in x for x in out)

@@ -1056,3 +1056,51 @@ def test_a_reveal_is_matched_before_prune_can_forget_its_blind(cfg, monkeypatch)
                                               reveal_html(a["day"], BLIND_A, "Pat Example"))), "bg.example": rss()})
     assert blinds.check(cfg, clues=False)["revealed"] == 1
     assert blinds.one(cfg, a["id"])["revealed"] == "Pat Example"
+
+
+def test_a_corrected_reveal_is_matched_again_and_the_old_answer_kept(cfg, monkeypatch):
+    a, _ = two_blinds(cfg, monkeypatch)
+    feeds(monkeypatch, {"cdan.example": atom(("Blind Items Revealed #1", TODAY,
+                                              reveal_html(a["day"], BLIND_A, "Pat Example"))), "bg.example": rss()})
+    blinds.check(cfg, clues=False)
+    feeds(monkeypatch, {"cdan.example": atom(("Blind Items Revealed #1", TODAY,
+                                              reveal_html(a["day"], BLIND_A, "Sam Sample"))), "bg.example": rss()})
+    assert blinds.check(cfg, clues=False)["revealed"] == 1
+    got = blinds.one(cfg, a["id"])
+    assert got["revealed"] == "Sam Sample"
+    assert any(h["what"] == "unrevealed" and h["was"] == "Pat Example" for h in got["history"])
+
+
+def test_the_scorecard_shows_the_guess_it_scored(cfg, monkeypatch):
+    test_a_guess_changed_after_the_reveal_is_scored_as_it_stood_before(cfg, monkeypatch)
+    (x,) = blinds.scorecard(cfg)["graded"]
+    assert (x["grade"], x["guess"], x["now"]) == ("wrong", "Sam Sample", "Pat Example")
+    assert "(scored: Sam Sample" in blinds.show_text(blinds.one(cfg, x["id"]))
+
+
+def test_a_reveal_cut_at_the_text_limit_is_not_matched(cfg, monkeypatch):
+    a, _ = two_blinds(cfg, monkeypatch)
+    long = BLIND_A + " " + "and more words here " * 400  # the answer line falls past TEXT_MAX
+    feeds(monkeypatch, {"cdan.example": atom(("Blind Items Revealed #1", TODAY,
+                                              reveal_html(a["day"], long, "Pat Example"))), "bg.example": rss()})
+    assert blinds.check(cfg, clues=False)["revealed"] == 0
+
+
+def test_a_revealed_blind_is_not_asked_about(cfg, monkeypatch):
+    a, _ = two_blinds(cfg, monkeypatch)
+    b = {**blinds.one(cfg, a["id"]), "status": "waiting", "revealed": "Pat Example"}
+    assert not blinds.alertable(cfg, b)
+
+
+def test_reveals_json_is_json(cfg, monkeypatch, capsys):
+    a, _ = two_blinds(cfg, monkeypatch)
+    db = blinds.connect(cfg)  # a reveal stored but not matched yet: the command matches it
+    blinds.store(db, blinds.source_list(cfg)[0], blinds.entries(atom(
+        ("Blind Items Revealed #1", TODAY, reveal_html(a["day"], BLIND_A, "Pat Example")))))
+    db.commit()
+    db.close()
+    capsys.readouterr()
+    args = cli.build_parser().parse_args(["blinds", "reveals", "--json"])
+    args.fn(cfg, args)
+    out = capsys.readouterr()
+    assert json.loads(out.out)["matched"] == 1 and "matched" in out.err

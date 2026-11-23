@@ -147,6 +147,10 @@ dated reveal whose blind was stored matched, and no blind was matched twice.
   id and the day it was posted, and logs it in the blind's history. `show` prints it, labelled
   as the source's word. `list` only marks a revealed blind `[revealed]`, so browsing never
   spoils one you haven't guessed.
+- **A corrected reveal** (the source edits the post) is matched again. The answer it gave before
+  stays in the blind's history. A reveal longer than the stored text limit (6,000 characters) isn't
+  matched, since its answer line may be cut off.
+- **Discord** never asks about a blind that is already revealed: a guess then wouldn't count.
 - **Unmatched reveals** are tried again on every check. Most are for blinds older than the store:
   `check --backfill DAYS` brings those blinds in, and the next check links them.
 - **Your guess is scored** against the names in the answer line (split on `/`, notes in brackets
@@ -254,7 +258,8 @@ or weekly issue can pick one up.
 `blinds/blinds.sqlite`, a snapshot taken with SQLite's backup API and checked with
 `integrity_check`. A store that fails the check still goes in, as `blinds.damaged.sqlite`, and
 the backup's output says so: a damaged copy beats none for a repair, and the rest of the backup
-isn't held up. A store still locked by a long write after 30 s is left out of that one backup,
+isn't held up. That backup drops no older zip (`[backup] keep` waits), so the last good copy
+survives. A store still locked by a long write after 30 s is left out of that one backup,
 with a line saying so, rather than copied half-written. `--dry-run` lists it without the snapshot. An older zip may hold a good copy. The zip is private, like the rest of the taste
 layer: it is copied off the NAS by hand, never published.
 

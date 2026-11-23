@@ -425,7 +425,7 @@ def cmd_blinds(cfg: dict, args: argparse.Namespace) -> None:
             print(f"{s['name']} ({s['kind']}): {s['items'] or 0} stored, fetched {s['fetched_at'] or 'never'}"
                   + (f", {s['error']}" if s["error"] else ""))
     elif a == "reveals":
-        sc = blinds.scorecard(cfg)
+        sc = blinds.scorecard(cfg, say=lambda m: print(m, file=sys.stderr) if args.json else print(m))
         if args.json:
             print_json(sc)
             return

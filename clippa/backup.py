@@ -178,12 +178,15 @@ def _run(cfg: dict, to: str | Path | None, with_secrets: bool | None, dry_run: b
         # one backup at a time per folder (serve's and one by hand): a .part left behind is
         # then a killed run's, and the newest-keep count sees every finished zip
         with jsonstate.locked(dest / "backup", wait_s=5):
-            return _write(cfg, dest, target, files, secrets) + notes
+            damaged = any(name == "blinds/blinds.damaged.sqlite" for name, _ in files)
+            # a damaged store: drop no older zip, one of them may hold the last good copy
+            return _write(cfg, dest, target, files, secrets, rotate=not damaged) + notes
     except TimeoutError:
         raise ClipperError(f"another backup is writing to {dest} now; try again when it is done") from None
 
 
-def _write(cfg: dict, dest: Path, target: Path, files: list[tuple[str, Path]], secrets: bool) -> list[str]:
+def _write(cfg: dict, dest: Path, target: Path, files: list[tuple[str, Path]], secrets: bool,
+           rotate: bool = True) -> list[str]:
     for left in dest.glob(f"{PREFIX}*.zip.part"):   # a run killed mid-write
         left.unlink(missing_ok=True)
     tmp = target.with_suffix(".zip.part")
@@ -194,7 +197,9 @@ def _write(cfg: dict, dest: Path, target: Path, files: list[tuple[str, Path]], s
     lines = [f"wrote {target} ({len(files)} files, {_mb(target.stat().st_size)}"
              + (", secrets included" if secrets else ", no secrets") + ")"]
     keep = cfg["backup"]["keep"]
-    old = sorted(dest.glob(f"{PREFIX}*.zip"))[:-keep] if keep > 0 else []
+    old = sorted(dest.glob(f"{PREFIX}*.zip"))[:-keep] if keep > 0 and rotate else []
+    if not rotate:
+        lines.append("kept every older backup: the blinds store is damaged, an older zip may hold a good copy")
     for p in old:
         p.unlink()
     if old:
