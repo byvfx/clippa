@@ -370,6 +370,7 @@ class Bot(discord.Client):
                 msg = await channel.send(blinds.alert_text(b), view=blind_view(b["id"]), allowed_mentions=quiet)
                 await asyncio.to_thread(blinds.mark_alerted, cfg, b["id"], f"{channel.id}/{msg.id}")
             log.info(f"blinds: {len(own)} alert(s)")
+        await self.post_reveals()
         day = await asyncio.to_thread(blinds.digest_due, cfg)  # after: a bad digest_at stops only the digest
         if not day:
             return
@@ -387,6 +388,36 @@ class Bot(discord.Client):
             await where.send(blinds.alert_text(b, n), view=blind_view(b["id"]), allowed_mentions=quiet)
             await asyncio.to_thread(blinds.mark_digested, cfg, b["id"], day, str(where.id))
         log.info(f"blinds: digest {day}, {len(todo)} blind(s)")
+
+    async def post_reveals(self) -> None:
+        """A blind you answered was revealed: who the source says, and how your guess did, as a
+        reply to its alert, in its digest's thread, or (asked in the war room) in the channel."""
+        cfg, quiet = self.cfg, discord.AllowedMentions.none()
+        todo = await asyncio.to_thread(blinds.reveal_follow_ups, cfg)
+        if not todo:
+            return
+        channel = await self.blinds_channel()
+        for b in todo:
+            text, where = blinds.reveal_text(b), b["where"]
+            try:
+                if "reply" in where:
+                    cid, mid = (int(x) for x in where["reply"].split("/"))
+                    at = self.get_channel(cid) or await self.fetch_channel(cid)
+                    await at.get_partial_message(mid).reply(text, allowed_mentions=quiet, mention_author=False)
+                elif "thread" in where:
+                    tid = int(where["thread"])
+                    await (self.get_channel(tid) or await self.fetch_channel(tid)).send(text, allowed_mentions=quiet)
+                else:
+                    await channel.send(text, allowed_mentions=quiet)
+            except discord.HTTPException as e:  # its alert or thread is gone: the channel has it
+                log.warning(f"blinds: reveal of {b['id']} not where it was asked ({e.text or e.status}); in the channel")
+                try:
+                    await channel.send(text, allowed_mentions=quiet)
+                except discord.HTTPException as e2:  # tried again next pass; the digest still goes
+                    log.warning(f"blinds: reveal of {b['id']} not posted ({e2.text or e2.status})")
+                    continue
+            await asyncio.to_thread(blinds.mark_told, cfg, b["id"])
+        log.info(f"blinds: {len(todo)} reveal follow-up(s)")
 
     async def blind_answer(self, interaction: discord.Interaction, bid: str, name: str = "", why: str = "",
                            none: bool = False, not_ours: bool = False) -> None:

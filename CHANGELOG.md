@@ -17,6 +17,8 @@ Developing#releases.
   A backup whose blinds store is damaged or was busy keeps every older zip and says so.
 - 11-22: Blind items: each check matches reveal posts to the blinds they answer, in code, and scores your guess
   against the answer; `clippa blinds reveals` prints the scorecard.
+- 11-23: Blind items: when a blind you answered is revealed, Discord replies with who the source says it
+  is and how your guess did, and the war room's Blinds window shows it on the card, with the scorecard in its header.
 - 11-22: The war room's show chips say whether each show approves its clips by itself: **AUTO**
   when `[review] auto_approve` is on for it, *manual* when not; hover the chip for the kinds and score floors.
 - 11-22: The checkup no longer reports the bot's Discord reconnects after a short network drop as

@@ -7,8 +7,8 @@ install follows. It is research for you alone: nothing in it is ever published (
 It is built in steps. **In so far:** the sources, storage, the clue pass, pairing twins,
 answering from the command line, the war room's Blinds window, serve's regular check and the
 questions in [Discord](#discord), and [reveals](#reveals) matched to their blinds with your
-guesses scored (step 4, from the command line). Still to come: the investigation after your
-answer (step 3), and the reveal's follow-up in Discord and the war room.
+guesses scored (step 4), with the reveal told to you in Discord and the war room once you've
+answered. Still to come: the investigation after your answer (step 3).
 
 ## Sources
 
@@ -159,8 +159,14 @@ dated reveal whose blind was stored matched, and no blind was matched twice.
   the full name or an alias of its [People](People) record, is in one revealed name. One word fits
   only as a surname: "Example" and "Pat Example" fit "Pat Example", "Pat" doesn't. A guess whose
   only name came after the reveal is **late** and isn't counted. No idea isn't scored.
-- **The war room** tags a revealed blind `revealed` (never who), so you know a guess there
-  wouldn't count.
+- **The war room** tags a revealed blind `revealed`, and shows who only on a blind you answered
+  (a guess or No idea), with how your guess did. The window's header carries the scorecard: how
+  many blinds are revealed, and your right and wrong guesses with the hit rate. A reveal post itself
+  is in the All view, as the source wrote it.
+- **Discord follows up** once a blind you answered is revealed: who the source says it is, and
+  whether your guess was right, wrong or late. It replies to the blind's alert, or posts in its
+  digest's thread, or in the channel for one you answered in the war room. A blind you never
+  answered isn't followed up, so its answer stays out of Discord.
 - **Right means matches the reveal, not true.** Sources sometimes take each other's stories.
 
 `clippa blinds reveals` prints how many reveals matched, how many wait for older blinds, and

@@ -314,7 +314,9 @@ of phone use; #300 (access levels, a local Jev-like classifier in front of the m
   2026 (143 from 2025), 48 quote a blind the feed never had, 35 are 2012-13 "Revealed <date>" posts. **Deploy before 2027-01-02:**
   the deployed code still forgets non-answered blinds after 365 days. After the deploy, backfill further back (needs
   `CLIPPER_BLINDS_BACKFILL_PAGES`, ~16 pages a quarter). Clues for the backfill (~$0.70) are read by serve's checks, 100 a pass.
-  Not built: the Discord follow-up, the war room scorecard, `calibrate`, step 3 (user: eventually check all data it can grab, not
+  **Reveal follow-up (11-23, branch `blinds/reveal-followup`):** a blind you answered, once revealed, gets a Discord
+  reply (its alert, its digest's thread, or the channel) with who and right/wrong/late; the war room shows who only on a blind
+  you answered, with the grade, and the scorecard in the window's header. Not built: `calibrate`, step 3 (user: eventually check all data it can grab, not
   only the cast). Copy the newest taste zip off the NAS by hand. Flow: https://claude.ai/artifact/1m3obUigUkkA5ZVdmmiLWn
 - **News watcher #110:** off since 2026-11-03 at the user's word (`[news] check_minutes = 0`, no terms); `auto_watch = true` brings back
   the cast/figures/library list; `#news` exists in Discord.
