@@ -112,3 +112,12 @@ def test_estimate_counts_a_rebuilt_summary_with_the_baseline_prompts(defaults):
     cand = compare.estimate(*args, model, 1800)
     none = compare.estimate(*args)
     assert own > cand > none  # the baseline's (longer) summary prompt is what gets priced
+
+
+def test_a_long_stream_scored_flat_gets_a_note(defaults):
+    """#430: comparing a long stream scored before scaling says the baseline's Pass B was flat."""
+    from clippa import compare, config
+    long = config.for_length(defaults, 18.3)
+    assert "before picks scaled" in compare.length_notes(long, {})[0]
+    assert compare.length_notes(long, {"length": long["_length"]}) == []
+    assert compare.length_notes(defaults, {}) == []

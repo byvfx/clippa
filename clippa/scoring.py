@@ -553,7 +553,8 @@ def _finish(stream_dir: Path, cfg: dict, meta: dict, prompts: Prompts, claude: C
         old_b, pass_b.get("picks", []) + [p for p in old_b.get("picks", []) if p["id"] in hand_ids])
     out = {"stream_id": stream_dir.name, "title": meta.get("title"),
            "prompt_version": prompts.version, "cost_usd": round(claude.cost, 4),
-           "windows_sha": windows_sha, "pass_a": results, "pass_b": pass_b}
+           "windows_sha": windows_sha, "pass_a": results, "pass_b": pass_b,
+           "length": cfg.get("_length")}  # #430: set when max_picks was scaled for a long stream
     jsonstate.write(stream_dir / "candidates.json", out)
     ckpt.unlink(missing_ok=True)
 

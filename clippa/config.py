@@ -539,9 +539,10 @@ def for_length(cfg: dict, hours: float) -> dict:
     and Pass B picks ([scoring] max_picks) in proportion, as schedule.budget_for scales its
     release budget; a shorter one keeps the configured numbers. [scoring] scale_with_length =
     false keeps them flat. A scaled config carries `_length` (hours, scale) for Pass B's note."""
-    scale = hours / cfg["schedule"]["budget_hours"]
-    if not cfg["scoring"]["scale_with_length"] or scale <= 1:
-        return cfg
+    budget = cfg["schedule"]["budget_hours"]
+    if not cfg["scoring"]["scale_with_length"] or budget <= 0 or hours / budget <= 1:
+        return cfg  # budget_hours <= 0 is a doctor warning (config.problems), not a crash here
+    scale = hours / budget
     return {**cfg, "_length": {"hours": round(hours, 2), "scale": round(scale, 2)},
             "signals": {**cfg["signals"], "top_n": scaled(cfg["signals"]["top_n"], scale)},
             "scoring": {**cfg["scoring"], "max_picks": scaled(cfg["scoring"]["max_picks"], scale)}}

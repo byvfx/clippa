@@ -352,6 +352,9 @@ def test_for_length_scales_top_n_and_max_picks_for_a_long_stream_only(defaults):
     assert (defaults["signals"]["top_n"], defaults["scoring"]["max_picks"]) == (30, 14)  # not changed in place
     assert config.for_length(defaults, 5.5) is defaults
     assert config.for_length(defaults, 8.0) is defaults
+    defaults["schedule"]["budget_hours"] = 0     # a doctor warning, not a crash in signals or score
+    assert config.for_length(defaults, 18.3) is defaults
+    defaults["schedule"]["budget_hours"] = 8.0
     defaults["scoring"]["scale_with_length"] = False
     assert config.for_length(defaults, 18.3) is defaults
 
