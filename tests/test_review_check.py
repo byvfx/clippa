@@ -232,6 +232,38 @@ def test_record_failure_flags_the_items_until_checked_again(tmp_path):
     assert review_check.load(tmp_path)["v01_t1"]["sig"] == ""
 
 
+def test_an_openrouter_limit_is_not_saved_as_a_bad_cover(defaults, tmp_path, monkeypatch):
+    """A key or credit limit stops the run. It is not a BAD cover, and the next item is not called."""
+    from clippa.errors import OpenRouterLimit
+
+    sd = fake_stream(defaults, tmp_path)
+    defaults["review"]["check_model"] = "openrouter:openai/gpt-5-mini"
+    calls = []
+
+    def vision(cfg, it, e, jpg, claude):
+        calls.append(it["key"])
+        raise OpenRouterLimit(
+            "OpenRouter limit openrouter_key_limit (HTTP 402), not retried: spent",
+            "openrouter_key_limit")
+
+    monkeypatch.setattr(review_check, "vision_check", vision)
+
+    def item(key):
+        f = sd / "segments" / f"{key}.mp4"
+        f.write_bytes(b"")
+        f.with_suffix(".jpg").write_bytes(b"")
+        return {"kind": "segment", "key": key, "file": f, "title": "A title", "description": "About it.",
+                "text": "A title\n\nAbout it.", "fields": {}, "meta": {"id": "s01"},
+                "thumb_key": f"segments/{key}"}
+
+    jsonstate.write(sd / "thumbnails.json", {"segments/one": {"text": "HI"}, "segments/two": {"text": "HO"}})
+    with pytest.raises(OpenRouterLimit):
+        review_check.run(sd, defaults, todo=[item("one"), item("two")], say=lambda *_: None)
+    assert calls == ["one"]
+    assert review_check.load(sd) == {}
+    assert not review_check.path(sd).exists()
+
+
 def test_run_save_false_writes_nothing_and_a_broken_check_is_a_finding(defaults, tmp_path, monkeypatch):
     sd = fake_stream(defaults, tmp_path)
     defaults["review"]["check_model"] = ""

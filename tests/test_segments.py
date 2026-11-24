@@ -124,3 +124,122 @@ def test_a_71_minute_model_segment_is_flagged_not_dropped(defaults, tmp_path, mo
     out = capsys.readouterr().out
     assert "RESPLIT s01 is 71 min, over [segments] split_over_s (50 min): flagged for a re-split" in out
     assert "re-split" in out
+
+
+def _tree(root) -> list[str]:
+    """Every file and directory under root, directories marked with a trailing slash."""
+    out = []
+    for p in sorted(root.rglob("*")):
+        rel = p.relative_to(root).as_posix()
+        out.append(rel + ("/" if p.is_dir() else ""))
+    return out
+
+
+def _chat(content: str) -> dict:
+    return {"id": "r1", "model": "openai/gpt-5-mini",
+            "choices": [{"message": {"content": content}, "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 10}}
+
+
+def _segment(start: float, end: float) -> dict:
+    return {"start_s": start, "end_s": end, "title": "A topic", "topic": "drama", "figures": [],
+            "kind": "commentary", "source_share": "none", "standalone": True,
+            "summary": "what happened", "description": "the whole thing"}
+
+
+class _Reply:
+    """A fake requests response: JSON body, status, no headers."""
+
+    def __init__(self, data: dict, status: int = 200):
+        self.status_code, self.ok, self._data, self.headers = status, status < 400, data, {}
+        self.text = str(data)
+
+    def json(self) -> dict:
+        return self._data
+
+
+def _key_limit() -> _Reply:
+    return _Reply({"error": {"code": 402, "message": "key limit reached", "metadata": {
+        "limit_source": "openrouter_key_limit"}}}, status=402)
+
+
+def _run_until_key_limit(sdir, defaults, monkeypatch, replies: list):
+    """segments.run against a fake OpenRouter. `replies` are consumed in order."""
+    import requests
+
+    from clippa import costs
+
+    sent = []
+    monkeypatch.setenv("OPENROUTER_API_KEY", "k")
+    monkeypatch.setattr(costs, "llm_call", lambda *a, **k: None)
+
+    def no_sleep(seconds):
+        raise AssertionError(f"slept {seconds}")
+
+    monkeypatch.setattr("clippa.llm.time.sleep", no_sleep)
+    defaults["segments"]["model"] = "openrouter:openai/gpt-5-mini"
+    defaults["paths"]["costs"] = None
+
+    def post(url, **kwargs):
+        sent.append(kwargs["json"])
+        return replies.pop(0)
+
+    monkeypatch.setattr(requests, "post", post)
+    return sent
+
+
+def test_a_key_limit_partway_through_segments_leaves_no_partial_output(defaults, tmp_path, monkeypatch):
+    """Preflight and the split both succeed, then the compilation call hits a key limit.
+
+    segments.json is written once, after that call, so the split that already came back is
+    not on disk: no segments.json, no checkpoint, no cut, no temp file. The only file left
+    is the transcript the stage read."""
+    from clippa.errors import OpenRouterLimit
+
+    sdir = tmp_path / "kick-1"
+    sdir.mkdir()
+    words = "\n".join(json.dumps({"word": "w", "start": a, "end": b, "seg": i}) for i, (a, b) in enumerate(
+        ((0.0, 1.0), (599.0, 600.0), (600.0, 601.0), (1199.0, 1200.0)))) + "\n"
+    (sdir / "words.jsonl").write_text(words, encoding="utf-8")
+    split = json.dumps({"segments": [_segment(0, 600), _segment(600, 1200)]})
+    replies = [_Reply(_chat("OK")), _Reply(_chat(split)), _key_limit()]
+    sent = _run_until_key_limit(sdir, defaults, monkeypatch, replies)
+    before = _tree(sdir)
+    with pytest.raises(OpenRouterLimit, match=r"openrouter_key_limit") as raised:
+        segments.run(sdir, defaults, force=True)
+    assert raised.value.limit_source == "openrouter_key_limit"
+    assert "not retried" in str(raised.value)
+    # preflight, the split, then one compilation call. The limit is that third call, not a retry.
+    assert len(sent) == 3
+    assert sent[0]["messages"][-1]["content"] == "Say OK."
+    assert sent[2]["messages"][-1]["content"].startswith("Subject: drama")
+    assert _tree(sdir) == before == ["words.jsonl"]
+    assert (sdir / "words.jsonl").read_text(encoding="utf-8") == words
+    assert not (sdir / "segments.json").exists()
+    assert list(sdir.rglob("*.tmp")) == []
+    assert list(sdir.rglob("*checkpoint*")) == []
+
+
+def test_a_key_limit_on_a_resplit_keeps_the_previous_segments_json(defaults, tmp_path, monkeypatch):
+    """A forced re-split that dies before the write leaves the previous segments.json byte for
+    byte, and leaves no temp file beside it."""
+    from clippa.errors import OpenRouterLimit
+
+    sdir = tmp_path / "kick-1"
+    sdir.mkdir()
+    (sdir / "words.jsonl").write_text(
+        "\n".join(json.dumps({"word": "w", "start": a, "end": b, "seg": i}) for i, (a, b) in enumerate(
+            ((0.0, 1.0), (599.0, 600.0), (600.0, 601.0), (1199.0, 1200.0)))) + "\n",
+        encoding="utf-8")
+    prior = {"sentinel": "keep-me", "segments": [{"id": "s01"}], "compilations": []}
+    jsonstate.write(sdir / "segments.json", prior)
+    raw = (sdir / "segments.json").read_bytes()
+    split = json.dumps({"segments": [_segment(0, 600), _segment(600, 1200)]})
+    replies = [_Reply(_chat("OK")), _Reply(_chat(split)), _key_limit()]
+    _run_until_key_limit(sdir, defaults, monkeypatch, replies)
+    with pytest.raises(OpenRouterLimit):
+        segments.run(sdir, defaults, force=True)
+    assert (sdir / "segments.json").read_bytes() == raw
+    assert jsonstate.load(sdir / "segments.json") == prior
+    assert list(sdir.rglob("*.tmp")) == []
+    assert _tree(sdir) == ["segments.json", "words.jsonl"]

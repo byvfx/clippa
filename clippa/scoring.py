@@ -20,7 +20,7 @@ import numpy as np
 
 from . import jsonstate
 from .config import for_stream
-from .errors import ClipperError
+from .errors import ClipperError, OpenRouterLimit
 from .llm import Claude, estimate_lines, preflight, tokens
 from .prompts import Prompts
 from .states import carry_numbers, number_history, numbered_picks
@@ -177,13 +177,19 @@ def stream_summary(stream_dir: Path, words: list[dict], n: int, cfg: dict,
         return jsonstate.load(path)
     sc = cfg["scoring"]
     system = prompts.get("summary")
+    halt: list[OpenRouterLimit] = []
 
     def one(a: int) -> dict:
+        if halt:  # a spending limit already stopped a block: don't call again
+            raise halt[0]
         lines = transcript_lines(words, a, a + SUMMARY_BLOCK_S)
         if not lines:
             return {"start_s": a, "summary": "(no speech)"}
         try:
             text, _ = claude.text_call(sc["model_a"], system, "\n".join(lines), sc["effort_a"])
+        except OpenRouterLimit as e:
+            halt.append(e)
+            raise
         except ClipperError:  # no key, or the API down after retries: stop the stage
             raise
         except Exception as e:  # noqa: BLE001  # one bad block shouldn't sink the run
@@ -211,14 +217,20 @@ def transcript_scan(stream_dir: Path, words: list[dict], n: int, cfg: dict,
     cached = cached_scan(path, sha)
     if cached is not None:
         return cached
+    halt: list[OpenRouterLimit] = []
 
     def one(a: int) -> list[dict]:
+        if halt:
+            raise halt[0]
         lines = transcript_lines(words, a, a + SUMMARY_BLOCK_S)
         if not lines:
             return []
         try:
             out, _ = claude.json_call(sc["model_a"], system, "\n".join(lines), SCAN_SCHEMA,
                                       sc["effort_a"])
+        except OpenRouterLimit as e:
+            halt.append(e)
+            raise
         except ClipperError:  # no key, or the API down after retries: stop the stage
             raise
         except Exception as e:  # noqa: BLE001  # one bad block shouldn't sink the scan
@@ -291,8 +303,11 @@ def run_pass_a(windows: list[dict], words: list[dict], sig: dict, cfg: dict,
     sc = cfg["scoring"]
     system = prompts.get("score_a")
     schema = pass_a_schema(prompts.version)
+    halt: list[OpenRouterLimit] = []
 
     def one(w: dict) -> dict:
+        if halt:
+            raise halt[0]
         rec = {"id": w.get("id") or f"w{w['rank']:02d}", "source": w.get("source", "chat"),
                "window_rank": w["rank"], "window": [w["start_s"], w["end_s"]],
                "heat": w["heat"], "pass": "A", "model": sc["model_a"],
@@ -300,6 +315,9 @@ def run_pass_a(windows: list[dict], words: list[dict], sig: dict, cfg: dict,
         user = pass_a_user(w, words, sig, sc["lead_in_s"])
         try:
             out, meta = claude.json_call(sc["model_a"], system, user, schema, sc["effort_a"])
+        except OpenRouterLimit as e:
+            halt.append(e)
+            raise
         except ClipperError:  # no key, or the API down after retries: stop the stage
             raise
         except Exception as e:  # noqa: BLE001  # one bad window shouldn't sink the stream

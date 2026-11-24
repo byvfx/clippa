@@ -39,7 +39,11 @@ publish` run on the picks alone, before the slow stages do the segments and comp
   named, `[music]`), and the weekly credits a quote to whoever said it.
 - **score**: Claude reads the transcript and heat curve and proposes moments and picks. A
   rerun pays every window again, so it refuses without `--force`.
-- **segments**: Claude splits the stream into topic segments and compilations. A segment
+- **segments**: Claude splits the stream into topic segments and compilations. The result is
+  written to `segments.json` only when the stage finishes (after the split, the filters, any
+  compilation calls and the optional score). A stop partway through, including an [OpenRouter spending limit](Model-providers#when-openrouter-stops-a-call),
+  leaves no `segments.json` on a first run and does not rewrite one already there; there is
+  no checkpoint, no cut and no temp file from that stop. Cuts are the next stage. A segment
   longer than `[segments] split_over_s` (0 or negative, off; a non-number is an error) is flagged
   for a re-split (`resplit` on the segment, skip reason `re-split`, a `RESPLIT` line in the stage
   log) instead of being dropped for length. With `[segments] score = true` (off by default) one

@@ -19,6 +19,11 @@ Developing#releases.
   with only the inference key the panel is read-only. A 402 with Retry-After waits and retries;
   a spent key limit stops the call. Wiki: War room (Modal, costs and analytics), Costs
   (The OpenRouter budget).
+- 11-23: an OpenRouter key limit or an empty balance stops the stage at once
+  (`openrouter_key_limit` on HTTP 402 or 403, `openrouter_credits` on 402) instead of being
+  sent again; an in-flight budget (`openrouter_in_flight_budget`) waits for `Retry-After` and
+  tries again. A stop during `segments` writes no partial `segments.json` (Model providers,
+  Pipeline).
 - 11-23: `docs/openrouter-claude.toml` is an opt-in overlay that sends every Claude stage
   model through OpenRouter at the same tier and effort. Paste it into `clipper.toml`; it
   needs `OPENROUTER_API_KEY`. The defaults stay on Claude. A `--dry-run` prices an

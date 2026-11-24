@@ -35,6 +35,21 @@ class KeyRejected(ClipperError):
         super().__init__(message, status=KEY_REJECTED)
 
 
+class OpenRouterLimit(ClipperError):
+    """OpenRouter refused the call on a spending limit (`error.metadata.limit_source`).
+
+    `openrouter_key_limit` (HTTP 402 or 403) and `openrouter_credits` (HTTP 402) are final:
+    the client does not send the request again. `openrouter_in_flight_budget` is raised when
+    the response has no Retry-After, or after those waits are used up. `limit_source` is the
+    metadata value, so a log line can tell the cases apart. The stage stops (exit 1). This
+    is not a rejected key: the key is valid, and holding the stream until the key file
+    changes would not clear a credit or key limit."""
+
+    def __init__(self, message: str, limit_source: str):
+        super().__init__(message)
+        self.limit_source = limit_source
+
+
 def key_rejected(e: BaseException) -> bool:
     """A refused key: KeyRejected, or the Anthropic SDK's AuthenticationError from a call past
     the preflight. A handler that turns errors into findings or a retry passes these through,

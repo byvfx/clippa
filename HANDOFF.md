@@ -239,6 +239,10 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
 - `ANTHROPIC_ADMIN_KEY` for Claude's own usage count on Costs, if wanted.
 
 ## Open work
+- **OpenRouter spending limits (not deployed):** a key limit or empty credits stops the model
+  call at once (`OpenRouterLimit`); an in-flight budget waits for `Retry-After` and retries.
+  A segments run that stops this way does not write a partial `segments.json`. Not on the hub
+  until this merges and `deploy/hub/deploy.sh` runs. Production `clipper.toml` was not touched.
 - **OpenRouter Claude overlay (not applied):** `docs/openrouter-claude.toml` is every Claude
   stage model at the same tier and effort, as `openrouter:anthropic/claude-*.5`. No price
   rows: a `--dry-run` reads OpenRouter's public list once per process. Paste into

@@ -21,6 +21,7 @@ module knows, and it is not the OpenRouter cap.
 """
 from __future__ import annotations
 
+import math
 import os
 import re
 import time
@@ -28,7 +29,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from .errors import ClipperError
+from .errors import ClipperError, OpenRouterLimit
 from .timefmt import now_iso
 
 BASE = "https://openrouter.ai/api/v1"
@@ -98,8 +99,13 @@ _TITLE = {"stopped": "Stopped", "retried": "Retried", "changed": "Changed",
 _CACHE: dict[str, dict] = {}
 
 
-class OpenRouterKeyLimit(ClipperError):
-    """OpenRouter refused a model call because the clippa key's spending limit is spent."""
+class OpenRouterKeyLimit(OpenRouterLimit):
+    """OpenRouter refused a model call because the clippa key's spending limit is spent.
+
+    An OpenRouterLimit, so a stage that stops on any spending limit stops on this too."""
+
+    def __init__(self, message: str, limit_source: str = "openrouter_key_limit"):
+        super().__init__(message, limit_source)
 
 
 def classify_payment(status: int, body: str, retry_after: str | None) -> str | None:
@@ -130,7 +136,7 @@ def retry_seconds(header: str | None) -> float | None:
         n = float(str(header).strip())
     except ValueError:
         return None
-    if n < 0 or n > 120:
+    if not math.isfinite(n) or n < 0 or n > 120:
         return None
     return n
 

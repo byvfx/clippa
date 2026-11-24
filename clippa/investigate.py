@@ -69,7 +69,7 @@ from pathlib import Path
 
 from . import jsonstate
 from .archive import load_catalog, subject_dir
-from .errors import ClipperError
+from .errors import ClipperError, OpenRouterLimit
 from .llm import Budget, OverBudget, estimate  # [investigate] budget_usd
 from .receipts import tokens
 
@@ -391,6 +391,9 @@ def run_facts(cfg: dict, subject: str, since: str | None = None, before: str | N
                     print(f"stopping: {e}", flush=True)
                 stop.set()
                 continue
+            except OpenRouterLimit:
+                stop.set()  # items not started yet don't call
+                raise
             except Exception as e:  # noqa: BLE001  # one bad item doesn't end the run
                 failed += 1
                 print(f"  {it['id']} failed: {e}", flush=True)

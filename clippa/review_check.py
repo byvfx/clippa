@@ -46,7 +46,7 @@ from pathlib import Path
 from . import jsonstate
 from .checkup import BAD, WARN, finding, lint_text
 from .config import for_stream
-from .errors import ClipperError, key_rejected
+from .errors import ClipperError, OpenRouterLimit, key_rejected
 
 CHECKS_FILE = "checks.json"
 VERSION = 1            # bump when a check changes: every item is checked again
@@ -781,8 +781,8 @@ def check_item(sdir: Path, cfg: dict, it: dict, ctx: dict, claude) -> tuple[list
             else:
                 got = subject_findings(sdir, cfg, it, ctx)
         except Exception as e:  # one broken check mustn't pass the item
-            if key_rejected(e):
-                raise  # not the item's fault: exit KEY_REJECTED, so the stream is held (#281)
+            if key_rejected(e) or isinstance(e, OpenRouterLimit):
+                raise  # a bad key is held; a spending limit stops the run
             if missing_opencv(e):
                 require_opencv()  # the same ClipperError, still not a finding
                 raise

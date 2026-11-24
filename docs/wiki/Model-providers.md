@@ -25,6 +25,16 @@ any provider a stage uses. `ANTHROPIC_API_KEY` is required while some stage is o
 > version for it. Claude's server-side refusal fallback has no equivalent elsewhere, and the
 > content is crude, so expect more refusals (a refused call is skipped the same way).
 
+## When OpenRouter stops a call
+
+A call to an `openrouter:` model reads `error.metadata.limit_source` on a refusal:
+
+- `openrouter_key_limit`, on HTTP 402 or HTTP 403: the key's own credit limit is spent. The call is not sent again. The stage stops with `OpenRouter limit openrouter_key_limit` in the error.
+- `openrouter_credits`, on HTTP 402: the balance cannot cover the request, or this one request is larger than the whole in-flight budget. Not sent again. The stage stops with `OpenRouter limit openrouter_credits`.
+- `openrouter_in_flight_budget`, on HTTP 402: other calls still in flight (or just settling) fill the budget. This is temporary. The call waits for the `Retry-After` header, each wait capped at 60 seconds like the other retries, and tries again, up to six calls in all. If the header is missing, or those tries are used up, the stage stops with `OpenRouter limit openrouter_in_flight_budget`.
+
+Any of those is a normal stage failure (exit 1), not a rejected key, so the worker retries the run on its usual schedule (`[worker] retry_minutes`, up to `max_attempts`). Adding credits or raising the key limit is what clears it. A stop during `segments` does not leave a partial `segments.json`; see [Pipeline](Pipeline#stages).
+
 ## Claude through OpenRouter
 
 [`docs/openrouter-claude.toml`](https://github.com/byvfx/clippa/blob/main/docs/openrouter-claude.toml)
