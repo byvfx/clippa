@@ -185,6 +185,11 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
 - **OpenRouter budget panel (draft, not deployed, 11-24):** Money page, beside API usage. Reads the clippa key server-side. Changing the limit or disabling the key needs `OPENROUTER_MANAGEMENT_KEY` or `secrets/openrouter_management_secret.txt` (never in the page). Warning percent defaults to 75, saved in `streams/.serve/openrouter.json`. Do not touch production `clipper.toml` for this. Reaches serve only after `bash deploy/hub/deploy.sh` from a main checkout once it is merged.
 
 ## Waiting on the user
+- Draft: the NAS agent container (`deploy/agent`, OpenCode + OpenRouter) beside `clippa-claude`.
+  It comes up dark (`CHECKUP_AT` empty). Phone bridge is still Brandon's call: Option A keeps
+  `claude remote-control` on `clippa-claude`; Option B would be a loopback OpenCode server on
+  127.0.0.1:4096 with no password in the environment and no published port. Do not merge until
+  that call, and do not edit production `clipper.toml`. `deploy/claude` stays for the burn-in.
 - v0.4.0 is released (PR #395, tag 11-23 on 7f6f4ed, the user: "can we tag a v0.4.0 tonight?"; Release "Clippa 0.4.0";
   #259 and #258 step D moved to v0.5.0, the v0.4.0 milestone closed). serve and the bot report `0.4.0` (deployed 11-23
   07:35 UTC); the worker follows once Don's 11-23 run finishes (a background deploy from `C:\clippa-pr378`, detached at

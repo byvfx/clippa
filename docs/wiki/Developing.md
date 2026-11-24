@@ -7,7 +7,7 @@ this page is the short version.
 | --- | --- |
 | `clippa/` | the package, one module per stage, cli.py wires them |
 | `clippa/prompts/` | the prompt files, versioned, shipped inside the package; the version in use is set in clipper.toml |
-| `deploy/` | bootstrap (new machine); compose stacks for the NAS hub (serve, bot, worker), the recorder, Kitsu and Claude; Windows task scripts for a GPU worker |
+| `deploy/` | bootstrap (new machine); compose stacks for the NAS hub (serve, bot, worker), the recorder, Kitsu, Claude, and the agent container; Windows task scripts for a GPU worker |
 | `streams/<id>/` | one folder per stream: source, transcript, cuts, metadata, review state |
 | `clippa/defaults.toml` | every setting with its default, documented; config.py loads it (clipper.example.toml is a starter clipper.toml) |
 | `tests/` | offline tests (pytest); CI runs them and ruff on every push |

@@ -1,0 +1,45 @@
+# OpenCode on the NAS (deploy/agent): headless checkup and audit in its own clone of the
+# repo. Nothing is published. The phone bridge is not this container (see entrypoint.sh):
+# during burn-in the phone stays on clippa-claude. Its own compose project, so deploying it
+# never restarts the recorder, the hub, or clippa-claude.
+name: clippa-agent
+
+services:
+  agent:
+    build: ./src
+    image: clippa-agent:latest
+    container_name: clippa-agent
+    hostname: clippa-agent
+    restart: unless-stopped
+    init: true                  # clippa stages and OpenCode run as child processes
+    user: "${PUID:-1000}:${PGID:-10}"
+    group_add: ["${RENDER_GID:-105}"]   # /dev/dri/renderD128 for QSV, as in the hub
+    network_mode: host          # the war room on 127.0.0.1, as in the hub; no host port is published
+    env_file: .env              # no OPENROUTER_API_KEY, ANTHROPIC_API_KEY, or OPENCODE_PASSWORD
+    environment:
+      TZ: ${TZ:-America/Los_Angeles}
+      CLIPPA_CUT_BACKEND: local
+      CLIPPA_YOUTUBE_COOKIES_FROM_BROWSER: ""
+      CLIPPA_PATHS_OPENROUTER_KEY: /run/secrets/openrouter_key
+      OPENCODE_DISABLE_AUTOUPDATE: "1"
+    secrets:
+      - openrouter_key
+    devices:
+      - /dev/dri:/dev/dri
+    volumes:
+      - ${CLIPPA_DATA:-/volume1/docker/clipper}:/data
+      - ${CLIPPA_DATA:-/volume1/docker/clipper}/fonts:/usr/local/share/fonts/clippa:ro
+      # The clone (/app) and OpenCode's home persist across deploys. deploy.sh makes both
+      # folders as the ssh user, so they belong to PUID.
+      - ${AGENT_DIR:-/volume1/docker/clippa-agent}/repo:/app
+      - ${AGENT_DIR:-/volume1/docker/clippa-agent}/home:/home/agent
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+secrets:
+  openrouter_key:
+    file: ./openrouter_key

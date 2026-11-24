@@ -189,10 +189,14 @@ def is_llm(key: str, value: Any) -> bool:
 
 
 def configured(cfg: dict) -> dict[str, str]:
-    """Every chat model the config names, as {"section.key" (or "shows.<s>.section.key"): model}."""
+    """Every chat model a stage names, as {"section.key" (or "shows.<s>.section.key"): model}.
+
+    [agent] is the NAS agent container, not a stage: `clippa doctor --role agent` checks it,
+    and a machine that does not run that container is not asked for its key."""
     from .config import _sections
 
-    out = {f"{s}.{k}": v for s, sec in _sections(cfg) for k, v in sec.items() if is_llm(k, v)}
+    out = {f"{s}.{k}": v for s, sec in _sections(cfg) for k, v in sec.items()
+           if s != "agent" and is_llm(k, v)}
     for show, prof in cfg.get("shows", {}).items():
         for s, sec in prof.get("overrides", {}).items():
             out.update({f"shows.{show}.{s}.{k}": v for k, v in sec.items() if is_llm(k, v)})
@@ -203,6 +207,14 @@ def claude_model(cfg: dict) -> str:
     """A Claude model the config uses, by its API name (to check the Anthropic key against);
     "" when every stage is on another provider."""
     return next((split(m)[1] for m in configured(cfg).values() if split(m)[0] == "anthropic"), "")
+
+
+def uses_bare_claude(cfg: dict) -> bool:
+    """A stage calls Anthropic itself: a bare ``claude-`` name or ``anthropic:``.
+
+    An ``openrouter:`` model that names Claude does not. The Anthropic key and the Admin
+    API bill are optional when this is false."""
+    return any(m.startswith(("claude-", "anthropic:")) for m in configured(cfg).values())
 
 
 def check_schema(schema: dict, v: Any, path: str = "$") -> list[str]:

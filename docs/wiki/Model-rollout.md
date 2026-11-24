@@ -142,21 +142,23 @@ These still reach Anthropic after the paste:
 - The server-side refusal fallback (`json_call(..., fallback=True)`) runs on the Claude
   API only. On an `openrouter:` model the call still runs, and is logged as `provider`
   `openrouter`. The fallback does not run and writes no line of its own.
-- `clippa setup`'s key check (`setup.py`) calls `models.retrieve` while some stage still
-  names Claude (`claude_model(cfg)`), and the retrieve uses that model. Reaching the
-  function with no Claude model uses `claude-haiku-5-5`, but `clippa setup` only asks
-  for `ANTHROPIC_API_KEY` while a stage still names Claude, and makes no Anthropic call
-  once every stage is off it. `clippa doctor` without `--offline` skips the Anthropic
-  ping once `claude_model` is empty too. The probe writes no `llm` line.
-- `clippa keys --check` (and the war room's **Check**) GETs
-  `https://api.anthropic.com/v1/models?limit=1` with `ANTHROPIC_API_KEY` whenever that
-  key is set, including after every stage has moved. `--check` with no name also asks
-  the Admin API when `ANTHROPIC_ADMIN_KEY` is set
+- `clippa setup`'s key check (`setup.py`) calls `models.retrieve` only while some stage
+  still names Claude directly (a bare `claude-*` or `anthropic:`), and the retrieve uses
+  that model (`claude_model(cfg)`). Once every stage is on another provider, setup skips
+  the prompt and the probe and makes no Anthropic call. `clippa doctor` without
+  `--offline` skips the Anthropic ping once `claude_model` is empty too. The probe writes
+  no `llm` line.
+- `clippa keys --check` (and the war room's **Check**) does not ask Anthropic when no
+  stage uses a bare `claude-` or `anthropic:` model: those two rows are optional and
+  skipped, even if the key is set. While a stage still names Claude, `--check` GETs
+  `https://api.anthropic.com/v1/models?limit=1` when `ANTHROPIC_API_KEY` is set, and with
+  no name also asks the Admin API when `ANTHROPIC_ADMIN_KEY` is set
   (`GET /v1/organizations/users?limit=1`). `--check Anthropic` asks only the inference
   key. Both are free reads. Neither writes an `llm` line.
 - `clippa/usage.py` reads Claude's own bill from the Admin API (`ANTHROPIC_ADMIN_KEY`,
-  or the file at `[paths] anthropic_admin_key`). That read writes no `llm` line. The
-  normal `ANTHROPIC_API_KEY` cannot read the bill.
+  or the file at `[paths] anthropic_admin_key`). With no admin key it says not configured
+  and does not call Anthropic. That read writes no `llm` line. The normal
+  `ANTHROPIC_API_KEY` cannot read the bill.
 
 `ANTHROPIC_API_KEY` is optional once no stage names Claude. `clippa doctor` says so.
 Keep the key when a stage might go back to a bare `claude-*` name: that name uses it

@@ -1,6 +1,8 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "instructions": ["AGENTS.md"],
+  "model": "openrouter/anthropic/claude-sonnet-5.5",
+  "update": "disable",
   "permissions": [
     { "action": "shell", "resource": "*", "effect": "ask" },
 
@@ -17,25 +19,68 @@
 
     { "action": "shell", "resource": "uvx ruff@0.17.3 *", "effect": "allow" },
     { "action": "shell", "resource": "*python.exe -m pytest *", "effect": "allow" },
-    { "action": "shell", "resource": "clipper doctor *", "effect": "allow" },
-    { "action": "shell", "resource": "clipper services status*", "effect": "allow" },
+    { "action": "shell", "resource": "clippa doctor *", "effect": "allow" },
+    { "action": "shell", "resource": "clippa services status*", "effect": "allow" },
 
     { "action": "shell", "resource": "bash deploy/*", "effect": "deny" },
-    { "action": "shell", "resource": "clipper services restart*", "effect": "deny" },
-    { "action": "shell", "resource": "clipper services stop*", "effect": "deny" },
+    { "action": "shell", "resource": "clippa services restart*", "effect": "deny" },
+    { "action": "shell", "resource": "clippa services stop*", "effect": "deny" },
 
-    { "action": "shell", "resource": "clipper upload*", "effect": "ask" },
-    { "action": "shell", "resource": "clipper review publish*", "effect": "ask" },
-    { "action": "shell", "resource": "clipper score*", "effect": "ask" },
-    { "action": "shell", "resource": "clipper segments*", "effect": "ask" },
-    { "action": "shell", "resource": "clipper meta*", "effect": "ask" },
-    { "action": "shell", "resource": "clipper thumbs*", "effect": "ask" }
+    { "action": "shell", "resource": "clippa upload*", "effect": "ask" },
+    { "action": "shell", "resource": "clippa review publish*", "effect": "ask" },
+    { "action": "shell", "resource": "clippa score*", "effect": "ask" },
+    { "action": "shell", "resource": "clippa segments*", "effect": "ask" },
+    { "action": "shell", "resource": "clippa meta*", "effect": "ask" },
+    { "action": "shell", "resource": "clippa thumbs*", "effect": "ask" }
   ],
+  "mcp": { "servers": {} },
   "agents": {
+    "build": {
+      "description": "Implement a change on a branch",
+      "mode": "primary",
+      "model": "openrouter/anthropic/claude-sonnet-5.5"
+    },
+    "plan": {
+      "description": "Plan a change before editing",
+      "mode": "primary",
+      "model": "openrouter/anthropic/claude-opus-5.5"
+    },
+    "explore": {
+      "description": "Read the repo and answer",
+      "mode": "subagent",
+      "model": "openrouter/anthropic/claude-haiku-5.5"
+    },
+    "reviewer": {
+      "description": "Review a diff for correctness",
+      "mode": "subagent",
+      "model": "openrouter/anthropic/claude-sonnet-5.5#high"
+    },
     "oss-reviewer": {
       "description": "DeepSeek code reviewer (free tier)",
       "model": "openrouter/deepseek/deepseek-v4.1-flash-1017",
       "permissions": []
+    },
+    "checkup": {
+      "description": "Local fallback for headless checkup. Default deny; agent-run replaces this.",
+      "mode": "primary",
+      "model": "openrouter/anthropic/claude-sonnet-5.5",
+      "steps": 40,
+      "permissions": [
+        { "action": "*", "resource": "*", "effect": "deny" }
+      ]
+    },
+    "audit": {
+      "description": "Local fallback for headless audit. Default deny, including writes.",
+      "mode": "primary",
+      "model": "openrouter/anthropic/claude-sonnet-5.5#high",
+      "steps": 80,
+      "permissions": [
+        { "action": "*", "resource": "*", "effect": "deny" },
+        { "action": "edit", "resource": "*", "effect": "deny" },
+        { "action": "write", "resource": "*", "effect": "deny" },
+        { "action": "patch", "resource": "*", "effect": "deny" },
+        { "action": "multiedit", "resource": "*", "effect": "deny" }
+      ]
     }
   }
 }

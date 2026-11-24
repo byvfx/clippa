@@ -23,6 +23,7 @@ TITLES: dict[str, str] = {
     "Character-pieces": "Character pieces",
     "Checkup": "Checkup",
     "Claude-on-the-NAS": "Claude on the NAS",
+    "Agent-on-the-NAS": "Agent on the NAS",
     "Clip-art": "Clip art",
     "Clippa-messenger": "Clippa messenger",
     "Configuration": "Configuration",
