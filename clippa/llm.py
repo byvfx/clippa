@@ -26,7 +26,9 @@ What differs per provider:
 - images: Claude content blocks ({"type": "image", "source": {"type": "base64", ...}}) are
   converted to image_url data URLs.
 Prices are [llm] prices ($ per 1M input/output tokens, by model string), for cost lines only;
-OpenRouter reports what each call cost, and that wins over the table.
+OpenRouter reports what each call cost, and that wins over the table. When a call omits that
+cost, and for a dry-run, an openrouter: model uses OpenRouter's published list (one fetch per
+process, including a failed fetch).
 """
 from __future__ import annotations
 
@@ -84,7 +86,8 @@ _OPENROUTER_MAX_OUT: dict[str, int] = {}
 
 def openrouter_prices() -> dict[str, tuple[float, float]]:
     """OpenRouter's published $ per 1M input/output tokens by model id (its /models list is
-    public), fetched once per process; {} when it can't be reached."""
+    public). Fetched once per process. A failed fetch is cached as {} so a dry-run of many
+    rows waits out the timeout at most once; a later row does not try again."""
     global _OPENROUTER_PRICES
     if _OPENROUTER_PRICES is None:
         import requests
@@ -99,7 +102,7 @@ def openrouter_prices() -> dict[str, tuple[float, float]]:
             _OPENROUTER_MAX_OUT.update({m["id"]: int(m["top_provider"]["max_completion_tokens"])
                                         for m in data if (m.get("top_provider") or {}).get("max_completion_tokens")})
         except (requests.RequestException, ValueError, KeyError, TypeError):
-            return {}  # not cached: the next estimate tries again
+            _OPENROUTER_PRICES = {}
     return _OPENROUTER_PRICES
 
 
@@ -287,11 +290,11 @@ class LLM:
     def _account(self, model: str, tokens_in: int, tokens_out: int,
                  usd: float | None = None) -> dict:
         """Add a call to the cost and the ledger. usd: what the provider says it cost
-        (OpenRouter), else the [llm] prices table's figure."""
+        (OpenRouter), else known_price: the [llm] prices table, then OpenRouter's list."""
         from . import costs
 
         if usd is None:
-            pin, pout = price_of(self.prices, model) or (0.0, 0.0)
+            pin, pout = known_price({"llm": {"prices": self.prices}}, model) or (0.0, 0.0)
             usd = (tokens_in * pin + tokens_out * pout) / 1e6
         with self._lock:
             self.cost += usd
@@ -562,9 +565,13 @@ class LLM:
                     r.status_code == 400 and prov == "gemini" and "api key not valid" in r.text.lower())):
                 raise KeyRejected(f"{model}: {env} (or [paths] {prov}_key) was rejected "
                                   f"(HTTP {r.status_code}): {r.text[:200]}")
+            if prov == "openrouter" and self._openrouter_payment(r, model, attempt, timeout_s):
+                continue
             if not r.ok:
                 raise RuntimeError(f"{model}: HTTP {r.status_code}: {r.text[:300]}")
             break
+        if prov == "openrouter":
+            self._openrouter_clear()
         data = r.json()
         choice = data["choices"][0]
         usage = data.get("usage") or {}
@@ -579,6 +586,29 @@ class LLM:
         elif choice.get("finish_reason") == "length" and not length_ok:
             raise RuntimeError(f"{model} hit max_tokens ({meta['request_id']})")
         return data, meta
+
+    def _openrouter_payment(self, response, model: str, attempt: int, timeout_s: float | None) -> bool:
+        """A 402/403 from OpenRouter. True: wait and send it again. A spent key limit raises."""
+        from . import openrouter_budget as ob
+
+        header = response.headers.get("Retry-After") or response.headers.get("retry-after")
+        kind = ob.classify_payment(response.status_code, response.text, header)
+        if kind == "openrouter_in_flight_budget" and attempt < 5 and not timeout_s:
+            wait = ob.retry_seconds(header) or 0
+            ob.note_retry({"paths": self.paths}, seconds=wait, status=response.status_code)
+            time.sleep(wait)
+            return True
+        if kind == "openrouter_key_limit":
+            ob.note_stop({"paths": self.paths}, status=response.status_code, model=model)
+            raise ob.OpenRouterKeyLimit(
+                f"openrouter_key_limit: OpenRouter refused {model} (HTTP {response.status_code}). "
+                "The clippa key's limit is spent.")
+        return False
+
+    def _openrouter_clear(self) -> None:
+        from . import openrouter_budget as ob
+
+        ob.clear_retry({"paths": self.paths})
 
 
 # Every stage's model calls go through clippa/llm.py, which picks the provider from the
@@ -634,12 +664,13 @@ def tokens(text: str) -> int:
 
 def estimate_lines(cfg: dict, rows: list[tuple[str, str, int, int, int]]) -> list[str]:
     """`--dry-run` lines for a stage's model calls, (label, model, calls, tokens in, tokens out)
-    each, then the total. Priced from [llm] prices alone (an estimate never goes online, not
-    even for an openrouter: model); a model missing there counts $0 and the line says so."""
+    each, then the total. Priced with known_price: the [llm] prices table, then OpenRouter's
+    public /models list for an openrouter: name. That list is fetched once per process, and a
+    failed fetch is cached, so later rows do not wait on it again. A model still missing counts
+    $0 and the line says so; a failed fetch does not raise."""
     out, total = [], 0.0
-    table = prices(cfg)
     for label, model, calls, tin, tout in rows:
-        price = price_of(table, model)
+        price = known_price(cfg, model)
         pin, pout = price or (0.0, 0.0)
         usd = (tin * pin + tout * pout) / 1e6
         total += usd
@@ -647,5 +678,6 @@ def estimate_lines(cfg: dict, rows: list[tuple[str, str, int, int, int]]) -> lis
         plural = "s" if calls != 1 else ""
         out.append(f"  {label:<9} {calls:>4} call{plural:<1}  ~{tin / 1000:>6,.0f}k in  ~{tout / 1000:>4,.0f}k out"
                    f"  ~${usd:>5.2f}  {model}{note}")
-    out.append(f"  total ~${total:.2f}  (four characters a token, [llm] prices; nothing was called)")
+    out.append(f"  total ~${total:.2f}  (four characters a token, [llm] prices or OpenRouter's "
+               "list; nothing was called)")
     return out

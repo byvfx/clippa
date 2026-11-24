@@ -57,9 +57,16 @@ function tick() {
   // #201: the light says how old the numbers are, whatever the last poll did
   const age = STATE ? Math.max(0, (Date.now() - new Date(STATE.generated_at)) / 1000) : null, w = $("#wHealth");
   const was = age === null ? "" : age < 90 ? `${Math.round(age)} s ago` : ago(STATE.generated_at);
-  const { level, why } = healthLight(age);
+  let { level, why } = healthLight(age);
+  let word = DOWN ? (DOWN.signedOut ? "Signed out" : "Offline") : level === "ok" ? "OK" : age === null ? "…" : "Check";
+  // The clippa key's OpenRouter cap is spent: the light says so until the limit has room again.
+  if (!DOWN && typeof budgetHealth === "function") {
+    const stop = budgetHealth();
+    if (stop) { level = stop.level; word = stop.label; why = [stop.why, ...why]; }
+  }
   w.dataset.level = level;
-  w.querySelector("b").textContent = DOWN ? (DOWN.signedOut ? "Signed out" : "Offline") : level === "ok" ? "OK" : age === null ? "…" : "Check";
+  w.querySelector("b").textContent = word;
+  if (typeof paintSpend === "function") paintSpend();
   $("#updated").textContent = age === null ? "" : age < 90 ? `${Math.round(age)} s` : was.replace(" ago", "");
   const title = [DOWN ? (DOWN.signedOut ? "Signed out: open the war room's ?key= link again." : `serve isn't answering: ${DOWN.msg}\nTrying again every 15 s.`) : "",
     ...why, age === null ? "No data yet" : `Updated ${ago(STATE.generated_at)}`, "Opens the Pipeline page (Health)"].filter(Boolean).join("\n");

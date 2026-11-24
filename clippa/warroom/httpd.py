@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import ClassVar
 from urllib.parse import parse_qs, unquote, urlparse
 
+from .. import openrouter_budget
 from ..config import base
 from ..errors import ClipperError
 from .blinds import blinds_answer, blinds_check, blinds_get, blinds_paste
@@ -112,6 +113,7 @@ GET_API = {
     "/api/modal": lambda cfg, qs: modal_status(cfg),
     "/api/costs": lambda cfg, qs: costs_status(cfg),
     "/api/usage": lambda cfg, qs: usage_status(cfg),
+    "/api/openrouter": lambda cfg, qs: openrouter_budget.status(cfg, fresh=_q(qs, "fresh") in ("1", "true")),
     "/api/analytics": lambda cfg, qs: analytics_status(cfg, _q(qs, "month")),
     "/api/undo": lambda cfg, qs: {"actions": recent_actions(cfg)},
     "/api/log": lambda cfg, qs: log_tail(cfg, _q(qs, "which"), _q(qs, "lines"), _q(qs, "q"), _q(qs, "bad")),
@@ -158,6 +160,12 @@ POST_API = {
     "/api/chat/card": chat_card,
     "/api/chat/pick": chat_pick,
     "/api/keys/check": keys_check,
+    "/api/openrouter/refresh": lambda cfg, body: openrouter_budget.status(cfg, fresh=True),
+    "/api/openrouter/warn": lambda cfg, body: openrouter_budget.set_warn(cfg, body.get("pct")),
+    "/api/openrouter/limit": lambda cfg, body: openrouter_budget.apply_limit(
+        cfg, body.get("limit"), body.get("limit_reset"), confirm=bool(body.get("confirm"))),
+    "/api/openrouter/disabled": lambda cfg, body: openrouter_budget.apply_disabled(
+        cfg, body.get("disabled"), confirm=bool(body.get("confirm"))),
 }
 
 LOCAL_HOSTS = ("localhost", "127.0.0.1", "[::1]")

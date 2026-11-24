@@ -154,9 +154,9 @@ bill in `usage.py` still calls Anthropic (`ANTHROPIC_ADMIN_KEY`, or the file at
 Step 6 is the stage calls. The workspace header, the fallback, the setup probe and the
 Admin API bill do not appear there as `provider` `anthropic`.
 
-A `--dry-run` prices from `[llm.prices]` only, so an `openrouter:` name with no row there
-counts as $0. Pricing those names from OpenRouter's list depends on #400. The overlay
-adds no price rows.
+A `--dry-run` prices an `openrouter:` name from `[llm.prices]`, then from OpenRouter's
+public `/models` list (one fetch per process; a failed fetch counts as $0 and is not
+tried again). The overlay adds no price rows.
 
 Rollback is [Putting it back](#putting-it-back): between streams, put the dated copy
 back at the live path, then `clippa services restart all` and `clippa doctor`.
