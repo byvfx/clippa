@@ -1,5 +1,5 @@
-"""The transcribe stage (clippa/transcribe.py): the pure fix-ups on WhisperX's words. The
-GPU, Modal and ffmpeg paths are not run here."""
+"""The transcribe stage (clippa/transcribe.py): the pure fix-ups on WhisperX's words and the
+Modal upload's format. The GPU, Modal and ffmpeg themselves are not run here."""
 import sys
 
 import pytest
@@ -50,3 +50,37 @@ def test_a_modal_lookup_finds_the_old_app_until_the_new_one_is_deployed(monkeypa
     assert transcribe.modal_found(Ref, "clippa-whisperx", "WhisperX")[1] == "clippa-whisperx"
     with pytest.raises(NotFound):
         transcribe.modal_found(Ref, "my-app", "WhisperX")
+
+
+def test_a_flac_over_the_limit_goes_up_as_opus(tmp_path, defaults, monkeypatch):
+    """#422: an 18 h stream's 1.3 GB FLAC took the NAS out of memory in Modal's multipart
+    upload (1 GiB and up). Over [transcribe] modal_opus_over_mb the upload is opus instead."""
+    tc = {**defaults["transcribe"], "modal_gpu": "L4"}
+    assert tc["modal_audio"] == "flac" and tc["modal_opus_over_mb"] == 900
+    assert not transcribe.too_big_for_flac(tc, "flac", 900_000_000)
+    assert transcribe.too_big_for_flac(tc, "flac", 900_000_001)
+    assert not transcribe.too_big_for_flac(tc, "opus", 2_000_000_000)    # already opus
+    assert not transcribe.too_big_for_flac({**tc, "modal_opus_over_mb": 0}, "flac", 2_000_000_000)
+
+    wav = tmp_path / "audio.wav"
+    wav.write_bytes(b"\0" * 1044)
+    encoded, sent = [], []
+
+    def encode(w, fmt):  # 200 bytes of FLAC, 50 of opus
+        encoded.append(fmt)
+        return b"x" * {"flac": 200, "opus": 50}[fmt], transcribe.MODAL_CODECS[fmt][0]
+
+    class Worker:
+        class transcribe:  # stands in for the Modal method
+            @staticmethod
+            def remote(data, suffix, settings):
+                sent.append((suffix, len(data)))
+                return {"gpu": "L4", "timings": {}, "dur": 1.0}
+
+    monkeypatch.setattr(transcribe, "modal_encode", encode)
+    monkeypatch.setattr(transcribe, "modal_worker", lambda tc, gpu: Worker)
+    transcribe.transcribe_modal(wav, {**tc, "modal_opus_over_mb": 100e-6})   # a 100-byte limit
+    assert encoded == ["flac", "opus"] and sent == [(".ogg", 50)]
+    encoded.clear(), sent.clear()
+    transcribe.transcribe_modal(wav, {**tc, "modal_opus_over_mb": 200e-6})   # at the limit: lossless
+    assert encoded == ["flac"] and sent == [(".flac", 200)]

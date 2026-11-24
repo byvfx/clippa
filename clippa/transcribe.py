@@ -110,21 +110,45 @@ def transcribe_mlx(wav: Path, tc: dict) -> tuple[list[dict], float]:
     return segments, dur
 
 
+MODAL_CODECS = {"flac": (".flac", ["-c:a", "flac"]),
+                "opus": (".ogg", ["-c:a", "libopus", "-b:a", "48k"])}
+
+
+def modal_encode(wav: Path, fmt: str) -> tuple[bytes, str]:
+    """The wav encoded for the Modal upload ([transcribe] modal_audio): its bytes and suffix."""
+    suffix, codec = MODAL_CODECS[fmt]
+    enc = wav.with_name(f"audio.modal{suffix}")
+    subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(wav), *codec,
+                    str(enc)], check=True)
+    data = enc.read_bytes()
+    enc.unlink()
+    return data, suffix
+
+
+def too_big_for_flac(tc: dict, fmt: str, size: int) -> bool:
+    """A FLAC over [transcribe] modal_opus_over_mb goes up as opus instead (#422): from 1 GiB
+    Modal's client uploads in parts all at once, and an 18 h stream's 1.3 GB took the NAS
+    out of memory. 0 = never switch."""
+    limit = tc["modal_opus_over_mb"]
+    return fmt == "flac" and bool(limit) and size > limit * 1e6
+
+
 def transcribe_modal(wav: Path, tc: dict, runs: Path | None = None, method: str = "transcribe") -> tuple[dict, dict]:
     """WhisperX on Modal: the call's result (segments, dur, diarization) plus what it cost (also
     logged to `runs`, [paths] modal_runs, for `clippa modal` and the war room). method
     "diarize" gets the speaker turns alone."""
     from .modalmon import tracked
 
-    suffix, codec = {"flac": (".flac", ["-c:a", "flac"]),
-                     "opus": (".ogg", ["-c:a", "libopus", "-b:a", "48k"])}[tc["modal_audio"]]
-    enc = wav.with_name(f"audio.modal{suffix}")
+    fmt = tc["modal_audio"]
     t1 = time.time()
-    subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(wav), *codec,
-                    str(enc)], check=True)
-    data = enc.read_bytes()
-    enc.unlink()
-    print(f"encoded {len(data) / 1e6:.0f} MB {tc['modal_audio']} in {time.time() - t1:.0f}s", flush=True)
+    data, suffix = modal_encode(wav, fmt)
+    print(f"encoded {len(data) / 1e6:.0f} MB {fmt} in {time.time() - t1:.0f}s", flush=True)
+    if too_big_for_flac(tc, fmt, len(data)):
+        fmt = "opus"
+        t1 = time.time()
+        data, suffix = modal_encode(wav, fmt)
+        print(f"over [transcribe] modal_opus_over_mb ({tc['modal_opus_over_mb']}): "
+              f"encoded {len(data) / 1e6:.0f} MB opus instead in {time.time() - t1:.0f}s", flush=True)
 
     with tracked(runs, "stream" if method == "transcribe" else method, wav.parent.name, tc["modal_gpu"],
                  max(0, wav.stat().st_size - 44) / 32000) as rec:  # 16 kHz mono s16
