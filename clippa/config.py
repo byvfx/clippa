@@ -543,9 +543,12 @@ def for_length(cfg: dict, hours: float) -> dict:
     if not cfg["scoring"]["scale_with_length"] or budget <= 0 or hours / budget <= 1:
         return cfg  # budget_hours <= 0 is a doctor warning (config.problems), not a crash here
     scale = hours / budget
+    top_n, picks = scaled(cfg["signals"]["top_n"], scale), scaled(cfg["scoring"]["max_picks"], scale)
+    if (top_n, picks) == (cfg["signals"]["top_n"], cfg["scoring"]["max_picks"]):
+        return cfg  # just over budget_hours: nothing rounds up, so no note for Pass B either
     return {**cfg, "_length": {"hours": round(hours, 2), "scale": round(scale, 2)},
-            "signals": {**cfg["signals"], "top_n": scaled(cfg["signals"]["top_n"], scale)},
-            "scoring": {**cfg["scoring"], "max_picks": scaled(cfg["scoring"]["max_picks"], scale)}}
+            "signals": {**cfg["signals"], "top_n": top_n},
+            "scoring": {**cfg["scoring"], "max_picks": picks}}
 
 
 def stream_hours(sdir: Path) -> float:
