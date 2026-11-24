@@ -73,6 +73,7 @@ nav:
       - NAS recorder: nas-recorder.md
       - NAS hub: nas-hub.md
       - Claude on the NAS: claude-on-the-nas.md
+      - Agent on the NAS: agent-on-the-nas.md
       - Phone access: phone-access.md
   - Cuts and covers:
       - Fetching VODs: fetching-vods.md

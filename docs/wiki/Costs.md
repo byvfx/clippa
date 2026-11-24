@@ -24,7 +24,8 @@ minutes.
   individual accounts): set `ANTHROPIC_ADMIN_KEY`, or put it in
   `secrets/anthropic_admin_secret.txt` (`[paths] anthropic_admin_key`). The normal
   `ANTHROPIC_API_KEY` can't read it. Costs appear about 5 minutes after a call. Without the key
-  the panel shows Clippa's log for Claude and says what to set; `clippa doctor` warns.
+  the panel says Claude is not configured and still shows Clippa's log. `clippa doctor` warns
+  when a stage still calls Claude directly, and stays quiet when none does.
 - **OpenRouter**: the key Clippa uses (`OPENROUTER_API_KEY`, or the file at
   `[paths] openrouter_key`, `secrets/openrouter_secret.txt` by default): today, this week,
   this month, all time, what's left of the key's limit if it has one, and the account

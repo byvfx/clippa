@@ -174,6 +174,13 @@ def held(cfg: dict) -> list[dict]:
     return out
 
 
+def anthropic_unused(cfg: dict) -> bool:
+    """No stage calls Anthropic itself, so its keys are optional and not probed."""
+    from .llm import uses_bare_claude
+
+    return not uses_bare_claude(cfg)
+
+
 def status(cfg: dict, run_checks: bool | str = False, remember: bool = True) -> dict:
     """Every key's row; run_checks: True for all, a key's name for one. With remember, the
     answers go in keys.json (the war room's), and earlier ones fill the rows not checked now."""
@@ -182,7 +189,8 @@ def status(cfg: dict, run_checks: bool | str = False, remember: bool = True) -> 
     ks, host = specs(cfg), socket.gethostname()
     # The streams folder is shared (a war room on the laptop sees the NAS's): each host's own answers.
     last = jsonstate.read_or(store(cfg), {}).get(host, {}) if remember else {}
-    want = [k for k in ks if run_checks is True or run_checks == k.name]
+    skip = {"Anthropic", "Anthropic admin"} if anthropic_unused(cfg) else set()
+    want = [k for k in ks if k.name not in skip and (run_checks is True or run_checks == k.name)]
     if want:
         with ThreadPoolExecutor(max_workers=8) as ex:
             got = dict(zip([k.name for k in want], ex.map(lambda k: check(cfg, k), want), strict=True))
@@ -204,9 +212,12 @@ def status(cfg: dict, run_checks: bool | str = False, remember: bool = True) -> 
             answer = None  # about a key since replaced, removed or (a "not set") added: ask again
         if answer:
             answer = {x: answer[x] for x in ("ok", "note", "at") if x in answer}
+        optional = k.name in skip
+        if optional:
+            answer = {"ok": None, "note": "skipped: optional, no stage uses a bare claude- model"}
         rows.append({"name": k.name, "env": k.env, "set": bool(v), "source": where,
                      "what": k.what + (f" ({len(used)} setting{'s' * (len(used) > 1)})" if used else ""),
-                     "checkable": bool(k.check), "last": answer})
+                     "checkable": bool(k.check) and not optional, "optional": optional, "last": answer})
     return {"keys": rows, "held": held(cfg), "host": socket.gethostname()}
 
 

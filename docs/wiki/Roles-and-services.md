@@ -7,6 +7,7 @@ Clippa runs in four roles, plus an optional operator. A machine can do more than
 | **Bot** | `clippa bot`: Discord review cards, buttons, DMs ([Review](Review)) | always on (usually the serve machine), the NAS share |
 | **Recorder** | `clippa record watch` in Docker on the NAS | Docker; see [NAS recorder](NAS-recorder) |
 | **Claude** (optional) | Claude Code in its own clone of the repo, driven from the Claude app on the phone | Docker on the NAS; see [Claude on the NAS](Claude-on-the-NAS) |
+| **Agent** (optional, burn-in) | OpenCode in its own clone, headless checkup and audit. The clock starts off so it does not overlap Claude | Docker on the NAS; see [Agent on the NAS](Agent-on-the-NAS) |
 
 All roles share one streams folder (a NAS share). Only one machine runs serve and only one
 runs the bot. Here serve, the bot and the worker run as containers on the NAS since
@@ -43,7 +44,8 @@ cards get posted then).
 ## Logs and alerts
 
 Logs go to `logs\` (`serve.log`, `bot.log`, `worker.log`). The bot DMs you when something needs
-you ([Review](Review), "Alerts"). `clippa doctor --role gpu|serve|bot|nas|claude|control` checks a machine
+you ([Review](Review), "Alerts"). `clippa doctor --role gpu|serve|bot|nas|agent|claude|control` checks a machine
+(`agent` and `claude` are the same check)
 and prints a fix for each problem. `clippa status` is the one screen: what needs you first,
 then every service's heartbeat and the recorder's, the worker's recent streams, review counts,
 the next releases and this month's spend, read from the share with nothing started (about 15 s

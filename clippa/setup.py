@@ -627,7 +627,9 @@ def check_key(name: str, cfg: dict) -> tuple[bool, str]:
     import requests
     try:
         if name == "ANTHROPIC_API_KEY":
-            from .llm import Claude, claude_model
+            from .llm import Claude, claude_model, uses_bare_claude
+            if not uses_bare_claude(cfg):
+                return True, "skipped: no stage uses a bare claude- model"
             model = claude_model(cfg) or "claude-haiku-5-5"
             Claude(cfg).client.models.retrieve(model)
             return True, f"Anthropic answers ({model} available)"
@@ -704,16 +706,16 @@ def step_keys(cfg: dict, st: dict, ask: Ask) -> None:  # noqa: C901
         say("The recorder needs no keys here.")
         return
     from .doctor import llm_providers
-    from .llm import PROVIDERS, claude_model, provider_key
+    from .llm import PROVIDERS, provider_key, uses_bare_claude
 
     if control_only(roles):
         say("A control station runs no stages and uses Kitsu in the browser, so these are optional:")
         say("Enter skips each. Add them later (`clippa setup --step keys`) to run a stage here.")
-    if claude_model(cfg):
+    if uses_bare_claude(cfg):
         ensure_env_key(cfg, ask, "ANTHROPIC_API_KEY", "the model calls (score, segments, titles, covers)",
                        "console.anthropic.com -> API keys")
     else:
-        say("ANTHROPIC_API_KEY: not needed, no stage uses Claude")
+        say("ANTHROPIC_API_KEY: skipped, no stage uses a bare claude- model")
 
     for prov, uses in llm_providers(cfg).items():
         env = PROVIDERS[prov][1]
