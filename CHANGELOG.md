@@ -12,6 +12,9 @@ Developing#releases.
 
 ### 2026-11
 
+- 11-24: `clippa doctor --role agent` no longer crashes on Windows when OpenCode came from npm
+  (`opencode.cmd`): it runs the CLI by the path it found. A CLI that won't start, doesn't answer
+  in 30 s, or fails its `--version` is a FAIL line that says which.
 - 11-24: `deploy/agent` is a second NAS container (`clippa-agent`) for headless checkup and
   audit through OpenCode and OpenRouter. It stays dark (`CHECKUP_AT` empty) so it does not
   overlap `clippa-claude`. `[agent]` picks the CLI and the models; `clippa agent-config`

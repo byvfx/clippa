@@ -181,9 +181,12 @@ def _agent_ready(defaults, tmp_path, monkeypatch):
     defaults["paths"]["openrouter_key"] = tmp_path / "openrouter_key"
     bindir = tmp_path / "bin"
     bindir.mkdir()
-    stub = bindir / "opencode"
-    stub.write_text("#!/bin/sh\necho 2.4.1-test\n", encoding="utf-8")
-    stub.chmod(0o755)
+    if os.name == "nt":  # what npm installs on Windows: a .cmd shim, found first on PATH
+        (bindir / "opencode.cmd").write_text("@echo 2.4.1-test\r\n", encoding="utf-8")
+    else:
+        stub = bindir / "opencode"
+        stub.write_text("#!/bin/sh\necho 2.4.1-test\n", encoding="utf-8")
+        stub.chmod(0o755)
     monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ['PATH']}")
     for name in ("OPENROUTER_API_KEY", "OPENCODE_PASSWORD", "ANTHROPIC_API_KEY"):
         monkeypatch.delenv(name, raising=False)
@@ -203,6 +206,7 @@ def test_doctor_agent_accepts_a_key_file(defaults, tmp_path, monkeypatch):
     _write_key(cfg)
     lines = doctor.collect(doctor.check_agent, cfg)
     text = " ".join(w for _, _, w, _ in lines)
+    assert any(s == "OK" and "OpenCode 2.4.1-test" in w for s, _, w, _ in lines)  # the stub ran
     assert any(s == "OK" and "readable" in w for s, _, w, _ in lines)
     assert "fixture-key" not in text
     assert not any(s == "FAIL" and "OpenRouter key" in w for s, _, w, _ in lines)
@@ -538,3 +542,57 @@ def test_checkup_git_allows_reads_and_refuses_writes(tmp_path):
         r = _sh(script, args, "", env, repo)
         assert r.returncode == 2, (args, r.stderr)
     assert not (repo / "out.patch").exists()
+
+
+def test_doctor_agent_says_when_the_cli_wont_start(defaults, tmp_path, monkeypatch):
+    """A CLI on PATH that can't be started is a FAIL line, not a crash of doctor."""
+    cfg = _agent_ready(defaults, tmp_path, monkeypatch)
+    _write_key(cfg)
+
+    real = doctor.run
+
+    def broken(cmd, timeout=30):
+        if "opencode" in Path(cmd[0]).name:
+            raise FileNotFoundError(2, "The system cannot find the file specified")
+        return real(cmd, timeout)
+
+    monkeypatch.setattr(doctor, "run", broken)
+    lines = doctor.collect(doctor.check_agent, cfg)
+    assert any(s == "FAIL" and "won't start" in w for s, _, w, _ in lines)
+
+
+def test_doctor_agent_fails_a_cli_whose_version_check_fails_or_hangs(defaults, tmp_path, monkeypatch):
+    cfg = _agent_ready(defaults, tmp_path, monkeypatch)
+    _write_key(cfg)
+    real = doctor.run
+    answer = {}
+
+    def fake(cmd, timeout=30):
+        if "opencode" not in Path(cmd[0]).name:
+            return real(cmd, timeout)
+        if answer["kind"] == "hang":
+            raise subprocess.TimeoutExpired(cmd, timeout)
+        return subprocess.CompletedProcess(cmd, 1, "", "Error: Cannot find module 'opencode-ai'\n")
+
+    monkeypatch.setattr(doctor, "run", fake)
+    answer["kind"] = "exit"
+    lines = doctor.collect(doctor.check_agent, cfg)
+    assert any(s == "FAIL" and "--version failed (exit 1): Error: Cannot find module" in w
+               for s, _, w, _ in lines)
+    answer["kind"] = "hang"
+    lines = doctor.collect(doctor.check_agent, cfg)
+    assert any(s == "FAIL" and "didn't answer within 30 s" in w for s, _, w, _ in lines)
+
+
+def test_doctor_claude_auth_status_that_hangs_is_not_a_missing_login(monkeypatch):
+    monkeypatch.setattr(doctor.shutil, "which", lambda name: "/usr/bin/claude" if name == "claude" else None)
+
+    def fake(cmd, timeout=30):
+        if cmd[1:] == ["--version"]:
+            return subprocess.CompletedProcess(cmd, 0, "2.1.0 (Claude Code)\n", "")
+        raise subprocess.TimeoutExpired(cmd, timeout)
+
+    monkeypatch.setattr(doctor, "run", fake)
+    lines = doctor.collect(doctor.check_agent_cli, "claude", "hint")
+    assert any(s == "FAIL" and "auth status` didn't answer within 30 s" in w for s, _, w, _ in lines)
+    assert not any("isn't signed in" in w for _, _, w, _ in lines)

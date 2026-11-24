@@ -1330,21 +1330,52 @@ def _needs_openrouter_file(cfg: dict, resolved: dict | None) -> bool:
     return str(source).startswith("openrouter:") or str(model).startswith("openrouter/")
 
 
+def _cli_run(path: str, *args: str) -> tuple[subprocess.CompletedProcess | None, str]:
+    """Run a CLI by the path shutil.which found. On Windows that is how an npm shim
+    (`opencode.cmd`) starts: the bare name can't. (result, "") or (None, what went wrong)."""
+    try:
+        return run([path, *args]), ""
+    except subprocess.TimeoutExpired:
+        return None, "didn't answer within 30 s"
+    except (OSError, subprocess.SubprocessError):
+        return None, "won't start"
+
+
+def _cli_version(name: str, path: str, hint: str) -> bool:
+    """OK with the CLI's version, or a FAIL that says why; True when it answered."""
+    r, why = _cli_run(path, "--version")
+    if r is not None and (r.returncode or not r.stdout.strip()):
+        err = (r.stderr or "").strip().splitlines()
+        why = f"--version failed (exit {r.returncode})" + (f": {err[0][:200]}" if err else "")
+        r = None
+    if r is None:
+        fail("agent", f"{name} ({path}) {why}", "reinstall it; " + hint)
+        return False
+    ok("agent", f"{name} {r.stdout.strip()}")
+    return True
+
+
 def check_agent_cli(cli: str, hint: str) -> None:
     """The CLI [agent] names: installed, and Claude Code signed in when that is the CLI."""
     if cli == "opencode":
-        if not shutil.which("opencode"):
+        path = shutil.which("opencode")
+        if not path:
             fail("agent", "OpenCode (`opencode`) not on PATH", "deploy/agent installs it; " + hint)
             return
-        ok("agent", "OpenCode " + run(["opencode", "--version"]).stdout.strip())
+        _cli_version("OpenCode", path, hint)
         return
     if cli != "claude":
         return
-    if not shutil.which("claude"):
+    path = shutil.which("claude")
+    if not path:
         fail("agent", "Claude Code (`claude`) not on PATH", "deploy/claude installs it; " + hint)
         return
-    ok("agent", "Claude Code " + run(["claude", "--version"]).stdout.strip())
-    status = run(["claude", "auth", "status"])
+    if not _cli_version("Claude Code", path, hint):
+        return
+    status, why = _cli_run(path, "auth", "status")
+    if status is None:  # it answered --version, so this is not a missing login
+        fail("agent", f"`claude auth status` {why}", hint)
+        return
     signed_in, method = claude_auth(status.stdout, status.returncode)
     if not signed_in:
         fail("agent", "Claude Code isn't signed in",
