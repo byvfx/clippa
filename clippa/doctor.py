@@ -1372,7 +1372,10 @@ def check_agent_cli(cli: str, hint: str) -> None:
         return
     if not _cli_version("Claude Code", path, hint):
         return
-    status = _cli_run(path, "auth", "status")[0] or subprocess.CompletedProcess([path], 1, "", "")
+    status, why = _cli_run(path, "auth", "status")
+    if status is None:  # it answered --version, so this is not a missing login
+        fail("agent", f"`claude auth status` {why}", hint)
+        return
     signed_in, method = claude_auth(status.stdout, status.returncode)
     if not signed_in:
         fail("agent", "Claude Code isn't signed in",

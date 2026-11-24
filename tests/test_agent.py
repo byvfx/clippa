@@ -582,3 +582,17 @@ def test_doctor_agent_fails_a_cli_whose_version_check_fails_or_hangs(defaults, t
     answer["kind"] = "hang"
     lines = doctor.collect(doctor.check_agent, cfg)
     assert any(s == "FAIL" and "didn't answer within 30 s" in w for s, _, w, _ in lines)
+
+
+def test_doctor_claude_auth_status_that_hangs_is_not_a_missing_login(monkeypatch):
+    monkeypatch.setattr(doctor.shutil, "which", lambda name: "/usr/bin/claude" if name == "claude" else None)
+
+    def fake(cmd, timeout=30):
+        if cmd[1:] == ["--version"]:
+            return subprocess.CompletedProcess(cmd, 0, "2.1.0 (Claude Code)\n", "")
+        raise subprocess.TimeoutExpired(cmd, timeout)
+
+    monkeypatch.setattr(doctor, "run", fake)
+    lines = doctor.collect(doctor.check_agent_cli, "claude", "hint")
+    assert any(s == "FAIL" and "auth status` didn't answer within 30 s" in w for s, _, w, _ in lines)
+    assert not any("isn't signed in" in w for _, _, w, _ in lines)
