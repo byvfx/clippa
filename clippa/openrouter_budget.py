@@ -352,10 +352,10 @@ def note_retry(cfg: dict, *, seconds: float, status: int = 402,
         events = d.setdefault("events", [])
         mine = next((e for e in reversed(events) if isinstance(e, dict) and e.get("id") == rid), None)
         if mine is not None:  # the same call waiting again: one line, the latest wait
-            mine.update(ts=now_iso(), seconds=seconds, status=status, pending=True)
+            mine.update(ts=now_iso(), seconds=seconds, status=status, pending=True, until=until)
         else:
             events.append({"ts": now_iso(), "kind": "retried", "code": code, "status": status,
-                           "seconds": seconds, "pending": True, "id": rid})
+                           "seconds": seconds, "pending": True, "id": rid, "until": until})
         d["events"] = events[-EVENTS_MAX:]
         d["retry"] = {"until": until, "seconds": seconds, "code": code, "status": status, "id": rid}
 
@@ -388,18 +388,25 @@ def note_stop(cfg: dict, *, status: int = 402, code: str = "openrouter_key_limit
 
 
 def clear_retry(cfg: dict, rid: str, *, ok: bool = True) -> None:
-    """The call that waited under ``rid`` is over: close its line (went through, or failed)
-    and drop the countdown if it is this call's. Other calls' waits are left alone."""
+    """The call that waited under ``rid`` is over: close its line (went through, or failed).
+    If the countdown was this call's, it goes to another call still waiting (the one that
+    waits longest), or is dropped. Other calls' waits are left alone."""
     if not rid:
         return
 
     def apply(d: dict) -> None:
-        if isinstance(d.get("retry"), dict) and d["retry"].get("id") == rid:
-            d.pop("retry", None)
         for ev in d.get("events") or []:
             if isinstance(ev, dict) and ev.get("id") == rid and ev.get("pending"):
                 ev["pending"] = False
                 ev["outcome"] = "ok" if ok else "failed"
+        if isinstance(d.get("retry"), dict) and d["retry"].get("id") == rid:
+            d.pop("retry", None)
+            now = datetime.now(UTC).isoformat(timespec="seconds")
+            waiting = [e for e in d.get("events") or [] if isinstance(e, dict) and e.get("pending")
+                       and e.get("kind") == "retried" and str(e.get("until") or "") > now]
+            if waiting:
+                other = max(waiting, key=lambda e: str(e["until"]))
+                d["retry"] = {k: other.get(k) for k in ("until", "seconds", "code", "status", "id")}
 
     _quietly(cfg, apply)
 
@@ -521,8 +528,8 @@ def _stop_holds(stop: dict, events: list, left: float | None, balance: float | N
     if _age(at) < 600:
         return True
     broke = balance is not None and balance <= 0.5
-    if credits:
-        return broke
+    if credits:  # no balance figure (the credits call failed): an hour, then the next refusal says
+        return broke if balance is not None else _age(at) < 3600
     return broke or (left is not None and left <= 0.5)  # a text-only refusal may be either
 
 

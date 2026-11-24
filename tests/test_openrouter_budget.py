@@ -476,3 +476,21 @@ def test_the_poll_keeps_a_refusal_recorded_after_it_read_the_file(cfg, monkeypat
     monkeypatch.setattr(ob, "_quietly", race)
     ob._finish(cfg, raw)
     assert ob._settings(cfg)["stop"]["at"] != old["at"]
+
+
+def test_a_finished_wait_hands_the_countdown_to_a_call_still_waiting(cfg):
+    a = ob.note_retry(cfg, seconds=120)
+    b = ob.note_retry(cfg, seconds=30)
+    assert ob._settings(cfg)["retry"]["id"] == b
+    ob.clear_retry(cfg, b, ok=True)
+    assert ob._settings(cfg)["retry"]["id"] == a     # A is still sleeping: its countdown stays
+    ob.clear_retry(cfg, a, ok=True)
+    assert not ob._settings(cfg).get("retry")
+
+
+def test_a_credits_stop_with_no_balance_holds_an_hour(monkeypatch):
+    stop = {"at": "2026-11-23T10:00:00+00:00", "code": "openrouter_credits"}
+    monkeypatch.setattr(ob, "_age", lambda iso: 1800)
+    assert ob._stop_holds(stop, [], left=40.0, balance=None)
+    monkeypatch.setattr(ob, "_age", lambda iso: 4000)
+    assert not ob._stop_holds(stop, [], left=40.0, balance=None)
