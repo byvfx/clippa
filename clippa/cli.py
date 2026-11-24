@@ -1162,6 +1162,13 @@ def cmd_codereview(cfg: dict, args: argparse.Namespace) -> None:
     codereview.run(cfg, args.base, args.head, args.pr, args.repo or "", args.dry_run)
 
 
+def cmd_agent_config(cfg: dict, args: argparse.Namespace) -> None:
+    from . import agent
+
+    resolved = agent.resolve(cfg, args.role)
+    print(json.dumps(resolved) if args.json else "\n".join(f"{k}={v}" for k, v in resolved.items()))
+
+
 def cmd_doctor(cfg: dict, args: argparse.Namespace) -> None:
     from . import doctor
 
@@ -1301,7 +1308,7 @@ COMMAND_GROUPS = [
     ('Services (long-running)', ['services', 'status', 'checkup', 'audit', 'record', 'worker', 'serve', 'bot', 'warroom', 'alert']),
     ('Extras', ['weekly', 'cast', 'broll', 'clipart', 'doc', 'people', 'news', 'blinds', 'receipts', 'archive', 'investigate', 'story', 'narrate', 'perform', 'modal',
                 'costs', 'compare', 'models']),
-    ('Setup and checks', ['setup', 'doctor', 'keys', 'config', 'shows', 'streams', 'backup', 'completion', 'cookies', 'codereview']),
+    ('Setup and checks', ['setup', 'doctor', 'keys', 'config', 'agent-config', 'shows', 'streams', 'backup', 'completion', 'cookies', 'codereview']),
 ]
 
 
@@ -2247,9 +2254,16 @@ def add_setup(sub) -> None:
 
     p = sub.add_parser("doctor", help="check this machine: ffmpeg, GPU, fonts, keys, Kitsu/Discord/NAS")
     p.add_argument("--offline", action="store_true", help="skip the network checks")
-    p.add_argument("--role", choices=["all", "gpu", "serve", "bot", "nas", "claude", "control"], default="all",
-                   help="only what this machine runs (gpu worker, serve, bot, nas recorder, claude on the NAS)")
+    p.add_argument("--role", choices=["all", "gpu", "serve", "bot", "nas", "agent", "claude", "control"],
+                   default="all",
+                   help="only what this machine runs (gpu worker, serve, bot, nas recorder, "
+                        "agent on the NAS; claude is the same check)")
     p.set_defaults(fn=cmd_doctor)
+
+    p = sub.add_parser("agent-config", help="the [agent] model for a headless checkup or audit, translated for its CLI")
+    p.add_argument("--role", required=True, choices=["checkup", "audit"], help="checkup or audit")
+    p.add_argument("--json", action="store_true", help="one JSON object")
+    p.set_defaults(fn=cmd_agent_config)
 
     p = sub.add_parser("keys", help="the API keys this machine has, where each comes from, and (--check) "
                                     "whether its provider still takes it; never a value")

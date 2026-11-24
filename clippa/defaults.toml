@@ -1299,3 +1299,20 @@ thinking_tokens = 200000       # room to think before it ([llm] thinking_max_tok
                                # V4 Pro used all 64k of that at medium and wrote nothing)
 timeout_s = 1800               # one request may think this long ([llm] timeout_s is 600); a
                                # timeout fails the review rather than paying for a second try
+
+[agent]
+# The NAS agent container (deploy/agent): headless checkup and audit, and `clippa agent-config`.
+# Model strings are Clippa's provider:model form. `clippa agent-config` turns the first ":" into
+# "/" for OpenCode and appends #<effort> when the effort is set. cli = "claude" accepts a bare
+# claude-* name (or anthropic:claude-*) and refuses an openrouter: model. Override with
+# clipper.toml, clipper.local.toml, or CLIPPA_AGENT_<KEY> (CLIPPER_AGENT_<KEY> still works).
+cli = "opencode"                               # opencode | claude
+model = "openrouter:anthropic/claude-sonnet-5.5"
+checkup_model = ""                             # empty = inherit model
+checkup_effort = ""                            # "", low, medium, high
+audit_model = ""                               # empty = inherit model
+audit_effort = "high"
+checkup_max_turns = 40
+audit_max_turns = 80
+checkup_timeout_s = 900
+audit_timeout_s = 1500

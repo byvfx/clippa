@@ -185,6 +185,11 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
 - **OpenRouter budget panel (merged, not deployed, 11-24):** Money page, beside API usage. Reads the clippa key server-side. Changing the limit or disabling the key needs `OPENROUTER_MANAGEMENT_KEY` or `secrets/openrouter_management_secret.txt` (never in the page). Warning percent defaults to 75, saved in `streams/.serve/openrouter.json`. Do not touch production `clipper.toml` for this. Reaches serve only after `bash deploy/hub/deploy.sh` from a main checkout once it is merged.
 
 ## Waiting on the user
+- Draft: the NAS agent container (`deploy/agent`, OpenCode + OpenRouter) beside `clippa-claude`.
+  It comes up dark (`CHECKUP_AT` empty). Phone bridge is still Brandon's call: Option A keeps
+  `claude remote-control` on `clippa-claude`; Option B would be a loopback OpenCode server on
+  127.0.0.1:4096 with no password in the environment and no published port. Do not merge until
+  that call, and do not edit production `clipper.toml`. `deploy/claude` stays for the burn-in.
 - v0.4.0 is released (PR #395, tag 11-23 on 7f6f4ed, the user: "can we tag a v0.4.0 tonight?"; Release "Clippa 0.4.0";
   #259 and #258 step D moved to v0.5.0, the v0.4.0 milestone closed). serve and the bot report `0.4.0` (deployed 11-23
   07:35 UTC); the worker follows once Don's 11-23 run finishes (a background deploy from `C:\clippa-pr378`, detached at
@@ -304,8 +309,30 @@ of phone use; #300 (access levels, a local Jev-like classifier in front of the m
 - **Demo videos (11-16, user):** a portfolio piece first (about 5:40, real shows, none named in the narration, the user reads it live;
   on the byvfx site), then an install tutorial recorded during the desktop clean install (#46/#78). Script and checklist:
   https://claude.ai/artifact/W48qW95ZPYkA7AE16F4TEX; build with `clippa doc`. **Intro (25 s):** Resolve project `clippa_intro`, media
-  `demo-intro/` on the share, sources `mockups/demo-intro/` on the laptop; latest full render `renders/intro_v3_stage_pop3.mp4`; the
-  user heard the sound ("good"); still theirs to judge: the haze, the spot's flicker, the last 1.78x blow-up. Build notes: log 11-17/18.
+  `demo-intro/` on the share, sources `mockups/demo-intro/` on the laptop; the user heard the sound ("good"); still theirs to judge:
+  the haze, the spot's flicker. **Brand title (11-23):** timeline `intro_v4_lockup` (a copy of `intro_v3_stage`, which keeps the old
+  Segoe "Clippa") has the kit's lockup (In-Out C + lowercase `clippa`, Plex Sans Medium) as the title matte, the mark `#5EA88A`
+  and word `#E8EEF6` at the end, the black easing to navy `#0B1220` over 484-496; render `renders/intro_v4_lockup.mp4` (frames
+  0-279 from `pop3`). Mattes and scripts in `mockups/demo-intro/work/lockup/`. **Then the reveal (11-23, user's
+  pick):** `intro_v5_reveal` (copy of v4): the clips play through a big centred C (12-20 s), the line folds inside
+  it, then the C rasters back in green (option 4) and slides left, shrinking, as `clippa` slides out (option 1's
+  move); render `renders/intro_v5_reveal.mp4`. The 12-15 s cross-fade replaced three ways, each a matte sequence
+  in `TitleFile`: `intro_v6_scan` (continuous scanlines), `intro_v7_boxes` (the user's box iris, middle punches
+  open), `intro_v8_iris` (iris hugging the C); renders `renders/intro_v6_scan|v7_boxes|v8_iris.mp4`. The user
+  liked the box and iris but wanted them much slower: `intro_v9_boxes_slow` and `intro_v10_iris_slow` build from
+  12 s to 17.8 s (`kit/win_boxes2|win_iris2/`), renders `renders/intro_v9_boxes_slow.mp4` / `intro_v10_iris_slow.mp4`,
+  then, on the user's notes, both dragged out further and softened: `intro_v11_boxes_soft` (sides together, then top
+  and bottom together, S-curves) and `intro_v12_iris_soft`, the C whole at 18.8 s, edges soft until it sharpens over
+  17.8-19.5 s; both with the thicker raster reveal (`kit/reveal_seq_v3/`), the motion-blurred switch-on (media pool
+  clip `kit/screen_content_24_v4.mp4`) and a very light chromatic aberration at the end (`EndCA`); renders
+  `renders/intro_v11_boxes_soft.mp4` and, for the iris, `intro_v14_iris.mp4` (v12's timeline, its matte with the CRT
+  bulge baked in, `kit/win_irisp4/`, so its edge doesn't pop at the frame's corners); the user keeps both (11-23, "perfect"). The pop at 4.2 s (channel 1 arriving shoved down the tube) is gone: the media pool's screen
+  clip is now `kit/screen_content_24_v3.mp4` (`work/fix_roll.py` wrote v2, lossless, which Resolve decodes blown out;
+  v3 is it at CRF 4, High profile; frames 100-101 changed; every timeline uses it). v9/v10's `TitleBulge` samples with
+  duplicated edges (`getr1d`): with `b` the all-white matte bulged black corners in from frame 0 (v6-v8 have them at 280-287), and
+  splices take frames 96-107 from `renders/intro_popfix_096.mp4` (`work/reveal/splice.sh`). Don't touch Resolve timelines while a render runs (it hung on 11-23). This reveal is the baseline; the user wants to explore the raster further
+  after (memory `clippa-logo-reveal`; first idea: a continuous scanline build-up). Options and scripts:
+  `mockups/demo-intro/work/reveal/`. Build notes: log 11-17/18/23.
 - **Documentaries (PR #233, live 11-13):** `clippa doc new|voice|build|master|leak|kit` (wiki Documentaries). Untried because they
   cost: `voice` against ElevenLabs, `leak` on Modal (`--dry-run` first); reels at another frame rate than the timeline. On the
   first real piece, listen to every take and watch the first built timeline. `[story] lufs = -14` is new (a story cut before it is

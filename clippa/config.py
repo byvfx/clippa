@@ -152,7 +152,11 @@ CHOICES = {
     ("scoring", "third_party_audio"): ("reject", "allow_reactions"),
     ("scoring", "audience_knowledge"): ("strangers", "fans"),
     ("scoring", "gambling"): ("reject", "commentary"),
+    ("agent", "cli"): ("opencode", "claude"),
 }
+# [agent] checkup_effort and audit_effort may be empty (inherit no effort suffix). Every other
+# effort key is a model effort, including "none".
+AGENT_EFFORTS = ("", "low", "medium", "high")
 # CLIPPER_* variables that aren't settings.
 SPECIAL_ENV = {"CLIPPER_CONFIG", "CLIPPER_LOCAL_CONFIG", "CLIPPER_BOOTSTRAP", "CLIPPER_ALERT_WEBHOOK",
                "CLIPPER_DATA", "CLIPPER_TOML",  # these two: the NAS recorder's deploy (deploy/record)
@@ -212,12 +216,23 @@ SHOW_KEYS = ("channel", "channels")  # a [shows.<key>] table's own settings; the
 EFFORTS = ("none", "low", "medium", "high", "xhigh", "max")
 
 
+def _bad_effort(section: str, key: str, value) -> str:
+    """An effort key's complaint, or "" when the value is one this key allows."""
+    if section == "agent" and key in ("checkup_effort", "audit_effort"):
+        allowed = AGENT_EFFORTS
+    elif "effort" in str(key):
+        allowed = EFFORTS
+    else:
+        return ""
+    if value in allowed:
+        return ""
+    return f"[{section}] {key} = {value!r} (one of: {', '.join(allowed)})"
+
+
 def check_choices(cfg: dict, where: str = "") -> None:
     bad = [f"[{s}] {k} = {cfg[s][k]!r} (one of: {', '.join(c)})"
            for (s, k), c in CHOICES.items() if s in cfg and cfg[s].get(k) not in c]
-    bad += [f"[{s}] {k} = {v!r} (one of: {', '.join(EFFORTS)})"
-            for s, sec in _sections(cfg) for k, v in sec.items()
-            if "effort" in k and v not in EFFORTS]  # any type: false or 3 is as wrong as "med"
+    bad += [msg for s, sec in _sections(cfg) for k, v in sec.items() if (msg := _bad_effort(s, k, v))]
     if bad:
         raise ClipperError(f"{where}not a valid choice: " + "; ".join(bad))
 

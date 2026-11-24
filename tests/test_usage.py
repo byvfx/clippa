@@ -45,7 +45,8 @@ def test_status_without_keys_says_what_to_set(tmp_path, monkeypatch):
     cfg = {"paths": {"costs": log, "anthropic_admin_key": tmp_path / "none.txt",
                      "openrouter_key": tmp_path / "none.txt"}}
     s = usage.status(cfg)
-    assert usage.ADMIN_ENV in s["claude"]["missing"] and s["claude"]["logged_usd"] == 1.5
+    assert s["claude"]["missing"] == "not configured" and s["claude"]["configured"] is False
+    assert s["claude"]["logged_usd"] == 1.5
     assert "OPENROUTER_API_KEY" in s["openrouter"]["missing"] and s["openrouter"]["logged_usd"] == 0.25
     usage._LAST.clear()
 

@@ -92,7 +92,11 @@ here reaches).
 ## The nightly report
 
 The [claude container](Claude-on-the-NAS) runs the checkup every morning at `CHECKUP_AT`
-(`deploy/claude/env.local`, e.g. `08:30`, after quiet hours; empty = off) and DMs you once:
+(`deploy/claude/env.local`, e.g. `08:30`, after quiet hours; empty = off) and DMs you once.
+A second container, [Agent on the NAS](Agent-on-the-NAS), can run the same clock through OpenCode.
+It ships with `CHECKUP_AT` empty so it does not overlap this one. Its prompt tells the model to
+call `checkup-clippa` (a fixed list of read-only commands) and to send the DM as one command,
+one `--line` per line of the message, not a heredoc.
 
 - **Nothing found:** a one-line "Checkup 11-09: all good.", with no model call, plus what the
   repairs did or would have done in the last 24 hours, when they did anything.

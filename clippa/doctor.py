@@ -1,7 +1,7 @@
 """`clippa doctor`: check that this machine can run Clippa, and say what to fix.
 
 Usage:
-    clippa doctor [--offline] [--role all|gpu|serve|bot|nas|claude|control]
+    clippa doctor [--offline] [--role all|gpu|serve|bot|nas|agent|claude|control]
 
 Checks Python, the config and prompt files, ffmpeg (filters and the configured encoders),
 fonts, the GPU stack (torch + WhisperX, only needed where transcribe runs), API keys and
@@ -10,7 +10,8 @@ OK, WARN (works, but something is missing or slow) or FAIL (a stage will break);
 code is 1 when anything fails. --role skips what that machine doesn't run: gpu (a worker:
 everything but serve and the bot), serve (`clippa serve`: the war room, uploads, pre-shows,
 retakes, the daily jobs), bot (the Discord bot, which needs serve to answer), nas (the
-recorder only), claude (Claude Code on the NAS: what a worker needs, plus its sign-in and clone),
+recorder only), agent (the NAS agent container, deploy/agent: the [agent] config, its CLI,
+the OpenRouter key file, and the clone), claude (the same check; the old name),
 control (a dev/control station: the keys, the war room, and ssh to the hub for `clippa services`).
 """
 
@@ -21,6 +22,7 @@ import os
 import platform
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import time
@@ -530,10 +532,13 @@ def check_keys(cfg: dict, role: str) -> None:
                  f"copy {p['youtube_client_secret'].name} and {p['youtube_token'].name} into secrets/")
         check_tiktok(cfg)
         check_x(cfg)
+        from .llm import uses_bare_claude
         from .usage import ADMIN_ENV, admin_key
 
         if admin_key(cfg):
             ok("keys", "Anthropic Admin key found (the war room's API usage panel reads Claude's bill)")
+        elif not uses_bare_claude(cfg):
+            ok("keys", "Anthropic Admin key not configured; no stage uses a bare claude- model")
         else:
             warn("keys", "no Anthropic Admin key: the API usage panel shows our log for Claude, not its bill",
                  f"Console -> Settings -> Admin keys (organizations only); set {ADMIN_ENV} "
@@ -1288,48 +1293,153 @@ def claude_auth(stdout: str, returncode: int) -> tuple[bool, str]:
     return returncode == 0, str(method)
 
 
-def check_claude(cfg: dict) -> None:
-    """--role claude: Claude Code on the NAS (deploy/claude) can sign in, work in its own
-    clone of the repo and run every stage against the share."""
-    hint = wiki.page("Claude-on-the-NAS")
+def opencode_json_path() -> Path:
+    """The repo's opencode.json, next to the package."""
+    return Path(__file__).resolve().parent.parent / "opencode.json"
+
+
+def openrouter_key_file(cfg: dict) -> Path | None:
+    """A readable, non-empty OpenRouter key file: [paths] openrouter_key, else the container's."""
+    seen: list[Path] = []
+    for raw in (cfg["paths"].get("openrouter_key"), "/run/secrets/openrouter_key"):
+        if not raw:
+            continue
+        path = Path(raw)
+        if path in seen:
+            continue
+        seen.append(path)
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        if text.strip():
+            return path
+    return None
+
+
+def _key_file_private(path: Path) -> bool:
+    """POSIX key files are mode 0600. Windows has no Unix mode, same as the prompt file."""
+    if os.name != "posix":
+        return True
+    return stat.S_IMODE(path.stat().st_mode) == 0o600
+
+
+def _needs_openrouter_file(cfg: dict, resolved: dict | None) -> bool:
+    source = (resolved or {}).get("source_model") or cfg["agent"].get("model") or ""
+    model = (resolved or {}).get("model") or ""
+    return str(source).startswith("openrouter:") or str(model).startswith("openrouter/")
+
+
+def check_agent_cli(cli: str, hint: str) -> None:
+    """The CLI [agent] names: installed, and Claude Code signed in when that is the CLI."""
+    if cli == "opencode":
+        if not shutil.which("opencode"):
+            fail("agent", "OpenCode (`opencode`) not on PATH", "deploy/agent installs it; " + hint)
+            return
+        ok("agent", "OpenCode " + run(["opencode", "--version"]).stdout.strip())
+        return
+    if cli != "claude":
+        return
     if not shutil.which("claude"):
-        fail("claude", "Claude Code (`claude`) not on PATH", "deploy/claude installs it; " + hint)
+        fail("agent", "Claude Code (`claude`) not on PATH", "deploy/claude installs it; " + hint)
+        return
+    ok("agent", "Claude Code " + run(["claude", "--version"]).stdout.strip())
+    status = run(["claude", "auth", "status"])
+    signed_in, method = claude_auth(status.stdout, status.returncode)
+    if not signed_in:
+        fail("agent", "Claude Code isn't signed in",
+             "docker compose exec claude claude auth login; " + wiki.page("Claude-on-the-NAS", "sign-in"))
     else:
-        ok("claude", "Claude Code " + run(["claude", "--version"]).stdout.strip())
-        r = run(["claude", "auth", "status"])
-        signed_in, method = claude_auth(r.stdout, r.returncode)
-        if not signed_in:
-            fail("claude", "Claude Code isn't signed in",
-                 "docker compose exec claude claude auth login; " + wiki.page("Claude-on-the-NAS", "sign-in"))
-        else:
-            (ok if method in ("", "claude.ai") else warn)(
-                "claude", f"Claude Code signed in ({method or 'method not given'})",
-                "" if method in ("", "claude.ai") else "Remote Control needs a claude.ai login: claude auth login")
+        (ok if method in ("", "claude.ai") else warn)(
+            "agent", f"Claude Code signed in ({method or 'method not given'})",
+            "" if method in ("", "claude.ai") else "Remote Control needs a claude.ai login: claude auth login")
     for env in ("ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN"):
         if os.environ.get(env):
-            fail("claude", f"{env} is set: Remote Control refuses to start with it",
+            fail("agent", f"{env} is set: Remote Control refuses to start with it",
                  "deploy/claude/deploy.sh passes the Anthropic key as a file ([paths] anthropic_key); "
                  f"take {env} out of the container's environment")
+
+
+def check_agent_repo(cfg: dict) -> None:
+    """The clone is a branch, and the streams folder (and /data, when this is the container) is writable."""
     root = Path(__file__).resolve().parent.parent
     r = run(["git", "-C", str(root), "status", "--porcelain", "--branch"]) if shutil.which("git") else None
     if r is None or r.returncode:
-        fail("claude", f"{root} isn't a git clone", "deploy/claude clones the repo into /app on first start")
+        fail("agent", f"{root} isn't a git clone", "deploy/agent clones the repo into /app on first start")
     else:
         branch, ahead, changed = repo_state(r.stdout)
-        (ok if branch else fail)("claude", f"repo on {branch}" if branch else "repo HEAD detached",
+        (ok if branch else fail)("agent", f"repo on {branch}" if branch else "repo HEAD detached",
                                  "" if branch else "git switch main (or the branch you were on)")
         if changed or ahead:
-            warn("claude", f"repo has {changed} changed file(s), {ahead} unpushed commit(s)",
+            warn("agent", f"repo has {changed} changed file(s), {ahead} unpushed commit(s)",
                  "commit and push, or git stash, before leaving it")
     streams = Path(cfg["paths"]["streams"])
     probe = streams / f".doctor-{os.getpid()}"
     try:
         probe.write_text("", encoding="utf-8")
         probe.unlink()
-        ok("claude", f"streams writable at {streams}")
+        ok("agent", f"streams writable at {streams}")
     except OSError as e:
-        fail("claude", f"can't write to {streams} ({type(e).__name__})",
-             "the container mounts CLIPPER_DATA at /data as PUID:PGID, the owner of the NAS folder")
+        fail("agent", f"can't write to {streams} ({type(e).__name__})",
+             "the container mounts CLIPPA_DATA at /data as PUID:PGID, the owner of the NAS folder")
+    data = Path("/data")
+    if data.is_dir():
+        marker = data / f".doctor-{os.getpid()}"
+        try:
+            marker.write_text("", encoding="utf-8")
+            marker.unlink()
+            ok("agent", "/data is writable")
+        except OSError as e:
+            fail("agent", f"can't write to /data ({type(e).__name__})",
+                 "the container mounts CLIPPA_DATA at /data as PUID:PGID")
+
+
+def check_agent(cfg: dict) -> None:
+    """--role agent, and --role claude (the same check): [agent] translates, the CLI it names
+    is installed, the OpenRouter key is a file, and that key is not also in the environment."""
+    from . import agent as agent_mod
+
+    hint = wiki.page("Agent-on-the-NAS")
+    resolved = None
+    try:
+        resolved = agent_mod.resolve(cfg, "checkup")
+        audit = agent_mod.resolve(cfg, "audit")
+        ok("agent", f"[agent] cli = {resolved['cli']}; checkup {resolved['model']}; audit {audit['model']}")
+    except ClipperError as e:
+        fail("agent", str(e), hint)
+    cli = (resolved or {}).get("cli") or cfg["agent"].get("cli") or ""
+    check_agent_cli(cli, hint)
+    leaked = ["OPENROUTER_API_KEY", "OPENCODE_PASSWORD"]
+    if cli == "opencode":
+        leaked.append("ANTHROPIC_API_KEY")
+    for env in leaked:
+        if os.environ.get(env, "").strip():
+            fail("agent", f"{env} is set in the environment",
+                 "deploy/agent keeps API keys in files, not the environment; " + hint)
+    if _needs_openrouter_file(cfg, resolved):
+        found = openrouter_key_file(cfg)
+        if not found:
+            fail("agent", "OpenRouter key file is missing or empty",
+                 "deploy/agent mounts it at /run/secrets/openrouter_key ([paths] openrouter_key); " + hint)
+        elif not _key_file_private(found):
+            fail("agent", f"OpenRouter key file {found} is not mode 600",
+                 "chmod 600 the file deploy/agent writes; " + hint)
+        else:
+            ok("agent", f"OpenRouter key file {found} is readable")
+    if cli == "opencode":
+        path = opencode_json_path()
+        try:
+            text = path.read_text(encoding="utf-8")
+            data = json.loads(text)
+        except FileNotFoundError:
+            fail("agent", f"no {path.name} next to the package", hint)
+        except (OSError, json.JSONDecodeError) as e:
+            fail("agent", f"{path.name} is not valid JSON ({type(e).__name__})", hint)
+        else:
+            (ok if isinstance(data, dict) else fail)(
+                "agent", f"{path.name} is valid JSON" if isinstance(data, dict) else f"{path.name} is not an object",
+                "" if isinstance(data, dict) else hint)
+    check_agent_repo(cfg)
 
 
 def check_tailnet(cfg: dict, offline: bool) -> None:
@@ -1452,7 +1562,7 @@ def main(cfg: dict, offline: bool = False, role: str = "all") -> int:
     if role != "nas":
         check_prompts(cfg)
     check_ffmpeg(cfg, role)
-    if role in ("all", "gpu", "claude"):
+    if role in ("all", "gpu", "claude", "agent"):
         check_fonts(cfg)
         check_photos(cfg)
         check_faces(cfg)
@@ -1463,7 +1573,7 @@ def main(cfg: dict, offline: bool = False, role: str = "all") -> int:
         check_youtube_cookies(cfg)  # archive fetches; a control station doesn't run them
         check_hei_cookies(cfg)
         check_twitch_cookies(cfg)
-    if role in ("all", "gpu", "claude"):
+    if role in ("all", "gpu", "claude", "agent"):
         check_narrate(cfg)
         check_broll(cfg)
         check_clipart(cfg)
@@ -1479,8 +1589,8 @@ def main(cfg: dict, offline: bool = False, role: str = "all") -> int:
     if role in ("all", "serve", "bot"):
         check_news(cfg, offline)
         check_blinds(cfg, offline)
-    if role == "claude":
-        check_claude(cfg)
+    if role in ("claude", "agent"):
+        check_agent(cfg)
     if not offline:
         check_online(cfg, role)
     n = report(RESULTS)

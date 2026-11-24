@@ -12,6 +12,13 @@ Developing#releases.
 
 ### 2026-11
 
+- 11-24: `deploy/agent` is a second NAS container (`clippa-agent`) for headless checkup and
+  audit through OpenCode and OpenRouter. It stays dark (`CHECKUP_AT` empty) so it does not
+  overlap `clippa-claude`. `[agent]` picks the CLI and the models; `clippa agent-config`
+  prints the translated model. `clippa doctor --role agent` checks that container
+  (`--role claude` is the same check). With no stage on a bare `claude-` model, the
+  Anthropic key is optional, and the API usage panel says Claude is not configured when
+  the admin key is unset. Not deployed. `deploy/claude` is unchanged.
 - 11-24: the war room's Money page has an OpenRouter budget panel (the API usage panel stays):
   the clippa key's cap, a 75% warning you can change, and Spend / Money reacting when the cap
   is close or spent. Top up is a link to OpenRouter. Editing the limit or disabling the key

@@ -79,11 +79,10 @@ def cost_rows(pages: list[dict], today: str) -> dict:
 
 
 def claude(cfg: dict) -> dict:
-    import requests
-
     key = admin_key(cfg)
     if not key:
-        return {"missing": f"set {ADMIN_ENV} (an Admin API key, sk-ant-admin...) to read Claude's own bill"}
+        return {"configured": False, "missing": "not configured"}
+    import requests
     now = datetime.now(UTC)
     params: dict = {"starting_at": month_start(now).strftime("%Y-%m-%dT%H:%M:%SZ"), "bucket_width": "1d",
                     "group_by[]": "description", "limit": 31}

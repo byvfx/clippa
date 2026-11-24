@@ -34,6 +34,7 @@
 - [NAS recorder](NAS-recorder)
 - [NAS hub](NAS-hub)
 - [Claude on the NAS](Claude-on-the-NAS)
+- [Agent on the NAS](Agent-on-the-NAS)
 - [Phone access](Phone-access)
 - [Model providers](Model-providers)
 - [Model rollout](Model-rollout)
