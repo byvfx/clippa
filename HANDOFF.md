@@ -238,6 +238,11 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
 - `ANTHROPIC_ADMIN_KEY` for Claude's own usage count on Costs, if wanted.
 
 ## Open work
+- **OpenRouter Claude overlay (not applied):** `docs/openrouter-claude.toml` is every Claude
+  stage model at the same tier and effort, as `openrouter:anthropic/claude-*.5`. No price
+  rows: a `--dry-run` reads OpenRouter's public list once per process. Paste into
+  `clipper.toml`; it needs `OPENROUTER_API_KEY`. The defaults stay on Claude. Direct Claude
+  access ends around 2026-12-22.
 - **Long segments (config-7 prep, not in production):** `[segments] split_over_s` defaults to 0
   (off). A negative value is off too; a non-number is a one-line error. The NAS `clipper.toml` does
   not set it, and `max_s` is still 3600. Turn it on (3000, the upcoming segments prompt's 50 minutes)

@@ -10,6 +10,14 @@ Developing#releases.
 
 ## Unreleased
 
+### 2026-11
+
+- 11-23: `docs/openrouter-claude.toml` is an opt-in overlay that sends every Claude stage
+  model through OpenRouter at the same tier and effort. Paste it into `clipper.toml`; it
+  needs `OPENROUTER_API_KEY`. The defaults stay on Claude. A `--dry-run` prices an
+  `openrouter:` model from OpenRouter's public list when `[llm.prices]` has no row (one
+  fetch per process; a failed fetch counts as $0 and is not tried again).
+
 ## 0.4.0 (2026-11-23)
 
 The rename reaches the NAS and the repo, the docs get a site of their own, and blind items learn
