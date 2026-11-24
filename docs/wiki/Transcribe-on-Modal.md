@@ -17,8 +17,8 @@ plan includes $30 of compute a month. Measured on that 8 h stream: L40S (default
    [transcribe]
    backend = "modal"
    modal_gpu = "L40S"      # T4 | L4 | A10 | L40S | A100 | H100
-   modal_audio = "flac"    # lossless upload, ~60 MB per hour of audio; "opus" is smaller
-   modal_opus_over_mb = 900   # a bigger FLAC goes up as opus instead; 0 = never
+   modal_audio = "flac"    # lossless upload, ~70 MB per hour of audio; "opus" is smaller
+   modal_opus_over_mb = 700   # a bigger FLAC goes up as opus instead; 0 = never
    ```
 5. `clippa doctor --role gpu` checks the package, the token and that the app is deployed.
 
@@ -52,8 +52,10 @@ most likely used up the NAS's memory. An out-of-memory daemon such as
 SIGTERM: `sudo journalctl -u earlyoom` shows the kill. The kernel's own out-of-memory killer would
 show `-9` (SIGKILL) instead.
 
-So a FLAC bigger than `[transcribe] modal_opus_over_mb` (900 MB, about a 15 h stream) is
-encoded again as opus (48 kbps, ~22 MB an hour) and sent instead. The log says so:
-`over [transcribe] modal_opus_over_mb (900): encoded ... MB opus instead`. To transcribe one stream
+So a FLAC bigger than `[transcribe] modal_opus_over_mb` (700 MB, about a 10 h stream) is
+encoded again as opus (48 kbps, ~21 MB an hour) and sent instead. The log says so:
+`over [transcribe] modal_opus_over_mb (700): encoded ... MB opus instead`. The biggest FLAC that
+has gone up fine is 884 MB (12.2 h); the limit stays below it. Opus is slow to encode on a NAS
+(an 18 h stream took 8 min, FLAC 30 s). To transcribe one stream
 from opus whatever its length, put `[transcribe] modal_audio = "opus"` in its
 `streams/<id>/config.toml`.

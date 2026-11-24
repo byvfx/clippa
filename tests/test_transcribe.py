@@ -56,9 +56,9 @@ def test_a_flac_over_the_limit_goes_up_as_opus(tmp_path, defaults, monkeypatch):
     """#422: an 18 h stream's 1.3 GB FLAC took the NAS out of memory in Modal's multipart
     upload (1 GiB and up). Over [transcribe] modal_opus_over_mb the upload is opus instead."""
     tc = {**defaults["transcribe"], "modal_gpu": "L4"}
-    assert tc["modal_audio"] == "flac" and tc["modal_opus_over_mb"] == 900
-    assert not transcribe.too_big_for_flac(tc, "flac", 900_000_000)
-    assert transcribe.too_big_for_flac(tc, "flac", 900_000_001)
+    assert tc["modal_audio"] == "flac" and tc["modal_opus_over_mb"] == 700
+    assert not transcribe.too_big_for_flac(tc, "flac", 700_000_000)
+    assert transcribe.too_big_for_flac(tc, "flac", 700_000_001)
     assert not transcribe.too_big_for_flac(tc, "opus", 2_000_000_000)    # already opus
     assert not transcribe.too_big_for_flac({**tc, "modal_opus_over_mb": 0}, "flac", 2_000_000_000)
     assert not transcribe.too_big_for_flac({**tc, "modal_opus_over_mb": -1}, "flac", 2_000_000_000)

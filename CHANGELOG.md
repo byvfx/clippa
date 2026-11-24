@@ -12,8 +12,8 @@ Developing#releases.
 
 ### 2026-11
 
-- 11-24: a Modal transcription whose FLAC would be over `[transcribe] modal_opus_over_mb` (900 MB,
-  about a 15 h stream) uploads opus instead. An 18 h stream's 1.3 GB upload ran the NAS out of
+- 11-24: a Modal transcription whose FLAC would be over `[transcribe] modal_opus_over_mb` (700 MB,
+  about a 10 h stream) uploads opus instead. An 18 h stream's 1.3 GB upload ran the NAS out of
   memory (#422). A stage stopped by a signal now says so in run.json and the worker log
   (`transcribe killed by SIGTERM (-15)`), not a bare `exited -15`.
 - 11-24: `clippa doctor --role agent` no longer crashes on Windows when OpenCode came from npm
