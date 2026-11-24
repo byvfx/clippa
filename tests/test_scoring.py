@@ -1,9 +1,10 @@
 """Scoring (clippa/scoring.py): the paid-rerun guard, Pass B hygiene (its picks are kept
 candidates, each once), the windows.json hash, and pick numbers that survive re-scores."""
+import numpy as np
 import pytest
 
 from clippa import jsonstate, scoring
-from clippa.errors import ClipperError
+from clippa.errors import ClipperError, OpenRouterLimit
 from clippa.states import carry_numbers
 
 
@@ -73,6 +74,52 @@ def test_a_rescan_that_moves_a_transcript_id_retires_its_number():
                             {"id": "t02", "source": "transcript", "window": [100, 160]}]
     assert scoring.moved_ids(old, rescanned) == ["t01"]  # t02 had no window recorded: not counted
     assert scoring.moved_ids(old, same[:1]) == ["t01"]  # gone: its number goes before t01 can return
+
+
+class _LimitClaude:
+    def __init__(self):
+        self.n = 0
+
+    def text_call(self, *a, **k):
+        self.n += 1
+        raise OpenRouterLimit("OpenRouter limit openrouter_key_limit", "openrouter_key_limit")
+
+    def json_call(self, *a, **k):
+        self.n += 1
+        raise OpenRouterLimit("OpenRouter limit openrouter_credits", "openrouter_credits")
+
+
+class _Prompts:
+    version = "v1"
+
+    def get(self, name, **k):
+        return "sys"
+
+
+def test_a_limit_stops_the_summary_without_another_block(defaults, tmp_path):
+    sdir = tmp_path / "kick-1"
+    sdir.mkdir()
+    defaults["scoring"]["concurrency"] = 1
+    words = [{"word": "hi", "start": 1.0, "end": 2.0, "seg": 0},
+             {"word": "yo", "start": 901.0, "end": 902.0, "seg": 1}]
+    claude = _LimitClaude()
+    with pytest.raises(OpenRouterLimit, match="openrouter_key_limit"):
+        scoring.stream_summary(sdir, words, 1800, defaults, claude, _Prompts())
+    assert claude.n == 1
+    assert not (sdir / "summary_v1.json").exists()
+
+
+def test_a_limit_stops_pass_a_without_another_window(defaults):
+    defaults["scoring"]["concurrency"] = 1
+    sig = {k: np.zeros(80) for k in ("chat_msgs", "loud_z", "heat", "react", "clip")}
+    windows = [{"start_s": 0, "end_s": 30, "rank": 1, "heat": 1.0, "peaks": [10]},
+               {"start_s": 40, "end_s": 70, "rank": 2, "heat": 1.0, "peaks": [50]}]
+    words = [{"word": "hi", "start": 5.0, "end": 6.0, "seg": 0},
+             {"word": "yo", "start": 45.0, "end": 46.0, "seg": 1}]
+    claude = _LimitClaude()
+    with pytest.raises(OpenRouterLimit, match="openrouter_credits"):
+        scoring.run_pass_a(windows, words, sig, defaults, claude, _Prompts())
+    assert claude.n == 1
 
 
 def test_pass_a_schema_why_first_from_v9():

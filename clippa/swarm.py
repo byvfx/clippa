@@ -49,7 +49,7 @@ from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlsplit
 
 from . import jsonstate, ytdl
-from .errors import ClipperError
+from .errors import ClipperError, OpenRouterLimit
 from .kick import RateLimiter
 from .llm import Budget, OverBudget, estimate
 
@@ -515,6 +515,11 @@ class Run:
                 self.stop(str(e))
                 with self.lock:
                     self.ran -= 1  # it never ran: a rerun picks it up
+                return []
+            except OpenRouterLimit as e:
+                self.stop(str(e))
+                with self.lock:
+                    self.ran -= 1
                 return []
             except Exception as e:  # noqa: BLE001  # a model error fails this task, not the run
                 return self.failed(t, t0, e)

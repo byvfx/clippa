@@ -22,7 +22,7 @@ from pathlib import Path
 
 from . import costs, jsonstate, lift
 from .config import base, for_stream
-from .errors import ClipperError
+from .errors import ClipperError, OpenRouterLimit
 from .llm import Claude, estimate_lines, preflight, tokens
 from .prompts import Prompts, version_of
 from .timefmt import hms
@@ -241,26 +241,37 @@ def backtest(cfg: dict, stream: str = "", transcript: bool = False, force: bool 
     clients: dict[tuple[str, str], Claude] = {}
     done = {}
     for sid, sdir, segs in plan:
-        costs.set_context("segments backtest", sid)
-        scfg = for_stream(cfg, sdir)
-        sc = scfg["segments"]
-        which = (scfg["show"]["key"], sc["score_model"])  # a stream's config.toml may pick another model
-        claude = clients.get(which)
-        if claude is None:
-            claude = clients[which] = Claude(scfg)
-            preflight(claude, sc["score_model"])
-        spent = claude.cost
-        try:
-            got = score(sdir, cfg, segs, rows, starts[sid], transcript, claude)
-        except ClipperError as e:  # one refused stream doesn't stop the rest
-            print(f"  {sid}: not scored ({e})")
-            continue
-        with jsonstate.update(sdir / BACKTEST, {}) as bt:
-            bt[variant] = {"model": sc["score_model"],
-                           "prompt_version": version_of(for_stream(cfg, sdir), "segment_score"),
-                           "as_of": starts[sid].isoformat(), "at": datetime.now(UTC).isoformat(timespec="seconds"),
-                           "usd": round(claude.cost - spent, 4), "scores": got}
-        done[sid] = len(got)
-        print(f"  {sid}: {len(got)} segments as of {starts[sid]:%Y-%m-%d}, ${claude.cost - spent:.3f}")
+        n = _score_backtest_stream(cfg, clients, sid, sdir, segs, rows, starts[sid], transcript, variant)
+        if n is not None:
+            done[sid] = n
     print(f"{variant}: {len(done)} streams, ${sum(c.cost for c in clients.values()):.2f}")
     return done
+
+
+def _score_backtest_stream(cfg: dict, clients: dict, sid: str, sdir: Path, segs: list[dict],
+                           rows: list[dict], start, transcript: bool, variant: str) -> int | None:
+    """Segments scored for one stream. None: this stream was refused and the rest continue.
+    A spending limit is raised, so later streams are not called."""
+    costs.set_context("segments backtest", sid)
+    scfg = for_stream(cfg, sdir)
+    sc = scfg["segments"]
+    which = (scfg["show"]["key"], sc["score_model"])  # a stream's config.toml may pick another model
+    claude = clients.get(which)
+    if claude is None:
+        claude = clients[which] = Claude(scfg)
+        preflight(claude, sc["score_model"])
+    spent = claude.cost
+    try:
+        got = score(sdir, cfg, segs, rows, start, transcript, claude)
+    except OpenRouterLimit:
+        raise
+    except ClipperError as e:  # one refused stream doesn't stop the rest
+        print(f"  {sid}: not scored ({e})")
+        return None
+    with jsonstate.update(sdir / BACKTEST, {}) as bt:
+        bt[variant] = {"model": sc["score_model"],
+                       "prompt_version": version_of(for_stream(cfg, sdir), "segment_score"),
+                       "as_of": start.isoformat(), "at": datetime.now(UTC).isoformat(timespec="seconds"),
+                       "usd": round(claude.cost - spent, 4), "scores": got}
+    print(f"  {sid}: {len(got)} segments as of {start:%Y-%m-%d}, ${claude.cost - spent:.3f}")
+    return len(got)

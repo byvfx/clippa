@@ -6,14 +6,15 @@ its provider by prefix; a bare name like `claude-sonnet-5-5` is Claude, as befor
 | `claude-<model>` (or `anthropic:claude-<model>`) | Claude | `ANTHROPIC_API_KEY`, or `secrets/anthropic_secret.txt` (`[paths] anthropic_key`; [Claude on the NAS](Claude-on-the-NAS) uses the file) |
 | `openai:<model>` | OpenAI | `OPENAI_API_KEY` (user env var), or `secrets/openai_secret.txt` |
 | `gemini:<model>` | Google Gemini (its OpenAI-compatible endpoint) | `GEMINI_API_KEY`, or `secrets/gemini_secret.txt` |
-| `openrouter:<vendor>/<model>` | OpenRouter: one key for most vendors' models, e.g. `openrouter:openai/gpt-5-mini` | `OPENROUTER_API_KEY`, or the key in `secrets/openrouter_secret.txt` (`[paths] openrouter_key`) |
+| `openrouter:<vendor>/<model>` | OpenRouter: one key for most vendors' models, e.g. `openrouter:openai/gpt-5-mini` | `OPENROUTER_API_KEY`, or the key in `secrets/openrouter_secret.txt` (`[paths] openrouter_key`). The war room's budget panel can change that key's limit when `OPENROUTER_MANAGEMENT_KEY` (or `[paths] openrouter_management_key`) is set; see [Costs](Costs#the-openrouter-budget) |
 | `local:<model>` | Ollama, vLLM, LM Studio or any OpenAI-compatible server | `[llm] local_base_url` in clipper.toml (e.g. `http://<host>:11434/v1`); `LOCAL_LLM_API_KEY` if it wants one |
 
 Trying config-7, one stage at a time, is [Model rollout](Model-rollout).
 
 Add prices under `[llm.prices]` (`"openai:gpt-5-mini" = [0.25, 2.00]`, $ per 1M input/output
-tokens) so the cost lines stay right; an unlisted model counts as $0, except on OpenRouter,
-which reports what each call cost ([its own count](Costs#the-providers-own-numbers) is in the war room). `clippa doctor` checks the key or URL for every provider in
+tokens) so the cost lines stay right; an unlisted model counts as $0, except on OpenRouter.
+A call reports its own cost ([its own count](Costs#the-providers-own-numbers) is in the war room),
+and a `--dry-run` uses OpenRouter's published list when the table has no row. `clippa doctor` checks the key or URL for every provider in
 use and, online, that the server lists the model; `clippa setup --step keys` asks for the key of
 any provider a stage uses. `ANTHROPIC_API_KEY` is only required while some stage is on Claude.
 
@@ -32,6 +33,22 @@ A call to an `openrouter:` model reads `error.metadata.limit_source` on a refusa
 - `openrouter_in_flight_budget`, on HTTP 402: other calls still in flight (or just settling) fill the budget. This is temporary. The call waits for the `Retry-After` header, each wait capped at 60 seconds like the other retries, and tries again, up to six calls in all. If the header is missing, or those tries are used up, the stage stops with `OpenRouter limit openrouter_in_flight_budget`.
 
 Any of those is a normal stage failure (exit 1), not a rejected key, so the worker retries the run on its usual schedule (`[worker] retry_minutes`, up to `max_attempts`). Adding credits or raising the key limit is what clears it. A stop during `segments` does not leave a partial `segments.json`; see [Pipeline](Pipeline#stages).
+
+## Claude through OpenRouter
+
+`docs/openrouter-claude.toml` sends every Claude stage model through OpenRouter at the same
+tier and the same effort (`openrouter:anthropic/claude-haiku-5.5`, and the same for Sonnet
+and Opus). Paste its tables into `clipper.toml`. Do not replace that file: it still holds
+the shows, paths and ids. It needs `OPENROUTER_API_KEY`, or the file at `[paths] openrouter_key`.
+`clipper.local.toml` and `CLIPPER_*` still win. To go back, restore the copy of `clipper.toml`
+you made before the paste.
+
+The overlay adds no `[llm.prices]` rows. A `--dry-run` prices an `openrouter:` model from
+the table, then from OpenRouter's public model list. That list is fetched once per process.
+If the fetch fails, the line says the model was counted as $0 and later rows do not wait
+again. A real call still uses the cost OpenRouter reports on the answer. The defaults stay
+on Claude until you paste the overlay. Config-7, which tries other models, is
+[Model rollout](Model-rollout).
 
 ## Trying a model on a stream
 

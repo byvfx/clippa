@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import copy
+import tomllib
 
 import pytest
+from conftest import ROOT
 
 from clippa import config, costs, doctor, llm
 from clippa.errors import ClipperError
@@ -167,6 +169,30 @@ def test_an_openrouter_model_is_priced_from_its_list(defaults, monkeypatch):
     assert llm.estimate(defaults, "openrouter:openai/gpt-6-luna", 1e6, 1e6) == pytest.approx(0.6)
     assert llm.known_price(defaults, "openrouter:nobody/none") is None
     assert llm.known_price(defaults, "openai:gpt-6-luna") is None  # only OpenRouter's own models
+
+
+def test_a_missing_openrouter_cost_uses_the_published_list(defaults, monkeypatch):
+    """OpenRouter omitted the call's cost: _account uses known_price and the mocked list.
+    A failed fetch counts $0 and does not raise. No network."""
+    import requests
+
+    monkeypatch.setattr(costs, "llm_call", lambda *a, **k: None)
+    monkeypatch.setattr(llm, "_OPENROUTER_PRICES", None)
+
+    def get(url, timeout):
+        return FakeResponse({"data": [{"id": "anthropic/claude-haiku-5.5",
+                                       "pricing": {"prompt": "0.0000001", "completion": "0.0000005"}}]})
+    monkeypatch.setattr(requests, "get", get)
+    meta = llm.LLM(defaults)._account("openrouter:anthropic/claude-haiku-5.5", 1_000_000, 1_000_000)
+    assert meta["usd"] == pytest.approx(0.6)
+
+    monkeypatch.setattr(llm, "_OPENROUTER_PRICES", None)
+
+    def down(url, timeout):
+        raise requests.ConnectionError("offline")
+    monkeypatch.setattr(requests, "get", down)
+    meta = llm.LLM(defaults)._account("openrouter:anthropic/claude-sonnet-5.5", 1_000_000, 0)
+    assert meta["usd"] == 0.0
 
 
 def test_doctor_wants_no_price_for_openrouter(defaults):
@@ -456,6 +482,36 @@ def test_openrouter_in_flight_budget_fails_when_the_retries_are_used_up(posted, 
     assert len(sent) == 6 and slept == [1.0, 1.0, 1.0, 1.0, 1.0]
 
 
+def test_credits_or_in_flight_on_403_are_not_spending_limits(posted, monkeypatch, defaults):
+    """Those sources are HTTP 402. A 403 with either is a plain refusal, not retried."""
+    sent, replies = posted
+    monkeypatch.setenv("OPENROUTER_API_KEY", "k")
+    slept = []
+    monkeypatch.setattr(llm.time, "sleep", lambda s: slept.append(s))
+    replies.append(_limit("openrouter_credits", 403, "stopped"))
+    with pytest.raises(RuntimeError, match="HTTP 403"):
+        llm.LLM(defaults).text_call("openrouter:openai/gpt-5-mini", "sys", "hi", "low")
+    replies.append(_limit("openrouter_in_flight_budget", 403, "in flight", retry_after="4"))
+    with pytest.raises(RuntimeError, match="HTTP 403"):
+        llm.LLM(defaults).text_call("openrouter:openai/gpt-5-mini", "sys", "hi", "low")
+    assert len(sent) == 2 and slept == []
+
+
+@pytest.mark.parametrize("header", ["nan", "NaN", "inf", "-1"])
+def test_a_non_finite_or_negative_retry_after_is_not_retried(posted, monkeypatch, defaults, header):
+    from clippa.errors import OpenRouterLimit
+
+    sent, replies = posted
+    monkeypatch.setenv("OPENROUTER_API_KEY", "k")
+    slept = []
+    monkeypatch.setattr(llm.time, "sleep", lambda s: slept.append(s))
+    replies.append(_limit("openrouter_in_flight_budget", 402, "in flight", retry_after=header))
+    with pytest.raises(OpenRouterLimit, match="not retried") as raised:
+        llm.LLM(defaults).text_call("openrouter:openai/gpt-5-mini", "sys", "hi", "low")
+    assert raised.value.limit_source == "openrouter_in_flight_budget"
+    assert len(sent) == 1 and slept == []
+
+
 def test_in_flight_budget_without_retry_after_is_not_retried(posted, monkeypatch, defaults):
     """A 402 in-flight budget with no Retry-After is not a wait-and-retry (OpenRouter's rule)."""
     from clippa.errors import OpenRouterLimit
@@ -469,6 +525,66 @@ def test_in_flight_budget_without_retry_after_is_not_retried(posted, monkeypatch
         llm.LLM(defaults).text_call("openrouter:openai/gpt-5-mini", "sys", "hi", "low")
     assert raised.value.limit_source == "openrouter_in_flight_budget"
     assert len(sent) == 1 and slept == []
+
+
+# Clippa's hyphen ids. OpenRouter's catalog uses a dot in the version (checked against
+# GET /api/v1/models): anthropic/claude-haiku-5.5 and the same for Sonnet and Opus.
+OPENROUTER_CLAUDE = {
+    "claude-haiku-5-5": "openrouter:anthropic/claude-haiku-5.5",
+    "claude-sonnet-5-5": "openrouter:anthropic/claude-sonnet-5.5",
+    "claude-opus-5-5": "openrouter:anthropic/claude-opus-5.5",
+}
+# Production clipper.toml sets these bare names (the same strings as defaults.toml).
+PRODUCTION_MODELS = {
+    "preshow.model": "claude-sonnet-5-5",
+    "scoring.model_a": "claude-haiku-5-5",
+    "scoring.model_b": "claude-sonnet-5-5",
+    "segments.model": "claude-opus-5-5",
+    "meta.model": "claude-opus-5-5",
+    "thumbnail.model": "claude-opus-5-5",
+    "shorts.layout_model": "claude-haiku-5-5",
+    "retake.model": "claude-sonnet-5-5",
+}
+OVERLAY = ROOT / "docs" / "openrouter-claude.toml"
+
+
+def test_openrouter_claude_overlay_leaves_no_direct_claude(defaults):
+    """docs/openrouter-claude.toml over the defaults: no chat model is still a bare
+    claude- name, and each one is the same tier on OpenRouter. No [llm.prices] rows:
+    a dry-run prices an openrouter: name from OpenRouter's list. Effort and every other
+    setting stay as they are."""
+    file = tomllib.loads(OVERLAY.read_text(encoding="utf-8"))
+    assert "llm" not in file
+    for section, values in file.items():
+        assert section in config.DEFAULTS, section
+        for key, value in values.items():
+            old = config.DEFAULTS[section][key]
+            assert llm.is_llm(key, old) and llm.split(old)[0] == "anthropic", (section, key, old)
+            assert value == OPENROUTER_CLAUDE[old.removeprefix("anthropic:")]
+    cfg = config.load(OVERLAY, use_local=False)
+    assert cfg["_unknown"] == []
+    assert cfg["llm"]["prices"] == config.DEFAULTS["llm"]["prices"]
+    before, after = llm.configured(defaults), llm.configured(cfg)
+    assert set(after) == set(before) and before
+    for where, old in before.items():
+        if llm.split(old)[0] != "anthropic":
+            assert after[where] == old
+            continue
+        bare = old.removeprefix("anthropic:")
+        assert bare.startswith("claude-") and bare in OPENROUTER_CLAUDE, (where, old)
+        assert after[where] == OPENROUTER_CLAUDE[bare]
+        assert not after[where].startswith(("claude-", "anthropic:"))
+        assert llm.split(after[where])[0] == "openrouter"
+    for where, old in PRODUCTION_MODELS.items():
+        assert before[where] == old and after[where] == OPENROUTER_CLAUDE[old]
+    assert "max_picks" not in file["scoring"]
+    for section, sec in config.DEFAULTS.items():
+        if section == "paths" or not isinstance(sec, dict):
+            continue
+        for key, value in sec.items():
+            if section in file and key in file[section]:
+                continue
+            assert cfg[section][key] == value, (section, key)
 
 
 def test_cli_exits_key_rejected_on_a_claude_auth_error_past_the_preflight(monkeypatch, capsys):

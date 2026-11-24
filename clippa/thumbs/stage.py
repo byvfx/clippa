@@ -10,7 +10,7 @@ from pathlib import Path
 
 from .. import jsonstate
 from ..config import for_stream
-from ..errors import ClipperError
+from ..errors import ClipperError, OpenRouterLimit
 from ..llm import Claude, estimate_lines, preflight, tokens
 from ..meta import duration, load_assets
 from ..prompts import Prompts
@@ -292,6 +292,8 @@ def run(stream_dir: Path, cfg: dict, ids: list[str] | None = None, force: bool =
         def safe(x: dict) -> tuple[str, dict | None]:
             try:
                 return one(x)
+            except OpenRouterLimit:
+                raise  # the rest of the covers would be refused the same way
             except Exception as e:  # noqa: BLE001  # #75: one bad grab can't cost the others' picks
                 print(f"{x['id']:<22} failed: {type(e).__name__}: {e}", flush=True)
                 return asset_key(x), None

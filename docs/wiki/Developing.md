@@ -3,18 +3,18 @@ this page is the short version.
 
 ## Layout
 
-```
-clippa/              the package, one module per stage, cli.py wires them
-clippa/prompts/      the prompt files, versioned, shipped inside the package; the version in use is set in clipper.toml
-deploy/               bootstrap (new machine); compose stacks for the NAS hub (serve, bot, worker), the recorder, Kitsu and Claude; Windows task scripts for a GPU worker
-streams/<id>/         one folder per stream: source, transcript, cuts, metadata, review state
-clippa/defaults.toml every setting with its default, documented; config.py loads it (clipper.example.toml is a starter clipper.toml)
-tests/                offline tests (pytest); CI runs them and ruff on every push
-docs/wiki/            these pages; pushed to the wiki on every push to main
-HANDOFF.md            current state between work sessions (short); docs/log/ has the dated diary
-studio/               the studio's working files: mockups, research notes, media-heavy reports (not the package)
-reports/              the monthly analytics reports (the old audits are in docs/archive/)
-```
+| Folder | What's in it |
+| --- | --- |
+| `clippa/` | the package, one module per stage, cli.py wires them |
+| `clippa/prompts/` | the prompt files, versioned, shipped inside the package; the version in use is set in clipper.toml |
+| `deploy/` | bootstrap (new machine); compose stacks for the NAS hub (serve, bot, worker), the recorder, Kitsu and Claude; Windows task scripts for a GPU worker |
+| `streams/<id>/` | one folder per stream: source, transcript, cuts, metadata, review state |
+| `clippa/defaults.toml` | every setting with its default, documented; config.py loads it (clipper.example.toml is a starter clipper.toml) |
+| `tests/` | offline tests (pytest); CI runs them and ruff on every push |
+| `docs/wiki/` | these pages; pushed to the wiki on every push to main |
+| `HANDOFF.md` | current state between work sessions (short); docs/log/ has the dated diary |
+| `studio/` | the studio's working files: mockups, research notes, media-heavy reports (not the package) |
+| `reports/` | the monthly analytics reports (the old audits are in docs/archive/) |
 
 ## Shape
 
