@@ -181,7 +181,9 @@ bugs found", a 30-minute timeout, a dropped
 connection or a gateway's 408/502/504, never retried since each try may be paid for) says so in the comment and keeps the last good review below
 it. The review is printed before it is posted, so a failed post loses nothing.
 
-It needs `OPENROUTER_API_KEY` in the environment. `clippa codereview` prints the review and posts
+It needs `OPENROUTER_API_KEY`, or the key file at `[paths] openrouter_key`
+(`secrets/openrouter_secret.txt` when that path is the default). The GitHub workflow uses
+the repo secret `OPENROUTER_API_KEY`. `clippa codereview` prints the review and posts
 nothing; `clippa codereview --dry-run` shows what would be sent and its cost; `--pr N` posts it
 (with `GITHUB_TOKEN` set). To try another model, set `CLIPPER_CODEREVIEW_REVIEWER` (e.g.
 `openrouter:openai/gpt-5.6-sol-pro`). Check each finding against the code.

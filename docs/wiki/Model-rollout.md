@@ -78,10 +78,9 @@ Leave every setting that is not Claude as it is: Whisper (`[transcribe] model`,
 table also names `claude-haiku-5-5`, `claude-sonnet-5-5` and `claude-opus-5-5`. Those
 three rows are prices. OpenRouter reports each call's cost, so leave them.
 
-[`docs/openrouter-claude.toml`](https://github.com/byvfx/clippa/pull/400) is the
-all-OpenRouter file: those 29 settings, and nothing else. Effort stays whatever the live
-config already has. The file is on that PR's branch and not on `main` yet. Nothing loads
-it on its own.
+[`docs/openrouter-claude.toml`](https://github.com/byvfx/clippa/blob/main/docs/openrouter-claude.toml)
+is the all-OpenRouter file: those 29 settings, and nothing else. Effort stays whatever the
+live config already has. Nothing loads it on its own.
 
 Paste its tables into the live `clipper.toml`. Do not replace that file: it still holds
 the shows, paths and ids. A second copy of a table is a TOML error, so put each key in
@@ -101,11 +100,13 @@ rg -n 'claude-' clipper.toml clipper.local.toml streams/*/config.toml
 Show tables are inside `clipper.toml`, so that file's hits cover them. When `clippa.toml`
 or `clippa.local.toml` is the file in use, search that name too (the new spelling wins
 when both are there). Leave out a path that has no file. `clippa config diff` lists
-`clipper.toml`, each show table, `clipper.local.toml` and `CLIPPER_*` / `CLIPPA_*`
-variables. A stream's `config.toml` is absent from that list. The overlay's test checks
-`docs/openrouter-claude.toml` against the defaults. It does not read the live file. The
-`rg` of the live `clipper.toml` is what catches a `claude-` override the test does not
-know about.
+settings that differ from `clippa/defaults.toml`: `clipper.toml`, each show table,
+`clipper.local.toml` and `CLIPPER_*` / `CLIPPA_*` variables. A value equal to the default
+is omitted, so a live `model_a = "claude-haiku-5-5"` (the same string as `defaults.toml`)
+is absent from the list. `rg` still prints that line. A stream's `config.toml` is absent
+from `config diff` as well. The overlay's test checks `docs/openrouter-claude.toml`
+against the defaults. It leaves the live `clipper.toml` unread.
+The `rg` is what catches a `claude-` line that the test and `config diff` both skip.
 
 Set `OPENROUTER_API_KEY` before the swap, or put the key in the file at `[paths]
 openrouter_key` (`secrets/openrouter_secret.txt` when that path is the default). A set
@@ -141,22 +142,39 @@ These still reach Anthropic after the paste:
 - The server-side refusal fallback (`json_call(..., fallback=True)`) runs on the Claude
   API only. On an `openrouter:` model the call still runs, and is logged as `provider`
   `openrouter`. The fallback does not run and writes no line of its own.
-- `clippa setup`'s key check (`setup.py`) calls `models.retrieve` with `claude_model(cfg)`,
-  or `claude-haiku-5-5` when no stage names Claude. That probe does not go through the
-  cost ledger, so it writes no `llm` line.
-- `clippa/usage.py` reads Claude's own bill from the Admin API. That read writes no `llm`
-  line.
+- `clippa setup`'s key check (`setup.py`) calls `models.retrieve` while some stage still
+  names Claude (`claude_model(cfg)`), and the retrieve uses that model. Reaching the
+  function with no Claude model uses `claude-haiku-5-5`, but `clippa setup` only asks
+  for `ANTHROPIC_API_KEY` while a stage still names Claude, and makes no Anthropic call
+  once every stage is off it. `clippa doctor` without `--offline` skips the Anthropic
+  ping once `claude_model` is empty too. The probe writes no `llm` line.
+- `clippa keys --check` (and the war room's **Check**) GETs
+  `https://api.anthropic.com/v1/models?limit=1` with `ANTHROPIC_API_KEY` whenever that
+  key is set, including after every stage has moved. `--check` with no name also asks
+  the Admin API when `ANTHROPIC_ADMIN_KEY` is set
+  (`GET /v1/organizations/users?limit=1`). `--check Anthropic` asks only the inference
+  key. Both are free reads. Neither writes an `llm` line.
+- `clippa/usage.py` reads Claude's own bill from the Admin API (`ANTHROPIC_ADMIN_KEY`,
+  or the file at `[paths] anthropic_admin_key`). That read writes no `llm` line. The
+  normal `ANTHROPIC_API_KEY` cannot read the bill.
 
-Keep `ANTHROPIC_API_KEY` set after the swap. The setup probe uses it, and the Admin API
-bill in `usage.py` still calls Anthropic (`ANTHROPIC_ADMIN_KEY`, or the file at
-`[paths] anthropic_admin_key`). Those two will be removed in a later pass.
+`ANTHROPIC_API_KEY` is optional once no stage names Claude. `clippa doctor` says so.
+Keep the key when a stage might go back to a bare `claude-*` name: that name uses it
+again. The NAS Claude container still keeps the key in a file and out of the environment
+([Claude on the NAS](Claude-on-the-NAS)).
 
-Step 6 is the stage calls. The workspace header, the fallback, the setup probe and the
-Admin API bill do not appear there as `provider` `anthropic`.
+Step 6 is the stage calls. The workspace header, the fallback, the setup probe,
+`clippa keys --check` and the Admin API bill are absent from those lines as `provider`
+`anthropic`.
 
-A `--dry-run` prices an `openrouter:` name from `[llm.prices]`, then from OpenRouter's
-public `/models` list (one fetch per process; a failed fetch counts as $0 and is not
-tried again). The overlay adds no price rows.
+A `--dry-run` prices an `openrouter:` name with `known_price`: the `[llm] prices` table,
+then OpenRouter's public `/models` list. The built-in rows `claude-haiku-5-5`,
+`claude-sonnet-5-5` and `claude-opus-5-5` are separate from the dotted OpenRouter ids
+(`anthropic/claude-haiku-5.5`, and the same for Sonnet and Opus), so the list is what
+prices the overlay. The list is fetched once per process (15 second timeout). A failed
+fetch is cached empty and is left alone after that, and it does not raise. A model still
+missing prints `(no [llm] price: counted $0)`. The overlay adds no price rows. A real
+call uses the cost OpenRouter puts on the answer.
 
 Rollback is [Putting it back](#putting-it-back): between streams, put the dated copy
 back at the live path, then `clippa services restart all` and `clippa doctor`.

@@ -17,7 +17,11 @@ its parent, results, findings, cost); a rerun resumes it. A 30-task run on Jer's
 
 ## Setup
 
-The swarm needs `ANTHROPIC_API_KEY`
-and yt-dlp (with deno, as for pre-shows). Its web and Reddit searches use the same Brave key; Kick,
+The swarm's default planner and worker are Claude (`[swarm] planner_model`,
+`worker_model`), so it needs `ANTHROPIC_API_KEY` and yt-dlp (with deno, as for pre-shows).
+Pasting [`docs/openrouter-claude.toml`](https://github.com/byvfx/clippa/blob/main/docs/openrouter-claude.toml)
+sends those two through OpenRouter; then the swarm needs `OPENROUTER_API_KEY`, or the file
+at `[paths] openrouter_key` ([Model rollout](Model-rollout#moving-every-claude-model-to-openrouter)).
+Its web and Reddit searches use the same Brave key; Kick,
 Odysee and YouTube listings need no key. YouTube searches run from this machine's IP, so a bot
 check here affects them too. Per-source request rates are `[swarm] rates`.

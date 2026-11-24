@@ -253,7 +253,11 @@ answers are kept in `streams/.serve/keys.json`. Streams the worker holds for a r
 No key's value ever reaches the page. To change one, edit `deploy/hub/env.local` (or its file in
 `secrets/`), then run `deploy.sh`, which checks it against the laptop's own first
 ([NAS-hub](NAS-hub#deploy)). `clippa keys` prints the same table for the machine it runs on
-(`--check` asks, `--check Anthropic` asks one; exit 1 on a rejected key).
+(`--check` asks, `--check Anthropic` asks one; exit 1 on a rejected key). `--check` asks
+Anthropic whenever `ANTHROPIC_API_KEY` is set, including after the
+[OpenRouter overlay](Model-rollout#moving-every-claude-model-to-openrouter) has moved every
+stage: one free model-list request, and the same for the Admin key when that one is set.
+OpenRouter's check uses `OPENROUTER_API_KEY` (or `[paths] openrouter_key`).
 
 ## Cast
 
@@ -341,7 +345,8 @@ to `""` (console only) says to use `docker compose logs` instead.
 
 ## Modal, costs and analytics
 
-The Money page has the first three, the Stats page the analytics.
+The Money page has the OpenRouter budget, Costs, Modal and API usage. The Stats page has
+the analytics.
 
 - **Modal**: the month's Modal bill, the spend rate, GPUs up, transcriptions
   running and failed, and each archive's progress. `clippa modal` prints the same.
@@ -352,19 +357,27 @@ The Money page has the first three, the Stats page the analytics.
   today, by model, OpenRouter's week, limit and balance, each next to what Clippa's log recorded.
   Claude's needs an Admin API key ([Costs](Costs#the-providers-own-numbers));
   `clippa costs --providers` prints the same.
-- **OpenRouter budget**: the clippa key's own cap, above Costs, Modal and API usage (those stay).
-  It reads the key and the account balance from OpenRouter, cached for five minutes, with
-  **Ask OpenRouter again** to fetch now. The warning mark defaults to 75% of the cap
-  (**Warn at 75% · Change…**) and is saved with the war room's state. Past it, the Spend
-  widget turns amber and Money gets a **!**. When the cap is spent (`openrouter_key_limit`),
-  Spend turns red, the health light says **Stopped**, and the panel says which run stopped.
-  A 402 that carries Retry-After is the in-flight budget: the panel counts down and the call
-  is sent again. **Top up on OpenRouter** opens the credits page; the API cannot buy credits.
-  **Edit limit…** and **Disable key…** each confirm before `PATCH /api/v1/keys/{hash}`, and
-  only when a management key is set (`OPENROUTER_MANAGEMENT_KEY`, or
-  `secrets/openrouter_management_secret.txt`). With only the inference key the panel is
-  read-only. The per-run `--budget` card is that flag's meaning: it stops one run, and it is
-  not a dollar amount. Detail on [Costs](Costs#the-openrouter-budget).
+- **OpenRouter budget**: the clippa key's own cap, first on the Money page, ahead of Costs,
+  Modal and API usage (those stay). It reads `OPENROUTER_API_KEY` (or the file at
+  `[paths] openrouter_key`) and the account balance, cached for five minutes.
+  **Ask OpenRouter again** fetches now. **Warn at** is a whole percent from 1 to 99
+  (default 75, **Change…**), saved in `<streams>/.serve/openrouter.json`. At or past it,
+  Spend turns amber and Money shows **!**. A spent cap (`openrouter_key_limit`) turns
+  Spend red and the health light to **Stopped**. The banner says the run stopped at its
+  next model call. A 402 whose Retry-After is at most two minutes is the in-flight budget
+  (`openrouter_in_flight_budget`) when the text says in-flight, or when it says nothing
+  about the key limit or the credits being spent. The call waits and is sent again, and
+  the panel counts down. Any other 402, and a 403 whose text says the limit or the credits
+  are spent, is the cap (`openrouter_key_limit`). **Top up on OpenRouter**
+  opens `https://openrouter.ai/settings/credits`. Buying credits and auto top-up stay on
+  OpenRouter. **Edit limit…** asks for the limit and reset, then confirms with a Now →
+  After diff, and **Disable key…** / **Enable key…** confirm once. Both send
+  `PATCH /api/v1/keys/{hash}`. The hash stays on the server. The buttons work when
+  `OPENROUTER_MANAGEMENT_KEY` (or `[paths] openrouter_management_key`,
+  `secrets/openrouter_management_secret.txt`) is set and that key can see the clippa key.
+  With only the inference key the panel is read-only. The per-run `--budget` card explains
+  that flag: Clippa stops one run at its own budget, and the OpenRouter cap covers every
+  run on the key. Detail on [Costs](Costs#the-openrouter-budget).
 - **Analytics**: a month of YouTube. Views, watch time and
   subscribers against the month before, views per day, where views came from (Shorts feed,
   search, ...), and the first-7-day numbers of that month's uploads by show, kind, weekday and
