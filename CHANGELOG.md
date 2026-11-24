@@ -29,6 +29,9 @@ Developing#releases.
   needs `OPENROUTER_API_KEY`. The defaults stay on Claude. A `--dry-run` prices an
   `openrouter:` model from OpenRouter's public list when `[llm.prices]` has no row (one
   fetch per process; a failed fetch counts as $0 and is not tried again).
+- 11-23: `clippa review check` stops when OpenCV isn't installed, instead of saving a bad-cover
+  finding for every item (a later run then skipped them). Items that don't need it are still
+  checked. `uv sync --extra faces` installs it.
 
 ## 0.4.0 (2026-11-23)
 

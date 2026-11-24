@@ -27,7 +27,9 @@ unless --force. `clippa review publish` runs this first ([review] checks) and pu
 summary in Kitsu's Checks column; the Discord card, the war room's ⚠ badge and `clippa
 status` read checks.json. An item with findings is one that needs a person: step B's automatic
 approval (#259) leaves it alone. A check that fails is a finding too, so a broken check never
-passes an item.
+passes an item. A missing OpenCV is not that kind of failure: items that don't import it
+are still saved, then the run raises, and the ones that would import it are left out of
+checks.json. A result already saved from that import error is checked again.
 """
 from __future__ import annotations
 
@@ -635,10 +637,137 @@ def context(sdir: Path, cfg: dict) -> dict:
 
 CHECKS = ("text", "picture", "cover", "subject")
 
+# The cover's face match (faces.pick) and a Short's webcam frames (detect) import cv2. A missing
+# one used to be caught per item and saved as a cover finding, signature and all, so the next
+# run skipped it and every cover stayed "bad".
+OPENCV_MSG = "review check needs OpenCV: install opencv-python-headless"
+
+
+def missing_opencv(e: BaseException) -> bool:
+    """cv2 failed to import, or this module already raised for that. The install, not the item."""
+    if isinstance(e, ClipperError) and str(e) == OPENCV_MSG:
+        return True
+    if not isinstance(e, ImportError):
+        return False
+    return getattr(e, "name", None) == "cv2" or "No module named 'cv2'" in str(e) \
+        or 'No module named "cv2"' in str(e)
+
+
+def require_opencv() -> None:
+    """Stop before any item when cv2 will not import. Never saved, so it cannot be skipped later."""
+    try:
+        import cv2  # noqa: F401
+    except ImportError:
+        # f-string, not a bare name: tests/test_errors.py treats that as an exit status.
+        raise ClipperError(f"{OPENCV_MSG}") from None
+
+
+def stale_opencv(old: dict | None) -> bool:
+    """A saved result that is the missing-cv2 failure. Its signature matches the files, so
+    keeping it would leave the bad covers and skip them next time."""
+    blob = " ".join((f.get("text") or "") for f in (old or {}).get("findings") or [])
+    return "No module named 'cv2'" in blob or 'No module named "cv2"' in blob
+
+
+def unchanged(old: dict | None, sig: str, force: bool) -> bool:
+    """Already checked for this signature, and not a stuck missing-cv2 result."""
+    return bool(old and old.get("sig") == sig and not force and not stale_opencv(old))
+
+
+def item_imports_cv2(sdir: Path, cfg: dict, it: dict, ctx: dict) -> bool:
+    """Whether checking this item reaches `import cv2`: a Short's webcam frames, or the face
+    box on its cover. Text, the subject and a vision-only cover do not."""
+    try:
+        short = it.get("kind") == "short" and _short_imports_cv2(cfg, it)
+    except (KeyError, TypeError, AttributeError, IndexError):
+        short = False
+    try:
+        cover = _cover_imports_cv2(sdir, it, ctx)
+    except (KeyError, TypeError, AttributeError, IndexError):
+        cover = False
+    return bool(short or cover)
+
+
+def _short_imports_cv2(cfg: dict, it: dict) -> bool:
+    """True only when picture_findings would call detect() (which imports cv2): a sample
+    time inside a webcam scene, not merely a cam panel somewhere in the layout. A scene
+    shorter than a second is never sampled (the 0.5 s margin either side)."""
+    from . import shorts
+
+    side = it.get("meta") or {}
+    layouts = shorts.layouts_of(cfg["shorts"])
+    scenes = short_scenes(side, layouts)
+    if not scenes:
+        return False
+    cams = {n: cam_panels(layouts[n]) for _, _, n in scenes}
+    if not any(cams.values()):
+        return False
+    length = side.get("duration_s") or scenes[-1][1]
+    n = max(1, cfg["review"]["check_frames"])
+    for k in range(n):
+        t = length * (k + 0.5) / n
+        scene = next((s for s in scenes if s[0] + 0.5 <= t < s[1] - 0.5), None)
+        if scene is not None and cams[scene[2]]:
+            return True
+    return False
+
+
+def _cover_imports_cv2(sdir: Path, it: dict, ctx: dict) -> bool:
+    """faces.pick imports cv2 when the chosen frame and its face box are on disk. The same
+    guard as cover_findings, so a cover that never imports cv2 still runs."""
+    jpg = it["file"].with_suffix(".jpg")
+    e = cover_entry(it, ctx)
+    if not jpg.exists() or not e or e.get("photo"):
+        return False
+    frames = e.get("frames") or []
+    n = e.get("frame")
+    if not (e.get("face") and n and len(frames) >= n):
+        return False
+    rel = frames[n - 1].get("path")
+    return bool(rel) and (sdir / "thumbs" / e["_key"] / rel).exists()
+
+
+def _check_these(sdir: Path, cfg: dict, batch: list[tuple[dict, str]], ctx: dict, vision: bool,
+                 claude, done: dict, fresh: dict, say) -> object:
+    """Check these items into done and fresh. Returns the vision client, created on first use."""
+    for it, sig in batch:
+        if vision and claude is None:
+            from .llm import Claude
+
+            claude = Claude(cfg)
+        found, v = check_item(sdir, cfg, it, ctx, claude if vision else None)
+        done[it["key"]] = fresh[it["key"]] = {
+            "sig": sig, "at": datetime.now(UTC).isoformat(timespec="seconds"), "kind": it["kind"],
+            "findings": found, **({"vision": v} if v else {})}
+        say(f"  {it['key']}: " + ("; ".join(f["text"] for f in found) if found else "clean"))
+    return claude
+
+
+def _persist(sdir: Path, cfg: dict, fresh: dict, done: dict, started: str, save: bool,
+             kitsu: bool, say) -> None:
+    """Write this run's new results, then the Kitsu column for everything it kept."""
+    if fresh and save:
+        # only what this run checked, and not over a result another run (a publish and a hand
+        # `review check` may overlap) wrote after this one started: that one read newer files
+        with jsonstate.update(path(sdir), {}) as state:
+            state.update({k: v for k, v in fresh.items() if (state.get(k) or {}).get("at", "") <= started})
+    if kitsu and save and done:
+        from . import review
+
+        try:   # what checks.json kept: a newer run's result where one finished first (merge above)
+            kept = load(sdir)
+            review.set_checks(sdir, cfg, {k: summary((kept.get(k) or v).get("findings") or [])
+                                          for k, v in done.items()})
+        except Exception as e:  # noqa: BLE001  # checks.json has them; the next publish writes the column
+            say(f"  Kitsu Checks column not updated: {type(e).__name__}: {e}")
+
 
 def check_item(sdir: Path, cfg: dict, it: dict, ctx: dict, claude) -> tuple[list[dict], dict]:
     """(findings, the vision answer). A check that crashes is a finding, so the rest still run
-    and the item never passes on a broken check."""
+    and the item never passes on a broken check. A missing OpenCV is raised instead: it is the
+    install, and saving it would mark the cover bad."""
+    if item_imports_cv2(sdir, cfg, it, ctx):
+        require_opencv()
     found: list[tuple[str, str, str]] = []
     vision: dict = {}
     for name in CHECKS:
@@ -653,7 +782,10 @@ def check_item(sdir: Path, cfg: dict, it: dict, ctx: dict, claude) -> tuple[list
                 got = subject_findings(sdir, cfg, it, ctx)
         except Exception as e:  # one broken check mustn't pass the item
             if key_rejected(e) or isinstance(e, OpenRouterLimit):
-                raise  # not this item: a bad key is held, a spending limit stops the run
+                raise  # a bad key is held; a spending limit stops the run
+            if missing_opencv(e):
+                require_opencv()  # the same ClipperError, still not a finding
+                raise
             got = [(BAD, f"the {name} check failed: {type(e).__name__}: {str(e)[:200]}")]
         found += [(name, level, text) for level, text in got]
     return [finding(f"{name}:{it['key']}:{n}", name, level, text, stream=sdir.name)
@@ -677,36 +809,28 @@ def run(sdir: Path, cfg: dict, todo: list[dict] | None = None, keys: list[str] |
     have = load(sdir)
     done: dict[str, dict] = {}
     fresh: dict[str, dict] = {}
-    claude = None
+    plain: list[tuple[dict, str]] = []
+    needs: list[tuple[dict, str]] = []
     for it in todo:
         sig = signature(cfg, it, ctx, vision)
         old = have.get(it["key"])
-        if old and old.get("sig") == sig and not force:
+        if unchanged(old, sig, force):
             done[it["key"]] = old
             continue
-        if vision and claude is None:
-            from .llm import Claude
-
-            claude = Claude(cfg)
-        found, v = check_item(sdir, cfg, it, ctx, claude if vision else None)
-        done[it["key"]] = fresh[it["key"]] = {
-            "sig": sig, "at": datetime.now(UTC).isoformat(timespec="seconds"), "kind": it["kind"],
-            "findings": found, **({"vision": v} if v else {})}
-        say(f"  {it['key']}: " + ("; ".join(f["text"] for f in found) if found else "clean"))
-    if fresh and save:
-        # only what this run checked, and not over a result another run (a publish and a hand
-        # `review check` may overlap) wrote after this one started: that one read newer files
-        with jsonstate.update(path(sdir), {}) as state:
-            state.update({k: v for k, v in fresh.items() if (state.get(k) or {}).get("at", "") <= started})
-    if kitsu and save and done:
-        from . import review
-
-        try:   # what checks.json kept: a newer run's result where one finished first (merge above)
-            kept = load(sdir)
-            review.set_checks(sdir, cfg, {k: summary((kept.get(k) or v).get("findings") or [])
-                                          for k, v in done.items()})
-        except Exception as e:  # noqa: BLE001  # checks.json has them; the next publish writes the column
-            say(f"  Kitsu Checks column not updated: {type(e).__name__}: {e}")
+        # Items that import cv2 wait until the others are checked. A missing OpenCV then
+        # raises, after those others are saved, and is never itself a finding.
+        (needs if item_imports_cv2(sdir, cfg, it, ctx) else plain).append((it, sig))
+    claude = None
+    try:
+        claude = _check_these(sdir, cfg, plain, ctx, vision, claude, done, fresh, say)
+        if needs:
+            require_opencv()
+            _check_these(sdir, cfg, needs, ctx, vision, claude, done, fresh, say)
+    except ClipperError as e:
+        if missing_opencv(e):
+            _persist(sdir, cfg, fresh, done, started, save, kitsu, say)
+        raise
+    _persist(sdir, cfg, fresh, done, started, save, kitsu, say)
     return {k: v["findings"] for k, v in done.items()}
 
 

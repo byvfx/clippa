@@ -25,28 +25,34 @@ minutes.
   `secrets/anthropic_admin_secret.txt` (`[paths] anthropic_admin_key`). The normal
   `ANTHROPIC_API_KEY` can't read it. Costs appear about 5 minutes after a call. Without the key
   the panel shows Clippa's log for Claude and says what to set; `clippa doctor` warns.
-- **OpenRouter**: the key Clippa uses (`OPENROUTER_API_KEY` or `secrets/openrouter_secret.txt`):
-  today, this week, this month, all time, what's left of the key's limit if it has one, and
-  the account balance when the key may read it.
+- **OpenRouter**: the key Clippa uses (`OPENROUTER_API_KEY`, or the file at
+  `[paths] openrouter_key`, `secrets/openrouter_secret.txt` by default): today, this week,
+  this month, all time, what's left of the key's limit if it has one, and the account
+  balance when the key may read it.
 
 ## The OpenRouter budget
 
-The war room's Money page has an **OpenRouter budget** panel beside API usage
-([War room](War-room#modal-costs-and-analytics)). It shows the clippa key's cap, what's left,
+The war room's Money page has an **OpenRouter budget** panel ahead of Costs, Modal and
+API usage ([War room](War-room#modal-costs-and-analytics)). It shows the clippa key's cap, what's left,
 today / this week / this month, and the account balance. The warning percent (default 75) is
-saved in `<streams>/.serve/openrouter.json` with the limit events. Past the warning, Spend
-turns amber and Money shows **!**. A spent cap (`openrouter_key_limit`) turns Spend red and
-the health light to **Stopped**. A 402 with Retry-After (`openrouter_in_flight_budget`) waits
-and tries the call again.
+saved in `<streams>/.serve/openrouter.json` with the limit events. At or past the warning,
+Spend turns amber and Money shows **!**. A spent cap (`openrouter_key_limit`) turns Spend
+red and the health light to **Stopped**. The banner says the run stopped at its next model
+call. A 402 whose Retry-After is at most two minutes is the in-flight budget
+(`openrouter_in_flight_budget`) when the text says in-flight, or when it says nothing
+about the key limit or the credits being spent. The call waits and is sent again, and
+the panel counts down. Any other 402, and a 403 whose text says the limit or the credits
+are spent, is the cap (`openrouter_key_limit`).
 
 **Top up on OpenRouter** is a link to the credits page. Buying credits and auto top-up stay
 on OpenRouter; its API cannot change them.
 
 Changing the limit or disabling the key needs a management key, which never reaches the
 browser: `OPENROUTER_MANAGEMENT_KEY`, or the file at `[paths] openrouter_management_key`
-(`secrets/openrouter_management_secret.txt`). Without it the panel still reads the clippa
-key and the buttons stay disabled. With it, **Edit limit…** (new limit, then a Now → After
-confirm) and **Disable key…** / **Enable key…** send `PATCH /api/v1/keys/{hash}`. The hash
+(`secrets/openrouter_management_secret.txt`). With only the inference key the panel still
+reads the clippa key and the buttons stay disabled. With a management key that can see
+the clippa key, **Edit limit…** (new limit, then a Now → After confirm) and **Disable
+key…** / **Enable key…** send `PATCH /api/v1/keys/{hash}`. The hash
 stays on the server. `--budget` on a run is Clippa's own guard for that one run; the panel
 only explains it. The OpenRouter cap covers every run on the key.
 
@@ -89,4 +95,5 @@ November 2026; `clippa costs` has the live numbers):
 So a full run on an evening show is about $3.50. A rerun of `score`, `segments`, `meta` or
 `thumbs` pays again (`score` refuses without `--force`); each of the four prints what a run
 would cost with `--dry-run`, from the prompts it would send (four characters a token, times
-`[llm] prices`), calling nothing. `clippa status` ends with the month's spend by stage.
+`[llm] prices`, or OpenRouter's published list for an `openrouter:` name). A model with no
+price prints `(no [llm] price: counted $0)`. The command calls nothing. `clippa status` ends with the month's spend by stage.

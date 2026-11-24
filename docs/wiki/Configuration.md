@@ -37,9 +37,17 @@ loads; an unknown setting or `CLIPPER_*` variable is a warning on every command,
 `clippa doctor` fails on it. `clippa --show <key>` applies that show to any stream.
 
 `clippa config diff` lists every setting this install changes from `clippa/defaults.toml`,
-by layer: `clipper.toml`, each show's table, `clipper.local.toml`, then `CLIPPER_*` variables
-(`clippa config diff kino` keeps one show's table; `--json` for a script). It answers "what
-did I change" without opening the file on the share.
+by layer: `clipper.toml`, each show's table, `clipper.local.toml`, then `CLIPPER_*`
+(or `CLIPPA_*` when that spelling is set) variables
+(`clippa config diff kino` keeps one show's table; `--json` for a script). A value equal to
+its default is omitted, so a `claude-` line that copies `defaults.toml` is absent here while
+`rg` still finds it. A stream's `streams/<id>/config.toml` is outside this list. It answers
+"what did I change" without opening the file on the share.
 
-Secrets never go in the config: API keys and tokens are environment variables, and the
-YouTube OAuth files live in `secrets/` (gitignored).
+Secrets stay out of the config: API keys and tokens are environment variables, or a file
+under `secrets/` (`[paths] anthropic_key` for `ANTHROPIC_API_KEY`, `[paths] openrouter_key`
+for `OPENROUTER_API_KEY`, the YouTube OAuth files; gitignored). Sending every Claude stage
+through OpenRouter is a paste of
+[`docs/openrouter-claude.toml`](https://github.com/byvfx/clippa/blob/main/docs/openrouter-claude.toml)
+into `clipper.toml` ([Model rollout](Model-rollout#moving-every-claude-model-to-openrouter)).
+Nothing loads that file on its own.

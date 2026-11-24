@@ -277,6 +277,164 @@ def test_run_save_false_writes_nothing_and_a_broken_check_is_a_finding(defaults,
                for f in found["s01_angry-joe"])
 
 
+def face_cover(sd):
+    """A cover whose face box is on disk: the cover check calls faces.pick, which imports cv2."""
+    rel = "segments/s01_angry-joe"
+    (sd / "segments" / "s01_angry-joe.jpg").write_bytes(b"jpg")
+    frame = sd / "thumbs" / rel / "f1.jpg"
+    frame.parent.mkdir(parents=True)
+    frame.write_bytes(b"frame")
+    jsonstate.write(sd / "thumbnails.json", {rel: {
+        "text": "JOE", "main_person": "Angry Joe", "frame": 1,
+        "face": {"x": 0.2, "y": 0.1, "width": 0.4, "height": 0.4},
+        "frames": [{"path": "f1.jpg"}]}})
+
+
+def hide_cv2(monkeypatch):
+    """`import cv2` fails the way a broken install does (sys.modules entry is None)."""
+    import sys
+
+    monkeypatch.setitem(sys.modules, "cv2", None)
+
+
+def test_missing_opencv_raises_and_does_not_write_checks(defaults, tmp_path, monkeypatch):
+    from clippa.errors import ClipperError
+
+    sd = fake_stream(defaults, tmp_path)
+    defaults["review"]["check_model"] = ""
+    face_cover(sd)
+    hide_cv2(monkeypatch)
+    with pytest.raises(ClipperError, match="review check needs OpenCV: install opencv-python-headless"):
+        review_check.run(sd, defaults, say=lambda *_: None)
+    assert not review_check.path(sd).exists()
+
+
+def test_missing_opencv_leaves_checks_json_and_is_not_skipped(defaults, tmp_path, monkeypatch):
+    """A saved 'No module named cv2' matches the signature, so it used to be skipped for good."""
+    from clippa import config, review
+    from clippa.errors import ClipperError
+
+    sd = fake_stream(defaults, tmp_path)
+    defaults["review"]["check_model"] = ""
+    face_cover(sd)
+    cfg = config.for_stream(defaults, sd)
+    it = review.items(sd, ["segments"], cfg)[0]
+    sig = review_check.signature(cfg, it, review_check.context(sd, cfg), False)
+    prior = {it["key"]: {"sig": sig, "at": "2026-11-20T00:00:00+00:00", "kind": "segment",
+                         "findings": [{"text": "the cover check failed: ModuleNotFoundError: "
+                                       "No module named 'cv2'"}]}}
+    jsonstate.write(review_check.path(sd), prior)
+    hide_cv2(monkeypatch)
+    with pytest.raises(ClipperError, match="review check needs OpenCV"):
+        review_check.run(sd, defaults, say=lambda *_: None)
+    assert review_check.load(sd) == prior
+
+
+def test_a_cover_is_still_checked_when_opencv_imports(defaults, tmp_path, monkeypatch):
+    """The normal path: cv2 imports, a broken cover is a finding and checks.json is written."""
+    import sys
+    import types
+
+    sd = fake_stream(defaults, tmp_path)
+    defaults["review"]["check_model"] = ""
+    face_cover(sd)
+    try:
+        import cv2  # noqa: F401
+    except ImportError:
+        monkeypatch.setitem(sys.modules, "cv2", types.ModuleType("cv2"))
+    found = review_check.run(sd, defaults, say=lambda *_: None)
+    assert review_check.path(sd).exists()
+    assert any(f["check"] == "cover" and "check failed" in f["text"] for f in found["s01_angry-joe"])
+
+
+def test_a_short_webcam_imports_cv2_and_a_plain_segment_does_not(defaults, tmp_path):
+    sd = fake_stream(defaults, tmp_path)
+    defaults["shorts"]["layouts"] = {"watch": WATCH}
+    short = {"kind": "short", "file": sd / "segments" / "s01_angry-joe.mp4", "thumb_key": "nope",
+             "meta": {"in_s": 0.0, "out_s": 30.0, "layout": "watch"}}
+    assert review_check.item_imports_cv2(sd, defaults, short, {"thumbs": {}})
+    # panel 0 is a webcam too: a non-empty cam list, including [0]
+    defaults["shorts"]["layouts"] = {"top": {"panels": [{"src": [0, 0, 1, 1], "cam": True}]}}
+    short["meta"] = {**short["meta"], "layout": "top"}
+    assert review_check.item_imports_cv2(sd, defaults, short, {"thumbs": {}})
+    # a 1 s webcam scene is never sampled (0.5 s margin either side), so detect() is not called
+    defaults["shorts"]["layouts"] = {"watch": WATCH}
+    defaults["review"]["check_frames"] = 8
+    short["meta"] = {"in_s": 0.0, "out_s": 20.0, "duration_s": 20.0, "layout": "watch",
+                     "scenes": [[0.0, 1.0, "watch"]]}
+    assert not review_check.item_imports_cv2(sd, defaults, short, {"thumbs": {}})
+    plain = {"kind": "segment", "file": sd / "segments" / "s01_angry-joe.mp4", "thumb_key": "nope",
+             "meta": {}}
+    assert not review_check.item_imports_cv2(sd, defaults, plain, {"thumbs": {}})
+
+
+def test_missing_opencv_still_saves_items_that_do_not_need_it(defaults, tmp_path, monkeypatch):
+    """A sibling whose title changed is rechecked and saved. The cover that needs cv2 is not
+    written as a bad cover, and a stale clean result does not stay in front of the new title."""
+    from clippa.errors import ClipperError
+
+    sd = fake_stream(defaults, tmp_path)
+    defaults["review"]["check_model"] = ""
+    side = sd / "segments" / "s01_angry-joe.json"
+    old = jsonstate.load(side)
+    jsonstate.write(side, {**old, "title": "Angry Joe returns", "description": "About Joe."})
+    review_check.run(sd, defaults, say=lambda *_: None)
+    assert not any("hosts" in f["text"] for f in review_check.load(sd)["s01_angry-joe"]["findings"])
+    jsonstate.write(side, {**jsonstate.load(side), "title": "The hosts give up"})
+    seg2 = {"id": "s02", "start_s": 3000.0, "end_s": 6000.0, "topic": "Don", "figures": ["Don"],
+            "title": "Don talks", "description": "Don talks.", "source_share": "none", "cut": True}
+    data = jsonstate.load(sd / "segments.json")
+    data["segments"].append(seg2)
+    jsonstate.write(sd / "segments.json", data)
+    jsonstate.write(sd / "segments" / "s02_don.json", seg2)
+    (sd / "segments" / "s02_don.mp4").write_bytes(b"")
+    rel = "segments/s02_don"
+    (sd / "segments" / "s02_don.jpg").write_bytes(b"jpg")
+    frame = sd / "thumbs" / rel / "f1.jpg"
+    frame.parent.mkdir(parents=True)
+    frame.write_bytes(b"frame")
+    jsonstate.write(sd / "thumbnails.json", {rel: {
+        "text": "DON", "main_person": "Don", "frame": 1,
+        "face": {"x": 0.2, "y": 0.1, "width": 0.4, "height": 0.4},
+        "frames": [{"path": "f1.jpg"}]}})
+    hide_cv2(monkeypatch)
+    with pytest.raises(ClipperError, match="review check needs OpenCV"):
+        review_check.run(sd, defaults, say=lambda *_: None)
+    saved = review_check.load(sd)
+    assert any("hosts" in f["text"] for f in saved["s01_angry-joe"]["findings"])
+    assert "s02_don" not in saved
+
+
+def test_an_unsampled_webcam_scene_does_not_need_opencv(defaults, tmp_path, monkeypatch):
+    sd = fake_stream(defaults, tmp_path)
+    defaults["review"]["check_model"] = ""
+    defaults["shorts"]["layouts"] = {"watch": WATCH}
+    defaults["review"]["check_frames"] = 8
+    hide_cv2(monkeypatch)
+    short = {"kind": "short", "key": "v01_t1", "file": sd / "shorts" / "v01.mp4",
+             "title": "Don talks", "description": "Don talks.", "text": "Don talks\n\nDon talks.",
+             "fields": {}, "thumb_key": "shorts/v01",
+             "meta": {"in_s": 0.0, "out_s": 20.0, "duration_s": 20.0, "layout": "watch",
+                      "scenes": [[0.0, 1.0, "watch"]]}}
+    found = review_check.run(sd, defaults, todo=[short], say=lambda *_: None)
+    assert "v01_t1" in found
+    assert not any("cv2" in f["text"] for f in found["v01_t1"])
+
+
+def test_publish_does_not_save_a_missing_opencv(defaults, tmp_path, monkeypatch):
+    from clippa import review
+    from clippa.errors import ClipperError
+
+    sd = fake_stream(defaults, tmp_path)
+    defaults["review"]["check_model"] = ""
+    face_cover(sd)
+    hide_cv2(monkeypatch)
+    todo = review.items(sd, ["segments"], defaults)
+    with pytest.raises(ClipperError, match="review check needs OpenCV"):
+        review.add_checks(sd, defaults, todo)
+    assert not review_check.path(sd).exists()
+
+
 def test_estimate_counts_covers_to_look_at(defaults, tmp_path):
     sd = fake_stream(defaults, tmp_path)
     assert review_check.estimate(sd, defaults)[0] == 0          # no cover .jpg
