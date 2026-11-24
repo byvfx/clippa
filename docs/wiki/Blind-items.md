@@ -130,11 +130,11 @@ The war room and Discord answer through the same function.
 
 A reveal post quotes the blind it answers and adds the answer on a last line of its own:
 
-```text
-November 7, 2026               the day the blind was posted
-The reality star with...       the blind, as posted
-Name One/Name Two              the answer
-```
+| Line | What it is |
+| --- | --- |
+| `November 7, 2026` | the day the blind was posted |
+| `The reality star with...` | the blind, as posted |
+| `Name One/Name Two` | the answer |
 
 Every `check` (and `clippa blinds reveals`) matches each new reveal to a stored blind, in code
 with no model call. A blind matches when the reveal repeats at least 60% of its wording (word

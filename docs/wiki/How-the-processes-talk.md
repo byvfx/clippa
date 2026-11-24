@@ -6,22 +6,19 @@ happen, this page says which file or log answers why.
 
 ## The streams folder is the bus
 
-```
-streams/<id>/                a stream: source, transcript, cuts, metadata, review.json, run.json, ...
-streams/<id>/.run.lock       the worker holding this stream (its name inside)
-streams/.serve.lock          one serve, one bot: OS locks held while the process lives
-streams/.bot.lock
-streams/.retake.lock         one retake run at a time
-streams/<id>/auto.json       approval by silence: who acted on an item, what approved itself (Review)
-streams/.serve/status.json   heartbeats: serve, bot, recorder
-streams/.bot/status.json
-streams/.record/status.json
-streams/.notify/outbox/      DMs waiting for the bot, one JSON file each
-streams/.checkup/state.json  the findings the last scheduled checkup saw (Checkup)
-streams/.checkup/repairs.json  what checkup --fix repaired, or would have (Checkup#repairs)
-streams/.checkup/alerted.json  the gone sign-ins checkup --alert already DMed (Checkup)
-streams/.audit/              the saved weekly digests and monthly deep audits (Audit)
-```
+| Path | What's in it |
+| --- | --- |
+| `streams/<id>/` | a stream: source, transcript, cuts, metadata, review.json, run.json, ... |
+| `streams/<id>/.run.lock` | the worker holding this stream (its name inside) |
+| `streams/.serve.lock`, `streams/.bot.lock` | one serve, one bot: OS locks held while the process lives |
+| `streams/.retake.lock` | one retake run at a time |
+| `streams/<id>/auto.json` | approval by silence: who acted on an item, what approved itself [Review](Review) |
+| `streams/.serve/status.json`, `streams/.bot/status.json`, `streams/.record/status.json` | heartbeats: serve, bot, recorder |
+| `streams/.notify/outbox/` | DMs waiting for the bot, one JSON file each |
+| `streams/.checkup/state.json` | the findings the last scheduled checkup saw [Checkup](Checkup) |
+| `streams/.checkup/repairs.json` | what checkup --fix repaired, or would have [Checkup](Checkup#repairs) |
+| `streams/.checkup/alerted.json` | the gone sign-ins checkup --alert already DMed [Checkup](Checkup) |
+| `streams/.audit/` | the saved weekly digests and monthly deep audits [Audit](Audit) |
 
 ## 1. State files and their locks (`clippa/jsonstate.py`)
 

@@ -19,6 +19,11 @@ Developing#releases.
   with only the inference key the panel is read-only. A 402 with Retry-After waits and retries;
   a spent key limit stops the call. Wiki: War room (Modal, costs and analytics), Costs
   (The OpenRouter budget).
+- 11-23: `docs/openrouter-claude.toml` is an opt-in overlay that sends every Claude stage
+  model through OpenRouter at the same tier and effort. Paste it into `clipper.toml`; it
+  needs `OPENROUTER_API_KEY`. The defaults stay on Claude. A `--dry-run` prices an
+  `openrouter:` model from OpenRouter's public list when `[llm.prices]` has no row (one
+  fetch per process; a failed fetch counts as $0 and is not tried again).
 
 ## 0.4.0 (2026-11-23)
 

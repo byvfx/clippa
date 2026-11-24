@@ -43,11 +43,57 @@ def test_meta_estimate_is_one_call_plus_chapters_minus_the_checkpoint(defaults, 
     assert any("nothing to pay" in x for x in lines) and not any("~$" in x for x in lines)
 
 
-def test_estimate_lines_never_go_online_for_a_price(defaults, monkeypatch):
-    """An openrouter: model not in [llm] prices counts $0 instead of fetching OpenRouter's list."""
-    monkeypatch.setattr(llm, "openrouter_prices", lambda: pytest.fail("the estimate went online"))
-    lines = llm.estimate_lines(defaults, [("x", "openrouter:acme/some-model", 1, 1_000, 10)])
-    assert "counted $0" in lines[0]
+def _models_response(rows: list[dict]):
+    class Response:
+        def json(self):
+            return {"data": rows}
+    return Response()
+
+
+def test_dry_run_prices_an_openrouter_model_from_its_list(defaults, monkeypatch):
+    """A --dry-run of an openrouter: name missing from [llm] prices uses the mocked /models
+    list. Nothing here calls the network."""
+    import requests
+
+    monkeypatch.setattr(llm, "_OPENROUTER_PRICES", None)
+    calls = []
+
+    def get(url, timeout):
+        calls.append(url)
+        return _models_response([
+            {"id": "anthropic/claude-haiku-5.5", "pricing": {"prompt": "0.0000001", "completion": "0.0000005"}},
+            {"id": "anthropic/claude-sonnet-5.5", "pricing": {"prompt": "0.000002", "completion": "0.00001"}},
+        ])
+    monkeypatch.setattr(requests, "get", get)
+    lines = llm.estimate_lines(defaults, [
+        ("haiku", "openrouter:anthropic/claude-haiku-5.5", 1, 1_000_000, 1_000_000),
+        ("sonnet", "openrouter:anthropic/claude-sonnet-5.5", 1, 1_000_000, 0),
+    ])
+    assert calls == [llm.PROVIDERS["openrouter"][0] + "/models"]
+    assert "~$ 0.60" in lines[0] and "counted $0" not in lines[0]
+    assert "~$ 2.00" in lines[1] and "counted $0" not in lines[1]
+    assert lines[-1].startswith("  total ~$2.60")
+
+
+def test_a_failed_openrouter_price_fetch_is_counted_once(defaults, monkeypatch):
+    """Offline, every openrouter: row would otherwise wait out its own timeout. A failed
+    fetch is cached: two rows, then another estimate, still one attempt, and $0."""
+    import requests
+
+    monkeypatch.setattr(llm, "_OPENROUTER_PRICES", None)
+    calls = []
+
+    def get(url, timeout):
+        calls.append((url, timeout))
+        raise requests.ConnectionError("offline")
+    monkeypatch.setattr(requests, "get", get)
+    rows = [("haiku", "openrouter:anthropic/claude-haiku-5.5", 1, 1_000_000, 0),
+            ("sonnet", "openrouter:anthropic/claude-sonnet-5.5", 1, 1_000_000, 0)]
+    lines = llm.estimate_lines(defaults, rows)
+    assert all("counted $0" in line for line in lines[:-1])
+    assert lines[-1].startswith("  total ~$0.00")
+    llm.estimate_lines(defaults, rows)
+    assert calls == [(llm.PROVIDERS["openrouter"][0] + "/models", 15)]
 
 
 def test_segments_estimate_without_a_split_costs_nothing(defaults, tmp_path):

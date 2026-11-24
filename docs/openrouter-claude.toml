@@ -1,0 +1,87 @@
+# Same Claude models, through OpenRouter. Paste these tables into clipper.toml. Do not
+# replace that file: it still holds the shows, paths and ids. Copy it first to
+# backups/clipper.toml.before_openrouter_<date> beside it.
+#
+# Needs OPENROUTER_API_KEY, or the key file at [paths] openrouter_key
+# (secrets/openrouter_secret.txt when that path is the default). A set environment
+# variable wins over the file. clipper.local.toml and CLIPPER_* still win over this.
+#
+# Roll back by restoring that copy. Putting a bare claude-* name back on one key sends
+# that stage to the Claude API again.
+#
+# Clippa's ids use hyphens (claude-haiku-5-5). OpenRouter's catalog ids use a dot
+# (anthropic/claude-haiku-5.5, and the same for Sonnet and Opus). Checked against
+# GET https://openrouter.ai/api/v1/models. Effort keys are not here: each stage keeps
+# the effort it already has (low, medium or high; none of these is "none").
+#
+# No [llm.prices] rows. A --dry-run prices an openrouter: model from the table, then
+# from OpenRouter's public /models list (one fetch per process; a failed fetch is
+# remembered, and the line says the model was counted as $0). A real call still uses
+# the cost OpenRouter reports.
+
+[preshow]
+model = "openrouter:anthropic/claude-sonnet-5.5"  # was claude-sonnet-5-5; effort stays medium
+
+[cast]
+label_model = "openrouter:anthropic/claude-haiku-5.5"  # was claude-haiku-5-5; label_effort stays low
+
+[news]
+judge_model = "openrouter:anthropic/claude-haiku-5.5"  # was claude-haiku-5-5; judge_effort stays low
+
+[blinds]
+clues_model = "openrouter:anthropic/claude-haiku-5.5"  # was claude-haiku-5-5; clues_effort stays low
+
+[scoring]
+model_a = "openrouter:anthropic/claude-haiku-5.5"  # was claude-haiku-5-5; effort_a stays medium
+model_b = "openrouter:anthropic/claude-sonnet-5.5"  # was claude-sonnet-5-5; effort_b stays high
+
+[segments]
+model = "openrouter:anthropic/claude-opus-5.5"  # was claude-opus-5-5; effort stays medium
+score_model = "openrouter:anthropic/claude-opus-5.5"  # was claude-opus-5-5; score_effort stays medium
+
+[meta]
+model = "openrouter:anthropic/claude-opus-5.5"  # was claude-opus-5-5; effort stays medium
+
+[thumbnail]
+model = "openrouter:anthropic/claude-opus-5.5"  # was claude-opus-5-5; effort stays medium
+
+[shorts]
+layout_model = "openrouter:anthropic/claude-haiku-5.5"  # was claude-haiku-5-5; layout_effort stays low
+
+[review]
+check_model = "openrouter:anthropic/claude-sonnet-5.5"  # was claude-sonnet-5-5; check_effort stays low
+
+[chat]
+model = "openrouter:anthropic/claude-haiku-5.5"  # was claude-haiku-5-5; effort stays low
+
+[retake]
+model = "openrouter:anthropic/claude-sonnet-5.5"  # was claude-sonnet-5-5; effort stays medium
+
+[pick]
+model = "openrouter:anthropic/claude-sonnet-5.5"  # was claude-sonnet-5-5; effort stays high
+locate_model = "openrouter:anthropic/claude-haiku-5.5"  # was claude-haiku-5-5; locate_effort stays medium
+
+[archive]
+ask_model = "openrouter:anthropic/claude-haiku-5.5"  # was claude-haiku-5-5; ask_effort stays low
+
+[receipts]
+model = "openrouter:anthropic/claude-sonnet-5.5"  # was claude-sonnet-5-5; effort stays medium
+script_model = "openrouter:anthropic/claude-opus-5.5"  # was claude-opus-5-5; script_effort stays medium
+
+[investigate]
+facts_model = "openrouter:anthropic/claude-haiku-5.5"  # was claude-haiku-5-5; facts_effort stays low
+leads_model = "openrouter:anthropic/claude-sonnet-5.5"  # was claude-sonnet-5-5; leads_effort stays medium
+check_model = "openrouter:anthropic/claude-haiku-5.5"  # was claude-haiku-5-5; check_effort stays low
+
+[swarm]
+planner_model = "openrouter:anthropic/claude-sonnet-5.5"  # was claude-sonnet-5-5; planner_effort stays low
+worker_model = "openrouter:anthropic/claude-haiku-5.5"  # was claude-haiku-5-5; worker_effort stays low
+
+[story]
+triage_model = "openrouter:anthropic/claude-haiku-5.5"  # was claude-haiku-5-5; triage_effort stays low
+find_model = "openrouter:anthropic/claude-haiku-5.5"  # was claude-haiku-5-5; find_effort stays low
+dossier_model = "openrouter:anthropic/claude-sonnet-5.5"  # was claude-sonnet-5-5; dossier_effort stays medium
+edit_model = "openrouter:anthropic/claude-sonnet-5.5"  # was claude-sonnet-5-5; edit_effort stays medium
+
+[weekly]
+model = "openrouter:anthropic/claude-opus-5.5"  # was claude-opus-5-5; effort stays high
