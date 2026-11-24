@@ -182,6 +182,7 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   analytics` retries Google's passing errors and skips a video still failing (#335, #336); a failed analytics or prune run comes
   back in 30 min, doubling per failure (`RETRY_FAILED_S`, #338). Details: log 11-20.
 - **Model providers (#72, closed 11-09):** production still runs Haiku and Sonnet. Config-7 is being evaluated through the opt-in overlays `docs/config-7-hybrid-segv4.toml` and `docs/config-7-hybrid-segv4-openrouter.toml` (wiki Model-rollout); the defaults stay. Tools: `clippa compare score`, `clippa models test|gold`; OpenRouter key in `secrets/openrouter_secret.txt`.
+- **OpenRouter budget panel (draft, not deployed, 11-24):** Money page, beside API usage. Reads the clippa key server-side. Changing the limit or disabling the key needs `OPENROUTER_MANAGEMENT_KEY` or `secrets/openrouter_management_secret.txt` (never in the page). Warning percent defaults to 75, saved in `streams/.serve/openrouter.json`. Do not touch production `clipper.toml` for this. Reaches serve only after `bash deploy/hub/deploy.sh` from a main checkout once it is merged.
 
 ## Waiting on the user
 - v0.4.0 is released (PR #395, tag 11-23 on 7f6f4ed, the user: "can we tag a v0.4.0 tonight?"; Release "Clippa 0.4.0";

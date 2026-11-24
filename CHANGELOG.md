@@ -12,6 +12,13 @@ Developing#releases.
 
 ### 2026-11
 
+- 11-24: the war room's Money page has an OpenRouter budget panel (the API usage panel stays):
+  the clippa key's cap, a 75% warning you can change, and Spend / Money reacting when the cap
+  is close or spent. Top up is a link to OpenRouter. Editing the limit or disabling the key
+  confirms first and needs `OPENROUTER_MANAGEMENT_KEY` (or `secrets/openrouter_management_secret.txt`);
+  with only the inference key the panel is read-only. A 402 with Retry-After waits and retries;
+  a spent key limit stops the call. Wiki: War room (Modal, costs and analytics), Costs
+  (The OpenRouter budget).
 - 11-23: `docs/openrouter-claude.toml` is an opt-in overlay that sends every Claude stage
   model through OpenRouter at the same tier and effort. Paste it into `clipper.toml`; it
   needs `OPENROUTER_API_KEY`. The defaults stay on Claude. A `--dry-run` prices an

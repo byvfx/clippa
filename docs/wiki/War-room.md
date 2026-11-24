@@ -352,6 +352,19 @@ The Money page has the first three, the Stats page the analytics.
   today, by model, OpenRouter's week, limit and balance, each next to what Clippa's log recorded.
   Claude's needs an Admin API key ([Costs](Costs#the-providers-own-numbers));
   `clippa costs --providers` prints the same.
+- **OpenRouter budget**: the clippa key's own cap, above Costs, Modal and API usage (those stay).
+  It reads the key and the account balance from OpenRouter, cached for five minutes, with
+  **Ask OpenRouter again** to fetch now. The warning mark defaults to 75% of the cap
+  (**Warn at 75% · Change…**) and is saved with the war room's state. Past it, the Spend
+  widget turns amber and Money gets a **!**. When the cap is spent (`openrouter_key_limit`),
+  Spend turns red, the health light says **Stopped**, and the panel says which run stopped.
+  A 402 that carries Retry-After is the in-flight budget: the panel counts down and the call
+  is sent again. **Top up on OpenRouter** opens the credits page; the API cannot buy credits.
+  **Edit limit…** and **Disable key…** each confirm before `PATCH /api/v1/keys/{hash}`, and
+  only when a management key is set (`OPENROUTER_MANAGEMENT_KEY`, or
+  `secrets/openrouter_management_secret.txt`). With only the inference key the panel is
+  read-only. The per-run `--budget` card is that flag's meaning: it stops one run, and it is
+  not a dollar amount. Detail on [Costs](Costs#the-openrouter-budget).
 - **Analytics**: a month of YouTube. Views, watch time and
   subscribers against the month before, views per day, where views came from (Shorts feed,
   search, ...), and the first-7-day numbers of that month's uploads by show, kind, weekday and
