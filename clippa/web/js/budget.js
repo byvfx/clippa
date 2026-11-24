@@ -14,6 +14,16 @@ function paintSpend() {
   const spend = ORB?.header?.spend;
   b.style.color = spend === "bad" ? "var(--red)" : spend === "warn" ? "var(--amber)" : "";
 }
+// The health light is owned by tick() (core.js). Applying a budget answer calls it now:
+// the overview poll and this one finish in either order, and the 1 s clock would otherwise
+// leave #wHealth on OK for up to a second after the cap is already spent.
+function applyOpenRouter(data) {
+  ORB = data;
+  paintSpend();
+  paintBadge();
+  renderOrb();
+  if (typeof tick === "function") tick();
+}
 function paintBadge() {
   const on = !!ORB?.header?.badge;
   for (const id of ["vnMoney", "vnMoneyMore"]) {
@@ -38,14 +48,11 @@ function retryLeft() {
 
 async function refreshBudget(fresh) {
   if (!$("#orb")) return;
-  try { ORB = await api("/api/openrouter" + (fresh ? "?fresh=1" : "")); }
+  try { applyOpenRouter(await api("/api/openrouter" + (fresh ? "?fresh=1" : ""))); }
   catch (e) {
-    ORB = { error: e.message, configured: false, level: "error", links: { credits: "https://openrouter.ai/settings/credits" },
-            header: { spend: "ok", health: null, badge: false }, events: [] };
+    applyOpenRouter({ error: e.message, configured: false, level: "error", links: { credits: "https://openrouter.ai/settings/credits" },
+            header: { spend: "ok", health: null, badge: false }, events: [] });
   }
-  paintSpend();
-  paintBadge();
-  renderOrb();
 }
 
 function renderOrb() {
@@ -206,7 +213,7 @@ async function limitConfirm() {
   catch (e) { return toast(e.message, true); }
   ORB_FORM = null;
   $("#tool").close();
-  paintSpend(); paintBadge(); renderOrb();
+  applyOpenRouter(ORB);
   toast("Limit updated");
 }
 
@@ -220,10 +227,11 @@ function warnDialog() {
 }
 async function saveWarn() {
   const pct = $("#orbWarn")?.value?.trim();
-  try { ORB = await api("/api/openrouter/warn", { pct: +pct }); }
+  let saved;
+  try { saved = await api("/api/openrouter/warn", { pct: +pct }); }
   catch (e) { return toast(e.message, true); }
   $("#tool").close();
-  paintSpend(); paintBadge(); renderOrb();
+  applyOpenRouter(saved);
 }
 
 function disableDialog(off) {
@@ -240,10 +248,11 @@ function disableDialog(off) {
 }
 async function disableConfirm(btn) {
   const off = btn?.dataset?.off === "1";
-  try { ORB = await api("/api/openrouter/disabled", { disabled: off, confirm: true }); }
+  let saved;
+  try { saved = await api("/api/openrouter/disabled", { disabled: off, confirm: true }); }
   catch (e) { return toast(e.message, true); }
   $("#tool").close();
-  paintSpend(); paintBadge(); renderOrb();
+  applyOpenRouter(saved);
   toast(off ? "Key disabled" : "Key enabled");
 }
 
