@@ -80,6 +80,7 @@ def test_a_flac_over_the_limit_goes_up_as_opus(tmp_path, defaults, monkeypatch):
 
     monkeypatch.setattr(transcribe, "modal_encode", encode)
     monkeypatch.setattr(transcribe, "modal_worker", lambda tc, gpu: Worker)
+    monkeypatch.setattr(transcribe, "modal_cost", lambda gpu, wall, out: {"call_s": 1.0, "est_usd": 0.0})  # CI has no modal
     transcribe.transcribe_modal(wav, {**tc, "modal_opus_over_mb": 100e-6})   # a 100-byte limit
     assert encoded == ["flac", "opus"] and sent == [(".ogg", 50)]
     encoded.clear(), sent.clear()
