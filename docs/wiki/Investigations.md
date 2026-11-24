@@ -53,8 +53,11 @@ kept is marked withdrawn in Discord; a thread or message is only remade when Dis
 
 ## Setup
 
-`clippa investigate` needs nothing new beyond a
-transcribed archive and `ANTHROPIC_API_KEY`; `clippa archive index <subject>` (free) lets it
+`clippa investigate` needs a transcribed archive and, with the default models,
+`ANTHROPIC_API_KEY`. The [OpenRouter overlay](Model-rollout#moving-every-claude-model-to-openrouter)
+moves `[investigate] facts_model`, `leads_model` and `check_model` onto OpenRouter, which
+then needs `OPENROUTER_API_KEY` or the file at `[paths] openrouter_key`.
+`clippa archive index <subject>` (free) lets it
 check dropped threads against the full transcripts and is needed for `--confirm`. Its coverage
 check searches the web and Reddit through the Brave key `clippa cast` uses (see the cast
 library above); without one it tries Reddit's own feed, which often turns unsigned clients away.

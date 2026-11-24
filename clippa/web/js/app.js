@@ -226,7 +226,7 @@ loadLooks();
 
 // Everything that polls the server: [refresh, every ms]. Each runs now, then whenever it falls due.
 const POLL = [[pollRefresh, 15000], [refreshLive, 60000], [refreshCloud, 60000], [refreshCosts, 300000],
-              [refreshUsage, 300000], [refreshStats, 900000]];
+              [refreshUsage, 300000], [refreshBudget, 60000], [refreshStats, 900000]];
 loadHash();
 // #201: a tab in the background doesn't poll; coming back runs whatever fell due while it was away.
 // One check a second rather than a timer each, so a catch-up poll moves the next one along with it

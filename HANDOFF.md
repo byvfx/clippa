@@ -182,6 +182,7 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   analytics` retries Google's passing errors and skips a video still failing (#335, #336); a failed analytics or prune run comes
   back in 30 min, doubling per failure (`RETRY_FAILED_S`, #338). Details: log 11-20.
 - **Model providers (#72, closed 11-09):** production still runs Haiku and Sonnet. Config-7 is being evaluated through the opt-in overlays `docs/config-7-hybrid-segv4.toml` and `docs/config-7-hybrid-segv4-openrouter.toml` (wiki Model-rollout); the defaults stay. Tools: `clippa compare score`, `clippa models test|gold`; OpenRouter key in `secrets/openrouter_secret.txt`.
+- **OpenRouter budget panel (draft, not deployed, 11-24):** Money page, beside API usage. Reads the clippa key server-side. Changing the limit or disabling the key needs `OPENROUTER_MANAGEMENT_KEY` or `secrets/openrouter_management_secret.txt` (never in the page). Warning percent defaults to 75, saved in `streams/.serve/openrouter.json`. Do not touch production `clipper.toml` for this. Reaches serve only after `bash deploy/hub/deploy.sh` from a main checkout once it is merged.
 
 ## Waiting on the user
 - v0.4.0 is released (PR #395, tag 11-23 on 7f6f4ed, the user: "can we tag a v0.4.0 tonight?"; Release "Clippa 0.4.0";
@@ -238,6 +239,15 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
 - `ANTHROPIC_ADMIN_KEY` for Claude's own usage count on Costs, if wanted.
 
 ## Open work
+- **OpenRouter spending limits (not deployed):** a key limit or empty credits stops the model
+  call at once (`OpenRouterLimit`); an in-flight budget waits for `Retry-After` and retries.
+  A segments run that stops this way does not write a partial `segments.json`. Not on the hub
+  until this merges and `deploy/hub/deploy.sh` runs. Production `clipper.toml` was not touched.
+- **OpenRouter Claude overlay (not applied):** `docs/openrouter-claude.toml` is every Claude
+  stage model at the same tier and effort, as `openrouter:anthropic/claude-*.5`. No price
+  rows: a `--dry-run` reads OpenRouter's public list once per process. Paste into
+  `clipper.toml`; it needs `OPENROUTER_API_KEY`. The defaults stay on Claude. Direct Claude
+  access ends around 2026-12-22.
 - **Long segments (config-7 prep, not in production):** `[segments] split_over_s` defaults to 0
   (off). A negative value is off too; a non-number is a one-line error. The NAS `clipper.toml` does
   not set it, and `max_s` is still 3600. Turn it on (3000, the upcoming segments prompt's 50 minutes)
@@ -275,6 +285,8 @@ of phone use; #300 (access levels, a local Jev-like classifier in front of the m
 - **War room heat graph (PR #294, live 11-19):** 🔥 on a stream or item (`/api/heat`, wiki War-room#heat); not yet seen on a real phone.
 - **Review pre-flight checks and approval by silence (#259):** steps A (`clippa review check`, PR #263) and B (`clippa review
   auto`, PR #265, serve's `auto` job every 10 min), stale-finding rechecks (#270) and hardening (#273) are live (wiki Review).
+  A missing OpenCV stops the run after saving items that don't need it, and does not cache a bad cover for the ones
+  that do; one already cached that way is checked again without `--force` once `uv sync --extra faces` is in.
   **On for Kino since 11-15 and Channel 404 since 11-20** (`[shows.<key>.review] auto_approve = true`, Shorts 6+, segments
   4+ since 11-23; the compilation floor is 0; backups `backups/clipper.toml.before_kino_auto_approve_2026-11-15`,
   `...before_c404_auto_approve_2026-11-20`). Don's Shorts clean since 11-20 (checkup `auto` all good 11-23). Segments (#258 A-C)

@@ -118,7 +118,11 @@ person's view ([Reviewing](Reviewing)).
 ## Requirements
 
 Python 3.12, [uv](https://docs.astral.sh/uv/), ffmpeg with libass (the "full" builds), an
-Anthropic API key, a Kitsu instance, and a Discord bot if you want cards in Discord. Any stage
-can run on another model provider instead (OpenAI, Gemini, or a local OpenAI-compatible server
-such as Ollama) by prefixing its model key: [Model providers](Model-providers).
+Anthropic API key (`ANTHROPIC_API_KEY`; the defaults are Claude), a Kitsu instance, and a
+Discord bot if you want cards in Discord. Any stage can run on another model provider
+(OpenAI, Gemini, OpenRouter, or a local OpenAI-compatible server such as Ollama) by
+prefixing its model key: [Model providers](Model-providers). OpenRouter for every Claude
+stage is the opt-in overlay
+[`docs/openrouter-claude.toml`](https://github.com/byvfx/clippa/blob/main/docs/openrouter-claude.toml),
+which needs `OPENROUTER_API_KEY` or `[paths] openrouter_key`.
 YouTube downloads (pre-shows) need a JavaScript runtime; `uv sync` installs deno for yt-dlp.

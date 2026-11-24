@@ -23,14 +23,21 @@ What differs per provider:
   the schema and sent back once with what was wrong.
 - refusals: (None, meta) from json_call and ("", meta) from text_call everywhere; the
   server-side refusal fallback exists on the Claude API only.
+- OpenRouter spending limits (error.metadata.limit_source): openrouter_key_limit (HTTP 402
+  or 403) and openrouter_credits (HTTP 402) raise OpenRouterLimit at once. An in-flight
+  budget (openrouter_in_flight_budget, HTTP 402) waits for Retry-After and tries again,
+  up to the same six attempts as the other retries, then raises OpenRouterLimit.
 - images: Claude content blocks ({"type": "image", "source": {"type": "base64", ...}}) are
   converted to image_url data URLs.
 Prices are [llm] prices ($ per 1M input/output tokens, by model string), for cost lines only;
-OpenRouter reports what each call cost, and that wins over the table.
+OpenRouter reports what each call cost, and that wins over the table. When a call omits that
+cost, and for a dry-run, an openrouter: model uses OpenRouter's published list (one fetch per
+process, including a failed fetch).
 """
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import threading
@@ -38,7 +45,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from .errors import ClipperError, KeyRejected
+from .errors import ClipperError, KeyRejected, OpenRouterLimit
 
 PROVIDERS = {  # prefix -> (base URL, key env var)
     "openai": ("https://api.openai.com/v1", "OPENAI_API_KEY"),
@@ -53,6 +60,8 @@ def claude_effort(effort: str) -> str:
     return "low" if effort == "none" else effort
 RETRY_STATUS = (408, 429, 500, 502, 503, 504, 529)
 STARTED = (408, 500, 502, 504)  # errors that can come after the model began (and was billed)
+ATTEMPTS = 6  # one call plus retries; an in-flight budget uses the same budget
+_IN_FLIGHT = "openrouter_in_flight_budget"
 MODEL_KEY = re.compile(r"(^|_)model(_[ab])?$")
 
 
@@ -84,7 +93,8 @@ _OPENROUTER_MAX_OUT: dict[str, int] = {}
 
 def openrouter_prices() -> dict[str, tuple[float, float]]:
     """OpenRouter's published $ per 1M input/output tokens by model id (its /models list is
-    public), fetched once per process; {} when it can't be reached."""
+    public). Fetched once per process. A failed fetch is cached as {} so a dry-run of many
+    rows waits out the timeout at most once; a later row does not try again."""
     global _OPENROUTER_PRICES
     if _OPENROUTER_PRICES is None:
         import requests
@@ -99,7 +109,7 @@ def openrouter_prices() -> dict[str, tuple[float, float]]:
             _OPENROUTER_MAX_OUT.update({m["id"]: int(m["top_provider"]["max_completion_tokens"])
                                         for m in data if (m.get("top_provider") or {}).get("max_completion_tokens")})
         except (requests.RequestException, ValueError, KeyError, TypeError):
-            return {}  # not cached: the next estimate tries again
+            _OPENROUTER_PRICES = {}
     return _OPENROUTER_PRICES
 
 
@@ -247,6 +257,108 @@ class NoSchema(Exception):
     """The server doesn't take response_format json_schema."""
 
 
+def _header(headers, name: str) -> str:
+    """A response header by name, whatever case the server or a fake used."""
+    wanted = name.lower()
+    for key, value in getattr(headers, "items", lambda: ())():
+        if str(key).lower() == wanted and value is not None:
+            return str(value).strip()
+    return ""
+
+
+def _retry_after_s(headers) -> float | None:
+    """Retry-After as seconds, or None when it is missing or not a number of seconds.
+
+    OpenRouter's in-flight budget says how long to wait. The number is kept (a 0 means
+    retry at once); an HTTP-date or anything else is not a wait this client can honour.
+    Capped at 60, the same ceiling as the client's other retries, so a stray header
+    cannot hold a stream for hours."""
+    raw = _header(headers, "retry-after")
+    if not raw:
+        return None
+    try:
+        pause = float(raw)
+    except ValueError:
+        return None
+    if not math.isfinite(pause) or pause < 0:
+        return None
+    return min(60.0, pause)
+
+
+def _error_body(response) -> dict | None:
+    """The JSON object in an error response, or None when it isn't one. Parsed once."""
+    try:
+        body = response.json()
+    except (ValueError, AttributeError):  # not JSON, or a stand-in response with no json()
+        return None
+    return body if isinstance(body, dict) else None
+
+
+def _limit_source(body: dict | None) -> str:
+    """error.metadata.limit_source, or "" when the body is not that shape."""
+    err = body.get("error") if isinstance(body, dict) else None
+    meta = err.get("metadata") if isinstance(err, dict) else None
+    source = meta.get("limit_source") if isinstance(meta, dict) else None
+    return source if isinstance(source, str) else ""
+
+
+def _provider_message(body: dict | None, response) -> str:
+    """The error message in an already-parsed body, else the body text, one short line."""
+    err = body.get("error") if isinstance(body, dict) else None
+    message = err.get("message") if isinstance(err, dict) else None
+    text = message if isinstance(message, str) and message.strip() else getattr(response, "text", "")
+    return " ".join(str(text).split())[:200]
+
+
+def _raise_limit(model: str, response, source: str, detail: str, *, paths, tries: int | None = None) -> None:
+    """Record the stop for the budget panel and raise. A key limit is OpenRouterKeyLimit
+    (still an OpenRouterLimit) so the panel and a stage both see it."""
+    from . import openrouter_budget as ob
+
+    if paths is not None:
+        ob.note_stop({"paths": paths}, status=response.status_code, code=source, model=model)
+    if tries:
+        message = (f"{model}: OpenRouter limit {source} (HTTP {response.status_code}) "
+                   f"after {tries} tries: {detail}")
+    else:
+        message = (f"{model}: OpenRouter limit {source} (HTTP {response.status_code}), "
+                   f"not retried: {detail}")
+    if source == "openrouter_key_limit":
+        raise ob.OpenRouterKeyLimit(message)
+    raise OpenRouterLimit(message, source)
+
+
+def _openrouter_limit_wait(model: str, response, attempt: int, paths=None,
+                           tries: int = ATTEMPTS) -> float | None:
+    """None when this response is not a metadata spending limit we handle. A float: sleep, then retry.
+
+    openrouter_key_limit is final on HTTP 402 or 403. openrouter_credits and
+    openrouter_in_flight_budget are final or retried only on HTTP 402. Another status
+    with those sources is left for the caller."""
+    status = response.status_code
+    if status not in (402, 403):
+        return None
+    body = _error_body(response)
+    source = _limit_source(body)
+    if not source:
+        return None
+    detail = _provider_message(body, response)
+    if source == "openrouter_key_limit":
+        _raise_limit(model, response, source, detail, paths=paths)
+    if source == "openrouter_credits":
+        if status != 402:
+            return None
+        _raise_limit(model, response, source, detail, paths=paths)
+    if source != _IN_FLIGHT or status != 402:
+        return None
+    pause = _retry_after_s(response.headers)
+    if pause is None:
+        _raise_limit(model, response, source, f"no Retry-After: {detail}", paths=paths)
+    if attempt + 1 >= tries:
+        _raise_limit(model, response, source, detail, paths=paths, tries=tries)
+    return pause
+
+
 class LLM:
     """One client for every stage; routes each call by its model string. `cost` adds up
     every call made through it (for the stages' cost lines)."""
@@ -287,11 +399,11 @@ class LLM:
     def _account(self, model: str, tokens_in: int, tokens_out: int,
                  usd: float | None = None) -> dict:
         """Add a call to the cost and the ledger. usd: what the provider says it cost
-        (OpenRouter), else the [llm] prices table's figure."""
+        (OpenRouter), else known_price: the [llm] prices table, then OpenRouter's list."""
         from . import costs
 
         if usd is None:
-            pin, pout = price_of(self.prices, model) or (0.0, 0.0)
+            pin, pout = known_price({"llm": {"prices": self.prices}}, model) or (0.0, 0.0)
             usd = (tokens_in * pin + tokens_out * pout) / 1e6
         with self._lock:
             self.cost += usd
@@ -486,16 +598,65 @@ class LLM:
                                "and nothing else:\n" + json.dumps(schema))
         return {"type": "json_object"}
 
-    def _compat(self, model: str, messages: list[dict], effort: str, max_tokens: int,  # noqa: C901
+    def _handle_compat_status(self, model: str, prov: str, env: str, r, body: dict, token_key: str,
+                              asked: int, response_format: dict | None, attempt: int,
+                              timeout_s: float | None) -> bool:
+        """True: send this request again. False: `r` is the answer to use.
+
+        Raises OpenRouterLimit, KeyRejected, NoSchema or RuntimeError when the call is over."""
+        # 200 OK never parses the body here: the limit check is only a 402 or 403.
+        if prov == "openrouter" and r.status_code in (402, 403):
+            wait = _openrouter_limit_wait(model, r, attempt, paths=self.paths)
+            if wait is not None:
+                from . import openrouter_budget as ob
+
+                ob.note_retry({"paths": self.paths}, seconds=wait, status=r.status_code)
+                time.sleep(wait)
+                return True
+            # No limit_source: the budget panel's text rules (a 402 that only says
+            # "in-flight" or "key limit") still apply.
+            if self._openrouter_payment(r, model, attempt, timeout_s):
+                return True
+        # A long call (timeout_s) that a gateway gave up on may be thinking still, and billed:
+        # only a refusal before it started (rate limit, overloaded) is worth sending again.
+        if r.status_code in RETRY_STATUS and attempt < ATTEMPTS - 1 and not (
+                timeout_s and r.status_code in STARTED):
+            time.sleep(min(60.0, float(r.headers.get("retry-after") or 2 ** (attempt + 1))))
+            return True
+        if r.status_code == 400:
+            text = r.text.lower()
+            if ("reasoning_effort" in body or "reasoning" in body) and "reasoning" in text:
+                self._no_effort.add(model)  # not a reasoning model
+                body.pop("reasoning_effort", None)
+                body.pop("reasoning", None)
+                body[token_key] = asked  # no thinking, so no room for it
+                return True
+            if body[token_key] > asked and ("max_tokens" in text or "max_completion_tokens" in text):
+                body[token_key] = asked  # more than this model writes: the caller's own figure
+                return True
+            if (response_format or {}).get("type") == "json_schema" and (
+                    "response_format" in text or "json_schema" in text):
+                raise NoSchema
+        # Gemini answers a bad key with a 400 ("API key not valid"), the others with a 401.
+        if prov != "local" and (r.status_code == 401 or (
+                r.status_code == 400 and prov == "gemini" and "api key not valid" in r.text.lower())):
+            raise KeyRejected(f"{model}: {env} (or [paths] {prov}_key) was rejected "
+                              f"(HTTP {r.status_code}): {r.text[:200]}")
+        if not r.ok:
+            raise RuntimeError(f"{model}: HTTP {r.status_code}: {r.text[:300]}")
+        return False
+
+    def _compat(self, model: str, messages: list[dict], effort: str, max_tokens: int,
                 response_format: dict | None = None, length_ok: bool = False,
                 thinking_tokens: int | None = None, timeout_s: float | None = None,
                 extra: dict | None = None) -> tuple[dict, dict]:
         """One chat/completions request with retries. Returns (response JSON, meta); meta has
-        "refusal" when the model refused. length_ok: running out of max_tokens isn't an error
-        (the preflight, where a reasoning model can spend them all thinking). thinking_tokens,
-        timeout_s: this call's own (text_call); with timeout_s, a dropped connection (a timeout, a
-        reset, a cut-off answer) or a gateway error (STARTED) is not sent again. extra: more of
-        the request body (tool_call's tools)."""
+        "refusal" when the model refused. An OpenRouter spending limit is handled in
+        _handle_compat_status (hard stop, or wait for Retry-After). length_ok: running out of
+        max_tokens isn't an error (the preflight, where a reasoning model can spend them all
+        thinking). thinking_tokens, timeout_s: this call's own (text_call); with timeout_s, a
+        dropped connection (a timeout, a reset, a cut-off answer) or a gateway error (STARTED)
+        is not sent again. extra: more of the request body (tool_call's tools)."""
         import requests
 
         prov, name = split(model)
@@ -529,42 +690,25 @@ class LLM:
         headers = {"Authorization": f"Bearer {key}"} if key else {}
         if prov == "openrouter":
             headers["X-Title"] = "clippa"
-        for attempt in range(6):
+        for attempt in range(ATTEMPTS):
             try:
                 r = requests.post(f"{base}/chat/completions", json=body, headers=headers,
                                   timeout=timeout_s or self.lc["timeout_s"])
             except requests.RequestException as e:
-                if attempt == 5 or timeout_s:  # a long call may have started: each try is paid for
+                if attempt == ATTEMPTS - 1 or timeout_s:  # a long call may have started: each try is paid for
                     raise RuntimeError(f"{model}: {type(e).__name__}: {e}") from None
                 time.sleep(2 ** attempt)
                 continue
-            # A long call (timeout_s) that a gateway gave up on may be thinking still, and billed:
-            # only a refusal before it started (rate limit, overloaded) is worth sending again.
-            if r.status_code in RETRY_STATUS and attempt < 5 and not (timeout_s and r.status_code in STARTED):
-                time.sleep(min(60.0, float(r.headers.get("retry-after") or 2 ** (attempt + 1))))
+            if self._handle_compat_status(model, prov, env, r, body, limit, asked, response_format,
+                                          attempt, timeout_s):
                 continue
-            if r.status_code == 400:
-                text = r.text.lower()
-                if ("reasoning_effort" in body or "reasoning" in body) and "reasoning" in text:
-                    self._no_effort.add(model)  # not a reasoning model
-                    body.pop("reasoning_effort", None)
-                    body.pop("reasoning", None)
-                    body[limit] = asked  # no thinking, so no room for it
-                    continue
-                if body[limit] > asked and ("max_tokens" in text or "max_completion_tokens" in text):
-                    body[limit] = asked  # more than this model writes: the caller's own figure
-                    continue
-                if (response_format or {}).get("type") == "json_schema" and (
-                        "response_format" in text or "json_schema" in text):
-                    raise NoSchema
-            # Gemini answers a bad key with a 400 ("API key not valid"), the others with a 401.
-            if prov != "local" and (r.status_code == 401 or (
-                    r.status_code == 400 and prov == "gemini" and "api key not valid" in r.text.lower())):
-                raise KeyRejected(f"{model}: {env} (or [paths] {prov}_key) was rejected "
-                                  f"(HTTP {r.status_code}): {r.text[:200]}")
-            if not r.ok:
-                raise RuntimeError(f"{model}: HTTP {r.status_code}: {r.text[:300]}")
             break
+        return self._compat_done(model, prov, name, r, length_ok)
+
+    def _compat_done(self, model: str, prov: str, name: str, r, length_ok: bool) -> tuple[dict, dict]:
+        """The successful response: cost, refusal, and a cut-off answer."""
+        if prov == "openrouter":
+            self._openrouter_clear()
         data = r.json()
         choice = data["choices"][0]
         usage = data.get("usage") or {}
@@ -579,6 +723,29 @@ class LLM:
         elif choice.get("finish_reason") == "length" and not length_ok:
             raise RuntimeError(f"{model} hit max_tokens ({meta['request_id']})")
         return data, meta
+
+    def _openrouter_payment(self, response, model: str, attempt: int, timeout_s: float | None) -> bool:
+        """A 402/403 from OpenRouter. True: wait and send it again. A spent key limit raises."""
+        from . import openrouter_budget as ob
+
+        header = response.headers.get("Retry-After") or response.headers.get("retry-after")
+        kind = ob.classify_payment(response.status_code, response.text, header)
+        if kind == "openrouter_in_flight_budget" and attempt < 5 and not timeout_s:
+            wait = ob.retry_seconds(header) or 0
+            ob.note_retry({"paths": self.paths}, seconds=wait, status=response.status_code)
+            time.sleep(wait)
+            return True
+        if kind == "openrouter_key_limit":
+            ob.note_stop({"paths": self.paths}, status=response.status_code, model=model)
+            raise ob.OpenRouterKeyLimit(
+                f"openrouter_key_limit: OpenRouter refused {model} (HTTP {response.status_code}). "
+                "The clippa key's limit is spent.")
+        return False
+
+    def _openrouter_clear(self) -> None:
+        from . import openrouter_budget as ob
+
+        ob.clear_retry({"paths": self.paths})
 
 
 # Every stage's model calls go through clippa/llm.py, which picks the provider from the
@@ -634,12 +801,13 @@ def tokens(text: str) -> int:
 
 def estimate_lines(cfg: dict, rows: list[tuple[str, str, int, int, int]]) -> list[str]:
     """`--dry-run` lines for a stage's model calls, (label, model, calls, tokens in, tokens out)
-    each, then the total. Priced from [llm] prices alone (an estimate never goes online, not
-    even for an openrouter: model); a model missing there counts $0 and the line says so."""
+    each, then the total. Priced with known_price: the [llm] prices table, then OpenRouter's
+    public /models list for an openrouter: name. That list is fetched once per process, and a
+    failed fetch is cached, so later rows do not wait on it again. A model still missing counts
+    $0 and the line says so; a failed fetch does not raise."""
     out, total = [], 0.0
-    table = prices(cfg)
     for label, model, calls, tin, tout in rows:
-        price = price_of(table, model)
+        price = known_price(cfg, model)
         pin, pout = price or (0.0, 0.0)
         usd = (tin * pin + tout * pout) / 1e6
         total += usd
@@ -647,5 +815,6 @@ def estimate_lines(cfg: dict, rows: list[tuple[str, str, int, int, int]]) -> lis
         plural = "s" if calls != 1 else ""
         out.append(f"  {label:<9} {calls:>4} call{plural:<1}  ~{tin / 1000:>6,.0f}k in  ~{tout / 1000:>4,.0f}k out"
                    f"  ~${usd:>5.2f}  {model}{note}")
-    out.append(f"  total ~${total:.2f}  (four characters a token, [llm] prices; nothing was called)")
+    out.append(f"  total ~${total:.2f}  (four characters a token, [llm] prices or OpenRouter's "
+               "list; nothing was called)")
     return out

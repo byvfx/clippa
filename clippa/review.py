@@ -731,7 +731,9 @@ def add_checks(stream_dir: Path, cfg: dict, todo: list[dict]) -> None:
     print("checks:", flush=True)
     try:
         found = review_check.run(stream_dir, cfg, todo)
-    except Exception as e:  # noqa: BLE001  # advisory: the review goes out without them, flagged
+    except Exception as e:  # advisory: the review goes out without them, flagged
+        if review_check.missing_opencv(e):
+            raise  # not a finding: a missing OpenCV would otherwise be saved for every item
         why = f"the checks didn't run: {type(e).__name__}: {str(e)[:200]}"
         print(f"  {why}", flush=True)
         found = {it["key"]: [{"text": why}] for it in todo}

@@ -3,18 +3,18 @@ this page is the short version.
 
 ## Layout
 
-```
-clippa/              the package, one module per stage, cli.py wires them
-clippa/prompts/      the prompt files, versioned, shipped inside the package; the version in use is set in clipper.toml
-deploy/               bootstrap (new machine); compose stacks for the NAS hub (serve, bot, worker), the recorder, Kitsu and Claude; Windows task scripts for a GPU worker
-streams/<id>/         one folder per stream: source, transcript, cuts, metadata, review state
-clippa/defaults.toml every setting with its default, documented; config.py loads it (clipper.example.toml is a starter clipper.toml)
-tests/                offline tests (pytest); CI runs them and ruff on every push
-docs/wiki/            these pages; pushed to the wiki on every push to main
-HANDOFF.md            current state between work sessions (short); docs/log/ has the dated diary
-studio/               the studio's working files: mockups, research notes, media-heavy reports (not the package)
-reports/              the monthly analytics reports (the old audits are in docs/archive/)
-```
+| Folder | What's in it |
+| --- | --- |
+| `clippa/` | the package, one module per stage, cli.py wires them |
+| `clippa/prompts/` | the prompt files, versioned, shipped inside the package; the version in use is set in clipper.toml |
+| `deploy/` | bootstrap (new machine); compose stacks for the NAS hub (serve, bot, worker), the recorder, Kitsu and Claude; Windows task scripts for a GPU worker |
+| `streams/<id>/` | one folder per stream: source, transcript, cuts, metadata, review state |
+| `clippa/defaults.toml` | every setting with its default, documented; config.py loads it (clipper.example.toml is a starter clipper.toml) |
+| `tests/` | offline tests (pytest); CI runs them and ruff on every push |
+| `docs/wiki/` | these pages; pushed to the wiki on every push to main |
+| `HANDOFF.md` | current state between work sessions (short); docs/log/ has the dated diary |
+| `studio/` | the studio's working files: mockups, research notes, media-heavy reports (not the package) |
+| `reports/` | the monthly analytics reports (the old audits are in docs/archive/) |
 
 ## Shape
 
@@ -181,7 +181,9 @@ bugs found", a 30-minute timeout, a dropped
 connection or a gateway's 408/502/504, never retried since each try may be paid for) says so in the comment and keeps the last good review below
 it. The review is printed before it is posted, so a failed post loses nothing.
 
-It needs `OPENROUTER_API_KEY` in the environment. `clippa codereview` prints the review and posts
+It needs `OPENROUTER_API_KEY`, or the key file at `[paths] openrouter_key`
+(`secrets/openrouter_secret.txt` when that path is the default). The GitHub workflow uses
+the repo secret `OPENROUTER_API_KEY`. `clippa codereview` prints the review and posts
 nothing; `clippa codereview --dry-run` shows what would be sent and its cost; `--pr N` posts it
 (with `GITHUB_TOKEN` set). To try another model, set `CLIPPER_CODEREVIEW_REVIEWER` (e.g.
 `openrouter:openai/gpt-5.6-sol-pro`). Check each finding against the code.

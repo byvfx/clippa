@@ -12,6 +12,7 @@
 <link rel="apple-touch-icon" href="/icon-192.png">
 <title>Clippa War Room</title>
 <link rel="stylesheet" href="warroom.css">
+<link rel="stylesheet" href="budget.css">
 <!-- the look: one file in web/themes/ (structure in warroom.css, every colour there), picked by
      theme.js; the chat docked at the side wears the same one -->
 <link rel="stylesheet" href="themes/warroom.css" id="theme">
@@ -59,6 +60,11 @@
   <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
   <symbol id="i-keys" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></symbol>
   <symbol id="i-filter" viewBox="0 0 24 24"><path d="M3 5h18M6 12h12M10 19h4"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14.5 8.5l2 2"/></symbol>
+  <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 2v10M18.4 6.6a9 9 0 1 1-12.8 0"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 9h6v6H9z"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 16v-5M12 8h.01"/></symbol>
 </svg>
 <!-- One row: the name, the live shows, four status widgets (each opens its page), the chat and a menu
      for the actions that change things. The pages sit in the bar under it (a phone: at the bottom). -->
@@ -88,7 +94,7 @@
   <button data-view="queue"><svg class="ic" aria-hidden="true"><use href="#i-review"/></svg>Review <span class="n" id="vnQueue"></span></button>
   <button data-view="schedule"><svg class="ic" aria-hidden="true"><use href="#i-schedule"/></svg>Schedule <span class="n warn" id="vnSched" title="Approved, with no slot yet"></span></button>
   <button data-view="pipeline"><svg class="ic" aria-hidden="true"><use href="#i-pipeline"/></svg>Pipeline</button>
-  <button data-view="money" class="wide"><svg class="ic" aria-hidden="true"><use href="#i-money"/></svg>Money</button>
+  <button data-view="money" class="wide"><svg class="ic" aria-hidden="true"><use href="#i-money"/></svg>Money <span class="n warn" id="vnMoney" hidden></span></button>
   <button data-view="stats" class="wide"><svg class="ic" aria-hidden="true"><use href="#i-stats"/></svg>Stats</button>
   <button data-view="library" class="wide"><svg class="ic" aria-hidden="true"><use href="#i-library"/></svg>Library</button>
   <button data-view="research" class="wide"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>Research</button>
@@ -98,7 +104,7 @@
 </nav>
 <div class="menu" id="pagesMenu" role="menu" hidden>
   <button class="mi" data-palette role="menuitem">Search…</button>
-  <button class="mi" data-go="money" role="menuitem">Money</button>
+  <button class="mi" data-go="money" role="menuitem">Money <span class="n warn" id="vnMoneyMore" hidden></span></button>
   <button class="mi" data-go="stats" role="menuitem">Stats</button>
   <button class="mi" data-go="library" role="menuitem">Library</button>
   <button class="mi" data-go="research" role="menuitem">Research</button>
@@ -143,6 +149,7 @@
   </div>
 
   <div class="page" data-page="money">
+    <section class="panel orb" data-panel="openrouter" id="orb"><h2>OpenRouter budget</h2><div class="skel" role="status" aria-label="Loading"><i></i><i></i><i></i></div></section>
     <section class="panel" data-panel="costs"><h2>Costs <span class="sp" id="costSub"></span></h2><div class="cloud" id="costs"><div class="skel" role="status" aria-label="Loading"><i></i><i></i><i></i></div></div></section>
     <section class="panel" data-panel="modal"><h2>Modal <span class="sp" id="cloudSub"></span></h2><div class="cloud" id="cloud"><div class="skel" role="status" aria-label="Loading"><i></i><i></i><i></i></div></div></section>
     <section class="panel" data-panel="usage"><h2>API usage <span class="sp" id="usageSub"></span></h2><div class="cloud" id="usage"><div class="skel" role="status" aria-label="Loading"><i></i><i></i><i></i></div></div></section>
@@ -206,6 +213,7 @@
 <script src="js/investigate.js"></script>
 <script src="js/heat.js"></script>
 <script src="js/apikeys.js"></script>
+<script src="js/budget.js"></script>
 <script src="js/chatdock.js"></script>
 <script src="js/palette.js"></script>
 <script src="js/app.js"></script>
