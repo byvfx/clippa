@@ -28,6 +28,7 @@ import copy
 import ctypes
 import logging
 import os
+import signal
 import socket
 import subprocess
 import sys
@@ -82,6 +83,17 @@ def snapshot(data: dict) -> dict:
 
 def stage_args(stage: str, stream: str, wc: dict, force: bool = False) -> list[str]:
     return stages.argv(stage, stream, wc, force)
+
+
+def exit_text(code: int) -> str:
+    """How a stage child ended: "exited 3", or "killed by SIGTERM (-15)" when a signal stopped it
+    (a negative code; on the NAS earlyoom sends SIGTERM when memory runs out, #422)."""
+    if code < 0:
+        try:
+            return f"killed by {signal.Signals(-code).name} ({code})"
+        except ValueError:
+            return f"killed by signal {-code} ({code})"
+    return f"exited {code}"
 
 
 def keep_awake(on: bool) -> None:
@@ -311,7 +323,7 @@ def run_stream(cfg: dict, stream_dir: Path, config_path: str | None = None,  # n
             if code:
                 st["status"] = "failed"
                 tail = log_path.read_text(encoding="utf-8", errors="replace").strip().splitlines()[-3:]
-                run.data.update(status="failed", error=f"{stage} exited {code}: " + " | ".join(tail))
+                run.data.update(status="failed", error=f"{stage} {exit_text(code)}: " + " | ".join(tail))
                 if code == KEY_REJECTED:
                     # The same key would only be refused again: hold the stream until a key
                     # changes (pending) and give back the attempt, which wasn't the stream's fault.
@@ -320,7 +332,7 @@ def run_stream(cfg: dict, stream_dir: Path, config_path: str | None = None,  # n
                     run.data["key_rejected"] = keys_then
                     run.data["attempts"] = max(0, run.data.get("attempts", 1) - 1)
                 run.save()
-                log.error("%s: %s failed (exit %s), see %s", name, stage, code, log_path)
+                log.error("%s: %s failed (%s), see %s", name, stage, exit_text(code), log_path)
                 return False
             st["status"] = "done"
             log.info("%s: %s done in %ds", name, stage, st["seconds"])

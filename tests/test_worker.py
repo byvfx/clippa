@@ -309,3 +309,17 @@ def test_the_ready_dm_after_the_fast_lane_does_not_say_finished(tmp_path, defaul
     assert show == "Stream A"
     done, _ = worker.ready_text(defaults, d, "everything")
     assert done == "Stream A finished processing. 2 cuts in review."
+
+
+def test_a_stage_killed_by_a_signal_says_which(tmp_path, defaults, monkeypatch):
+    """#422: earlyoom on the NAS stopped transcribe with SIGTERM, and run.json said only
+    "exited -15". A negative exit code is named as the signal; the exit field stays the number."""
+    assert worker.exit_text(3) == "exited 3"
+    assert worker.exit_text(-15) == "killed by SIGTERM (-15)"
+    assert worker.exit_text(-250) == "killed by signal 250 (-250)"
+    monkeypatch.setattr(worker.subprocess, "call", lambda cmd, stdout=None, **kw: -15)
+    monkeypatch.setattr(worker, "keep_awake", lambda on: None)
+    assert worker.run_stream(defaults, tmp_path, stages=["signals"], force=True) is False
+    run = jsonstate.read_or(tmp_path / "run.json", {})
+    assert run["stages"]["signals"]["exit"] == -15
+    assert run["error"].startswith("signals killed by SIGTERM (-15): ")

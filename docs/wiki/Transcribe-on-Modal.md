@@ -17,7 +17,8 @@ plan includes $30 of compute a month. Measured on that 8 h stream: L40S (default
    [transcribe]
    backend = "modal"
    modal_gpu = "L40S"      # T4 | L4 | A10 | L40S | A100 | H100
-   modal_audio = "flac"    # lossless upload, ~60 MB per hour of audio; "opus" is smaller
+   modal_audio = "flac"    # lossless upload, ~70 MB per hour of audio; "opus" is smaller
+   modal_opus_over_mb = 700   # a bigger FLAC goes up as opus instead; 0 = never
    ```
 5. `clippa doctor --role gpu` checks the package, the token and that the app is deployed.
 
@@ -36,3 +37,25 @@ alert_every_usd` (25); set `monthly_budget_usd` to show the month against your o
 The process that serves the war room (`clippa serve`) needs the Modal token, as the worker does.
 
 On a new install, `clippa modal --backfill` adds the runs from before the log, once.
+
+## Troubleshooting
+
+### A long stream's transcribe is killed during the upload
+
+Signs: `run_transcribe.log` stops at `encoded ... MB flac`, `modal_runs.jsonl` has a start and no
+end, and run.json says `transcribe killed by SIGTERM (-15)` (`exited -15` before 11-24).
+
+The audio goes to Modal as one payload held in memory, and Modal's client makes copies of it. From
+1 GiB it uploads the file in parts, all at once. An 18 h stream's 1.3 GB FLAC (2026-11-24, #422)
+most likely used up the NAS's memory. An out-of-memory daemon such as
+[earlyoom](https://github.com/rfjakob/earlyoom) (UGOS runs one) then stops the biggest process with
+SIGTERM: `sudo journalctl -u earlyoom` shows the kill. The kernel's own out-of-memory killer would
+show `-9` (SIGKILL) instead.
+
+So a FLAC bigger than `[transcribe] modal_opus_over_mb` (700 MB, about a 10 h stream) is
+encoded again as opus (48 kbps, ~21 MB an hour) and sent instead. The log says so:
+`over [transcribe] modal_opus_over_mb (700): encoded ... MB opus instead`. The biggest FLAC that
+has gone up fine is 884 MB (12.2 h); the limit stays below it. Opus is slow to encode on a NAS
+(an 18 h stream took 8 min, FLAC 30 s). To transcribe one stream
+from opus whatever its length, put `[transcribe] modal_audio = "opus"` in its
+`streams/<id>/config.toml`.
