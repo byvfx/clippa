@@ -339,3 +339,24 @@ def test_defaults_example_and_setup_name_no_install():
             if m:
                 hits.append(f"{f}:{i} {m.group(0)!r}")
     assert not hits, "this install's names in the product's files (they belong in clipper.toml): " + ", ".join(hits)
+
+
+def test_for_length_scales_top_n_and_max_picks_for_a_long_stream_only(defaults):
+    """#430: an 18 h stream gets 2.3x the windows and picks of an 8 h one; a short one keeps
+    the configured numbers, and the switch keeps them flat."""
+    defaults["schedule"]["budget_hours"] = 8.0
+    defaults["signals"]["top_n"], defaults["scoring"]["max_picks"] = 30, 14
+    long = config.for_length(defaults, 18.3)
+    assert (long["signals"]["top_n"], long["scoring"]["max_picks"]) == (69, 32)
+    assert long["_length"] == {"hours": 18.3, "scale": 2.29}
+    assert (defaults["signals"]["top_n"], defaults["scoring"]["max_picks"]) == (30, 14)  # not changed in place
+    assert config.for_length(defaults, 5.5) is defaults
+    assert config.for_length(defaults, 8.0) is defaults
+    defaults["scoring"]["scale_with_length"] = False
+    assert config.for_length(defaults, 18.3) is defaults
+
+
+def test_scaled_never_goes_below_the_configured_number():
+    assert config.scaled(10, 0.5) == 10
+    assert config.scaled(10, 1.26) == 13
+    assert config.scaled(0, 3.0) == 0

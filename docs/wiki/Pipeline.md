@@ -39,6 +39,13 @@ publish` run on the picks alone, before the slow stages do the segments and comp
   named, `[music]`), and the weekly credits a quote to whoever said it.
 - **score**: Claude reads the transcript and heat curve and proposes moments and picks. A
   rerun pays every window again, so it refuses without `--force`.
+
+A long stream gets more to choose from. Past `[schedule] budget_hours` (8 h), signals keeps more
+chat windows (`[signals] top_n`) and Pass B may pick more (`[scoring] max_picks`), both times
+hours / budget_hours: an 18 h stream gets 2.3x as many, and Pass B is told the stream's length.
+A shorter stream keeps the numbers as set. This is the same scaling the
+[release budget](Scheduling-and-uploads#staying-current) uses. More windows cost more in Pass A.
+`[scoring] scale_with_length = false` keeps both flat.
 - **segments**: Claude splits the stream into topic segments and compilations. The result is
   written to `segments.json` only when the stage finishes (after the split, the filters, any
   compilation calls and the optional score). A stop partway through, including an [OpenRouter spending limit](Model-providers#when-openrouter-stops-a-call),

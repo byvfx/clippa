@@ -529,6 +529,29 @@ def for_stream(cfg: dict, sdir: Path) -> dict:
     return {**res, "_pinned": True} if cfg.get("_pinned") else res
 
 
+def scaled(n: int, scale: float) -> int:
+    """n for a stream `scale` times the usual length: more for a long one, never fewer."""
+    return max(n, round(n * scale))
+
+
+def for_length(cfg: dict, hours: float) -> dict:
+    """#430: a stream longer than [schedule] budget_hours gets more chat windows ([signals] top_n)
+    and Pass B picks ([scoring] max_picks) in proportion, as schedule.budget_for scales its
+    release budget; a shorter one keeps the configured numbers. [scoring] scale_with_length =
+    false keeps them flat. A scaled config carries `_length` (hours, scale) for Pass B's note."""
+    scale = hours / cfg["schedule"]["budget_hours"]
+    if not cfg["scoring"]["scale_with_length"] or scale <= 1:
+        return cfg
+    return {**cfg, "_length": {"hours": round(hours, 2), "scale": round(scale, 2)},
+            "signals": {**cfg["signals"], "top_n": scaled(cfg["signals"]["top_n"], scale)},
+            "scoring": {**cfg["scoring"], "max_picks": scaled(cfg["scoring"]["max_picks"], scale)}}
+
+
+def stream_hours(sdir: Path) -> float:
+    """The stream's length in hours, from its meta.json."""
+    return jsonstate.load(Path(sdir) / "meta.json")["duration_s"] / 3600
+
+
 def explain(cfg: dict, name: str, sdir: Path | None = None) -> dict:
     """Where "section.key" comes from: every layer that sets it, in the order they apply
     (default < clipper.toml < show < stream config.toml < clipper.local.toml < env), and the

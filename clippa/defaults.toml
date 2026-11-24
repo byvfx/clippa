@@ -356,6 +356,9 @@ prompt_version = "v5"           # clippa/prompts/<name>_<version>.md (v5: reads 
 concurrency = 4
 lead_in_s = 120                 # transcript before each window, for context
 max_picks = 10
+# A stream longer than [schedule] budget_hours gets more Pass B picks (max_picks) and chat
+# windows ([signals] top_n), times hours / budget_hours; a shorter one keeps both as set.
+scale_with_length = true
 channel_name = "a clips channel"
 audience = "people who enjoy streamer commentary and drama"
 tone = "unfiltered, chaotic, funny"

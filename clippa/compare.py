@@ -28,7 +28,7 @@ from collections import Counter
 from pathlib import Path
 
 from . import jsonstate, llm
-from .config import EFFORTS, for_stream
+from .config import EFFORTS, for_length, for_stream, stream_hours
 from .errors import ClipperError
 from .llm import Claude, preflight
 from .prompts import Prompts
@@ -240,7 +240,7 @@ def compare_score(sdir: Path, cfg: dict, model: str, which: str = "a", budget: f
 
     if which not in ("a", "b", "ab"):
         raise ClipperError(f"--pass {which}: a, b or ab")
-    cfg = copy.deepcopy(for_stream(cfg, sdir))
+    cfg = copy.deepcopy(for_length(for_stream(cfg, sdir), stream_hours(sdir)))
     base = jsonstate.read(sdir / "candidates.json")
     if not base:
         raise ClipperError(f"{sdir.name} isn't scored yet (no candidates.json): nothing to compare with")

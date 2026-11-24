@@ -594,7 +594,8 @@ def cmd_signals(cfg: dict, args: argparse.Namespace) -> None:
     from . import signals
 
     sdir = stream_dir(cfg, args.stream)
-    signals.run(sdir, config.for_stream(cfg, sdir)["signals"])
+    scfg = config.for_stream(cfg, sdir)
+    signals.run(sdir, config.for_length(scfg, config.stream_hours(sdir))["signals"])
 
 
 def cmd_score(cfg: dict, args: argparse.Namespace) -> None:
