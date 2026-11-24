@@ -31,7 +31,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import jsonstate
+from . import jsonstate, wiki
 from .errors import ClipperError
 from .media import source_file
 
@@ -112,25 +112,27 @@ def transcribe_mlx(wav: Path, tc: dict) -> tuple[list[dict], float]:
 
 MODAL_CODECS = {"flac": (".flac", ["-c:a", "flac"]),
                 "opus": (".ogg", ["-c:a", "libopus", "-b:a", "48k"])}
+MODAL_MULTIPART = 1024**3   # Modal's client uploads this and more in parts (modal/_utils/blob_utils.py)
 
 
 def modal_encode(wav: Path, fmt: str) -> tuple[bytes, str]:
     """The wav encoded for the Modal upload ([transcribe] modal_audio): its bytes and suffix."""
     suffix, codec = MODAL_CODECS[fmt]
     enc = wav.with_name(f"audio.modal{suffix}")
-    subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(wav), *codec,
-                    str(enc)], check=True)
-    data = enc.read_bytes()
-    enc.unlink()
-    return data, suffix
+    try:
+        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(wav), *codec,
+                        str(enc)], check=True)
+        return enc.read_bytes(), suffix
+    finally:  # never leave a GB of audio beside the stream, a failed encode included
+        enc.unlink(missing_ok=True)
 
 
 def too_big_for_flac(tc: dict, fmt: str, size: int) -> bool:
     """A FLAC over [transcribe] modal_opus_over_mb goes up as opus instead (#422): from 1 GiB
     Modal's client uploads in parts all at once, and an 18 h stream's 1.3 GB took the NAS
-    out of memory. 0 = never switch."""
+    out of memory. 0 (or less) = never switch."""
     limit = tc["modal_opus_over_mb"]
-    return fmt == "flac" and bool(limit) and size > limit * 1e6
+    return fmt == "flac" and limit > 0 and size > limit * 1e6
 
 
 def transcribe_modal(wav: Path, tc: dict, runs: Path | None = None, method: str = "transcribe") -> tuple[dict, dict]:
@@ -144,11 +146,14 @@ def transcribe_modal(wav: Path, tc: dict, runs: Path | None = None, method: str 
     data, suffix = modal_encode(wav, fmt)
     print(f"encoded {len(data) / 1e6:.0f} MB {fmt} in {time.time() - t1:.0f}s", flush=True)
     if too_big_for_flac(tc, fmt, len(data)):
-        fmt = "opus"
+        fmt, data = "opus", b""   # let the FLAC go before the opus is read in
         t1 = time.time()
         data, suffix = modal_encode(wav, fmt)
         print(f"over [transcribe] modal_opus_over_mb ({tc['modal_opus_over_mb']}): "
               f"encoded {len(data) / 1e6:.0f} MB opus instead in {time.time() - t1:.0f}s", flush=True)
+    if len(data) >= MODAL_MULTIPART:
+        print(f"warning: {len(data) / 1e6:.0f} MB is past 1 GiB, where Modal uploads in parts all in "
+              f"memory; if the run is killed: {wiki.page('Transcribe-on-Modal', 'troubleshooting')}", flush=True)
 
     with tracked(runs, "stream" if method == "transcribe" else method, wav.parent.name, tc["modal_gpu"],
                  max(0, wav.stat().st_size - 44) / 32000) as rec:  # 16 kHz mono s16

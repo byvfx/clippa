@@ -61,6 +61,7 @@ def test_a_flac_over_the_limit_goes_up_as_opus(tmp_path, defaults, monkeypatch):
     assert transcribe.too_big_for_flac(tc, "flac", 900_000_001)
     assert not transcribe.too_big_for_flac(tc, "opus", 2_000_000_000)    # already opus
     assert not transcribe.too_big_for_flac({**tc, "modal_opus_over_mb": 0}, "flac", 2_000_000_000)
+    assert not transcribe.too_big_for_flac({**tc, "modal_opus_over_mb": -1}, "flac", 2_000_000_000)
 
     wav = tmp_path / "audio.wav"
     wav.write_bytes(b"\0" * 1044)
@@ -84,3 +85,18 @@ def test_a_flac_over_the_limit_goes_up_as_opus(tmp_path, defaults, monkeypatch):
     encoded.clear(), sent.clear()
     transcribe.transcribe_modal(wav, {**tc, "modal_opus_over_mb": 200e-6})   # at the limit: lossless
     assert encoded == ["flac"] and sent == [(".flac", 200)]
+
+
+def test_a_failed_modal_encode_leaves_no_audio_behind(tmp_path, monkeypatch):
+    """A killed or failed ffmpeg mustn't leave a GB of audio.modal.flac in the stream folder."""
+    import subprocess
+
+    wav = tmp_path / "audio.wav"
+
+    def fail(cmd, check):
+        (tmp_path / "audio.modal.flac").write_bytes(b"part")   # ffmpeg got partway
+        raise subprocess.CalledProcessError(1, cmd)
+    monkeypatch.setattr(transcribe.subprocess, "run", fail)
+    with pytest.raises(subprocess.CalledProcessError):
+        transcribe.modal_encode(wav, "flac")
+    assert not (tmp_path / "audio.modal.flac").exists()
