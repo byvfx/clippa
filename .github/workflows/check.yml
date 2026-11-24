@@ -1,6 +1,6 @@
 # Lint and tests on every push to main and every pull request, except one that changes only
 # notes no test reads (the two paths lists below; keep them the same). The same two commands
-# run locally (see CLAUDE.md "Checks").
+# run locally (see AGENTS.md "Checks").
 #
 # The lists read in order and the last match wins: everything, minus the notes ("!"), plus
 # studio/research_notes/streamers.json again, the one file under studio/ a test reads ([paths]

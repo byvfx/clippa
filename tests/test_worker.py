@@ -296,3 +296,16 @@ def test_a_rejected_key_passes_through_the_handlers_that_swallow_errors():
     auth = type("AuthenticationError", (Exception,), {"__module__": "anthropic._exceptions"})
     assert key_rejected(KeyRejected("x")) and key_rejected(auth("y"))
     assert not key_rejected(RuntimeError("z")) and not key_rejected(type("AuthenticationError", (Exception,), {})("w"))
+
+
+def test_the_ready_dm_after_the_fast_lane_does_not_say_finished(tmp_path, defaults):
+    d = tmp_path / "kick-1"
+    d.mkdir()
+    jsonstate.write(d / "meta.json", {"channel": "kick-1"})
+    jsonstate.write(d / "review_state.json", {"a": {}, "b": {}})
+    defaults["meta"]["show_name"] = "Stream A"
+    early, show = worker.ready_text(defaults, d, "clips and Shorts, segments next")
+    assert early == "Stream A: clips and Shorts are in review. 2 cuts in review. Segments next."
+    assert show == "Stream A"
+    done, _ = worker.ready_text(defaults, d, "everything")
+    assert done == "Stream A finished processing. 2 cuts in review."

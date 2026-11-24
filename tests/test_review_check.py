@@ -233,7 +233,8 @@ def test_record_failure_flags_the_items_until_checked_again(tmp_path):
 
 
 def test_an_openrouter_limit_is_not_saved_as_a_bad_cover(defaults, tmp_path, monkeypatch):
-    """A key or credit limit stops the run. It is not a BAD cover, and the next item is not called."""
+    """A key or credit limit stops the run. It is not a BAD cover, the next item is not called,
+    and both are saved as not checked (no signature), so the next run checks them."""
     from clippa.errors import OpenRouterLimit
 
     sd = fake_stream(defaults, tmp_path)
@@ -260,8 +261,11 @@ def test_an_openrouter_limit_is_not_saved_as_a_bad_cover(defaults, tmp_path, mon
     with pytest.raises(OpenRouterLimit):
         review_check.run(sd, defaults, todo=[item("one"), item("two")], say=lambda *_: None)
     assert calls == ["one"]
-    assert review_check.load(sd) == {}
-    assert not review_check.path(sd).exists()
+    saved = review_check.load(sd)
+    assert set(saved) == {"one", "two"} and all(r["sig"] == "" for r in saved.values())
+    for r in saved.values():
+        assert [f["check"] for f in r["findings"]] == ["run"]
+        assert r["findings"][0]["text"].startswith("not checked: OpenRouterLimit")
 
 
 def test_run_save_false_writes_nothing_and_a_broken_check_is_a_finding(defaults, tmp_path, monkeypatch):
@@ -297,7 +301,13 @@ def hide_cv2(monkeypatch):
     monkeypatch.setitem(sys.modules, "cv2", None)
 
 
-def test_missing_opencv_raises_and_does_not_write_checks(defaults, tmp_path, monkeypatch):
+def not_fully_checked(row):
+    return any(f["check"] == "run" and "needs OpenCV" in f["text"] for f in row["findings"])
+
+
+def test_missing_opencv_raises_and_flags_the_item_with_no_signature(defaults, tmp_path, monkeypatch):
+    """Not a cover finding (the cover was never looked at), but not clean either: its text is
+    checked, it says OpenCV is missing, and with no signature the next run checks it in full."""
     from clippa.errors import ClipperError
 
     sd = fake_stream(defaults, tmp_path)
@@ -306,10 +316,14 @@ def test_missing_opencv_raises_and_does_not_write_checks(defaults, tmp_path, mon
     hide_cv2(monkeypatch)
     with pytest.raises(ClipperError, match="review check needs OpenCV: install opencv-python-headless"):
         review_check.run(sd, defaults, say=lambda *_: None)
-    assert not review_check.path(sd).exists()
+    row = review_check.load(sd)["s01_angry-joe"]
+    assert row["sig"] == "" and not_fully_checked(row)
+    assert any("says 'hosts'" in f["text"] for f in row["findings"])
+    assert not any(f["check"] == "cover" for f in row["findings"])
+    assert review_check.flagged_keys(sd) == {"s01_angry-joe"}
 
 
-def test_missing_opencv_leaves_checks_json_and_is_not_skipped(defaults, tmp_path, monkeypatch):
+def test_missing_opencv_replaces_a_stale_result_and_it_is_not_skipped(defaults, tmp_path, monkeypatch):
     """A saved 'No module named cv2' matches the signature, so it used to be skipped for good."""
     from clippa import config, review
     from clippa.errors import ClipperError
@@ -324,27 +338,38 @@ def test_missing_opencv_leaves_checks_json_and_is_not_skipped(defaults, tmp_path
                          "findings": [{"text": "the cover check failed: ModuleNotFoundError: "
                                        "No module named 'cv2'"}]}}
     jsonstate.write(review_check.path(sd), prior)
+    assert review_check.stale_opencv(prior[it["key"]])
+    assert review_check.stale_opencv({"findings": [{"text": "the cover check failed: ImportError: DLL load failed"}]})
     hide_cv2(monkeypatch)
     with pytest.raises(ClipperError, match="review check needs OpenCV"):
         review_check.run(sd, defaults, say=lambda *_: None)
-    assert review_check.load(sd) == prior
+    row = review_check.load(sd)[it["key"]]
+    assert row["sig"] == "" and not_fully_checked(row)
 
 
 def test_a_cover_is_still_checked_when_opencv_imports(defaults, tmp_path, monkeypatch):
-    """The normal path: cv2 imports, a broken cover is a finding and checks.json is written."""
+    """The normal path, the same with or without OpenCV installed: cv2 imports (a stand-in),
+    the face match runs, and a crash in it is a cover finding saved with the signature."""
     import sys
     import types
+
+    from clippa import config, faces, review
 
     sd = fake_stream(defaults, tmp_path)
     defaults["review"]["check_model"] = ""
     face_cover(sd)
-    try:
-        import cv2  # noqa: F401
-    except ImportError:
-        monkeypatch.setitem(sys.modules, "cv2", types.ModuleType("cv2"))
+    monkeypatch.setitem(sys.modules, "cv2", types.ModuleType("cv2"))
+
+    def boom(frame, box, cfg):
+        raise RuntimeError("boom")
+    monkeypatch.setattr(faces, "pick", boom)
     found = review_check.run(sd, defaults, say=lambda *_: None)
-    assert review_check.path(sd).exists()
-    assert any(f["check"] == "cover" and "check failed" in f["text"] for f in found["s01_angry-joe"])
+    assert any(f["check"] == "cover" and f["text"] == "the cover check failed: RuntimeError: boom"
+               for f in found["s01_angry-joe"])
+    cfg = config.for_stream(defaults, sd)
+    it = review.items(sd, ["segments"], cfg)[0]
+    assert review_check.load(sd)["s01_angry-joe"]["sig"] == review_check.signature(
+        cfg, review_check.as_edited(sd, [it])[0], review_check.context(sd, cfg), False)
 
 
 def test_a_short_webcam_imports_cv2_and_a_plain_segment_does_not(defaults, tmp_path):
@@ -370,7 +395,8 @@ def test_a_short_webcam_imports_cv2_and_a_plain_segment_does_not(defaults, tmp_p
 
 def test_missing_opencv_still_saves_items_that_do_not_need_it(defaults, tmp_path, monkeypatch):
     """A sibling whose title changed is rechecked and saved. The cover that needs cv2 is not
-    written as a bad cover, and a stale clean result does not stay in front of the new title."""
+    written as a bad cover but flagged as not fully checked, and a stale clean result does not stay
+    in front of the new title."""
     from clippa.errors import ClipperError
 
     sd = fake_stream(defaults, tmp_path)
@@ -402,7 +428,8 @@ def test_missing_opencv_still_saves_items_that_do_not_need_it(defaults, tmp_path
         review_check.run(sd, defaults, say=lambda *_: None)
     saved = review_check.load(sd)
     assert any("hosts" in f["text"] for f in saved["s01_angry-joe"]["findings"])
-    assert "s02_don" not in saved
+    assert saved["s02_don"]["sig"] == "" and not_fully_checked(saved["s02_don"])
+    assert not any(f["check"] == "cover" for f in saved["s02_don"]["findings"])
 
 
 def test_an_unsampled_webcam_scene_does_not_need_opencv(defaults, tmp_path, monkeypatch):
@@ -421,18 +448,20 @@ def test_an_unsampled_webcam_scene_does_not_need_opencv(defaults, tmp_path, monk
     assert not any("cv2" in f["text"] for f in found["v01_t1"])
 
 
-def test_publish_does_not_save_a_missing_opencv(defaults, tmp_path, monkeypatch):
+def test_publish_goes_on_without_opencv_and_flags_what_needed_it(defaults, tmp_path, monkeypatch):
+    """The worker's review stage doesn't fail on a missing OpenCV: the items go to Kitsu
+    flagged, and nothing is saved as a bad cover."""
     from clippa import review
-    from clippa.errors import ClipperError
 
     sd = fake_stream(defaults, tmp_path)
     defaults["review"]["check_model"] = ""
     face_cover(sd)
     hide_cv2(monkeypatch)
     todo = review.items(sd, ["segments"], defaults)
-    with pytest.raises(ClipperError, match="review check needs OpenCV"):
-        review.add_checks(sd, defaults, todo)
-    assert not review_check.path(sd).exists()
+    review.add_checks(sd, defaults, todo)
+    assert "OpenCV" in todo[0]["fields"][review.CHECKS_COL]
+    row = review_check.load(sd)["s01_angry-joe"]
+    assert row["sig"] == "" and not any(f["check"] == "cover" for f in row["findings"])
 
 
 def test_estimate_counts_covers_to_look_at(defaults, tmp_path):
@@ -543,3 +572,11 @@ def test_the_kitsu_column_gets_what_checks_json_kept(defaults, tmp_path, monkeyp
     monkeypatch.setattr(review, "set_checks", lambda sdir, c, summaries: columns.append(summaries) or [])
     review_check.run(sd, defaults, say=lambda *_: None, kitsu=True)
     assert columns == [{"v01_t1": ""}]
+
+
+def test_a_check_that_failed_on_the_in_flight_budget_is_checked_again():
+    old = {"sig": "s1", "findings": [{"check": "cover", "text":
+           "the cover check failed: RuntimeError: m: HTTP 402 openrouter_in_flight_budget after 6 tries: busy"}]}
+    assert review_check.stale_in_flight(old) and not review_check.unchanged(old, "s1", False)
+    other = {"sig": "s1", "findings": [{"check": "cover", "text": "the cover check failed: ValueError: bad"}]}
+    assert review_check.unchanged(other, "s1", False)   # anything else still needs --force

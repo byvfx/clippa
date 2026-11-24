@@ -731,9 +731,17 @@ def add_checks(stream_dir: Path, cfg: dict, todo: list[dict]) -> None:
     print("checks:", flush=True)
     try:
         found = review_check.run(stream_dir, cfg, todo)
-    except Exception as e:  # advisory: the review goes out without them, flagged
-        if review_check.missing_opencv(e):
-            raise  # not a finding: a missing OpenCV would otherwise be saved for every item
+    except Exception as e:  # noqa: BLE001  # advisory: the review goes out without them, flagged
+        if getattr(e, "checks_saved", False):
+            # run() saved what it checked and flagged the rest (no OpenCV, a spending limit) with
+            # no signature, so they are checked again: publish with those, not a failed stage, and
+            # leave the results that are still good alone.
+            print(f"  {e}: the items it didn't check are flagged", flush=True)
+            kept = review_check.load(stream_dir)
+            found = {it["key"]: (kept.get(it["key"]) or {}).get("findings") or [] for it in todo}
+            for it in todo:
+                it["fields"][CHECKS_COL] = review_check.summary(found[it["key"]])
+            return
         why = f"the checks didn't run: {type(e).__name__}: {str(e)[:200]}"
         print(f"  {why}", flush=True)
         found = {it["key"]: [{"text": why}] for it in todo}

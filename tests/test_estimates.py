@@ -96,6 +96,69 @@ def test_a_failed_openrouter_price_fetch_is_counted_once(defaults, monkeypatch):
     assert calls == [(llm.PROVIDERS["openrouter"][0] + "/models", 15)]
 
 
+def test_a_failed_price_fetch_is_tried_again_after_five_minutes(defaults, monkeypatch):
+    """serve and the bot run for days: one blip must not leave the list empty until a restart."""
+    import requests
+
+    monkeypatch.setattr(llm, "_OPENROUTER_PRICES", None)
+    clock = [1000.0]
+    monkeypatch.setattr(llm.time, "monotonic", lambda: clock[0])
+    answers = [requests.ConnectionError("offline"),
+               _models_response([{"id": "a/m", "pricing": {"prompt": "0.000001", "completion": "0.000002"},
+                                  "context_length": 1000, "top_provider": {"max_completion_tokens": 500}}])]
+
+    def get(url, timeout):
+        a = answers.pop(0)
+        if isinstance(a, Exception):
+            raise a
+        return a
+    monkeypatch.setattr(requests, "get", get)
+    assert llm.openrouter_prices() == {}
+    clock[0] += 60
+    assert llm.openrouter_prices() == {}  # within five minutes: no second try
+    assert len(answers) == 1
+    clock[0] += 300
+    assert llm.openrouter_prices() == {"a/m": (1.0, 2.0)}
+    assert llm.max_output("openrouter:a/m") == 500 and llm.context_length("openrouter:a/m") == 1000
+
+
+def test_one_bad_row_doesnt_drop_the_price_list(defaults, monkeypatch):
+    import requests
+
+    monkeypatch.setattr(llm, "_OPENROUTER_PRICES", None)
+    monkeypatch.setattr(requests, "get", lambda url, timeout: _models_response([
+        {"id": "a/good", "pricing": {"prompt": "0.000001", "completion": "0.000002"}, "context_length": 9},
+        {"id": "a/bad", "pricing": {"prompt": "x"}, "context_length": "lots",
+         "top_provider": {"max_completion_tokens": None}},
+        "not a row"]))
+    assert llm.openrouter_prices() == {"a/good": (1.0, 2.0)}
+    assert llm.context_length("openrouter:a/good") == 9
+
+
+def test_threads_fetch_the_price_list_once(defaults, monkeypatch):
+    """Several calls at once on a cold process: one GET, and nobody overwrites the table."""
+    import threading
+
+    import requests
+
+    monkeypatch.setattr(llm, "_OPENROUTER_PRICES", None)
+    calls, gate = [], threading.Event()
+
+    def get(url, timeout):
+        calls.append(url)
+        gate.wait(2)
+        return _models_response([{"id": "a/m", "pricing": {"prompt": "0.000001", "completion": "0.000002"}}])
+    monkeypatch.setattr(requests, "get", get)
+    got = []
+    threads = [threading.Thread(target=lambda: got.append(llm.openrouter_prices())) for _ in range(4)]
+    for t in threads:
+        t.start()
+    gate.set()
+    for t in threads:
+        t.join()
+    assert len(calls) == 1 and all(g == {"a/m": (1.0, 2.0)} for g in got)
+
+
 def test_segments_estimate_without_a_split_costs_nothing(defaults, tmp_path):
     lines = segments.estimate(tmp_path, defaults, Prompts(defaults), split=False)
     assert lines[0].startswith("  segments.json is kept") and "compile" not in lines[0]

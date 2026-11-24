@@ -355,15 +355,46 @@ def resplit(cfg: dict, item: Item, who: str = "") -> dict:
     from .notify import over_phrase
 
     _touched(item, "re-split", who)
-    how = over_phrase(row.get("resplit_limit_s") or 0)
-    _comment(review.connect(cfg["review"]), item, None,
-             f"{review.NOTE_PREFIX} Flagged for re-split. Over [segments] split_over_s ({how}).{_by(who)}")
+    sid = f"{item.key.split('_', 1)[0]}:kitsu"  # apart from a notice's ask, which wrote no comment
+    if _asked_resplit(item.stream_dir, sid, who) is None:
+        # one Kitsu comment per segment until `clippa segments` runs again, however many presses
+        how = over_phrase(row.get("resplit_limit_s") or 0)
+        try:
+            _comment(review.connect(cfg["review"]), item, None,
+                     f"{review.NOTE_PREFIX} Flagged for re-split. Over [segments] split_over_s ({how}).{_by(who)}")
+        except Exception:
+            _forget_resplit(item.stream_dir, sid)  # not in Kitsu: the next press tries again
+            raise
     return refresh(cfg, item)
 
 
+def _forget_resplit(sdir: Path, sid: str) -> None:
+    with jsonstate.update(sdir / "resplit_asks.json", {}) as data:
+        data.pop(sid, None)
+
+
+def _asked_resplit(sdir: Path, sid: str, who: str) -> dict | None:
+    """Record a Re-split press in resplit_asks.json. The earlier ask when this segment was
+    already flagged since segments.json last changed (a repeat press), else None. A rerun of
+    `clippa segments` rewrites segments.json, so a press after it counts as new."""
+    seg = sdir / "segments.json"
+    since = datetime.fromtimestamp(seg.stat().st_mtime, UTC) if seg.exists() else None
+    with jsonstate.update(sdir / "resplit_asks.json", {}) as data:
+        old = data.get(sid)
+        try:
+            again = bool(old) and (since is None or datetime.fromisoformat(old["at"]) >= since)
+        except (KeyError, TypeError, ValueError):  # a broken entry: this press counts
+            again = False
+        if again:
+            return old
+        data[sid] = {"at": datetime.now(UTC).isoformat(timespec="seconds"), "who": who}
+    return None
+
+
 def ask_resplit(cfg: dict, ref: str, who: str = "") -> str:
-    """The Re-split button on a segment that is not in review. Records the ask and says the
-    next command. No model call, and no Kitsu write (there is no task yet)."""
+    """The Re-split button on a segment that is not in review. Records the ask (a repeat press
+    says it was already flagged) and says the next command. No model call, and no Kitsu write
+    (there is no task yet)."""
     from .notify import cut_label, over_phrase
 
     stream, _, sid = ref.partition("/")
@@ -376,10 +407,11 @@ def ask_resplit(cfg: dict, ref: str, who: str = "") -> str:
         limit = _split_limit(for_stream(cfg, sdir)["segments"])
     except (KeyError, TypeError):
         limit = 0.0
-    with jsonstate.update(sdir / "resplit_asks.json", {}) as data:
-        data[sid] = {"at": datetime.now(UTC).isoformat(timespec="seconds"), "who": who}
+    old = _asked_resplit(sdir, sid, who)
     how = over_phrase(limit) if limit else "the limit"
-    return (f"{cut_label(sid)} is over {how}. Flagged for re-split. It is not in review. "
+    flagged = (f"Already flagged for re-split{_by(old.get('who', ''))}" if old
+               else "Flagged for re-split")
+    return (f"{cut_label(sid)} is over {how}. {flagged}. It is not in review. "
             f"`clippa segments {sdir.name} --force` splits it again.")
 
 

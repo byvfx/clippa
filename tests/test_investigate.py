@@ -329,6 +329,32 @@ def test_a_refused_coverage_judgement_is_unchecked_not_fresh(defaults, tmp_path,
     assert got["coverage"]["label"] == "unchecked"
 
 
+def test_a_search_cut_short_by_a_spending_limit_is_unchecked_not_fresh(defaults, tmp_path, monkeypatch):
+    """One task finished with nothing, then an OpenRouter limit stopped the swarm: that isn't
+    a search that found nobody covering the lead."""
+    from clippa import swarm
+
+    subject(defaults, tmp_path)
+    lead = investigate.make_lead(
+        {"keep": True, "reject": "", "headline": "h", "story": "S", "kind": "shift", "confidence": "low",
+         "confirm_or_kill": "c", "people": [], "timeline": ["a", "b"], "search": "h"},
+        {"why": "w", "facts": [fact("a", "2026-01-01", "v1"), fact("b", "2026-02-01", "v2")]})
+    investigate.save_leads(defaults, "jer", {"subject": "jer", "about": "", "made_at": "2026-11-03T00:00:00+00:00",
+                                             "model": "m", "candidates": 1, "leads": investigate.rank([lead], 5)})
+
+    def fake_run(cfg, goal, path, **kw):
+        jsonstate.write(path, {"tasks": [{"kind": "youtube_search", "target": "h", "status": "done"}]})
+        return {"findings": [], "stopped": "openrouter_key_limit", "usd": 0.0, "tasks": 1,
+                "limit": "openrouter_key_limit: spent"}
+    monkeypatch.setattr(swarm, "run", fake_run)
+    monkeypatch.setattr(investigate, "own_titles", lambda *a, **k: [])
+    monkeypatch.setattr(investigate, "llm_setup", lambda cfg, m: (Scripted({"coverage": "fresh", "note": "n",
+                                                                           "matches": []}), FakePrompts()))
+    investigate.run_check(defaults, "jer")
+    (got,) = investigate.load_leads(defaults, "jer")["leads"]
+    assert got["coverage"]["label"] == "unchecked" and "limit" in got["coverage"]["note"]
+
+
 class FakeDiscord:
     """Discord's REST API as `notify.Rest` calls it: one text channel, ids counted up."""
 
@@ -495,3 +521,57 @@ def test_check_searches_with_the_swarm_seeded_by_the_old_searches(defaults, tmp_
                                                               "swarm": "no search finished (stopped: ?)"}
     tasks = [{**tasks[0], "status": "pending"}]   # stopped by a limit before any search ran
     assert "swarm" in investigate.findings(defaults, "jer", lead)[1]
+
+
+def test_a_spending_limit_keeps_the_facts_that_finished(defaults, tmp_path, monkeypatch):
+    from clippa.errors import OpenRouterLimit
+
+    d = subject(defaults, tmp_path)
+    items = [{"id": "v1", "duration_s": 60, "date": "2026-01-01", "channel": "c"},
+             {"id": "v2", "duration_s": 60, "date": "2026-01-02", "channel": "c"}]
+    monkeypatch.setattr(investigate, "facts_todo", lambda *a, **k: (items, 0))
+    monkeypatch.setattr(investigate, "facts_estimate", lambda *a: (1000, 2, 0.01))
+    monkeypatch.setattr(investigate, "llm_setup", lambda cfg, model: (FakeClaude(), FakePrompts()))
+
+    def item_facts(cfg, subj, it, claude, system, budget):
+        if it["id"] == "v2":
+            raise OpenRouterLimit("openrouter_key_limit: spent", "openrouter_key_limit")
+        return {"id": it["id"], "facts": [], "dropped": 0}
+
+    monkeypatch.setattr(investigate, "item_facts", item_facts)
+    with pytest.raises(OpenRouterLimit):
+        investigate.run_facts(defaults, "jer")
+    assert (d / "investigate" / "facts" / "v1.json").is_file()
+    assert "spent" in jsonstate.load(d / "investigate" / "runs.json")[-1]["stopped"]
+
+
+def test_a_failed_call_on_the_next_lead_keeps_the_leads_already_checked(defaults, tmp_path, monkeypatch):
+    """An in-flight 402 that ran out of tries is a plain error, not a spending limit: the
+    leads checked before it are still written."""
+    subject(defaults, tmp_path)
+
+    def lead(h, a, b):
+        return investigate.make_lead(
+            {"keep": True, "reject": "", "headline": h, "story": "S", "kind": "shift", "confidence": "low",
+             "confirm_or_kill": "c", "people": [], "timeline": [a, b], "search": h},
+            {"why": "w", "facts": [fact(a, "2026-01-01", "v1"), fact(b, "2026-02-01", "v2")]})
+
+    investigate.save_leads(defaults, "jer", {"subject": "jer", "about": "", "made_at": "2026-11-03T00:00:00+00:00",
+                                             "model": "m", "candidates": 2,
+                                             "leads": investigate.rank([lead("one", "a", "b"), lead("two", "c", "d")], 5)})
+    calls = []
+
+    def findings(cfg, subj, ld, claude):
+        calls.append(ld["headline"])
+        if len(calls) == 2:
+            raise RuntimeError("m: HTTP 402 openrouter_in_flight_budget after 6 tries: busy")
+        return [], {}
+
+    monkeypatch.setattr(investigate, "findings", findings)
+    monkeypatch.setattr(investigate, "llm_setup", lambda cfg, m: (Scripted({"coverage": "fresh", "note": "n",
+                                                                           "matches": []}), FakePrompts()))
+    with pytest.raises(RuntimeError):
+        investigate.run_check(defaults, "jer")
+    saved = {x["headline"]: x for x in investigate.load_leads(defaults, "jer")["leads"]}
+    assert saved[calls[0]]["coverage"]["label"] == "fresh"
+    assert "coverage" not in saved[calls[1]] or saved[calls[1]]["coverage"].get("label") != "fresh"

@@ -38,18 +38,25 @@ API usage ([War room](War-room#modal-costs-and-analytics)). It shows the clippa 
 today / this week / this month, and the account balance. The warning percent (default 75) is
 saved in `<streams>/.serve/openrouter.json` with the limit events. At or past the warning,
 Spend turns amber and Money shows **!**. A spent cap (`openrouter_key_limit`) turns Spend
-red and the health light to **Stopped**. The banner says the run stopped at its next model
-call. The call reads `error.metadata.limit_source`. `openrouter_key_limit` (HTTP 402 or
-403) and `openrouter_credits` (HTTP 402) stop at once: the error says `OpenRouter limit`
+red and the health light to **Stopped**, and so does a disabled key. The banner says the
+run stopped at its next model call; an account out of credits (`openrouter_credits`) has a
+banner of its own that says to top up. A stop stays on the panel for ten minutes from the
+latest refusal, even when the cached figures (up to five minutes old) still show room, unless
+you change the limit or enable the key here (that doesn't clear a credits stop); after that it
+clears once what ran out has room again: the balance for credits, the cap and the balance for
+a key-limit stop. The call reads `error.metadata.limit_source`. `openrouter_key_limit` (HTTP 402
+or 403) and `openrouter_credits` (HTTP 402) stop at once: the error says `OpenRouter limit`
 and `not retried`, and the call is not sent again. `openrouter_in_flight_budget` (HTTP
-402) waits for a `Retry-After` that is a number of seconds, each wait capped at 60
-seconds, and is sent again, up to six calls. The panel counts down. A header that is
-missing or not a number of seconds stops the call (`not retried`); six failures stop it
-(`after 6 tries`). Anything else on 402 or 403 still follows the text: a 402 whose
-Retry-After is at most two minutes is the in-flight budget when the text says in-flight,
-or when it says nothing about the key limit or the credits being spent. Any other such
-402, and a 403 whose text says the limit or the credits are spent, is the cap
-(`openrouter_key_limit`).
+402) is a moment's crowding, not a spent limit: it waits for a `Retry-After` that is a number
+of seconds, each wait capped at two minutes, and is sent again, up to six calls. The panel
+counts down, one line per waiting call, and says whether it went through. A header that is
+missing or not a number of seconds, or six refusals, fail only that call, as a plain HTTP
+error (`no Retry-After`, `after 6 tries`); the run is not stopped. Anything else on 402 or 403
+still follows the text: a 402 whose Retry-After is at most two minutes is the in-flight
+budget when the text says in-flight, or when it says nothing about the key limit or the
+credits being spent; a 402 that says in-flight with no usable Retry-After fails that call. Any
+other such 402, and a 403 whose text says the limit or the credits are spent, is the cap
+(`openrouter_key_limit`): the text alone can't tell the key's cap from the account's balance.
 
 **Top up on OpenRouter** is a link to the credits page. Buying credits and auto top-up stay
 on OpenRouter; its API cannot change them.

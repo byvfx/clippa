@@ -70,3 +70,79 @@ def test_replan_only_for_schedule_moves(monkeypatch):
     assert actions.replan(cfg, ITEM, "approve", {})[1] == "not going out: stale"
     assert ran == [False, False, False]
     assert actions.replan({"discord": {"replan": False}}, ITEM, "approve", {}) == ({}, "")
+
+
+def test_a_second_resplit_press_is_not_a_second_ask(defaults, tmp_path):
+    import os
+    import time
+
+    sdir = tmp_path / "kick-1"
+    sdir.mkdir()
+    defaults["paths"]["streams"] = tmp_path
+    defaults["segments"]["split_over_s"] = 3000
+    actions.ask_resplit(defaults, "kick-1/s06", "Brandon")
+    again = actions.ask_resplit(defaults, "kick-1/s06", "Pat")
+    assert "Already flagged for re-split (Brandon)" in again
+    assert jsonstate.load(sdir / "resplit_asks.json")["s06"]["who"] == "Brandon"
+    seg = sdir / "segments.json"   # `clippa segments` ran again: a press after it is new
+    jsonstate.write(seg, {"segments": []})
+    os.utime(seg, (time.time() + 3600,) * 2)
+    assert actions._asked_resplit(sdir, "s06", "Pat") is None
+
+
+def test_resplit_comments_in_kitsu_once(monkeypatch, tmp_path):
+    item = SimpleNamespace(stream_dir=tmp_path, key="s06_topic", ref="kick-1/s06")
+    monkeypatch.setattr(actions, "for_stream", lambda cfg, d: cfg)
+    monkeypatch.setattr(actions, "describe", lambda cfg, sdir: {
+        "s06_topic": {"resplit": True, "resplit_limit_s": 3000, "short": "kick-1/s06"}})
+    monkeypatch.setattr(actions, "_touched", lambda *a: None)
+    monkeypatch.setattr(actions.review, "connect", lambda rc: None)
+    monkeypatch.setattr(actions, "refresh", lambda cfg, item: {})
+    comments = []
+    monkeypatch.setattr(actions, "_comment", lambda gazu, it, status, text: comments.append(text))
+    cfg = {"review": {}}
+    actions.resplit(cfg, item, "Brandon")
+    actions.resplit(cfg, item, "Brandon")
+    assert len(comments) == 1 and "Flagged for re-split" in comments[0]
+
+
+def test_a_resplit_press_whose_kitsu_comment_failed_is_tried_again(monkeypatch, tmp_path):
+    item = SimpleNamespace(stream_dir=tmp_path, key="s06_topic", ref="kick-1/s06")
+    monkeypatch.setattr(actions, "for_stream", lambda cfg, d: cfg)
+    monkeypatch.setattr(actions, "describe", lambda cfg, sdir: {
+        "s06_topic": {"resplit": True, "resplit_limit_s": 3000, "short": "kick-1/s06"}})
+    monkeypatch.setattr(actions, "_touched", lambda *a: None)
+    monkeypatch.setattr(actions.review, "connect", lambda rc: None)
+    monkeypatch.setattr(actions, "refresh", lambda cfg, item: {})
+    tries = []
+
+    def comment(gazu, it, status, text):
+        tries.append(text)
+        if len(tries) == 1:
+            raise ConnectionError("kitsu down")
+
+    monkeypatch.setattr(actions, "_comment", comment)
+    with pytest.raises(ConnectionError):
+        actions.resplit({"review": {}}, item, "Brandon")
+    actions.resplit({"review": {}}, item, "Brandon")
+    assert len(tries) == 2
+
+
+def test_a_notice_press_does_not_hold_back_the_cards_kitsu_comment(defaults, monkeypatch, tmp_path):
+    """The notice's ask wrote nothing to Kitsu, so a later press on the card still comments."""
+    sdir = tmp_path / "kick-1"
+    sdir.mkdir()
+    defaults["paths"]["streams"] = tmp_path
+    defaults["segments"]["split_over_s"] = 3000
+    actions.ask_resplit(defaults, "kick-1/s06", "Brandon")
+    item = SimpleNamespace(stream_dir=sdir, key="s06_topic", ref="kick-1/s06")
+    monkeypatch.setattr(actions, "for_stream", lambda cfg, d: cfg)
+    monkeypatch.setattr(actions, "describe", lambda cfg, d: {
+        "s06_topic": {"resplit": True, "resplit_limit_s": 3000, "short": "kick-1/s06"}})
+    monkeypatch.setattr(actions, "_touched", lambda *a: None)
+    monkeypatch.setattr(actions.review, "connect", lambda rc: None)
+    monkeypatch.setattr(actions, "refresh", lambda cfg, item: {})
+    comments = []
+    monkeypatch.setattr(actions, "_comment", lambda gazu, it, status, text: comments.append(text))
+    actions.resplit(defaults, item, "Brandon")
+    assert len(comments) == 1

@@ -54,6 +54,9 @@ COPY = {
                   "Raise the limit or wait for the reset{when}, then resume it from Pipeline."),
     "stop_body_once": ("OpenRouter refused a call with {status} · {code}. {where} "
                        "Raise the limit, then resume it from Pipeline."),
+    "stop_title_credits": "Stream stopped: the OpenRouter account is out of credits.",
+    "stop_body_credits": ("OpenRouter refused a call with {status} · {code}. {where} "
+                          "Buy credits on OpenRouter, then resume it from Pipeline."),
     "stop_where": "The run stopped at its next model call.",
     "warn_title": "{pct}% of the {period} cap is used.",
     "warn_body": "{left} left before OpenRouter stops the clippa key. It resets {when}.",
@@ -80,6 +83,9 @@ COPY = {
     "retried": ("OpenRouter's in-flight budget was full. Waited {seconds} s as its Retry-After said, "
                 "then the call went through."),
     "retried_wait": "OpenRouter's in-flight budget is full. Waiting {seconds} s as its Retry-After said.",
+    "retried_failed": ("OpenRouter's in-flight budget was full. Waited {seconds} s as its Retry-After said, "
+                       "then the call failed."),
+    "retried_done": "OpenRouter's in-flight budget was full. Waited {seconds} s as its Retry-After said.",
     "changed": "Limit {before} → {after}, resets {reset}. Set from the War Room.",
     "disabled_ev": "The clippa key was disabled from the War Room.",
     "enabled_ev": "The clippa key was enabled from the War Room.",
@@ -113,8 +119,13 @@ def classify_payment(status: int, body: str, retry_after: str | None) -> str | N
 
     A 402 with a Retry-After of at most two minutes, and whose text does not say the key
     limit itself is spent, is ``openrouter_in_flight_budget``: wait, then send the call again.
-    A 402 without that wait, or a 403 whose text says the limit or the credits are spent, is
-    ``openrouter_key_limit``. Any other status, including a 403 about something else, is None.
+    So is a 402 whose text says in-flight with no usable Retry-After (the caller fails that call
+    rather than wait, and records no stop).
+    Any other 402, or a 403 whose text says the limit or the credits are spent, is
+    ``openrouter_key_limit``: the text alone can't tell the key's cap from the account's balance
+    ("requires more credits" is either), so only ``limit_source`` names ``openrouter_credits``,
+    and the panel judges a text-only stop on both figures. Any other status, including a 403
+    about something else, is None.
     """
     if status not in (402, 403):
         return None
@@ -122,6 +133,8 @@ def classify_payment(status: int, body: str, retry_after: str | None) -> str | N
     wait = retry_seconds(retry_after)
     limit = bool(_LIMIT_WORDS.search(text))
     if status == 402 and wait is not None and (bool(_INFLIGHT.search(text)) or not limit):
+        return "openrouter_in_flight_budget"
+    if status == 402 and _INFLIGHT.search(text):  # says in-flight, no usable wait: not a spent limit
         return "openrouter_in_flight_budget"
     if status == 402 or (status == 403 and limit):
         return "openrouter_key_limit"
@@ -190,6 +203,8 @@ def parse_limit(value) -> float:
         n = round(float(value), 2)
     except (TypeError, ValueError):
         raise ClipperError("the spending limit should be a number of dollars") from None
+    if not math.isfinite(n):  # json.loads takes NaN
+        raise ClipperError("the spending limit should be a number of dollars")
     if n < 0 or n > LIMIT_MAX:
         raise ClipperError("the spending limit should be between $0 and $1,000,000")
     return n
@@ -324,18 +339,28 @@ def _quietly(cfg: dict, fn) -> None:
 
 
 def note_retry(cfg: dict, *, seconds: float, status: int = 402,
-               code: str = "openrouter_in_flight_budget") -> None:
-    """Remember an in-flight 402: the banner counts down, and the events list gains a line."""
+               code: str = "openrouter_in_flight_budget", rid: str = "") -> str:
+    """Remember an in-flight 402: the banner counts down, and the events list gains a line.
+    Returns the retry's id (``rid`` when given, a new one otherwise); the call that waited
+    passes it to `clear_retry`, so another call's answer doesn't close this one."""
+    import uuid
+
+    rid = rid or uuid.uuid4().hex[:12]
     until = (datetime.now(UTC) + timedelta(seconds=float(seconds))).isoformat(timespec="seconds")
 
     def apply(d: dict) -> None:
-        ev = {"ts": now_iso(), "kind": "retried", "code": code, "status": status,
-              "seconds": seconds, "pending": True}
-        d.setdefault("events", []).append(ev)
-        d["events"] = d["events"][-EVENTS_MAX:]
-        d["retry"] = {"until": until, "seconds": seconds, "code": code, "status": status}
+        events = d.setdefault("events", [])
+        mine = next((e for e in reversed(events) if isinstance(e, dict) and e.get("id") == rid), None)
+        if mine is not None:  # the same call waiting again: one line, the latest wait
+            mine.update(ts=now_iso(), seconds=seconds, status=status, pending=True, until=until)
+        else:
+            events.append({"ts": now_iso(), "kind": "retried", "code": code, "status": status,
+                           "seconds": seconds, "pending": True, "id": rid, "until": until})
+        d["events"] = events[-EVENTS_MAX:]
+        d["retry"] = {"until": until, "seconds": seconds, "code": code, "status": status, "id": rid}
 
     _quietly(cfg, apply)
+    return rid
 
 
 def note_stop(cfg: dict, *, status: int = 402, code: str = "openrouter_key_limit",
@@ -352,6 +377,7 @@ def note_stop(cfg: dict, *, status: int = 402, code: str = "openrouter_key_limit
             for k in ("show", "stage", "detail", "model", "status"):
                 if fresh.get(k):
                     last[k] = fresh[k]
+            last["ts"] = fresh["ts"]  # the ten minutes count from the latest refusal
             d["stop"] = _stop_of(last)
             return
         events.append(fresh)
@@ -361,25 +387,27 @@ def note_stop(cfg: dict, *, status: int = 402, code: str = "openrouter_key_limit
     _quietly(cfg, apply)
 
 
-def clear_retry(cfg: dict) -> None:
-    """The waited call went through: drop the countdown and close the open retry line."""
+def clear_retry(cfg: dict, rid: str, *, ok: bool = True) -> None:
+    """The call that waited under ``rid`` is over: close its line (went through, or failed).
+    If the countdown was this call's, it goes to another call still waiting (the one that
+    waits longest), or is dropped. Other calls' waits are left alone."""
+    if not rid:
+        return
+
     def apply(d: dict) -> None:
-        d.pop("retry", None)
         for ev in d.get("events") or []:
-            if isinstance(ev, dict) and ev.get("pending"):
+            if isinstance(ev, dict) and ev.get("id") == rid and ev.get("pending"):
                 ev["pending"] = False
+                ev["outcome"] = "ok" if ok else "failed"
+        if isinstance(d.get("retry"), dict) and d["retry"].get("id") == rid:
+            d.pop("retry", None)
+            now = datetime.now(UTC).isoformat(timespec="seconds")
+            waiting = [e for e in d.get("events") or [] if isinstance(e, dict) and e.get("pending")
+                       and e.get("kind") == "retried" and str(e.get("until") or "") > now]
+            if waiting:
+                other = max(waiting, key=lambda e: str(e["until"]))
+                d["retry"] = {k: other.get(k) for k in ("until", "seconds", "code", "status", "id")}
 
-    path = _path(cfg)
-    if path is None or not path.is_file():
-        return
-    from . import jsonstate
-
-    data = jsonstate.read_or(path, {})
-    if not isinstance(data, dict):
-        return
-    pending = any(isinstance(e, dict) and e.get("pending") for e in data.get("events") or [])
-    if not data.get("retry") and not pending:
-        return
     _quietly(cfg, apply)
 
 
@@ -417,7 +445,11 @@ def event_text(ev: dict) -> str:
     if kind == "retried":
         n = ev.get("seconds") or 0
         n_s = int(n) if float(n) == int(float(n)) else n
-        return COPY["retried_wait" if ev.get("pending") else "retried"].format(seconds=n_s)
+        if ev.get("pending") and _age(ev.get("ts")) < 600:
+            which = "retried_wait"
+        else:  # no outcome: written before outcomes were kept, or a call that never reported back
+            which = {"ok": "retried", "failed": "retried_failed"}.get(ev.get("outcome"), "retried_done")
+        return COPY[which].format(seconds=n_s)
     if kind == "changed":
         word = ev.get("reset") or "never"
         before = "none" if ev.get("before_limit") is None else usd(ev.get("before_limit") or 0)
@@ -466,9 +498,11 @@ def _live_retry(settings: dict, now: datetime) -> dict | None:
 
 
 def _header(level: str) -> dict:
-    spend = "bad" if level == "stopped" else "warn" if level == "warn" else "ok"
-    return {"spend": spend, "health": "stopped" if level == "stopped" else None,
-            "badge": level in ("warn", "stopped")}
+    """A disabled key fails every call, so it lights the header like a spent cap."""
+    out = level in ("stopped", "disabled")
+    spend = "bad" if out else "warn" if level == "warn" else "ok"
+    return {"spend": spend, "health": "stopped" if out else None,
+            "badge": level in ("warn", "stopped", "disabled")}
 
 
 def _numbers(data: dict, reset: str | None) -> tuple[float, float | None, float | None]:
@@ -478,6 +512,25 @@ def _numbers(data: dict, reset: str | None) -> tuple[float, float | None, float 
     if left is None and limit is not None:
         left = round(max(0.0, limit - used), 2)
     return used, limit, left
+
+
+def _stop_holds(stop: dict, events: list, left: float | None, balance: float | None) -> bool:
+    """Whether a recorded refusal still stands. For ten minutes it does, unless the limit was
+    changed or the key enabled from the War Room since: OpenRouter's figures here can be five
+    minutes old (TTL), so they don't overrule a refusal that just happened. After that it stands
+    while what ran out is still spent: the account's balance for a credits stop (a limit edit
+    doesn't clear that one), the key's remaining limit or the balance for a key-limit stop."""
+    at = str(stop.get("at") or "")
+    credits = stop.get("code") == "openrouter_credits"
+    if not credits and any(isinstance(e, dict) and e.get("kind") in ("changed", "enabled")
+                           and str(e.get("ts") or "") >= at for e in events):  # >=: to the second
+        return False  # a new cap or an enabled key; neither buys credits
+    if _age(at) < 600:
+        return True
+    broke = balance is not None and balance <= 0.5
+    if credits:  # no balance figure (the credits call failed): an hour, then the next refusal says
+        return broke if balance is not None else _age(at) < 3600
+    return broke or (left is not None and left <= 0.5)  # a text-only refusal may be either
 
 
 def _cap_reached(limit: float | None, used: float, left: float | None) -> bool:
@@ -514,12 +567,11 @@ def view_from(cfg: dict, raw: dict, settings: dict, now: datetime | None = None)
     used, limit, left = _numbers(merged, reset)
     disabled = bool(merged.get("disabled"))
     reached = _cap_reached(limit, used, left)
+    credits = raw.get("credits") if isinstance(raw.get("credits"), dict) else {}
+    bought = _money(credits.get("total_credits")) if "total_credits" in credits else None
+    balance = round(bought - (_money(credits.get("total_usage")) or 0), 2) if bought is not None else None
     stop = settings.get("stop")
-    # Keep a recorded refusal up while a few cents are left (the remaining figure lags the
-    # 402) or for ten minutes. Room of more than a dollar means the limit was raised.
-    recent = bool(stop) and _age(stop.get("at")) < 600 and not (left is not None and left > 1)
-    lingering = bool(stop) and left is not None and left <= 0.5
-    active_stop = stop if (reached or recent or lingering) else None
+    active_stop = stop if stop and _stop_holds(stop, settings["events"], left, balance) else None
     spent = reached or bool(active_stop)
     pct = round(100 * used / limit, 1) if limit else None
     level = _level(disabled, spent, active_stop, pct, warn)
@@ -543,9 +595,6 @@ def view_from(cfg: dict, raw: dict, settings: dict, now: datetime | None = None)
     periods = [{"label": "Today", "usd": key["today_usd"], "current": current == "Today"},
                {"label": "This week", "usd": key["week_usd"], "current": current == "This week"},
                {"label": "This month", "usd": key["month_usd"], "current": current == "This month"}]
-    credits = raw.get("credits") if isinstance(raw.get("credits"), dict) else {}
-    bought = _money(credits.get("total_credits")) if "total_credits" in credits else None
-    balance = round(bought - (_money(credits.get("total_usage")) or 0), 2) if bought is not None else None
     retry = None if level == "stopped" else _retry_view(_live_retry(settings, now))
     banner = _banner(level, key, active_stop, warn, period_word)
     period_key = f"{warn}:{reset or 'all'}:{_bucket(now, reset)}"
@@ -624,8 +673,11 @@ def _banner(level: str, key: dict, stop, warn: int, period_word: str) -> dict | 
         status = (stop or {}).get("status") or 402
         code = (stop or {}).get("code") or "openrouter_key_limit"
         when = f" on {key['reset_both']}" if key.get("reset_both") else ""
-        body_key = "stop_body" if key.get("limit_reset") else "stop_body_once"
-        return {"kind": "bad", "title": COPY["stop_title"],
+        if code == "openrouter_credits":
+            title, body_key = COPY["stop_title_credits"], "stop_body_credits"
+        else:
+            title, body_key = COPY["stop_title"], "stop_body" if key.get("limit_reset") else "stop_body_once"
+        return {"kind": "bad", "title": title,
                 "body": COPY[body_key].format(status=status, code=code, where=_where(stop), when=when)}
     if level == "warn" and key.get("pct") is not None:
         left = usd(key["left_usd"] or 0)
@@ -769,17 +821,17 @@ def _expires_label(iso: str | None) -> str:
 
 
 def _match_listed(label: str, rows: list) -> dict | None:
+    """The management list's row for the clippa key: the one row whose label is the key's own.
+    Nothing else counts, not even a list of one: a PATCH goes to the row's hash, so a guess
+    would change or disable some other key while the panel shows the clippa key."""
     def norm(s: str) -> str:
-        return re.sub(r"[.\u2026\u00b7]{2,}", "...", (s or "").strip().lower())
+        return re.sub(r"\u2026+|[.\u00b7]{2,}", "...", (s or "").strip().lower())  # "\u2026" is "..."
 
     want = norm(label)
-    hits = [r for r in rows if isinstance(r, dict) and norm(str(r.get("label") or "")) == want and want]
-    if len(hits) == 1:
-        return hits[0]
-    usable = [r for r in rows if isinstance(r, dict)]
-    if len(usable) == 1:
-        return usable[0]
-    return None
+    if not want:
+        return None
+    hits = [r for r in rows if isinstance(r, dict) and norm(str(r.get("label") or "")) == want]
+    return hits[0] if len(hits) == 1 else None
 
 
 def _load_remote(cfg: dict) -> dict:
@@ -870,8 +922,11 @@ def _finish(cfg: dict, raw: dict, now: datetime | None = None) -> dict:
     settings = _settings(cfg)
     view = view_from(cfg, raw, settings, now)
     if view.get("recovered") or _retry_expired(settings, now):
+        judged = (settings.get("stop") or {}).get("at")
+
         def clear(d: dict) -> None:
-            if view.get("recovered"):
+            # only the stop judged recovered: a refusal recorded since this poll read the file stays
+            if view.get("recovered") and isinstance(d.get("stop"), dict) and d["stop"].get("at") == judged:
                 d.pop("stop", None)
             waiting = d.get("retry")
             if isinstance(waiting, dict):
@@ -891,6 +946,8 @@ def _finish(cfg: dict, raw: dict, now: datetime | None = None) -> dict:
             and settings.get("warned_for") != view.get("period_key")):
         key = view["key"]
         def mark(d: dict) -> None:
+            if d.get("warned_for") == view.get("period_key"):  # another poll got here first
+                return
             d.setdefault("events", []).append({
                 "ts": now_iso(), "kind": "passed", "pct": settings["warn_pct"],
                 "limit": key["limit_usd"], "period": key.get("reset_label") or "monthly"})
@@ -1009,4 +1066,8 @@ def _patch_key(cfg: dict, body: dict) -> None:
         raise ClipperError("set a management key that can see this clippa key before changing it")
     r = _request("PATCH", f"{BASE}/keys/{digest}", key, body)
     if not r.ok:
-        raise ClipperError(f"OpenRouter refused the change (HTTP {r.status_code}): {_msg(r) or 'no details'}")
+        msg = (_msg(r) or "no details").replace(digest, "<hash>")
+        for secret in (key, inference_key(cfg)):
+            if secret:
+                msg = msg.replace(secret, "<key>")
+        raise ClipperError(f"OpenRouter refused the change (HTTP {r.status_code}): {msg}")

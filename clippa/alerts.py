@@ -239,14 +239,17 @@ def _payloads(files: list[Path], nc: dict, st: dict, now: datetime, tz: ZoneInfo
                 and now - datetime.fromisoformat(last) < timedelta(hours=nc["cooldown_hours"]):
             continue
         st["sent"][ev["key"]] = now.isoformat(timespec="seconds")
-        embed = (dm_embed(ev["kind"], ev["text"], ev.get("title") or "", ev.get("short") or "")
+        try:
+            at = datetime.fromisoformat(ev["at"]).astimezone(tz)
+        except (KeyError, TypeError, ValueError):  # another machine's file: send it without a time
+            at = now
+        when = f"[{at:%a %H:%M}] " if now - at > timedelta(minutes=10) else ""  # held or late
+        embed = (dm_embed(ev["kind"], when + ev["text"], ev.get("title") or "", ev.get("short") or "")
                  if ev["kind"] in EMBED_KINDS else None)
         if embed:
             flush()
             payloads.append({"embed": embed})
         else:
-            at = datetime.fromisoformat(ev["at"]).astimezone(tz)
-            when = f"[{at:%a %H:%M}] " if now - at > timedelta(minutes=10) else ""  # held or late
             text.append(f"{ICON.get(ev['kind'], '•')} {when}{ev['text']}")
         linked |= ev["kind"] in ("ready", "digest", "test")
     flush()
@@ -267,14 +270,21 @@ def _batch(lines: list[str]) -> list[str]:
 
 
 def _attach_link(payloads: list[dict], link: str) -> None:
-    """The war room URL once, on the last DM."""
+    """The war room URL once, on the last DM; a DM of its own when the last one has no room
+    left (it is never cut off)."""
     if not payloads:
         return
-    line = f"War room: {link}"
+    line = f"War room: {link}"[:1900]
     last = payloads[-1]
-    if last.get("content") and line in last["content"]:
+    body = last.get("content") or ""
+    if line in body:
         return
-    last["content"] = f"{last['content']}\n{line}"[:1900] if last.get("content") else line
+    if not body:
+        last["content"] = line
+    elif len(body) + 1 + len(line) <= 1900:
+        last["content"] = f"{body}\n{line}"
+    else:
+        payloads.append({"content": line})
 
 
 def done(cfg: dict, files: list[Path], st: dict) -> None:

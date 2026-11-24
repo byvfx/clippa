@@ -385,6 +385,7 @@ class Run:
         self.claude, self.tools, self.archives, self.log = claude, tools, archives, log
         self.budget = Budget(s["budget_usd"], claude, spent_before=claude.cost)
         self.t0, self.ran, self.stopped = time.monotonic(), 0, ""
+        self.limit = ""  # an OpenRouter spending limit cut the run short: its search is unfinished
         self.lock = threading.Lock()
         self.found = {f["key"]: f for f in trail["findings"]}
         self.words = terms(goal)
@@ -519,6 +520,7 @@ class Run:
             except OpenRouterLimit as e:
                 self.stop(str(e))
                 with self.lock:
+                    self.limit = self.limit or str(e)
                     self.ran -= 1
                 return []
             except Exception as e:  # noqa: BLE001  # a model error fails this task, not the run
@@ -567,7 +569,9 @@ def run(cfg: dict, goal: str, trail_path: Path, context: str = "", seeds: list[d
         archives: list[str] | None = None, days: int = 0, since: str | None = None, before: str | None = None,
         log: Callable[[str], None] = print) -> dict:
     """Search for `goal` and return the merged findings, ranked, with why the run stopped and
-    what it cost: {"findings", "stopped", "usd", "tasks"}.
+    what it cost: {"findings", "stopped", "usd", "tasks", "limit"}. "limit" is the OpenRouter
+    spending limit that cut the run short, or "": a caller must not read a run with one as a
+    search that found nothing.
 
     context: what the caller knows (people, their channels, dates), shown to the planner and
     every worker. seeds: tasks the caller wants run first ({kind, target, why}), e.g. a
@@ -601,7 +605,7 @@ def run(cfg: dict, goal: str, trail_path: Path, context: str = "", seeds: list[d
     found = trail["findings"]
     strong = sum(f["relevance"] == "strong" for f in found)
     log(f"swarm: {r.ran} tasks, {len(found)} findings ({strong} strong), ~${usd:.3f}; stopped: {r.stopped}")
-    return {"findings": found, "stopped": r.stopped, "usd": usd, "tasks": r.ran}
+    return {"findings": found, "stopped": r.stopped, "usd": usd, "tasks": r.ran, "limit": r.limit}
 
 
 # ---------- the trail ----------

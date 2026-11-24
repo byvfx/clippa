@@ -26,6 +26,22 @@ Developing#releases.
   with only the inference key the panel is read-only. A 402 with Retry-After waits and retries;
   a spent key limit stops the call. Wiki: War room (Modal, costs and analytics), Costs
   (The OpenRouter budget).
+- 11-23: fixes to the last few days' OpenRouter, Discord and review-check changes, before they
+  deploy. An in-flight 402 waits up to two minutes per try and, when it runs out of tries or has
+  no Retry-After, fails only that call instead of stopping the run. A credits stop has its own
+  banner. The budget panel keeps a stop for ten minutes from the latest refusal despite
+  five-minute-old figures, shows one countdown per waiting call and whether it went through,
+  lights Stopped for a disabled key, and matches the clippa key by its exact label only. A
+  spending limit mid-run keeps what was paid for: the covers that finished (`thumbs`, which
+  starts no more), the facts read and the leads checked (`investigate`, which marks a cut-short
+  check unchecked instead of "nothing found"), and the review checks done. Without OpenCV or
+  past a limit, `review check` saves the items it couldn't check with a finding, and a publish
+  goes on with that finding in Kitsu. Discord:
+  the thread's first message says "segments next" after the fast lane and is edited as cards
+  come in, the ready DM no longer says "finished processing" early, an item waiting for a person
+  isn't shown as approving itself, a second Re-split press adds no second Kitsu comment, held
+  error DMs keep their time, and the war room link is never cut off. `mkdocs serve` no longer
+  rebuilds in a loop. Wiki: Costs (The OpenRouter budget), Model providers, Review, Reviewing.
 - 11-23: an OpenRouter key limit or an empty balance stops the stage at once
   (`openrouter_key_limit` on HTTP 402 or 403, `openrouter_credits` on 402) instead of being
   sent again; an in-flight budget (`openrouter_in_flight_budget`) waits for `Retry-After` and

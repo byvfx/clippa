@@ -89,27 +89,61 @@ def price_of(prices: dict, model: str) -> tuple[float, float] | None:
 _OPENROUTER_PRICES: dict[str, tuple[float, float]] | None = None
 _OPENROUTER_CONTEXT: dict[str, int] = {}
 _OPENROUTER_MAX_OUT: dict[str, int] = {}
+_OPENROUTER_FAILED_AT = 0.0  # time.monotonic() of the last failed fetch; 0 = the table is good
+_OPENROUTER_LOCK = threading.Lock()
+_OPENROUTER_RETRY_S = 300
+
+
+def _openrouter_fresh() -> bool:
+    return _OPENROUTER_PRICES is not None and not (
+        _OPENROUTER_FAILED_AT and time.monotonic() - _OPENROUTER_FAILED_AT >= _OPENROUTER_RETRY_S)
 
 
 def openrouter_prices() -> dict[str, tuple[float, float]]:
     """OpenRouter's published $ per 1M input/output tokens by model id (its /models list is
-    public). Fetched once per process. A failed fetch is cached as {} so a dry-run of many
-    rows waits out the timeout at most once; a later row does not try again."""
-    global _OPENROUTER_PRICES
-    if _OPENROUTER_PRICES is None:
+    public). Fetched once per process, by one thread at a time. A failed fetch is kept as {}
+    for five minutes, so a dry-run of many rows waits out the timeout at most once, and then
+    tried again: serve and the bot run for days, and one network blip shouldn't leave their
+    prices, context sizes and output caps empty until a restart. A row that doesn't parse is
+    skipped on its own; the rest of the list stands."""
+    global _OPENROUTER_PRICES, _OPENROUTER_FAILED_AT
+    if _openrouter_fresh():
+        return _OPENROUTER_PRICES
+    with _OPENROUTER_LOCK:
+        if _openrouter_fresh():  # another thread fetched it while this one waited
+            return _OPENROUTER_PRICES
         import requests
 
         try:
             data = requests.get(PROVIDERS["openrouter"][0] + "/models", timeout=15).json()["data"]
-            _OPENROUTER_PRICES = {m["id"]: (float(m["pricing"]["prompt"]) * 1e6,
-                                            float(m["pricing"]["completion"]) * 1e6)
-                                  for m in data if m.get("pricing")}
-            _OPENROUTER_CONTEXT.update({m["id"]: int(m["context_length"])
-                                        for m in data if m.get("context_length")})
-            _OPENROUTER_MAX_OUT.update({m["id"]: int(m["top_provider"]["max_completion_tokens"])
-                                        for m in data if (m.get("top_provider") or {}).get("max_completion_tokens")})
+            if not isinstance(data, list):
+                raise TypeError("/models data is not a list")
         except (requests.RequestException, ValueError, KeyError, TypeError):
-            _OPENROUTER_PRICES = {}
+            _OPENROUTER_PRICES = _OPENROUTER_PRICES or {}  # only None or an earlier failure gets here
+            _OPENROUTER_FAILED_AT = time.monotonic()
+            return _OPENROUTER_PRICES
+        table, ctx, cap = {}, {}, {}
+        for m in data:
+            if not isinstance(m, dict):
+                continue
+            try:
+                if m.get("pricing"):
+                    table[m["id"]] = (float(m["pricing"]["prompt"]) * 1e6, float(m["pricing"]["completion"]) * 1e6)
+            except (KeyError, TypeError, ValueError):
+                pass
+            try:
+                if m.get("context_length"):
+                    ctx[m["id"]] = int(m["context_length"])
+            except (KeyError, TypeError, ValueError):
+                pass
+            try:
+                if (m.get("top_provider") or {}).get("max_completion_tokens"):
+                    cap[m["id"]] = int(m["top_provider"]["max_completion_tokens"])
+            except (KeyError, TypeError, ValueError, AttributeError):
+                pass
+        _OPENROUTER_CONTEXT.update(ctx)
+        _OPENROUTER_MAX_OUT.update(cap)
+        _OPENROUTER_PRICES, _OPENROUTER_FAILED_AT = table, 0.0
     return _OPENROUTER_PRICES
 
 
@@ -283,8 +317,8 @@ def _retry_after_s(headers) -> float | None:
 
     OpenRouter's in-flight budget says how long to wait. The number is kept (a 0 means
     retry at once); an HTTP-date or anything else is not a wait this client can honour.
-    Capped at 60, the same ceiling as the client's other retries, so a stray header
-    cannot hold a stream for hours."""
+    Capped at 120, the longest in-flight wait the budget panel reads as one
+    (openrouter_budget.retry_seconds), so a stray header cannot hold a stream for hours."""
     raw = _header(headers, "retry-after")
     if not raw:
         return None
@@ -294,7 +328,7 @@ def _retry_after_s(headers) -> float | None:
         return None
     if not math.isfinite(pause) or pause < 0:
         return None
-    return min(60.0, pause)
+    return min(120.0, pause)
 
 
 def _error_body(response) -> dict | None:
@@ -344,9 +378,11 @@ def _openrouter_limit_wait(model: str, response, attempt: int, paths=None,
                            tries: int = ATTEMPTS) -> float | None:
     """None when this response is not a metadata spending limit we handle. A float: sleep, then retry.
 
-    openrouter_key_limit is final on HTTP 402 or 403. openrouter_credits and
-    openrouter_in_flight_budget are final or retried only on HTTP 402. Another status
-    with those sources is left for the caller."""
+    openrouter_key_limit is final on HTTP 402 or 403, and openrouter_credits on 402: those
+    stop the run (OpenRouterLimit). openrouter_in_flight_budget on 402 is retried; it is a
+    moment's crowding, not a spent limit, so once the tries run out (or there is no
+    Retry-After) only this call fails, with a RuntimeError, like any other HTTP error.
+    Another status with those sources is left for the caller."""
     status = response.status_code
     if status not in (402, 403):
         return None
@@ -365,9 +401,9 @@ def _openrouter_limit_wait(model: str, response, attempt: int, paths=None,
         return None
     pause = _retry_after_s(response.headers)
     if pause is None:
-        _raise_limit(model, response, source, f"no Retry-After: {detail}", paths=paths)
+        raise RuntimeError(f"{model}: HTTP 402 {source}, no Retry-After: {detail}")
     if attempt + 1 >= tries:
-        _raise_limit(model, response, source, detail, paths=paths, tries=tries)
+        raise RuntimeError(f"{model}: HTTP 402 {source} after {tries} tries: {detail}")
     return pause
 
 
@@ -612,22 +648,22 @@ class LLM:
 
     def _handle_compat_status(self, model: str, prov: str, env: str, r, body: dict, token_key: str,
                               asked: int, response_format: dict | None, attempt: int,
-                              timeout_s: float | None) -> bool:
+                              timeout_s: float | None, waits: dict | None = None) -> bool:
         """True: send this request again. False: `r` is the answer to use.
 
-        Raises OpenRouterLimit, KeyRejected, NoSchema or RuntimeError when the call is over."""
+        Raises OpenRouterLimit, KeyRejected, NoSchema or RuntimeError when the call is over.
+        waits: this call's own retry record ({"rid": ...}), so the budget panel closes the
+        right line when the call ends."""
         # 200 OK never parses the body here: the limit check is only a 402 or 403.
         if prov == "openrouter" and r.status_code in (402, 403):
             wait = _openrouter_limit_wait(model, r, attempt, paths=self.paths)
             if wait is not None:
-                from . import openrouter_budget as ob
-
-                ob.note_retry({"paths": self.paths}, seconds=wait, status=r.status_code)
+                self._note_wait(waits, wait, r.status_code)
                 time.sleep(wait)
                 return True
             # No limit_source: the budget panel's text rules (a 402 that only says
             # "in-flight" or "key limit") still apply.
-            if self._openrouter_payment(r, model, attempt, timeout_s):
+            if self._openrouter_payment(r, model, attempt, timeout_s, waits):
                 return True
         # A long call (timeout_s) that a gateway gave up on may be thinking still, and billed:
         # only a refusal before it started (rate limit, overloaded) is worth sending again.
@@ -702,25 +738,30 @@ class LLM:
         headers = {"Authorization": f"Bearer {key}"} if key else {}
         if prov == "openrouter":
             headers["X-Title"] = "clippa"
-        for attempt in range(ATTEMPTS):
-            try:
-                r = requests.post(f"{base}/chat/completions", json=body, headers=headers,
-                                  timeout=timeout_s or self.lc["timeout_s"])
-            except requests.RequestException as e:
-                if attempt == ATTEMPTS - 1 or timeout_s:  # a long call may have started: each try is paid for
-                    raise RuntimeError(f"{model}: {type(e).__name__}: {e}") from None
-                time.sleep(2 ** attempt)
-                continue
-            if self._handle_compat_status(model, prov, env, r, body, limit, asked, response_format,
-                                          attempt, timeout_s):
-                continue
-            break
-        return self._compat_done(model, prov, name, r, length_ok)
+        waits: dict = {}
+        try:
+            for attempt in range(ATTEMPTS):
+                try:
+                    r = requests.post(f"{base}/chat/completions", json=body, headers=headers,
+                                      timeout=timeout_s or self.lc["timeout_s"])
+                except requests.RequestException as e:
+                    if attempt == ATTEMPTS - 1 or timeout_s:  # a long call may have started: each try is paid for
+                        raise RuntimeError(f"{model}: {type(e).__name__}: {e}") from None
+                    time.sleep(2 ** attempt)
+                    continue
+                if self._handle_compat_status(model, prov, env, r, body, limit, asked, response_format,
+                                              attempt, timeout_s, waits):
+                    continue
+                break
+            out = self._compat_done(model, prov, name, r, length_ok)
+        except Exception:
+            self._openrouter_clear(waits, ok=False)
+            raise
+        self._openrouter_clear(waits, ok=True)
+        return out
 
     def _compat_done(self, model: str, prov: str, name: str, r, length_ok: bool) -> tuple[dict, dict]:
         """The successful response: cost, refusal, and a cut-off answer."""
-        if prov == "openrouter":
-            self._openrouter_clear()
         data = r.json()
         choice = data["choices"][0]
         usage = data.get("usage") or {}
@@ -736,15 +777,22 @@ class LLM:
             raise RuntimeError(f"{model} hit max_tokens ({meta['request_id']})")
         return data, meta
 
-    def _openrouter_payment(self, response, model: str, attempt: int, timeout_s: float | None) -> bool:
-        """A 402/403 from OpenRouter. True: wait and send it again. A spent key limit raises."""
+    def _openrouter_payment(self, response, model: str, attempt: int, timeout_s: float | None,
+                            waits: dict | None = None) -> bool:
+        """A 402/403 from OpenRouter with no limit_source. True: wait and send it again. A spent
+        key limit or an account out of credits raises. An in-flight refusal isn't billed, so it is
+        sent again even on a long call (timeout_s); once the tries run out it is a plain HTTP error."""
         from . import openrouter_budget as ob
 
         header = response.headers.get("Retry-After") or response.headers.get("retry-after")
         kind = ob.classify_payment(response.status_code, response.text, header)
-        if kind == "openrouter_in_flight_budget" and attempt < 5 and not timeout_s:
-            wait = ob.retry_seconds(header) or 0
-            ob.note_retry({"paths": self.paths}, seconds=wait, status=response.status_code)
+        if kind == "openrouter_in_flight_budget":
+            wait = _retry_after_s(response.headers)  # capped at two minutes, as with limit_source
+            if wait is None:
+                raise RuntimeError(f"{model}: HTTP 402 {kind}, no Retry-After: {response.text[:200]}")
+            if attempt >= ATTEMPTS - 1:
+                raise RuntimeError(f"{model}: HTTP 402 {kind} after {ATTEMPTS} tries: {response.text[:200]}")
+            self._note_wait(waits, wait, response.status_code)
             time.sleep(wait)
             return True
         if kind == "openrouter_key_limit":
@@ -752,12 +800,30 @@ class LLM:
             raise ob.OpenRouterKeyLimit(
                 f"openrouter_key_limit: OpenRouter refused {model} (HTTP {response.status_code}). "
                 "The clippa key's limit is spent.")
+        if kind == "openrouter_credits":
+            ob.note_stop({"paths": self.paths}, status=response.status_code, code=kind, model=model)
+            raise OpenRouterLimit(
+                f"openrouter_credits: OpenRouter refused {model} (HTTP {response.status_code}). "
+                "The OpenRouter account is out of credits.", kind)
         return False
 
-    def _openrouter_clear(self) -> None:
+    def _note_wait(self, waits: dict | None, seconds: float, status: int) -> None:
+        """Put this call's wait on the budget panel, one line per call however often it waits."""
         from . import openrouter_budget as ob
 
-        ob.clear_retry({"paths": self.paths})
+        rid = ob.note_retry({"paths": self.paths}, seconds=seconds, status=status,
+                            rid=(waits or {}).get("rid", ""))
+        if waits is not None:
+            waits["rid"] = rid
+
+    def _openrouter_clear(self, waits: dict, *, ok: bool) -> None:
+        """Close this call's wait on the budget panel, if it waited. A call that never waited
+        doesn't touch the panel's file."""
+        if not waits.get("rid"):
+            return
+        from . import openrouter_budget as ob
+
+        ob.clear_retry({"paths": self.paths}, waits["rid"], ok=ok)
 
 
 # Every stage's model calls go through clippa/llm.py, which picks the provider from the

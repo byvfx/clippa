@@ -373,6 +373,7 @@ def run_facts(cfg: dict, subject: str, since: str | None = None, before: str | N
     (d / "facts").mkdir(parents=True, exist_ok=True)
     stop = threading.Event()
     t0, done, n_facts, n_dropped, failed, why = time.time(), 0, 0, 0, 0, ""
+    refused: OpenRouterLimit | None = None  # a spending limit stopped it
 
     def one(it: dict) -> dict | None:
         if stop.is_set():
@@ -391,9 +392,12 @@ def run_facts(cfg: dict, subject: str, since: str | None = None, before: str | N
                     print(f"stopping: {e}", flush=True)
                 stop.set()
                 continue
-            except OpenRouterLimit:
-                stop.set()  # items not started yet don't call
-                raise
+            except OpenRouterLimit as e:
+                stop.set()  # items not started yet don't call; the ones that finished are kept
+                if refused is None:
+                    why, refused = str(e), e
+                    print(f"stopping: {e}", flush=True)
+                continue
             except Exception as e:  # noqa: BLE001  # one bad item doesn't end the run
                 failed += 1
                 print(f"  {it['id']} failed: {e}", flush=True)
@@ -409,9 +413,11 @@ def run_facts(cfg: dict, subject: str, since: str | None = None, before: str | N
                       flush=True)
     left = len(todo) - done - failed
     print(f"{subject}: {done} items read, {n_facts} facts kept, {n_dropped} dropped (quote not in the "
-          f"words), {failed} failed; ~${claude.cost:.2f}" + (f"; {left} left over budget" if why else ""))
+          f"words), {failed} failed; ~${claude.cost:.2f}" + (f"; {left} left ({'an OpenRouter limit' if refused else 'over budget'})" if why else ""))
     log_run(d, {"step": "facts", "since": since, "before": before, "items": done, "facts": n_facts,
                 "dropped": n_dropped, "failed": failed, "usd": round(claude.cost, 4), "stopped": why})
+    if refused is not None:
+        raise refused
     return claude.cost
 
 
@@ -957,6 +963,9 @@ def run_confirm(cfg: dict, subject: str, only: str | None = None) -> float:
             break
         try:
             out, _ = claude.json_call(ic["check_model"], system, user, CONFIRM_SCHEMA, ic["check_effort"])
+        except Exception:
+            save_leads(cfg, subject, data)  # a limit or a failed call: the verdicts made are kept
+            raise
         finally:
             budget.release(est)
         if not out:
@@ -1104,6 +1113,8 @@ def findings(cfg: dict, subject: str, lead: dict, claude=None) -> tuple[list[dic
     # coverage was looked at only if a search finished: else the lead stays unchecked, not fresh
     errors = {} if any(t["status"] == "done" for t in tasks) else \
         {**failed, "swarm": f"no search finished (stopped: {out.get('stopped') or '?'})"}
+    if out.get("limit"):  # cut short: what didn't run isn't evidence that nobody covers it
+        errors["swarm"] = f"stopped by an OpenRouter limit: {out['limit']}"[:200]
     try:
         found += own_titles(cfg, subject, ts, lead["first"], ic["check_results"])
     except Exception as e:  # noqa: BLE001  # the catalog unreadable doesn't stop the check
@@ -1129,7 +1140,11 @@ def run_check(cfg: dict, subject: str, only: str | None = None) -> float:
             print(f"stopping: budget ${ic['budget_usd']:.2f}: ${budget.spent:.2f} spent, a lead's swarm "
                   f"may take ${per_swarm:.2f}")
             break
-        found, errors = findings(cfg, subject, lead, claude)
+        try:
+            found, errors = findings(cfg, subject, lead, claude)
+        except Exception:
+            save_leads(cfg, subject, data)  # a limit or a failed call: the leads done stay done
+            raise
         print(f"{lead['id']} {lead['headline']}: {len(found)} results"
               + (f" ({', '.join(f'{k} failed' for k in errors)})" if errors else ""), flush=True)
         verdict = {"coverage": "fresh", "note": "nothing found", "matches": []}
@@ -1148,11 +1163,17 @@ def run_check(cfg: dict, subject: str, only: str | None = None) -> float:
                 break
             try:
                 out, _ = claude.json_call(ic["check_model"], system, user, CHECK_SCHEMA, ic["check_effort"])
+            except Exception:
+                save_leads(cfg, subject, data)  # a limit or a failed call: the leads done stay done
+                raise
             finally:
                 budget.release(est)
             verdict = out or {"coverage": "unchecked", "note": "the model declined to judge", "matches": []}
         matched = [found[k] for k in verdict["matches"] if 0 <= k < len(found)]
-        if errors and not found:
+        cut_short = str(errors.get("swarm", "")).startswith("stopped by an OpenRouter limit")
+        if cut_short and (not found or verdict["coverage"] == "fresh"):
+            verdict = {"coverage": "unchecked", "note": "an OpenRouter limit cut the search short", "matches": []}
+        elif errors and not found:
             verdict = {"coverage": "unchecked", "note": "every search failed", "matches": []}
         lead["coverage"] = {"label": verdict["coverage"], "note": verdict["note"],
                             "links": [{"source": r["source"], "title": r["title"], "url": r["url"]} for r in matched],
@@ -1327,7 +1348,7 @@ def post_discord(cfg: dict, subject: str, new_thread: bool = False) -> str:
         except Missing:
             thread_id = None  # deleted: a new one (any other failure stops here, ids kept)
     if not thread_id:
-        thread_id = open_thread(api, channel_id, thread_title(data), {"content": header_message(data)})
+        thread_id, _ = open_thread(api, channel_id, thread_title(data), {"content": header_message(data)})
         state = {"made_at": data["made_at"], "channel_id": channel_id, "thread_id": thread_id, "messages": {}}
         jsonstate.write(dpath, state)
     base = war_room_link(cfg)

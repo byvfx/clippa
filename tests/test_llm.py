@@ -452,21 +452,24 @@ def test_openrouter_in_flight_budget_waits_for_retry_after_then_succeeds(posted,
     assert slept == [4.0] and len(sent) == 2
 
 
-def test_in_flight_retry_after_is_capped_at_sixty_seconds(posted, monkeypatch, defaults):
-    """A huge Retry-After waits the client's 60s ceiling, not the raw header, then one more call."""
+def test_in_flight_retry_after_is_capped_at_two_minutes(posted, monkeypatch, defaults):
+    """A huge Retry-After waits 120 s at most (the longest wait the budget panel reads as an
+    in-flight one), not the raw header, then one more call."""
     sent, replies = posted
     monkeypatch.setenv("OPENROUTER_API_KEY", "k")
     slept = []
     monkeypatch.setattr(llm.time, "sleep", lambda s: slept.append(s))
     replies += [_limit("openrouter_in_flight_budget", 402, "in flight", retry_after="120"),
+                _limit("openrouter_in_flight_budget", 402, "in flight", retry_after="9000"),
                 FakeResponse(answer("ok"))]
     text, _ = llm.LLM(defaults).text_call("openrouter:openai/gpt-5-mini", "sys", "hi", "low")
     assert text == "ok"
-    assert slept == [60.0] and len(sent) == 2
+    assert slept == [120.0, 120.0] and len(sent) == 3
 
 
-def test_openrouter_in_flight_budget_fails_when_the_retries_are_used_up(posted, monkeypatch, defaults):
-    """Six tries (the client's existing attempt budget), five waits, then a clean limit error."""
+def test_openrouter_in_flight_budget_fails_only_this_call_when_the_retries_are_used_up(posted, monkeypatch, defaults):
+    """Six tries, five waits, then a plain HTTP error: a crowded moment fails one call, it is
+    not a spent limit, so it doesn't stop the stage (OpenRouterLimit) or the panel (no stop)."""
     from clippa.errors import OpenRouterLimit
 
     sent, replies = posted
@@ -475,9 +478,9 @@ def test_openrouter_in_flight_budget_fails_when_the_retries_are_used_up(posted, 
     monkeypatch.setattr(llm.time, "sleep", lambda s: slept.append(s))
     replies += [_limit("openrouter_in_flight_budget", 402, "still in flight", retry_after="1")
                 for _ in range(6)]
-    with pytest.raises(OpenRouterLimit, match=r"after 6 tries") as raised:
+    with pytest.raises(RuntimeError, match=r"after 6 tries") as raised:
         llm.LLM(defaults).text_call("openrouter:openai/gpt-5-mini", "sys", "hi", "low")
-    assert raised.value.limit_source == "openrouter_in_flight_budget"
+    assert not isinstance(raised.value, OpenRouterLimit)
     assert "HTTP 402" in str(raised.value)
     assert len(sent) == 6 and slept == [1.0, 1.0, 1.0, 1.0, 1.0]
 
@@ -497,6 +500,22 @@ def test_credits_or_in_flight_on_403_are_not_spending_limits(posted, monkeypatch
     assert len(sent) == 2 and slept == []
 
 
+def test_a_403_that_says_out_of_credits_stops_the_run(posted, monkeypatch, defaults):
+    """OpenRouter's wording on a 403 with credits on 402 only in limit_source: the run stops
+    (credits don't come back on a retry). The text can't say whether the key's cap or the
+    account ran out, so it stops as the key limit and the panel judges it on both figures."""
+    from clippa.openrouter_budget import OpenRouterKeyLimit
+
+    sent, replies = posted
+    monkeypatch.setenv("OPENROUTER_API_KEY", "k")
+    monkeypatch.setattr(llm.time, "sleep", lambda s: None)
+    replies.append(_limit("openrouter_credits", 403, "Insufficient credits. Add more at openrouter.ai"))
+    with pytest.raises(OpenRouterKeyLimit):
+        llm.LLM(defaults).text_call("openrouter:openai/gpt-5-mini", "sys", "hi", "low")
+    assert len(sent) == 1
+    assert len(sent) == 1
+
+
 @pytest.mark.parametrize("header", ["nan", "NaN", "inf", "-1"])
 def test_a_non_finite_or_negative_retry_after_is_not_retried(posted, monkeypatch, defaults, header):
     from clippa.errors import OpenRouterLimit
@@ -506,14 +525,15 @@ def test_a_non_finite_or_negative_retry_after_is_not_retried(posted, monkeypatch
     slept = []
     monkeypatch.setattr(llm.time, "sleep", lambda s: slept.append(s))
     replies.append(_limit("openrouter_in_flight_budget", 402, "in flight", retry_after=header))
-    with pytest.raises(OpenRouterLimit, match="not retried") as raised:
+    with pytest.raises(RuntimeError, match="no Retry-After") as raised:
         llm.LLM(defaults).text_call("openrouter:openai/gpt-5-mini", "sys", "hi", "low")
-    assert raised.value.limit_source == "openrouter_in_flight_budget"
+    assert not isinstance(raised.value, OpenRouterLimit)
     assert len(sent) == 1 and slept == []
 
 
 def test_in_flight_budget_without_retry_after_is_not_retried(posted, monkeypatch, defaults):
-    """A 402 in-flight budget with no Retry-After is not a wait-and-retry (OpenRouter's rule)."""
+    """A 402 in-flight budget with no Retry-After is not a wait-and-retry (OpenRouter's rule),
+    and not a stop either: this call fails."""
     from clippa.errors import OpenRouterLimit
 
     sent, replies = posted
@@ -521,10 +541,24 @@ def test_in_flight_budget_without_retry_after_is_not_retried(posted, monkeypatch
     slept = []
     monkeypatch.setattr(llm.time, "sleep", lambda s: slept.append(s))
     replies.append(_limit("openrouter_in_flight_budget", 402, "in flight"))
-    with pytest.raises(OpenRouterLimit, match=r"not retried") as raised:
+    with pytest.raises(RuntimeError, match=r"no Retry-After") as raised:
         llm.LLM(defaults).text_call("openrouter:openai/gpt-5-mini", "sys", "hi", "low")
-    assert raised.value.limit_source == "openrouter_in_flight_budget"
+    assert not isinstance(raised.value, OpenRouterLimit)
     assert len(sent) == 1 and slept == []
+
+
+def test_a_text_only_in_flight_402_waits_even_on_a_long_call(posted, monkeypatch, defaults):
+    """No limit_source, the text says in-flight: the refusal isn't billed, so codereview's long
+    call (timeout_s) waits and sends it again too."""
+    sent, replies = posted
+    monkeypatch.setenv("OPENROUTER_API_KEY", "k")
+    slept = []
+    monkeypatch.setattr(llm.time, "sleep", lambda s: slept.append(s))
+    replies += [FakeResponse({"error": {"message": "in-flight budget is full"}}, status=402,
+                             headers={"Retry-After": "3"}),
+                FakeResponse(answer("ok"))]
+    text, _ = llm.LLM(defaults).text_call("openrouter:openai/gpt-5-mini", "sys", "hi", "low", timeout_s=1800)
+    assert text == "ok" and slept == [3.0] and len(sent) == 2
 
 
 # Clippa's hyphen ids. OpenRouter's catalog uses a dot in the version (checked against
@@ -600,3 +634,35 @@ def test_cli_exits_key_rejected_on_a_claude_auth_error_past_the_preflight(monkey
     monkeypatch.setattr(cli, "run_command", lambda args: (_ for _ in ()).throw(KeyError("other")))
     with pytest.raises(KeyError):
         cli.main()
+
+
+def test_a_text_only_in_flight_402_without_retry_after_fails_the_call_and_stops_nothing(
+        posted, monkeypatch, defaults, tmp_path):
+    """No limit_source and no usable Retry-After, but the text says in-flight: not a spent
+    key limit. This call fails; no stop is written for the budget panel."""
+    from clippa import openrouter_budget as ob
+    from clippa.errors import OpenRouterLimit
+
+    sent, replies = posted
+    monkeypatch.setenv("OPENROUTER_API_KEY", "k")
+    defaults["paths"]["streams"] = tmp_path
+    stops = []
+    monkeypatch.setattr(ob, "note_stop", lambda *a, **k: stops.append(k))
+    monkeypatch.setattr(llm.time, "sleep", lambda s: None)
+    replies.append(FakeResponse({"error": {"message": "in-flight budget is full"}}, status=402))
+    with pytest.raises(RuntimeError, match="no Retry-After") as raised:
+        llm.LLM(defaults).text_call("openrouter:openai/gpt-5-mini", "sys", "hi", "low")
+    assert not isinstance(raised.value, OpenRouterLimit)
+    assert len(sent) == 1 and stops == []
+
+
+def test_a_text_only_in_flight_402_with_a_long_retry_after_waits_two_minutes(posted, monkeypatch, defaults):
+    sent, replies = posted
+    monkeypatch.setenv("OPENROUTER_API_KEY", "k")
+    slept = []
+    monkeypatch.setattr(llm.time, "sleep", lambda s: slept.append(s))
+    replies += [FakeResponse({"error": {"message": "in-flight budget is full"}}, status=402,
+                             headers={"Retry-After": "300"}),
+                FakeResponse(answer("ok"))]
+    text, _ = llm.LLM(defaults).text_call("openrouter:openai/gpt-5-mini", "sys", "hi", "low")
+    assert text == "ok" and slept == [120.0] and len(sent) == 2

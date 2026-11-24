@@ -71,7 +71,7 @@ TITLES: dict[str, str] = {
     "YouTube-sign-in": "YouTube sign-in",
 }
 
-_FENCE = re.compile(r"^[ \t]*```.*?^[ \t]*```", re.M | re.S)
+_FENCE = re.compile(r"^[ \t]*(```|~~~).*?^[ \t]*\1", re.M | re.S)
 _INLINE = re.compile(r"`[^`\n]*`")
 _MERMAID = re.compile(r"^```mermaid\n.*?\n```[ \t]*\n?", re.M | re.S)
 _BANNER = re.compile(r'<p align="center">\s*<picture>.*?</picture>\s*</p>\s*', re.S | re.I)
@@ -136,15 +136,15 @@ def convert_page(stem: str, text: str, pages: dict[str, str], diagram: str) -> s
 def generate(docs_dir: Path, wiki_dir: Path) -> int:
     """Write ``docs_dir/*.md`` from ``wiki_dir``. Returns how many pages were written.
 
-    Deletes previously generated markdown in ``docs_dir`` (not subfolders). Does not
-    write inside ``wiki_dir``.
+    A page whose text is unchanged is left alone, so `mkdocs serve` (which watches
+    ``docs_dir``) doesn't rebuild forever. Generated markdown with no wiki page left is
+    deleted (not subfolders). Does not write inside ``wiki_dir``.
     """
     docs_dir = Path(docs_dir)
     diagram_path = docs_dir / "assets" / "pipeline-diagram.html"
     diagram = diagram_path.read_text(encoding="utf-8")
     pages = {path.stem: path.read_text(encoding="utf-8") for path in sorted(wiki_dir.glob("*.md"))}
-    for old in docs_dir.glob("*.md"):
-        old.unlink()
+    stale = {path.name: path for path in docs_dir.glob("*.md")}
     written = 0
     seen: dict[str, str] = {}
     for stem, text in pages.items():
@@ -157,8 +157,13 @@ def generate(docs_dir: Path, wiki_dir: Path) -> int:
         out = convert_page(stem, text, pages, diagram)
         if not out.endswith("\n"):
             out += "\n"
-        (docs_dir / f"{slug}.md").write_text(out, encoding="utf-8")
+        target = docs_dir / f"{slug}.md"
+        stale.pop(target.name, None)
+        if not target.exists() or target.read_text(encoding="utf-8") != out:
+            target.write_text(out, encoding="utf-8", newline="\n")
         written += 1
+    for path in stale.values():
+        path.unlink()
     return written
 
 

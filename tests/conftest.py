@@ -26,6 +26,7 @@ def clean_env(monkeypatch):
     monkeypatch.setattr(llm, "_OPENROUTER_PRICES", {})
     monkeypatch.setattr(llm, "_OPENROUTER_CONTEXT", {})
     monkeypatch.setattr(llm, "_OPENROUTER_MAX_OUT", {})
+    monkeypatch.setattr(llm, "_OPENROUTER_FAILED_AT", 0.0)
 
 
 @pytest.fixture

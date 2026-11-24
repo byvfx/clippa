@@ -363,18 +363,15 @@ the analytics.
   **Ask OpenRouter again** fetches now. **Warn at** is a whole percent from 1 to 99
   (default 75, **Change…**), saved in `<streams>/.serve/openrouter.json`. At or past it,
   Spend turns amber and Money shows **!**. A spent cap (`openrouter_key_limit`) turns
-  Spend red and the health light to **Stopped**. The banner says the run stopped at its
-  next model call. The call reads `error.metadata.limit_source`. `openrouter_key_limit`
-  (HTTP 402 or 403) and `openrouter_credits` (HTTP 402) stop at once: the error says
-  `OpenRouter limit` and `not retried`, and the call is not sent again.
-  `openrouter_in_flight_budget` (HTTP 402) waits for a `Retry-After` that is a number of
-  seconds, each wait capped at 60 seconds, and is sent again, up to six calls. The panel
-  counts down. A header that is missing or not a number of seconds stops the call
-  (`not retried`); six failures stop it (`after 6 tries`). Anything else on 402 or 403
-  still follows the text: a 402 whose Retry-After is at most two minutes is the in-flight
-  budget when the text says in-flight, or when it says nothing about the key limit or the
-  credits being spent. Any other such 402, and a 403 whose text says the limit or the
-  credits are spent, is the cap (`openrouter_key_limit`). **Top up on OpenRouter**
+  Spend red and the health light to **Stopped**, and so does a disabled key. The banner
+  says the run stopped at its next model call (an account out of credits says to top up).
+  A stop stays for ten minutes from the latest refusal even when the cached figures still
+  show room, unless the limit is changed or the key enabled here (not for a credits stop). `openrouter_key_limit` (HTTP 402 or 403) and
+  `openrouter_credits` (HTTP 402) stop at once: the error says `OpenRouter limit` and `not retried`. `openrouter_in_flight_budget`
+  (HTTP 402) waits for a `Retry-After` of up to two minutes and is sent again, up to six
+  calls; the panel counts down, one line per call, and says whether it went through. No
+  usable header, or six refusals, fail only that call, not the run. The rest is on
+  [Costs](Costs#the-openrouter-budget). **Top up on OpenRouter**
   opens `https://openrouter.ai/settings/credits`. Buying credits and auto top-up stay on
   OpenRouter. **Edit limit…** asks for the limit and reset, then confirms with a Now →
   After diff, and **Disable key…** / **Enable key…** confirm once. Both send
