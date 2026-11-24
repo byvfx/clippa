@@ -37,7 +37,13 @@
    [Environment]::SetEnvironmentVariable('ANTHROPIC_API_KEY', '<key>', 'User')
    [Environment]::SetEnvironmentVariable('KITSU_TOKEN', '<Kitsu bot token>', 'User')
    ```
-   Add `ANTHROPIC_WORKSPACE_ID` if the key isn't scoped to a workspace. Open a new terminal.
+   Add `ANTHROPIC_WORKSPACE_ID` if the key isn't scoped to a workspace. The defaults use
+   Claude, so `ANTHROPIC_API_KEY` is the model key a new machine needs. OpenRouter is
+   opt-in: set `OPENROUTER_API_KEY`, or put the key in `secrets/openrouter_secret.txt`
+   (`[paths] openrouter_key`), and paste
+   [`docs/openrouter-claude.toml`](https://github.com/byvfx/clippa/blob/main/docs/openrouter-claude.toml)
+   ([Model rollout](Model-rollout)). `clippa keys --check` asks each provider whether the
+   key still works. Open a new terminal.
 
 6. **Fonts**: thumbnails and Short captions use Impact and Bahnschrift, both standard on
    Windows. On Linux install `ttf-mscorefonts-installer` (Impact)

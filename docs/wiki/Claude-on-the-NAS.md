@@ -46,8 +46,11 @@ memory, and the uv cache).
 Remote Control needs a claude.ai sign-in (Pro or Max), not an API key, and it refuses to start
 where `ANTHROPIC_API_KEY` is set. So the deploy hands the key to Clippa as a file
 (`/run/secrets/anthropic_key`, `[paths] anthropic_key`) and keeps it out of the container's
-environment. Clippa's model calls still bill the API key as everywhere else; Claude itself
-uses the subscription.
+environment. Clippa's model calls still bill the API key as everywhere else while a stage
+is on Claude; with
+[`docs/openrouter-claude.toml`](https://github.com/byvfx/clippa/blob/main/docs/openrouter-claude.toml)
+pasted, those calls use `OPENROUTER_API_KEY` (or `[paths] openrouter_key`) instead. Claude
+itself uses the subscription.
 
 ## Sign in
 

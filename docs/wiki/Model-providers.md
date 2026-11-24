@@ -16,7 +16,8 @@ tokens) so the cost lines stay right; an unlisted model counts as $0, except on 
 A call reports its own cost ([its own count](Costs#the-providers-own-numbers) is in the war room),
 and a `--dry-run` uses OpenRouter's published list when the table has no row. `clippa doctor` checks the key or URL for every provider in
 use and, online, that the server lists the model; `clippa setup --step keys` asks for the key of
-any provider a stage uses. `ANTHROPIC_API_KEY` is only required while some stage is on Claude.
+any provider a stage uses. `ANTHROPIC_API_KEY` is required while some stage is on Claude.
+`clippa keys --check` still asks Anthropic when that key is set ([Model rollout](Model-rollout#moving-every-claude-model-to-openrouter)).
 
 > [!NOTE]
 > The prompts are tuned on Claude. Before moving a stage, compare the two (below) on a
@@ -26,19 +27,20 @@ any provider a stage uses. `ANTHROPIC_API_KEY` is only required while some stage
 
 ## Claude through OpenRouter
 
-`docs/openrouter-claude.toml` sends every Claude stage model through OpenRouter at the same
-tier and the same effort (`openrouter:anthropic/claude-haiku-5.5`, and the same for Sonnet
-and Opus). Paste its tables into `clipper.toml`. Do not replace that file: it still holds
-the shows, paths and ids. It needs `OPENROUTER_API_KEY`, or the file at `[paths] openrouter_key`.
+[`docs/openrouter-claude.toml`](https://github.com/byvfx/clippa/blob/main/docs/openrouter-claude.toml)
+sends every Claude stage model through OpenRouter at the same tier and the same effort
+(`openrouter:anthropic/claude-haiku-5.5`, and the same for Sonnet and Opus). Paste its
+tables into `clipper.toml`. Leave the live file in place: it still holds the shows, paths
+and ids. It needs `OPENROUTER_API_KEY`, or the file at `[paths] openrouter_key`.
 `clipper.local.toml` and `CLIPPER_*` still win. To go back, restore the copy of `clipper.toml`
-you made before the paste.
+you made before the paste. The steps are on [Model rollout](Model-rollout#moving-every-claude-model-to-openrouter).
 
 The overlay adds no `[llm.prices]` rows. A `--dry-run` prices an `openrouter:` model from
 the table, then from OpenRouter's public model list. That list is fetched once per process.
-If the fetch fails, the line says the model was counted as $0 and later rows do not wait
-again. A real call still uses the cost OpenRouter reports on the answer. The defaults stay
-on Claude until you paste the overlay. Config-7, which tries other models, is
-[Model rollout](Model-rollout).
+A failed fetch is cached empty. Later rows reuse that cache, and a model still missing
+prints `(no [llm] price: counted $0)`. A real call uses the cost OpenRouter reports on the
+answer. The defaults stay on Claude until you paste the overlay. Config-7, which tries
+other models, is [Model rollout](Model-rollout).
 
 ## Trying a model on a stream
 

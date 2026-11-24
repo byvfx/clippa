@@ -63,8 +63,10 @@ Then set `[serve] hub = "clippa-hub"` in `clipper.toml`; until you do, `clippa s
 the live folder anyway (the old one until the deploy retires it) and `clippa doctor` warns.
 
 The first run copies `deploy/hub/env.template` to `deploy/hub/env.local` (gitignored) and
-stops: fill in the keys (`ANTHROPIC_API_KEY`, `KITSU_TOKEN`, `MODAL_TOKEN_ID` /
-`MODAL_TOKEN_SECRET` from `~/.modal.toml`, the alert webhook). The other keys are files in
+stops: fill in the keys (`ANTHROPIC_API_KEY` for the default Claude models, `KITSU_TOKEN`,
+`MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET` from `~/.modal.toml`, the alert webhook, and
+`OPENROUTER_API_KEY` when a stage uses OpenRouter, including the
+[Claude overlay](Model-rollout#moving-every-claude-model-to-openrouter)). The other keys are files in
 `secrets/`. `env.local` is a copy: before each deploy, `deploy/keys.sh` compares its keys
 (`*_KEY`, `*_TOKEN`, `*_SECRET`, `*_WEBHOOK`) with this machine's own of the same name (Windows
 user variables, else the shell's environment), by name only, and stops on one that differs.
