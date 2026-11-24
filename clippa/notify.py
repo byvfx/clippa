@@ -195,9 +195,19 @@ def card_status(r: dict) -> str:
         return "finding"
     if r.get("resplit"):
         return "resplit"
-    if r.get("auto_state") in ("waiting", "due") or (r.get("auto") and decision == "pending"):
+    if will_auto_approve(r):
         return "auto"
     return "pending"
+
+
+def will_auto_approve(r: dict) -> bool:
+    """The item approves itself unless someone acts: review_auto's "waiting" or "due". Not
+    "person" (it waits for you, and review_auto.note still gives it a line) nor "off". A row
+    from before auto_state was kept goes by its note's words."""
+    state = r.get("auto_state")
+    if state:
+        return state in ("waiting", "due")
+    return (r.get("decision") or "pending") == "pending" and "approves itself" in (r.get("auto") or "")
 
 
 def status_line(r: dict) -> str:
@@ -212,7 +222,7 @@ def status_line(r: dict) -> str:
     if state == "approved" or card_status(r) == "auto_approved":
         if "auto-approved" not in out:
             out += ", auto-approved"
-    elif state in ("waiting", "due", "person") or (r.get("auto") and state not in ("off", "decided")):
+    elif will_auto_approve(r):
         if "auto-approve" not in out and "auto-approved" not in out:
             out += ", auto-approve"
     return out
@@ -358,10 +368,15 @@ def card(r: dict, now: float | None = None) -> tuple[dict, list[dict]]:
     return embed, _rows(r)
 
 
-def in_review_embed(show: str, n: int, n_seg: int, n_clip: int, episode_url: str, short: str) -> dict:
-    """The thread starter: a stream that has finished processing."""
+def in_review_embed(show: str, n: int, n_seg: int, n_clip: int, episode_url: str, short: str,
+                    finished: bool = True) -> dict:
+    """The thread starter: a stream that has finished processing, or (finished=False, after the
+    fast lane) one whose clips and Shorts are in review with its segments still to come."""
     show = show or "Stream"
-    desc = f"{show} finished processing. {n} cuts in review." if n else f"{show} finished processing."
+    head = f"{show} finished processing." if finished else f"{show}: clips and Shorts are in review."
+    desc = f"{head} {n} cuts in review." if n else head
+    if not finished:
+        desc += " Segments next."
     if n_seg or n_clip:
         desc += f"\n{n_seg} segments and {n_clip} clips."
     emoji, word = MARK["review"]
@@ -521,44 +536,80 @@ def save_state(dpath: Path, dstate: dict, key: str | None = None) -> None:
         if fresh.get("thread_id") != dstate.get("thread_id"):
             fresh.clear()
             fresh.update(dstate)
-        elif key:
+            return
+        if key:
             fresh.setdefault("messages", {})[key] = dstate["messages"][key]
+        if dstate.get("starter"):  # the thread's first message, edited as the counts change
+            fresh["starter"] = dstate["starter"]
 
 
 def ensure_thread(api: Rest, cfg: dict, sdir: Path, dstate: dict, rows: list[dict]) -> str:
+    """The stream's review thread, made on the first post. Its starter says how many cuts are
+    in review and whether the stream is finished; a later post (the segments after the fast
+    lane's clips) edits it, so it doesn't stay at the first post's counts."""
     cfg = for_stream(cfg, sdir)
     dc = cfg["discord"]
     channel_id = str(dc["review_channel_id"])
-    if dstate.get("thread_id") and dstate.get("channel_id") == channel_id:
-        try:
-            api("GET", f"/channels/{dstate['thread_id']}")
-            return dstate["thread_id"]
-        except ClipperError:
-            pass  # deleted: make a new one
-    meta = jsonstate.load(sdir / "meta.json")
     show = cfg["meta"]["show_name"] or cfg["review"]["project"] or "Stream"
-    name = dc["thread_name"].format(show=show, date=meta.get("started_at", "")[:10],
-                                    stream_id=sdir.name, title=meta.get("title", ""))[:100]
     n_seg = sum(r["kind"] == "segment" for r in rows)
     n_clip = len(rows) - n_seg
     episode = rows[0]["episode_url"] if rows else ""
-    header = {"embeds": [in_review_embed(show, len(rows), n_seg, n_clip, episode, sdir.name)]}
-    thread_id = open_thread(api, channel_id, name, header)
-    dstate.update({"channel_id": channel_id, "thread_id": thread_id, "messages": {}})
+    finished = segments_in(sdir)
+    embed = in_review_embed(show, len(rows), n_seg, n_clip, episode, sdir.name, finished=finished)
+    if dstate.get("thread_id") and dstate.get("channel_id") == channel_id:
+        try:
+            api("GET", f"/channels/{dstate['thread_id']}")
+        except ClipperError:
+            pass  # deleted: make a new one
+        else:
+            refresh_starter(api, dstate, embed)
+            return dstate["thread_id"]
+    meta = jsonstate.load(sdir / "meta.json")
+    name = dc["thread_name"].format(show=show, date=meta.get("started_at", "")[:10],
+                                    stream_id=sdir.name, title=meta.get("title", ""))[:100]
+    thread_id, starter = open_thread(api, channel_id, name, {"embeds": [embed]})
+    dstate.update({"channel_id": channel_id, "thread_id": thread_id, "messages": {},
+                   "starter": {**starter, "description": embed["description"]}})
     return thread_id
 
 
-def open_thread(api: Rest, channel_id: str, name: str, header: dict) -> str:
-    """A new thread under header in a text channel, or a post in a forum; its id."""
+def segments_in(sdir: Path) -> bool:
+    """False while the fast lane's clips are in review and the slow lane's review (the
+    segments) hasn't started: run.json's status is "running" in either lane, so it can't say.
+    True with no fast lane (one review posts everything), for a run that is done, and for a
+    stream run by hand (no run.json)."""
+    data = jsonstate.read_or(sdir / "run.json", {}) or {}
+    stages = data.get("stages") or {}
+    if data.get("status") == "done" or "clips_review" not in stages:
+        return True
+    return (stages.get("review") or {}).get("status") in ("running", "done", "skipped")
+
+
+def refresh_starter(api: Rest, dstate: dict, embed: dict) -> None:
+    """Edit the thread's first message when its text is out of date. A thread made before the
+    starter was kept is left as it is; a failed edit only leaves the old counts."""
+    starter = dstate.get("starter")
+    if not isinstance(starter, dict) or starter.get("description") == embed["description"]:
+        return
+    try:
+        api("PATCH", f"/channels/{starter['channel']}/messages/{starter['id']}", {"embeds": [embed]})
+    except (ClipperError, KeyError):
+        return
+    starter["description"] = embed["description"]
+
+
+def open_thread(api: Rest, channel_id: str, name: str, header: dict) -> tuple[str, dict]:
+    """A new thread under header in a text channel, or a post in a forum: (its id, where its
+    starter message is: {"channel", "id"})."""
     channel = api("GET", f"/channels/{channel_id}")
-    if channel["type"] == 15:  # forum: the header is the post's first message
+    if channel["type"] == 15:  # forum: the header is the post's first message, id = the thread's
         thread = api("POST", f"/channels/{channel_id}/threads",
                      {"name": name, "auto_archive_duration": 10080, "message": header})
-    else:
-        msg = api("POST", f"/channels/{channel_id}/messages", header)
-        thread = api("POST", f"/channels/{channel_id}/messages/{msg['id']}/threads",
-                     {"name": name, "auto_archive_duration": 10080})
-    return thread["id"]
+        return thread["id"], {"channel": thread["id"], "id": thread["id"]}
+    msg = api("POST", f"/channels/{channel_id}/messages", header)
+    thread = api("POST", f"/channels/{channel_id}/messages/{msg['id']}/threads",
+                 {"name": name, "auto_archive_duration": 10080})
+    return thread["id"], {"channel": channel_id, "id": msg["id"]}
 
 
 def post(sdir: Path, cfg: dict, keys: list[str] | None = None, force: bool = False,
@@ -573,7 +624,9 @@ def post(sdir: Path, cfg: dict, keys: list[str] | None = None, force: bool = Fal
         raise ClipperError("set [discord] review_channel_id in clipper.toml")
     review.sync(sdir, cfg, quiet=True)
     rows = list(actions.describe(cfg, sdir).values())
-    notices = [] if keys else unreviewed_resplits(sdir, cfg, rows)
+    # Every post, keys or not: publish (the worker, the CLI) posts with keys, and the notices
+    # are only for segments that have no card. Each is posted once (discord.json keeps it).
+    notices = unreviewed_resplits(sdir, cfg, rows)
     if not rows and not notices:
         print("nothing published to Kitsu for this stream yet")
         return 0

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import re
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from .. import jsonstate
@@ -216,6 +216,34 @@ def estimate(cfg: dict, tc: dict, todo: list[dict], style: str) -> list[str]:
         f"  {frames} candidate frames go as images; enquirer covers add a few face frames"]
 
 
+def pick_all(todo: list[dict], safe, workers: int, keep) -> list[str]:
+    """safe(x) -> (key, entry or None) for each of `todo` on `workers` threads; keep(key, entry)
+    as each finishes, in the order they finish. Returns the keys whose entry was None. An
+    OpenRouterLimit from one is raised only after every pick that did finish is kept: those
+    were paid for (#75)."""
+    failed, limit = [], None
+    with ThreadPoolExecutor(workers) as pool:
+        futs = [pool.submit(safe, x) for x in todo]
+        for fut in as_completed(futs):
+            if fut.cancelled():
+                continue
+            try:
+                key, entry = fut.result()
+            except OpenRouterLimit as e:
+                if limit is None:  # the rest would be refused too: don't start them
+                    limit = e
+                    for other in futs:
+                        other.cancel()
+                continue
+            if entry is None:
+                failed.append(key)
+                continue
+            keep(key, entry)
+    if limit is not None:
+        raise limit
+    return failed
+
+
 def run(stream_dir: Path, cfg: dict, ids: list[str] | None = None, force: bool = False,  # noqa: C901
         compose_only: bool = False, kitsu: bool = True,
         feedback: dict[str, str] | None = None, missing: bool = False, dry_run: bool = False) -> list[dict]:
@@ -298,14 +326,12 @@ def run(stream_dir: Path, cfg: dict, ids: list[str] | None = None, force: bool =
                 print(f"{x['id']:<22} failed: {type(e).__name__}: {e}", flush=True)
                 return asset_key(x), None
 
-        failed = []
-        with ThreadPoolExecutor(tc["concurrency"]) as pool:
-            for key, entry in pool.map(safe, todo):
-                if entry is None:
-                    failed.append(key)
-                    continue
-                state[key] = entry  # each paid pick is kept as soon as it's made
-                state = jsonstate.merge(state_path, state, [key])
+        def keep(key: str, entry: dict) -> None:
+            nonlocal state
+            state[key] = entry  # each paid pick is kept as soon as it's made
+            state = jsonstate.merge(state_path, state, [key])
+
+        failed = pick_all(todo, safe, tc["concurrency"], keep)
         if failed:
             raise ClipperError(f"thumbnails failed for {', '.join(failed)}; the other picks are saved, "
                              "rerun clippa thumbs for these")

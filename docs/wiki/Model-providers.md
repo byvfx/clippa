@@ -30,10 +30,10 @@ any provider a stage uses. `ANTHROPIC_API_KEY` is required while some stage is o
 A call to an `openrouter:` model reads `error.metadata.limit_source` on a refusal:
 
 - `openrouter_key_limit`, on HTTP 402 or HTTP 403: the key's own credit limit is spent. The call is not sent again. The stage stops with `OpenRouter limit openrouter_key_limit` in the error.
-- `openrouter_credits`, on HTTP 402: the balance cannot cover the request, or this one request is larger than the whole in-flight budget. Not sent again. The stage stops with `OpenRouter limit openrouter_credits`.
-- `openrouter_in_flight_budget`, on HTTP 402: other calls still in flight (or just settling) fill the budget. This is temporary. The call waits for the `Retry-After` header when it is a number of seconds, each wait capped at 60 seconds like the other retries, and tries again, up to six calls in all. If the header is missing or not a number of seconds, the stage stops with `OpenRouter limit openrouter_in_flight_budget` and `not retried`. After six calls the error says `after 6 tries`.
+- `openrouter_credits`, on HTTP 402: the balance cannot cover the request, or this one request is larger than the whole in-flight budget. Not sent again. The stage stops with `OpenRouter limit openrouter_credits`. A 402 or 403 with no `limit_source` whose text says credits stops too, as `openrouter_key_limit`: the text can't say whether the key's cap or the account ran out.
+- `openrouter_in_flight_budget`, on HTTP 402: other calls still in flight (or just settling) fill the budget. This is temporary and not billed. The call waits for the `Retry-After` header when it is a number of seconds, each wait capped at two minutes, and tries again, up to six calls in all, a long call (a set `timeout_s`) too. If the header is missing or not a number of seconds (`no Retry-After`), or after six calls (`after 6 tries`), only that call fails, like any other HTTP error: the stage goes on where it would after a failed call, and nothing is recorded as a spent limit.
 
-Any of those is a normal stage failure (exit 1), not a rejected key, so the worker retries the run on its usual schedule (`[worker] retry_minutes`, up to `max_attempts`). Adding credits or raising the key limit is what clears it. A stop during `segments` does not leave a partial `segments.json`; see [Pipeline](Pipeline#stages).
+A key limit or credits stop is a normal stage failure (exit 1), not a rejected key, so the worker retries the run on its usual schedule (`[worker] retry_minutes`, up to `max_attempts`). Adding credits or raising the key limit is what clears it. A stop during `segments` does not leave a partial `segments.json`; see [Pipeline](Pipeline#stages).
 
 ## Claude through OpenRouter
 

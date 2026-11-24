@@ -97,12 +97,16 @@ def test_classify_names_an_in_flight_wait_and_a_spent_key():
     assert ob.classify_payment(402, "in-flight budget is full", "6") == "openrouter_in_flight_budget"
     assert ob.classify_payment(402, "", "6") == "openrouter_in_flight_budget"
     assert ob.classify_payment(402, "Key limit exceeded", "6") == "openrouter_key_limit"
+    # credits wording alone can't tell the key's cap from the account (limit_source can)
     assert ob.classify_payment(402, "This request requires more credits", None) == "openrouter_key_limit"
+    assert ob.classify_payment(403, "Insufficient credits", None) == "openrouter_key_limit"
     assert ob.classify_payment(402, "", None) == "openrouter_key_limit"
     assert ob.classify_payment(403, "Key limit exceeded. Manage it", None) == "openrouter_key_limit"
     assert ob.classify_payment(403, "not allowed to use this model", None) is None
     assert ob.classify_payment(401, "nope", None) is None
-    assert ob.classify_payment(402, "in-flight budget", "500") == "openrouter_key_limit"
+    # says in-flight, but no wait it can honour: still not a spent limit (the call fails, no stop)
+    assert ob.classify_payment(402, "in-flight budget", "500") == "openrouter_in_flight_budget"
+    assert ob.classify_payment(402, "in-flight budget", None) == "openrouter_in_flight_budget"
     assert ob.retry_seconds("6") == 6
     assert ob.retry_seconds("0") == 0
     assert ob.retry_seconds("Wed, 21 Oct 2015 07:28:00 GMT") is None
@@ -227,17 +231,69 @@ def test_a_recorded_stop_names_the_stream_and_a_later_call_fills_it_in(cfg):
 
 
 def test_an_in_flight_retry_is_a_countdown_and_clears_when_the_call_lands(cfg, monkeypatch):
-    ob.note_retry(cfg, seconds=6, status=402)
+    rid = ob.note_retry(cfg, seconds=6, status=402)
     raw = {"key": KEY, "listed": LISTED, "credits": CREDITS, "can_edit": True,
            "management_configured": True, "secrets": []}
     view = ob.view_from(cfg, raw, ob._settings(cfg), datetime.now(UTC))
     assert view["retry"]["code"] == "openrouter_in_flight_budget"
     assert "Nothing to do" in view["retry"]["body"]
     assert view["events"][0]["title"] == "Retried" and "Waiting 6 s" in view["events"][0]["text"]
-    ob.clear_retry(cfg)
+    ob.clear_retry(cfg, rid)
     view = ob.view_from(cfg, raw, ob._settings(cfg), NOW)
     assert view["retry"] is None
     assert "then the call went through" in view["events"][0]["text"]
+
+
+def test_another_calls_answer_leaves_a_waiting_retry_alone(cfg):
+    """Several calls run at once: B landing doesn't close A's wait, and A failing says so."""
+    a = ob.note_retry(cfg, seconds=6, status=402)
+    b = ob.note_retry(cfg, seconds=4, status=402)
+    ob.clear_retry(cfg, b)
+    settings = ob._settings(cfg)
+    by_id = {e["id"]: e for e in settings["events"]}
+    assert by_id[a]["pending"] and not by_id[b]["pending"]
+    ob.clear_retry(cfg, a, ok=False)
+    text = {e["id"]: ob.event_text(e) for e in ob._settings(cfg)["events"]}
+    assert "then the call failed" in text[a] and "went through" in text[b]
+    # the same call waiting twice is one line
+    c = ob.note_retry(cfg, seconds=2, status=402)
+    ob.note_retry(cfg, seconds=3, status=402, rid=c)
+    assert sum(e.get("id") == c for e in ob._settings(cfg)["events"]) == 1
+
+
+def test_a_stop_holds_for_ten_minutes_even_when_the_cached_figure_shows_room(cfg):
+    """OpenRouter's numbers can be five minutes old: a refusal just now outranks them, and
+    only an edit from the War Room (or ten minutes and real room) clears it."""
+    ob.note_stop(cfg, status=402, code="openrouter_key_limit", show="kino", stage="score")
+    raw = {"key": KEY, "listed": LISTED, "credits": CREDITS, "can_edit": True,
+           "management_configured": True, "secrets": []}
+    view = ob._finish(cfg, raw)
+    assert view["level"] == "stopped" and view["header"]["health"] == "stopped"
+    assert ob._settings(cfg)["stop"]  # not erased by the poll
+    ob._write(cfg, lambda d: d["events"].append({"ts": ob.now_iso(), "kind": "changed", "limit": 90}))
+    view = ob._finish(cfg, raw)
+    assert view["level"] != "stopped" and not ob._settings(cfg)["stop"]
+
+
+def test_a_credits_stop_is_named_for_the_account(cfg):
+    ob.note_stop(cfg, status=402, code="openrouter_credits")
+    raw = {"key": KEY, "listed": LISTED, "credits": CREDITS, "can_edit": True,
+           "management_configured": True, "secrets": []}
+    view = ob.view_from(cfg, raw, ob._settings(cfg), datetime.now(UTC))
+    assert view["level"] == "stopped" and "out of credits" in view["banner"]["title"]
+
+
+def test_a_single_listed_key_with_another_label_is_not_the_clippa_key():
+    """A PATCH goes to the matched row's hash, so a list of one other key must not match."""
+    other = {"name": "other", "hash": "h-other", "label": "sk-or-v1-bbbb...yyy"}
+    assert ob._match_listed("sk-or-v1-aaaa...zzz", [other]) is None
+    assert ob._match_listed("", [other]) is None
+    assert ob._match_listed("sk-or-v1-bbbb…yyy", [other]) is other
+
+
+def test_a_nan_limit_is_a_clear_error():
+    with pytest.raises(ClipperError, match="number of dollars"):
+        ob.parse_limit(float("nan"))
 
 
 def test_limit_preview_and_confirm_patches_and_records(cfg, monkeypatch):
@@ -288,7 +344,7 @@ def test_disable_preview_and_confirm(cfg, monkeypatch):
     _route_get(monkeypatch, answers[1:])
     view = ob.apply_disabled(cfg, True, confirm=True)
     assert seen == [{"disabled": True}]
-    assert view["level"] == "disabled" and view["header"]["health"] is None
+    assert view["level"] == "disabled" and view["header"]["health"] == "stopped"  # every call fails
     assert view["banner"]["title"] == ob.COPY["disabled_title"]
     assert any(e["kind"] == "disabled" for e in view["events"])
 
@@ -377,3 +433,46 @@ def test_a_402_with_retry_after_is_sent_again_and_a_key_limit_stops(cfg, monkeyp
 def test_run_budget_card_has_no_dollar_guard():
     assert "$" not in ob.COPY["run_budget"]
     assert "single run" in ob.COPY["run_budget"] and "OpenRouter cap" in ob.COPY["run_budget"]
+
+
+def test_a_second_refusal_moves_the_stop_time(cfg, monkeypatch):
+    """The ten minutes a stop holds count from the latest refusal, not the first."""
+    times = iter(["2026-11-23T10:00:00+00:00", "2026-11-23T10:09:00+00:00"])
+    monkeypatch.setattr(ob, "now_iso", lambda: next(times))
+    monkeypatch.setattr(ob, "_age", lambda iso: 60)
+    ob.note_stop(cfg, status=402, code="openrouter_key_limit", stage="score")
+    ob.note_stop(cfg, status=402, code="openrouter_key_limit", stage="meta")
+    settings = ob._settings(cfg)
+    assert settings["stop"]["at"] == "2026-11-23T10:09:00+00:00" and settings["stop"]["stage"] == "meta"
+    assert sum(e.get("kind") == "stopped" for e in settings["events"]) == 1
+
+
+def test_a_limit_edit_does_not_clear_a_credits_stop(cfg):
+    ob.note_stop(cfg, status=402, code="openrouter_credits")
+    ob._write(cfg, lambda d: d["events"].append({"ts": ob.now_iso(), "kind": "changed", "limit": 90}))
+    settings = ob._settings(cfg)
+    assert ob._stop_holds(settings["stop"], settings["events"], left=50.0, balance=0.0)
+
+
+def test_a_text_only_stop_holds_while_either_figure_is_spent():
+    old = {"at": "2020-01-01T00:00:00+00:00", "code": "openrouter_key_limit"}
+    assert ob._stop_holds(old, [], left=40.0, balance=0.1)    # the account ran out
+    assert ob._stop_holds(old, [], left=0.2, balance=30.0)    # the key's cap did
+    assert not ob._stop_holds(old, [], left=40.0, balance=30.0)
+
+
+def test_the_poll_keeps_a_refusal_recorded_after_it_read_the_file(cfg, monkeypatch):
+    """_finish judged the old stop recovered; a worker's new refusal lands before the write."""
+    old = {"at": "2020-01-01T00:00:00+00:00", "code": "openrouter_key_limit", "status": 402}
+    ob._write(cfg, lambda d: d.update(stop=old))
+    raw = {"key": KEY, "listed": LISTED, "credits": CREDITS, "can_edit": True,
+           "management_configured": True, "secrets": []}
+    real = ob._quietly
+
+    def race(cfg_, fn):
+        ob._write(cfg_, lambda d: d.update(stop={**old, "at": ob.now_iso()}))   # the new refusal
+        real(cfg_, fn)
+
+    monkeypatch.setattr(ob, "_quietly", race)
+    ob._finish(cfg, raw)
+    assert ob._settings(cfg)["stop"]["at"] != old["at"]

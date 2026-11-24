@@ -33,18 +33,22 @@ def _diagram() -> str:
 
 
 def test_slugify_matches_github_heading_ids():
-    samples = [
-        "Cut on the NAS (#51)",
-        "The walkthrough: `clippa setup`",
-        "The providers' own numbers",
-        "1. State files and their locks (`clippa/jsonstate.py`)",
-        "2026-11-09: prompt v8 on Haiku",
-        "Something broke?",
-    ]
-    for heading in samples:
-        github = re.sub(r"[^\w\- ]", "", heading.strip().lower()).replace(" ", "-")
-        assert github_slugify(heading, "-") == github
-        assert github_slugify(heading.replace("`", ""), "-") == github
+    # The ids GitHub gives these headings, written out, not a copy of the rule.
+    samples = {
+        "Cut on the NAS (#51)": "cut-on-the-nas-51",
+        "The walkthrough: `clippa setup`": "the-walkthrough-clippa-setup",
+        "The providers' own numbers": "the-providers-own-numbers",
+        "1. State files and their locks (`clippa/jsonstate.py`)":
+            "1-state-files-and-their-locks-clippajsonstatepy",
+        "2026-11-09: prompt v8 on Haiku": "2026-11-09-prompt-v8-on-haiku",
+        "Something broke?": "something-broke",
+        "Faces & covers": "faces--covers",
+        "Ask a question \u2014 any time": "ask-a-question--any-time",
+        "snake_case_key": "snake_case_key",
+    }
+    for heading, github in samples.items():
+        assert github_slugify(heading, "-") == github, heading
+        assert github_slugify(heading.replace("`", ""), "-") == github, heading
 
 
 def test_titles_cover_every_wiki_page():
@@ -195,3 +199,28 @@ def test_generate_writes_pages_and_leaves_the_wiki_alone(tmp_path: Path):
     (wiki / "Install.md").unlink()
     assert generate(docs, wiki) == 1
     assert not (docs / "install.md").exists()
+
+
+def test_generate_leaves_an_unchanged_page_alone(tmp_path: Path):
+    """mkdocs serve watches docs-site/: rewriting every page on each build rebuilt forever."""
+    import os
+
+    wiki, docs = tmp_path / "wiki", tmp_path / "docs"
+    wiki.mkdir()
+    (docs / "assets").mkdir(parents=True)
+    (docs / "assets" / "pipeline-diagram.html").write_text("x\n", encoding="utf-8")
+    (wiki / "Home.md").write_text("Hello\n", encoding="utf-8")
+    (wiki / "Install.md").write_text("Do the install.\n", encoding="utf-8")
+    generate(docs, wiki)
+    for page in docs.glob("*.md"):
+        os.utime(page, ns=(1_000_000_000, 1_000_000_000))
+    (wiki / "Install.md").write_text("Do it again.\n", encoding="utf-8")
+    assert generate(docs, wiki) == 2
+    assert (docs / "index.md").stat().st_mtime_ns == 1_000_000_000
+    assert (docs / "install.md").stat().st_mtime_ns != 1_000_000_000
+
+
+def test_a_tilde_fence_is_left_as_code():
+    text = "~~~\n[Faces](Faces)\n<!-- wiki-only -->\n~~~\n"
+    out = convert_page("Install", text, {"Install": text, "Faces": "x"}, "")
+    assert "[Faces](Faces)" in out and "<!-- wiki-only -->" in out

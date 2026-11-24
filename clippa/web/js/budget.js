@@ -180,7 +180,8 @@ function reqBlock(req) {
 function limitDialog() {
   if (!ORB?.can_edit) return toast(ORB?.edit_why || "Set a management key to change the limit.", true);
   const k = ORB.key || {}, form = ORB_FORM || {};
-  const reset = form.reset || k.limit_reset || "monthly";
+  // A cap that is set but doesn't reset stays that way unless you pick otherwise.
+  const reset = form.reset || k.limit_reset || (k.limit_usd != null ? "none" : "monthly");
   const limit = form.limit != null && form.limit !== "" ? form.limit : (k.limit_usd ?? "");
   const opt = (v, label) => `<option value="${v}" ${reset === v ? "selected" : ""}>${label}</option>`;
   openOrb(`${head("Change the clippa key's limit")}<div class="tbody">

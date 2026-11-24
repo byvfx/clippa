@@ -196,3 +196,55 @@ def test_a_cover_goes_stale_on_the_cut_not_the_file(tmp_path):
     # a cover made before cut_key existed still goes by the mtime
     assert thumbs_stage.cut_changed({"video_mtime": 0}, video)
     assert not thumbs_stage.cut_changed({"video_mtime": video.stat().st_mtime}, video)
+
+
+def test_a_spending_limit_on_one_cover_keeps_the_picks_that_finished():
+    """pick_all keeps every finished pick before it raises a limit from another (#75: paid)."""
+    import threading
+
+    from clippa.errors import OpenRouterLimit
+
+    first_done = threading.Event()
+
+    def safe(x):
+        if x["id"] == "a":  # the first in order raises, but only after the others finished
+            first_done.wait(2)
+            raise OpenRouterLimit("openrouter_key_limit: spent", "openrouter_key_limit")
+        if x["id"] == "bad":
+            return "bad", None
+        return x["id"], {"pick": x["id"]}
+
+    kept = {}
+
+    def keep(key, entry):
+        kept[key] = entry
+        if len(kept) == 2:
+            first_done.set()
+
+    with pytest.raises(OpenRouterLimit):
+        thumbs_stage.pick_all([{"id": "a"}, {"id": "b"}, {"id": "c"}, {"id": "bad"}], safe, 4, keep)
+    assert kept == {"b": {"pick": "b"}, "c": {"pick": "c"}}
+    assert thumbs_stage.pick_all([{"id": "b"}, {"id": "bad"}], safe, 2, keep) == ["bad"]
+
+
+def test_after_a_spending_limit_the_covers_not_started_do_not_start():
+    import threading
+
+    from clippa.errors import OpenRouterLimit
+    from clippa.thumbs import stage
+
+    started, gate = [], threading.Event()
+
+    def safe(x):
+        started.append(x)
+        if x == 0:
+            raise OpenRouterLimit("spent", "openrouter_key_limit")
+        gate.wait(0.5)
+        return f"k{x}", {"x": x}
+
+    kept = []
+    with pytest.raises(OpenRouterLimit):
+        stage.pick_all(list(range(6)), safe, 2,
+                       lambda k, e: (kept.append(k), gate.set()))
+    gate.set()
+    assert len(started) < 6   # the queued ones were cancelled

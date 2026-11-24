@@ -20,6 +20,10 @@ lands in Kitsu whichever surface you make it on. Three surfaces; pick what fits 
 
 ## The card (Discord)
 
+The thread's first message counts what is in review. After the fast lane it says the clips and
+Shorts are in review and the segments are next; it is edited as more cards are posted, and says
+the stream finished processing once the segments are in.
+
 Each item is one card: the preview (480p, the first 60 s of a long item), the Kitsu link, and
 buttons. The title leads with the status and a word, then the YouTube title (`⏸ Held · …`,
 `⚠ Finding · …`, `⏱ Auto-approve · …`, `✓ Approved · …`, `✓ Auto-approved · …`,
@@ -34,6 +38,10 @@ mentions): look there first. When the show [approves by silence](Review#approval
 **Auto-approve** field counts down with a live timestamp, or says why the item waits for you;
 any button you press leaves it to you. A segment longer than `[segments] split_over_s` (0, off,
 unless a config sets it) is marked **Re-split**, and its Re-split button sits on a third row.
+A press adds one Kitsu comment; pressing again adds none until `clippa segments` runs again. A
+segment over the limit that has no card yet gets a Re-split notice in the thread; its button
+records the ask (`resplit_asks.json`, a second press says it was already flagged) and names
+`clippa segments <stream> --force`, the model call that splits it again.
 **Approve**. **Reject…** with a reason. **Changes…** says what to change:
 Clippa starts a retake: the item is cut again or re-covered and comes back as a new card. **Hold** keeps it out of the
 schedule until you unhold it. **Reopen** undoes a decision. **Pin time…** sets its publish time.

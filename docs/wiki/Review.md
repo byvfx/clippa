@@ -42,9 +42,14 @@ findings"). An item is checked again only when something it reads changed (`--fo
 anyway; `--dry-run` prices the vision calls; `--no-vision` skips them). A check that fails is a
 finding too. A missing OpenCV is the exception: a cover face match, or a Short frame that
 actually goes through the webcam check, needs it (`uv sync --extra faces`, the same extra as
-[Faces](Faces)). Without it those items are left out and the run stops, after the other items
-have been saved, instead of recording a bad cover. One already saved from that failure is
-checked again without `--force`. Findings don't stop anything: they say
+[Faces](Faces)). Without it the run stops after the other items have been saved, instead of
+recording a bad cover; those items are saved with their text findings and a `not fully
+checked` finding that names the fix, and no signature, so the next run checks them again
+without `--force`. An OpenRouter spending limit stops a run the same way: what was checked is
+kept, and the rest get a `not checked` finding. The review stage of a publish doesn't stop on
+either: the items go to Kitsu with that finding in the **Checks** column, and the results that
+still match their files are left as they are. One saved from that failure before (a cover check that
+failed on the import) is checked again without `--force` too. Findings don't stop anything: they say
 where to look, and an item with any waits for you rather than
 [approving itself](#approval-by-silence).
 

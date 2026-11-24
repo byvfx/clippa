@@ -666,7 +666,9 @@ def stale_opencv(old: dict | None) -> bool:
     """A saved result that is the missing-cv2 failure. Its signature matches the files, so
     keeping it would leave the bad covers and skip them next time."""
     blob = " ".join((f.get("text") or "") for f in (old or {}).get("findings") or [])
-    return "No module named 'cv2'" in blob or 'No module named "cv2"' in blob
+    return ("No module named 'cv2'" in blob or 'No module named "cv2"' in blob
+            # a broken install (a DLL or libGL that won't load) failed the same way
+            or bool(re.search(r"the (cover|picture) check failed: (ImportError|ModuleNotFoundError)\b", blob)))
 
 
 def unchanged(old: dict | None, sig: str, force: bool) -> bool:
@@ -741,6 +743,36 @@ def _check_these(sdir: Path, cfg: dict, batch: list[tuple[dict, str]], ctx: dict
             "findings": found, **({"vision": v} if v else {})}
         say(f"  {it['key']}: " + ("; ".join(f["text"] for f in found) if found else "clean"))
     return claude
+
+
+def _hold_for_opencv(sdir: Path, cfg: dict, batch: list[tuple[dict, str]], done: dict, fresh: dict,
+                     say) -> None:
+    """The items OpenCV would have checked, when it won't import: each gets its text findings
+    (they don't need cv2) and one that says OpenCV is missing, with no signature. So an old clean
+    row isn't left standing (the files changed since), nothing reads the item as clean, and the
+    next run with OpenCV checks it in full. Not a cover finding: the cover was never looked at."""
+    at = datetime.now(UTC).isoformat(timespec="seconds")
+    for it, _sig in batch:
+        try:
+            got = [("text", level, text) for level, text in text_findings(cfg, it)]
+        except Exception as e:  # noqa: BLE001  # the OpenCV line below still flags it
+            got = [("text", BAD, f"the text check failed: {type(e).__name__}: {str(e)[:200]}")]
+        got.append(("run", BAD, f"not fully checked: {OPENCV_MSG}"))
+        done[it["key"]] = fresh[it["key"]] = {
+            "sig": "", "at": at, "kind": it["kind"],
+            "findings": [finding(f"{name}:{it['key']}:{n}", name, level, text, stream=sdir.name)
+                         for n, (name, level, text) in enumerate(got)]}
+        say(f"  {it['key']}: not fully checked (no OpenCV)")
+
+
+def _hold_unfinished(sdir: Path, batch: list[tuple[dict, str]], why: str, done: dict, fresh: dict) -> None:
+    """The items a stopped run didn't get to: one finding that says why, no signature, so
+    nothing reads them as clean and the next run checks them."""
+    at = datetime.now(UTC).isoformat(timespec="seconds")
+    for it, _sig in batch:
+        done[it["key"]] = fresh[it["key"]] = {
+            "sig": "", "at": at, "kind": it["kind"],
+            "findings": [finding(f"run:{it['key']}:0", "run", BAD, why, stream=sdir.name)]}
 
 
 def _persist(sdir: Path, cfg: dict, fresh: dict, done: dict, started: str, save: bool,
@@ -827,8 +859,13 @@ def run(sdir: Path, cfg: dict, todo: list[dict] | None = None, keys: list[str] |
             require_opencv()
             _check_these(sdir, cfg, needs, ctx, vision, claude, done, fresh, say)
     except ClipperError as e:
+        left = [(it, sig) for it, sig in plain + needs if it["key"] not in fresh]
         if missing_opencv(e):
-            _persist(sdir, cfg, fresh, done, started, save, kitsu, say)
+            _hold_for_opencv(sdir, cfg, left, done, fresh, say)
+        else:  # a spending limit, a rejected key: what was checked is kept (paid for)
+            _hold_unfinished(sdir, left, f"not checked: {type(e).__name__}: {str(e)[:200]}", done, fresh)
+        _persist(sdir, cfg, fresh, done, started, save, kitsu, say)
+        e.checks_saved = True  # review.add_checks reads checks.json instead of overwriting it
         raise
     _persist(sdir, cfg, fresh, done, started, save, kitsu, say)
     return {k: v["findings"] for k, v in done.items()}

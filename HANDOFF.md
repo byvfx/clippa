@@ -182,7 +182,7 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
   analytics` retries Google's passing errors and skips a video still failing (#335, #336); a failed analytics or prune run comes
   back in 30 min, doubling per failure (`RETRY_FAILED_S`, #338). Details: log 11-20.
 - **Model providers (#72, closed 11-09):** production still runs Haiku and Sonnet. Config-7 is being evaluated through the opt-in overlays `docs/config-7-hybrid-segv4.toml` and `docs/config-7-hybrid-segv4-openrouter.toml` (wiki Model-rollout); the defaults stay. Tools: `clippa compare score`, `clippa models test|gold`; OpenRouter key in `secrets/openrouter_secret.txt`.
-- **OpenRouter budget panel (draft, not deployed, 11-24):** Money page, beside API usage. Reads the clippa key server-side. Changing the limit or disabling the key needs `OPENROUTER_MANAGEMENT_KEY` or `secrets/openrouter_management_secret.txt` (never in the page). Warning percent defaults to 75, saved in `streams/.serve/openrouter.json`. Do not touch production `clipper.toml` for this. Reaches serve only after `bash deploy/hub/deploy.sh` from a main checkout once it is merged.
+- **OpenRouter budget panel (merged, not deployed, 11-24):** Money page, beside API usage. Reads the clippa key server-side. Changing the limit or disabling the key needs `OPENROUTER_MANAGEMENT_KEY` or `secrets/openrouter_management_secret.txt` (never in the page). Warning percent defaults to 75, saved in `streams/.serve/openrouter.json`. Do not touch production `clipper.toml` for this. Reaches serve only after `bash deploy/hub/deploy.sh` from a main checkout once it is merged.
 
 ## Waiting on the user
 - v0.4.0 is released (PR #395, tag 11-23 on 7f6f4ed, the user: "can we tag a v0.4.0 tonight?"; Release "Clippa 0.4.0";
@@ -239,10 +239,16 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
 - `ANTHROPIC_ADMIN_KEY` for Claude's own usage count on Costs, if wanted.
 
 ## Open work
+- **Hold the hub deploy for the review-fix PR (11-23):** the Cursor agent PRs merged since
+  v0.4.0 (#398 cost estimates, #400 / #414 OpenRouter limits, #415 budget panel) had Grok
+  findings nobody handled, and a review found more. Branch `fix/cursor-pr-review` fixes them
+  (log 2026-11-23 "Review fixes for the Cursor PRs"). Deploy only once it is merged; #388 (the
+  Discord cards) is already on the hub, so its fixes reach the bot with that deploy.
 - **OpenRouter spending limits (not deployed):** a key limit or empty credits stops the model
-  call at once (`OpenRouterLimit`); an in-flight budget waits for `Retry-After` and retries.
-  A segments run that stops this way does not write a partial `segments.json`. Not on the hub
-  until this merges and `deploy/hub/deploy.sh` runs. Production `clipper.toml` was not touched.
+  call at once (`OpenRouterLimit`); an in-flight budget waits for `Retry-After` (up to two
+  minutes a try) and retries; when it can't, only that call fails. A segments run that stops
+  this way does not write a partial `segments.json`. Not on the hub until
+  `deploy/hub/deploy.sh` runs. Production `clipper.toml` was not touched.
 - **OpenRouter Claude overlay (not applied):** `docs/openrouter-claude.toml` is every Claude
   stage model at the same tier and effort, as `openrouter:anthropic/claude-*.5`. No price
   rows: a `--dry-run` reads OpenRouter's public list once per process. Paste into

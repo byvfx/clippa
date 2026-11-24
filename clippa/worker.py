@@ -419,13 +419,16 @@ def since_end(stream_dir: Path, t: float) -> str:
 
 
 def ready_text(cfg: dict, d: Path, what: str) -> tuple[str, str]:
-    """(sentence, show name) for the in-review DM. 'Kino Casino finished processing. 7 cuts in review.'"""
+    """(sentence, show name) for the in-review DM. 'Kino Casino finished processing. 7 cuts in
+    review.' After the fast lane (what says "segments next") the stream isn't finished: 'Kino
+    Casino: clips and Shorts are in review. 7 cuts in review. Segments next.'"""
     meta = jsonstate.read_or(d / "meta.json", {})
     show = for_stream(cfg, d)["meta"]["show_name"] or meta.get("channel", d.name)
     n = len(jsonstate.read_or(d / "review_state.json", {}))
     count = f" {n} cuts in review." if n else ""
-    tail = " Segments next." if "segments next" in what else ""
-    return f"{show} finished processing.{count}{tail}", show
+    if "segments next" in what:
+        return f"{show}: clips and Shorts are in review.{count} Segments next.", show
+    return f"{show} finished processing.{count}", show
 
 
 def watch(cfg: dict, config_path: str | None = None, once: bool = False) -> None:  # noqa: C901

@@ -73,7 +73,8 @@ def test_a_finding_and_a_rejection_use_the_finding_color_with_different_words():
     assert found["color"] == notify.COLORS["finding"]
     assert found["title"].startswith("⚠ Finding · ")
     assert "Finding on Cut 04: subject name does not match the source label." in found["description"]
-    assert "1 finding" in field(found, "Status") and "auto-approve" in field(found, "Status")
+    # it waits for a person (auto_state "person"): not shown as approving itself
+    assert "1 finding" in field(found, "Status") and "auto-approve" not in field(found, "Status")
     rejected, _ = notify.card(row(decision="rejected", comment="off topic"))
     assert rejected["color"] == notify.COLORS["finding"]
     assert rejected["title"].startswith("✕ Rejected · ")
@@ -190,3 +191,84 @@ def test_copy_has_no_we():
     for r in samples:
         embed, rows = notify.card(r, now=1_763_900_000)
         assert WE.search(blob(embed, rows)) is None
+
+
+def test_the_thread_starter_after_the_fast_lane_says_segments_are_next():
+    early = notify.in_review_embed("Stream A", 7, 0, 7, "", "stream-a", finished=False)
+    assert early["description"].startswith("Stream A: clips and Shorts are in review. 7 cuts in review. "
+                                            "Segments next.")
+    assert "finished processing" not in early["description"]
+    assert WE.search(blob(early)) is None
+
+
+def test_only_waiting_or_due_counts_as_approving_itself():
+    assert notify.will_auto_approve(row(auto_state="waiting")) is True
+    assert notify.will_auto_approve(row(auto_state="due")) is True
+    assert notify.will_auto_approve(row(auto_state="person", auto="waits for a person")) is False
+    assert notify.will_auto_approve(row(auto_state="off", auto="approves itself at 18:00")) is False
+    assert notify.will_auto_approve(row(auto="approves itself at 18:00")) is True   # an older row
+    assert notify.will_auto_approve(row(decision="approved", auto="approves itself")) is False
+    assert notify.card_status(row(auto_state="person")) == "pending"
+    assert "auto-approves" not in notify.status_line(row(auto_state="person"))
+
+
+class FakeApi:
+    def __init__(self, kind=0):
+        self.kind, self.calls = kind, []
+
+    def __call__(self, method, path, payload=None, **kw):
+        self.calls.append((method, path, payload))
+        if method == "GET":
+            return {"type": self.kind}
+        if path.endswith("/threads"):
+            return {"id": "T1"}
+        return {"id": "M1"}
+
+
+def test_open_thread_says_where_the_starter_is():
+    text = FakeApi(kind=0)
+    assert notify.open_thread(text, "C1", "name", {"embeds": []}) == ("T1", {"channel": "C1", "id": "M1"})
+    forum = FakeApi(kind=15)
+    assert notify.open_thread(forum, "C1", "name", {"embeds": []}) == ("T1", {"channel": "T1", "id": "T1"})
+
+
+def test_the_starter_is_edited_only_when_its_text_changed():
+    api = FakeApi()
+    dstate = {"starter": {"channel": "C1", "id": "M1", "description": "old"}}
+    notify.refresh_starter(api, dstate, {"description": "old"})
+    assert api.calls == []
+    notify.refresh_starter(api, dstate, {"description": "new"})
+    assert api.calls == [("PATCH", "/channels/C1/messages/M1", {"embeds": [{"description": "new"}]})]
+    assert dstate["starter"]["description"] == "new"
+    notify.refresh_starter(api, {}, {"description": "new"})   # a thread from before: left alone
+    assert len(api.calls) == 1
+
+
+def test_save_state_keeps_the_starter_and_a_new_thread_wins(tmp_path):
+    from clippa import jsonstate
+
+    p = tmp_path / "discord.json"
+    jsonstate.write(p, {"thread_id": "T1", "messages": {"a": {"id": "1"}}})
+    notify.save_state(p, {"thread_id": "T1", "messages": {"a": {"id": "1"}, "b": {"id": "2"}},
+                          "starter": {"channel": "C1", "id": "M1", "description": "x"}}, "b")
+    saved = jsonstate.load(p)
+    assert saved["messages"] == {"a": {"id": "1"}, "b": {"id": "2"}} and saved["starter"]["id"] == "M1"
+    notify.save_state(p, {"thread_id": "T2", "messages": {}}, None)
+    assert jsonstate.load(p) == {"thread_id": "T2", "messages": {}}
+
+
+def test_segments_in_goes_by_the_stages_not_the_run_status(tmp_path):
+    from clippa import jsonstate
+
+    assert notify.segments_in(tmp_path) is True   # run by hand: no run.json
+    run = tmp_path / "run.json"
+    # the fast lane's own review stage posts while the run says "running"
+    jsonstate.write(run, {"status": "running", "stages": {"clips_review": {"status": "running"}}})
+    assert notify.segments_in(tmp_path) is False
+    jsonstate.write(run, {"status": "partial", "stages": {"clips_review": {"status": "done"}}})
+    assert notify.segments_in(tmp_path) is False
+    jsonstate.write(run, {"status": "running", "stages": {"clips_review": {"status": "done"},
+                                                          "review": {"status": "running"}}})
+    assert notify.segments_in(tmp_path) is True
+    jsonstate.write(run, {"status": "running", "stages": {"review": {"status": "running"}}})
+    assert notify.segments_in(tmp_path) is True   # no fast lane: one review posts everything
