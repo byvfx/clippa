@@ -963,8 +963,8 @@ def run_confirm(cfg: dict, subject: str, only: str | None = None) -> float:
             break
         try:
             out, _ = claude.json_call(ic["check_model"], system, user, CONFIRM_SCHEMA, ic["check_effort"])
-        except OpenRouterLimit:
-            save_leads(cfg, subject, data)  # the verdicts made before this one are kept
+        except Exception:
+            save_leads(cfg, subject, data)  # a limit or a failed call: the verdicts made are kept
             raise
         finally:
             budget.release(est)
@@ -1142,8 +1142,8 @@ def run_check(cfg: dict, subject: str, only: str | None = None) -> float:
             break
         try:
             found, errors = findings(cfg, subject, lead, claude)
-        except OpenRouterLimit:
-            save_leads(cfg, subject, data)  # the leads checked before this one stay checked
+        except Exception:
+            save_leads(cfg, subject, data)  # a limit or a failed call: the leads done stay done
             raise
         print(f"{lead['id']} {lead['headline']}: {len(found)} results"
               + (f" ({', '.join(f'{k} failed' for k in errors)})" if errors else ""), flush=True)
@@ -1163,8 +1163,8 @@ def run_check(cfg: dict, subject: str, only: str | None = None) -> float:
                 break
             try:
                 out, _ = claude.json_call(ic["check_model"], system, user, CHECK_SCHEMA, ic["check_effort"])
-            except OpenRouterLimit:
-                save_leads(cfg, subject, data)  # the leads checked before this one stay checked
+            except Exception:
+                save_leads(cfg, subject, data)  # a limit or a failed call: the leads done stay done
                 raise
             finally:
                 budget.release(est)

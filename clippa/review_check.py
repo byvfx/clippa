@@ -671,9 +671,17 @@ def stale_opencv(old: dict | None) -> bool:
             or bool(re.search(r"the (cover|picture) check failed: (ImportError|ModuleNotFoundError)\b", blob)))
 
 
+def stale_in_flight(old: dict | None) -> bool:
+    """A saved result with a check that failed on OpenRouter's in-flight budget: a moment's
+    crowding, not something about the item, so the next run checks it again."""
+    return any("check failed" in (f.get("text") or "") and "openrouter_in_flight_budget" in (f.get("text") or "")
+               for f in (old or {}).get("findings") or [])
+
+
 def unchanged(old: dict | None, sig: str, force: bool) -> bool:
-    """Already checked for this signature, and not a stuck missing-cv2 result."""
-    return bool(old and old.get("sig") == sig and not force and not stale_opencv(old))
+    """Already checked for this signature, and not a stuck missing-cv2 or in-flight result."""
+    return bool(old and old.get("sig") == sig and not force
+                and not stale_opencv(old) and not stale_in_flight(old))
 
 
 def item_imports_cv2(sdir: Path, cfg: dict, it: dict, ctx: dict) -> bool:

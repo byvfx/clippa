@@ -126,3 +126,23 @@ def test_a_resplit_press_whose_kitsu_comment_failed_is_tried_again(monkeypatch, 
         actions.resplit({"review": {}}, item, "Brandon")
     actions.resplit({"review": {}}, item, "Brandon")
     assert len(tries) == 2
+
+
+def test_a_notice_press_does_not_hold_back_the_cards_kitsu_comment(defaults, monkeypatch, tmp_path):
+    """The notice's ask wrote nothing to Kitsu, so a later press on the card still comments."""
+    sdir = tmp_path / "kick-1"
+    sdir.mkdir()
+    defaults["paths"]["streams"] = tmp_path
+    defaults["segments"]["split_over_s"] = 3000
+    actions.ask_resplit(defaults, "kick-1/s06", "Brandon")
+    item = SimpleNamespace(stream_dir=sdir, key="s06_topic", ref="kick-1/s06")
+    monkeypatch.setattr(actions, "for_stream", lambda cfg, d: cfg)
+    monkeypatch.setattr(actions, "describe", lambda cfg, d: {
+        "s06_topic": {"resplit": True, "resplit_limit_s": 3000, "short": "kick-1/s06"}})
+    monkeypatch.setattr(actions, "_touched", lambda *a: None)
+    monkeypatch.setattr(actions.review, "connect", lambda rc: None)
+    monkeypatch.setattr(actions, "refresh", lambda cfg, item: {})
+    comments = []
+    monkeypatch.setattr(actions, "_comment", lambda gazu, it, status, text: comments.append(text))
+    actions.resplit(defaults, item, "Brandon")
+    assert len(comments) == 1

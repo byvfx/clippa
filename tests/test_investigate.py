@@ -543,3 +543,35 @@ def test_a_spending_limit_keeps_the_facts_that_finished(defaults, tmp_path, monk
         investigate.run_facts(defaults, "jer")
     assert (d / "investigate" / "facts" / "v1.json").is_file()
     assert "spent" in jsonstate.load(d / "investigate" / "runs.json")[-1]["stopped"]
+
+
+def test_a_failed_call_on_the_next_lead_keeps_the_leads_already_checked(defaults, tmp_path, monkeypatch):
+    """An in-flight 402 that ran out of tries is a plain error, not a spending limit: the
+    leads checked before it are still written."""
+    subject(defaults, tmp_path)
+
+    def lead(h, a, b):
+        return investigate.make_lead(
+            {"keep": True, "reject": "", "headline": h, "story": "S", "kind": "shift", "confidence": "low",
+             "confirm_or_kill": "c", "people": [], "timeline": [a, b], "search": h},
+            {"why": "w", "facts": [fact(a, "2026-01-01", "v1"), fact(b, "2026-02-01", "v2")]})
+
+    investigate.save_leads(defaults, "jer", {"subject": "jer", "about": "", "made_at": "2026-11-03T00:00:00+00:00",
+                                             "model": "m", "candidates": 2,
+                                             "leads": investigate.rank([lead("one", "a", "b"), lead("two", "c", "d")], 5)})
+    calls = []
+
+    def findings(cfg, subj, ld, claude):
+        calls.append(ld["headline"])
+        if len(calls) == 2:
+            raise RuntimeError("m: HTTP 402 openrouter_in_flight_budget after 6 tries: busy")
+        return [], {}
+
+    monkeypatch.setattr(investigate, "findings", findings)
+    monkeypatch.setattr(investigate, "llm_setup", lambda cfg, m: (Scripted({"coverage": "fresh", "note": "n",
+                                                                           "matches": []}), FakePrompts()))
+    with pytest.raises(RuntimeError):
+        investigate.run_check(defaults, "jer")
+    saved = {x["headline"]: x for x in investigate.load_leads(defaults, "jer")["leads"]}
+    assert saved[calls[0]]["coverage"]["label"] == "fresh"
+    assert "coverage" not in saved[calls[1]] or saved[calls[1]]["coverage"].get("label") != "fresh"

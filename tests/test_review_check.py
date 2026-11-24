@@ -572,3 +572,11 @@ def test_the_kitsu_column_gets_what_checks_json_kept(defaults, tmp_path, monkeyp
     monkeypatch.setattr(review, "set_checks", lambda sdir, c, summaries: columns.append(summaries) or [])
     review_check.run(sd, defaults, say=lambda *_: None, kitsu=True)
     assert columns == [{"v01_t1": ""}]
+
+
+def test_a_check_that_failed_on_the_in_flight_budget_is_checked_again():
+    old = {"sig": "s1", "findings": [{"check": "cover", "text":
+           "the cover check failed: RuntimeError: m: HTTP 402 openrouter_in_flight_budget after 6 tries: busy"}]}
+    assert review_check.stale_in_flight(old) and not review_check.unchanged(old, "s1", False)
+    other = {"sig": "s1", "findings": [{"check": "cover", "text": "the cover check failed: ValueError: bad"}]}
+    assert review_check.unchanged(other, "s1", False)   # anything else still needs --force

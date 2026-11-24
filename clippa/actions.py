@@ -355,7 +355,7 @@ def resplit(cfg: dict, item: Item, who: str = "") -> dict:
     from .notify import over_phrase
 
     _touched(item, "re-split", who)
-    sid = item.key.split("_", 1)[0]
+    sid = f"{item.key.split('_', 1)[0]}:kitsu"  # apart from a notice's ask, which wrote no comment
     if _asked_resplit(item.stream_dir, sid, who) is None:
         # one Kitsu comment per segment until `clippa segments` runs again, however many presses
         how = over_phrase(row.get("resplit_limit_s") or 0)
