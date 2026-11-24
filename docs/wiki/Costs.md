@@ -38,11 +38,17 @@ today / this week / this month, and the account balance. The warning percent (de
 saved in `<streams>/.serve/openrouter.json` with the limit events. At or past the warning,
 Spend turns amber and Money shows **!**. A spent cap (`openrouter_key_limit`) turns Spend
 red and the health light to **Stopped**. The banner says the run stopped at its next model
-call. A 402 whose Retry-After is at most two minutes is the in-flight budget
-(`openrouter_in_flight_budget`) when the text says in-flight, or when it says nothing
-about the key limit or the credits being spent. The call waits and is sent again, and
-the panel counts down. Any other 402, and a 403 whose text says the limit or the credits
-are spent, is the cap (`openrouter_key_limit`).
+call. The call reads `error.metadata.limit_source`. `openrouter_key_limit` (HTTP 402 or
+403) and `openrouter_credits` (HTTP 402) stop at once: the error says `OpenRouter limit`
+and `not retried`, and the call is not sent again. `openrouter_in_flight_budget` (HTTP
+402) waits for a `Retry-After` that is a number of seconds, each wait capped at 60
+seconds, and is sent again, up to six calls. The panel counts down. A header that is
+missing or not a number of seconds stops the call (`not retried`); six failures stop it
+(`after 6 tries`). Anything else on 402 or 403 still follows the text: a 402 whose
+Retry-After is at most two minutes is the in-flight budget when the text says in-flight,
+or when it says nothing about the key limit or the credits being spent. Any other such
+402, and a 403 whose text says the limit or the credits are spent, is the cap
+(`openrouter_key_limit`).
 
 **Top up on OpenRouter** is a link to the credits page. Buying credits and auto top-up stay
 on OpenRouter; its API cannot change them.
