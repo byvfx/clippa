@@ -29,6 +29,27 @@ minutes.
   today, this week, this month, all time, what's left of the key's limit if it has one, and
   the account balance when the key may read it.
 
+## The OpenRouter budget
+
+The war room's Money page has an **OpenRouter budget** panel beside API usage
+([War room](War-room#modal-costs-and-analytics)). It shows the clippa key's cap, what's left,
+today / this week / this month, and the account balance. The warning percent (default 75) is
+saved in `<streams>/.serve/openrouter.json` with the limit events. Past the warning, Spend
+turns amber and Money shows **!**. A spent cap (`openrouter_key_limit`) turns Spend red and
+the health light to **Stopped**. A 402 with Retry-After (`openrouter_in_flight_budget`) waits
+and tries the call again.
+
+**Top up on OpenRouter** is a link to the credits page. Buying credits and auto top-up stay
+on OpenRouter; its API cannot change them.
+
+Changing the limit or disabling the key needs a management key, which never reaches the
+browser: `OPENROUTER_MANAGEMENT_KEY`, or the file at `[paths] openrouter_management_key`
+(`secrets/openrouter_management_secret.txt`). Without it the panel still reads the clippa
+key and the buttons stay disabled. With it, **Edit limit…** (new limit, then a Now → After
+confirm) and **Disable key…** / **Enable key…** send `PATCH /api/v1/keys/{hash}`. The hash
+stays on the server. `--budget` on a run is Clippa's own guard for that one run; the panel
+only explains it. The OpenRouter cap covers every run on the key.
+
 Modal's own billing is the real number for transcription ([Transcribe on Modal](Transcribe-on-Modal#watching-modal));
 the bot DMs each time the month passes a multiple of `[modal] alert_every_usd`.
 

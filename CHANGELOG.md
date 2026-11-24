@@ -10,6 +10,16 @@ Developing#releases.
 
 ## Unreleased
 
+### 2026-11
+
+- 11-24: the war room's Money page has an OpenRouter budget panel (the API usage panel stays):
+  the clippa key's cap, a 75% warning you can change, and Spend / Money reacting when the cap
+  is close or spent. Top up is a link to OpenRouter. Editing the limit or disabling the key
+  confirms first and needs `OPENROUTER_MANAGEMENT_KEY` (or `secrets/openrouter_management_secret.txt`);
+  with only the inference key the panel is read-only. A 402 with Retry-After waits and retries;
+  a spent key limit stops the call. Wiki: War room (Modal, costs and analytics), Costs
+  (The OpenRouter budget).
+
 ## 0.4.0 (2026-11-23)
 
 The rename reaches the NAS and the repo, the docs get a site of their own, and blind items learn

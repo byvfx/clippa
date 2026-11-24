@@ -562,9 +562,13 @@ class LLM:
                     r.status_code == 400 and prov == "gemini" and "api key not valid" in r.text.lower())):
                 raise KeyRejected(f"{model}: {env} (or [paths] {prov}_key) was rejected "
                                   f"(HTTP {r.status_code}): {r.text[:200]}")
+            if prov == "openrouter" and self._openrouter_payment(r, model, attempt, timeout_s):
+                continue
             if not r.ok:
                 raise RuntimeError(f"{model}: HTTP {r.status_code}: {r.text[:300]}")
             break
+        if prov == "openrouter":
+            self._openrouter_clear()
         data = r.json()
         choice = data["choices"][0]
         usage = data.get("usage") or {}
@@ -579,6 +583,29 @@ class LLM:
         elif choice.get("finish_reason") == "length" and not length_ok:
             raise RuntimeError(f"{model} hit max_tokens ({meta['request_id']})")
         return data, meta
+
+    def _openrouter_payment(self, response, model: str, attempt: int, timeout_s: float | None) -> bool:
+        """A 402/403 from OpenRouter. True: wait and send it again. A spent key limit raises."""
+        from . import openrouter_budget as ob
+
+        header = response.headers.get("Retry-After") or response.headers.get("retry-after")
+        kind = ob.classify_payment(response.status_code, response.text, header)
+        if kind == "openrouter_in_flight_budget" and attempt < 5 and not timeout_s:
+            wait = ob.retry_seconds(header) or 0
+            ob.note_retry({"paths": self.paths}, seconds=wait, status=response.status_code)
+            time.sleep(wait)
+            return True
+        if kind == "openrouter_key_limit":
+            ob.note_stop({"paths": self.paths}, status=response.status_code, model=model)
+            raise ob.OpenRouterKeyLimit(
+                f"openrouter_key_limit: OpenRouter refused {model} (HTTP {response.status_code}). "
+                "The clippa key's limit is spent.")
+        return False
+
+    def _openrouter_clear(self) -> None:
+        from . import openrouter_budget as ob
+
+        ob.clear_retry({"paths": self.paths})
 
 
 # Every stage's model calls go through clippa/llm.py, which picks the provider from the

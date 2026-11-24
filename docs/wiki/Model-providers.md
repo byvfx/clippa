@@ -6,7 +6,7 @@ its provider by prefix; a bare name like `claude-sonnet-5-5` is Claude, as befor
 | `claude-<model>` (or `anthropic:claude-<model>`) | Claude | `ANTHROPIC_API_KEY`, or `secrets/anthropic_secret.txt` (`[paths] anthropic_key`; [Claude on the NAS](Claude-on-the-NAS) uses the file) |
 | `openai:<model>` | OpenAI | `OPENAI_API_KEY` (user env var), or `secrets/openai_secret.txt` |
 | `gemini:<model>` | Google Gemini (its OpenAI-compatible endpoint) | `GEMINI_API_KEY`, or `secrets/gemini_secret.txt` |
-| `openrouter:<vendor>/<model>` | OpenRouter: one key for most vendors' models, e.g. `openrouter:openai/gpt-5-mini` | `OPENROUTER_API_KEY`, or the key in `secrets/openrouter_secret.txt` (`[paths] openrouter_key`) |
+| `openrouter:<vendor>/<model>` | OpenRouter: one key for most vendors' models, e.g. `openrouter:openai/gpt-5-mini` | `OPENROUTER_API_KEY`, or the key in `secrets/openrouter_secret.txt` (`[paths] openrouter_key`). The war room's budget panel can change that key's limit when `OPENROUTER_MANAGEMENT_KEY` (or `[paths] openrouter_management_key`) is set; see [Costs](Costs#the-openrouter-budget) |
 | `local:<model>` | Ollama, vLLM, LM Studio or any OpenAI-compatible server | `[llm] local_base_url` in clipper.toml (e.g. `http://<host>:11434/v1`); `LOCAL_LLM_API_KEY` if it wants one |
 
 Trying config-7, one stage at a time, is [Model rollout](Model-rollout).
