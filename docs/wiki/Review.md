@@ -40,8 +40,13 @@ made in Kitsu (as of the bot's last sync) over the draft's. What it finds goes i
 on the Discord card, the war room's ⚠ badge and item window, and `clippa status` ("2 with check
 findings"). An item is checked again only when something it reads changed (`--force` to check
 anyway; `--dry-run` prices the vision calls; `--no-vision` skips them). A check that fails is a
-finding too. Findings don't stop anything: they say where to look, and an item with any waits for
-you rather than [approving itself](#approval-by-silence).
+finding too. A missing OpenCV is the exception: a cover face match, or a Short frame that
+actually goes through the webcam check, needs it (`uv sync --extra faces`, the same extra as
+[Faces](Faces)). Without it those items are left out and the run stops, after the other items
+have been saved, instead of recording a bad cover. One already saved from that failure is
+checked again without `--force`. Findings don't stop anything: they say
+where to look, and an item with any waits for you rather than
+[approving itself](#approval-by-silence).
 
 ## Approval by silence
 

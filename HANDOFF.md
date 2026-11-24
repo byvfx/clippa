@@ -281,6 +281,8 @@ of phone use; #300 (access levels, a local Jev-like classifier in front of the m
 - **War room heat graph (PR #294, live 11-19):** 🔥 on a stream or item (`/api/heat`, wiki War-room#heat); not yet seen on a real phone.
 - **Review pre-flight checks and approval by silence (#259):** steps A (`clippa review check`, PR #263) and B (`clippa review
   auto`, PR #265, serve's `auto` job every 10 min), stale-finding rechecks (#270) and hardening (#273) are live (wiki Review).
+  A missing OpenCV stops the run after saving items that don't need it, and does not cache a bad cover for the ones
+  that do; one already cached that way is checked again without `--force` once `uv sync --extra faces` is in.
   **On for Kino since 11-15 and Channel 404 since 11-20** (`[shows.<key>.review] auto_approve = true`, Shorts 6+, segments
   4+ since 11-23; the compilation floor is 0; backups `backups/clipper.toml.before_kino_auto_approve_2026-11-15`,
   `...before_c404_auto_approve_2026-11-20`). Don's Shorts clean since 11-20 (checkup `auto` all good 11-23). Segments (#258 A-C)
