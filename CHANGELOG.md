@@ -10,6 +10,14 @@ Developing#releases.
 
 ## Unreleased
 
+### 2026-11
+
+- 11-24: an OpenRouter key limit or an empty balance stops the stage at once
+  (`openrouter_key_limit` on HTTP 402 or 403, `openrouter_credits` on 402) instead of being
+  sent again; an in-flight budget (`openrouter_in_flight_budget`) waits for `Retry-After` and
+  tries again. A stop during `segments` writes no partial `segments.json` (Model providers,
+  Pipeline).
+
 ## 0.4.0 (2026-11-23)
 
 The rename reaches the NAS and the repo, the docs get a site of their own, and blind items learn

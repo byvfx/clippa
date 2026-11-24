@@ -23,6 +23,10 @@ What differs per provider:
   the schema and sent back once with what was wrong.
 - refusals: (None, meta) from json_call and ("", meta) from text_call everywhere; the
   server-side refusal fallback exists on the Claude API only.
+- OpenRouter spending limits (error.metadata.limit_source): openrouter_key_limit (HTTP 402
+  or 403) and openrouter_credits (HTTP 402) raise OpenRouterLimit at once. An in-flight
+  budget (openrouter_in_flight_budget, HTTP 402) waits for Retry-After and tries again,
+  up to the same six attempts as the other retries, then raises OpenRouterLimit.
 - images: Claude content blocks ({"type": "image", "source": {"type": "base64", ...}}) are
   converted to image_url data URLs.
 Prices are [llm] prices ($ per 1M input/output tokens, by model string), for cost lines only;
@@ -38,7 +42,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from .errors import ClipperError, KeyRejected
+from .errors import ClipperError, KeyRejected, OpenRouterLimit
 
 PROVIDERS = {  # prefix -> (base URL, key env var)
     "openai": ("https://api.openai.com/v1", "OPENAI_API_KEY"),
@@ -53,6 +57,10 @@ def claude_effort(effort: str) -> str:
     return "low" if effort == "none" else effort
 RETRY_STATUS = (408, 429, 500, 502, 503, 504, 529)
 STARTED = (408, 500, 502, 504)  # errors that can come after the model began (and was billed)
+ATTEMPTS = 6  # one call plus retries; an in-flight budget uses the same budget
+# Spending limits that will fail the same way if sent again (OpenRouter's limit_source).
+_HARD_LIMITS = frozenset({"openrouter_key_limit", "openrouter_credits"})
+_IN_FLIGHT = "openrouter_in_flight_budget"
 MODEL_KEY = re.compile(r"(^|_)model(_[ab])?$")
 
 
@@ -245,6 +253,86 @@ def _openai_content(user: str | list[dict]) -> str | list[dict]:
 
 class NoSchema(Exception):
     """The server doesn't take response_format json_schema."""
+
+
+def _header(headers, name: str) -> str:
+    """A response header by name, whatever case the server or a fake used."""
+    wanted = name.lower()
+    for key, value in getattr(headers, "items", lambda: ())():
+        if str(key).lower() == wanted and value is not None:
+            return str(value).strip()
+    return ""
+
+
+def _retry_after_s(headers) -> float | None:
+    """Retry-After as seconds, or None when it is missing or not a number of seconds.
+
+    OpenRouter's in-flight budget says how long to wait. The number is kept (a 0 means
+    retry at once); an HTTP-date or anything else is not a wait this client can honour.
+    Capped at 60, the same ceiling as the client's other retries, so a stray header
+    cannot hold a stream for hours."""
+    raw = _header(headers, "retry-after")
+    if not raw:
+        return None
+    try:
+        pause = float(raw)
+    except ValueError:
+        return None
+    if pause < 0:
+        return None
+    return min(60.0, pause)
+
+
+def _openrouter_limit_source(response) -> str:
+    """error.metadata.limit_source, or "" when the body is not that shape."""
+    try:
+        body = response.json()
+    except (ValueError, AttributeError):  # not JSON, or a stand-in response with no json()
+        return ""
+    err = body.get("error") if isinstance(body, dict) else None
+    meta = err.get("metadata") if isinstance(err, dict) else None
+    source = meta.get("limit_source") if isinstance(meta, dict) else None
+    return source if isinstance(source, str) else ""
+
+
+def _provider_message(response) -> str:
+    """The error message in the body, else the body text, one short line."""
+    try:
+        body = response.json()
+    except ValueError:
+        body = None
+    err = body.get("error") if isinstance(body, dict) else None
+    message = err.get("message") if isinstance(err, dict) else None
+    text = message if isinstance(message, str) and message.strip() else getattr(response, "text", "")
+    return " ".join(str(text).split())[:200]
+
+
+def _openrouter_limit_wait(model: str, response, attempt: int, tries: int = ATTEMPTS) -> float | None:
+    """None when this response is not an OpenRouter spending limit. A float: sleep, then retry.
+
+    Raises OpenRouterLimit for a hard limit (key or credits), an in-flight budget with no
+    usable Retry-After, or an in-flight budget whose tries are used up."""
+    source = _openrouter_limit_source(response)
+    if not source:
+        return None
+    detail = _provider_message(response)
+    if source in _HARD_LIMITS:
+        raise OpenRouterLimit(
+            f"{model}: OpenRouter limit {source} (HTTP {response.status_code}), not retried: {detail}",
+            source)
+    if source != _IN_FLIGHT:
+        return None
+    pause = _retry_after_s(response.headers)
+    if pause is None:
+        raise OpenRouterLimit(
+            f"{model}: OpenRouter limit {source} (HTTP {response.status_code}), "
+            f"not retried: no Retry-After: {detail}",
+            source)
+    if attempt + 1 >= tries:
+        raise OpenRouterLimit(
+            f"{model}: OpenRouter limit {source} (HTTP {response.status_code}) after {tries} tries: {detail}",
+            source)
+    return pause
 
 
 class LLM:
@@ -486,16 +574,57 @@ class LLM:
                                "and nothing else:\n" + json.dumps(schema))
         return {"type": "json_object"}
 
-    def _compat(self, model: str, messages: list[dict], effort: str, max_tokens: int,  # noqa: C901
+    def _handle_compat_status(self, model: str, prov: str, env: str, r, body: dict, token_key: str,
+                              asked: int, response_format: dict | None, attempt: int,
+                              timeout_s: float | None) -> bool:
+        """True: send this request again. False: `r` is the answer to use.
+
+        Raises OpenRouterLimit, KeyRejected, NoSchema or RuntimeError when the call is over."""
+        if prov == "openrouter":
+            wait = _openrouter_limit_wait(model, r, attempt)
+            if wait is not None:
+                time.sleep(wait)
+                return True
+        # A long call (timeout_s) that a gateway gave up on may be thinking still, and billed:
+        # only a refusal before it started (rate limit, overloaded) is worth sending again.
+        if r.status_code in RETRY_STATUS and attempt < ATTEMPTS - 1 and not (
+                timeout_s and r.status_code in STARTED):
+            time.sleep(min(60.0, float(r.headers.get("retry-after") or 2 ** (attempt + 1))))
+            return True
+        if r.status_code == 400:
+            text = r.text.lower()
+            if ("reasoning_effort" in body or "reasoning" in body) and "reasoning" in text:
+                self._no_effort.add(model)  # not a reasoning model
+                body.pop("reasoning_effort", None)
+                body.pop("reasoning", None)
+                body[token_key] = asked  # no thinking, so no room for it
+                return True
+            if body[token_key] > asked and ("max_tokens" in text or "max_completion_tokens" in text):
+                body[token_key] = asked  # more than this model writes: the caller's own figure
+                return True
+            if (response_format or {}).get("type") == "json_schema" and (
+                    "response_format" in text or "json_schema" in text):
+                raise NoSchema
+        # Gemini answers a bad key with a 400 ("API key not valid"), the others with a 401.
+        if prov != "local" and (r.status_code == 401 or (
+                r.status_code == 400 and prov == "gemini" and "api key not valid" in r.text.lower())):
+            raise KeyRejected(f"{model}: {env} (or [paths] {prov}_key) was rejected "
+                              f"(HTTP {r.status_code}): {r.text[:200]}")
+        if not r.ok:
+            raise RuntimeError(f"{model}: HTTP {r.status_code}: {r.text[:300]}")
+        return False
+
+    def _compat(self, model: str, messages: list[dict], effort: str, max_tokens: int,
                 response_format: dict | None = None, length_ok: bool = False,
                 thinking_tokens: int | None = None, timeout_s: float | None = None,
                 extra: dict | None = None) -> tuple[dict, dict]:
         """One chat/completions request with retries. Returns (response JSON, meta); meta has
-        "refusal" when the model refused. length_ok: running out of max_tokens isn't an error
-        (the preflight, where a reasoning model can spend them all thinking). thinking_tokens,
-        timeout_s: this call's own (text_call); with timeout_s, a dropped connection (a timeout, a
-        reset, a cut-off answer) or a gateway error (STARTED) is not sent again. extra: more of
-        the request body (tool_call's tools)."""
+        "refusal" when the model refused. An OpenRouter spending limit is handled in
+        _handle_compat_status (hard stop, or wait for Retry-After). length_ok: running out of
+        max_tokens isn't an error (the preflight, where a reasoning model can spend them all
+        thinking). thinking_tokens, timeout_s: this call's own (text_call); with timeout_s, a
+        dropped connection (a timeout, a reset, a cut-off answer) or a gateway error (STARTED)
+        is not sent again. extra: more of the request body (tool_call's tools)."""
         import requests
 
         prov, name = split(model)
@@ -529,41 +658,18 @@ class LLM:
         headers = {"Authorization": f"Bearer {key}"} if key else {}
         if prov == "openrouter":
             headers["X-Title"] = "clippa"
-        for attempt in range(6):
+        for attempt in range(ATTEMPTS):
             try:
                 r = requests.post(f"{base}/chat/completions", json=body, headers=headers,
                                   timeout=timeout_s or self.lc["timeout_s"])
             except requests.RequestException as e:
-                if attempt == 5 or timeout_s:  # a long call may have started: each try is paid for
+                if attempt == ATTEMPTS - 1 or timeout_s:  # a long call may have started: each try is paid for
                     raise RuntimeError(f"{model}: {type(e).__name__}: {e}") from None
                 time.sleep(2 ** attempt)
                 continue
-            # A long call (timeout_s) that a gateway gave up on may be thinking still, and billed:
-            # only a refusal before it started (rate limit, overloaded) is worth sending again.
-            if r.status_code in RETRY_STATUS and attempt < 5 and not (timeout_s and r.status_code in STARTED):
-                time.sleep(min(60.0, float(r.headers.get("retry-after") or 2 ** (attempt + 1))))
+            if self._handle_compat_status(model, prov, env, r, body, limit, asked, response_format,
+                                          attempt, timeout_s):
                 continue
-            if r.status_code == 400:
-                text = r.text.lower()
-                if ("reasoning_effort" in body or "reasoning" in body) and "reasoning" in text:
-                    self._no_effort.add(model)  # not a reasoning model
-                    body.pop("reasoning_effort", None)
-                    body.pop("reasoning", None)
-                    body[limit] = asked  # no thinking, so no room for it
-                    continue
-                if body[limit] > asked and ("max_tokens" in text or "max_completion_tokens" in text):
-                    body[limit] = asked  # more than this model writes: the caller's own figure
-                    continue
-                if (response_format or {}).get("type") == "json_schema" and (
-                        "response_format" in text or "json_schema" in text):
-                    raise NoSchema
-            # Gemini answers a bad key with a 400 ("API key not valid"), the others with a 401.
-            if prov != "local" and (r.status_code == 401 or (
-                    r.status_code == 400 and prov == "gemini" and "api key not valid" in r.text.lower())):
-                raise KeyRejected(f"{model}: {env} (or [paths] {prov}_key) was rejected "
-                                  f"(HTTP {r.status_code}): {r.text[:200]}")
-            if not r.ok:
-                raise RuntimeError(f"{model}: HTTP {r.status_code}: {r.text[:300]}")
             break
         data = r.json()
         choice = data["choices"][0]

@@ -234,6 +234,10 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
 - `ANTHROPIC_ADMIN_KEY` for Claude's own usage count on Costs, if wanted.
 
 ## Open work
+- **OpenRouter spending limits (not deployed):** a key limit or empty credits stops the model
+  call at once (`OpenRouterLimit`); an in-flight budget waits for `Retry-After` and retries.
+  A segments run that stops this way does not write a partial `segments.json`. Not on the hub
+  until this merges and `deploy/hub/deploy.sh` runs. Production `clipper.toml` was not touched.
 - **Long segments (config-7 prep, not in production):** `[segments] split_over_s` defaults to 0
   (off). A negative value is off too; a non-number is a one-line error. The NAS `clipper.toml` does
   not set it, and `max_s` is still 3600. Turn it on (3000, the upcoming segments prompt's 50 minutes)
