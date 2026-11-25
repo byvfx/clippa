@@ -40,13 +40,20 @@ fi
 # Memory (#435): the Hindsight bank the laptop's Claude uses, through the same plugin. Its
 # settings are all environment (compose.yaml, .env); installing puts its hooks in
 # ~/.claude/settings.json and its MCP server in ~/.claude.json, from the image's pinned copy.
-# Without HINDSIGHT_API_URL memory is off, and hooks from an earlier start stay quiet.
+# Without HINDSIGHT_API_URL memory is off: hooks an earlier start installed come out (a
+# `docker compose exec` session wouldn't see the variable below, and the plugin's default
+# server is Hindsight Cloud).
+HS_INSTALLER=/opt/hindsight-coding-agents/dist/installer.js
 if [ -n "${HINDSIGHT_API_URL:-}" ]; then
-    node /opt/hindsight-coding-agents/dist/installer.js install claude-code </dev/null >/tmp/hindsight-install.log 2>&1 \
+    node "$HS_INSTALLER" install claude-code </dev/null >/tmp/hindsight-install.log 2>&1 \
         || echo "Hindsight plugin install failed, see /tmp/hindsight-install.log" >&2
     hindsight-check >&2 || true
 else
     export HINDSIGHT_DISABLED=1
+    if grep -q hindsight-coding-agents "$HOME/.claude/settings.json" 2>/dev/null; then
+        node "$HS_INSTALLER" uninstall claude-code </dev/null >/tmp/hindsight-install.log 2>&1 \
+            || echo "Hindsight plugin uninstall failed, see /tmp/hindsight-install.log" >&2
+    fi
 fi
 
 # The nightly checkup (#185) at CHECKUP_AT (HH:MM, the container's TZ; "" = off), in the

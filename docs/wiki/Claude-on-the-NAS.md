@@ -98,9 +98,11 @@ code; the container does neither (that would add a second copy under the name `a
 recalls and writes back its sessions. The nightly checkup and audit runs aren't written back.
 
 Hindsight isn't required: with no server on the laptop or `HINDSIGHT_API_URL=off`, memory is off
-and the session uses Claude Code's own file memory in `home/`. When it is on, the container's
-log says at start if the server doesn't answer or refuses the key, and the nightly checkup DMs
-the same line, with the fix.
+(the next start takes the plugin's hooks out again) and the session uses Claude Code's own file
+memory in `home/`. A key copied from the laptop goes only with the laptop's server: name another
+server in `env.local` and give its key there too. When memory is on, the container's log says at
+start if the server doesn't answer or refuses the key; `clippa doctor --role claude` shows it as
+a `hindsight` line, and the nightly checkup DMs it, with the fix.
 
 ## Check
 

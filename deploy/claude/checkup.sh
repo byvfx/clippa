@@ -30,7 +30,8 @@ dm() {  # the DM: stdin
 }
 
 # Memory (#435): a stopped Hindsight or a lost key gets a DM of its own, whatever the checkup finds.
-hs=$(hindsight-check) || echo "Checkup $day: $hs" | dm
+hs_note=""
+hs=$(hindsight-check) || { echo "Checkup $day: $hs" | dm; hs_note=" but for Hindsight (above)"; }
 
 if [ ! -d "$WT/.git" ] && [ ! -f "$WT/.git" ]; then
     git -C /app worktree prune
@@ -58,7 +59,7 @@ report=$(clippa checkup --json $mark 2>/tmp/checkup.err)
 code=$?
 if [ "$code" -eq 0 ]; then
     # and what serve's `checkup --fix` repaired (or would have) in the last 24 h, when anything (#287)
-    { echo "Checkup $day: all good."; clippa checkup 2>/dev/null | tail -n +2; } | dm
+    { echo "Checkup $day: all good$hs_note."; clippa checkup 2>/dev/null | tail -n +2; } | dm
     exit 0
 fi
 # Exit 1 is findings only with a report; without one (a CLI error, --mark's write failing) the

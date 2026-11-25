@@ -64,12 +64,22 @@ hs_conf() {  # a string field of the laptop's Hindsight config (one JSON file), 
 HS_URL=$(setting HINDSIGHT_API_URL)
 if [ "$HS_URL" = off ]; then
     fill HINDSIGHT_API_URL ""
-elif [ -z "$HS_URL" ] && [ "$(hs_conf serverMode)" = daemon ]; then
-    echo "note: the laptop's Hindsight is a local daemon the NAS can't reach: memory stays off there" >&2
-else
-    [ -n "$HS_URL" ] || fill HINDSIGHT_API_URL "$(hs_conf apiUrl)"
-    [ -n "$(setting HINDSIGHT_SERVER_MODE)" ] || fill HINDSIGHT_SERVER_MODE "$(hs_conf serverMode | sed 's/^$/self-hosted/')"
-    [ -n "$(setting HINDSIGHT_API_TOKEN)" ] || fill HINDSIGHT_API_TOKEN "$(hs_conf apiToken)"
+elif [ -z "$HS_URL" ]; then
+    # The laptop's server, and its key and mode with it (only then: the key is for that server).
+    HS_URL=$(hs_conf apiUrl)
+    case "$(hs_conf serverMode):$HS_URL" in
+        daemon:*) HS_URL=""; echo "note: the laptop's Hindsight is a local daemon the NAS can't reach: memory stays off there" >&2 ;;
+        *://localhost*|*://127.*|*://\[::1\]*)
+            HS_URL=""; echo "note: the laptop's Hindsight is on the laptop itself ($(hs_conf apiUrl)): set HINDSIGHT_API_URL in $ENV_LOCAL to an address the NAS can reach" >&2 ;;
+    esac
+    fill HINDSIGHT_API_URL "$HS_URL"
+    if [ -n "$HS_URL" ]; then
+        [ -n "$(setting HINDSIGHT_SERVER_MODE)" ] || fill HINDSIGHT_SERVER_MODE "$(hs_conf serverMode | sed 's/^$/self-hosted/')"
+        [ -n "$(setting HINDSIGHT_API_TOKEN)" ] || fill HINDSIGHT_API_TOKEN "$(hs_conf apiToken)"
+    fi
+fi
+if [ -n "$HS_URL" ] && [ "$HS_URL" != off ]; then
+    [ -n "$(setting HINDSIGHT_SERVER_MODE)" ] || grep -q '^HINDSIGHT_SERVER_MODE=.' "$TMP/.env" || fill HINDSIGHT_SERVER_MODE self-hosted
     # The plugin's own default, coding-agent::<the main checkout's folder>, unless it names a bank
     BANK=$(hs_conf bankId)
     [ -n "$BANK" ] || BANK="coding-agent::$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
