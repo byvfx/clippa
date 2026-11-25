@@ -19,6 +19,7 @@
 - [Scheduling and uploads](Scheduling-and-uploads)
 - [Costs](Costs)
 - [Checkup](Checkup)
+- [Bugs to remember](Bugs-to-remember)
 - [Audit](Audit)
 - [Backups](Backups)
 

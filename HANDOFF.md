@@ -28,6 +28,11 @@ Project memory (`~/.claude/projects/C--clipper/memory/`, MEMORY.md first) holds 
   dropped by `docs_site/convert.py`, so that note is not on the site. The case study stays at
   https://byvfx.github.io/clippa/. Do not enable Pages on `byvfx/clippa`, and do not edit
   `byvfx/byvfx.github.io`. Repo About > Website still needs setting to the docs URL (the gear next to About).
+- The wiki's **Bugs-to-remember** page (11-25, #426) collects the bugs whose symptom points away from the cause
+  or comes back with new hardware, a recorder or an ffmpeg: symptom, cause, how to tell, band-aid, fix. First
+  entry: the 18 h stream's transcribe killed by SIGTERM during the 1.3 GB Modal upload (#422, fixed by
+  `[transcribe] modal_opus_over_mb = 700` in PR #431). A closed issue labelled `bug-to-remember` gets its entry
+  in the fix's PR (AGENTS.md Rules); #427/#428 add more entries.
 - Keys are Windows **User** env vars (ANTHROPIC_API_KEY, KITSU_TOKEN, ...); agent shells must load them:
   `export KITSU_TOKEN="$(powershell.exe -NoProfile -Command "[Environment]::GetEnvironmentVariable('KITSU_TOKEN','User')" | tr -d '\r')"`
 

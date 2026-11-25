@@ -73,6 +73,9 @@ the same PR as the change.
   `clippa upload` or `clippa review publish` by hand without being asked.
 - Generated titles, descriptions and thumbnail text should avoid the word "hosts"; the
   user finds it reads as machine-written.
+- An issue labelled `bug-to-remember` gets its entry on the wiki's Bugs-to-remember page in the
+  same PR as the fix: its symptom misleads, or it will come back with new hardware, a recorder or
+  an ffmpeg.
 
 ## Running things here
 
