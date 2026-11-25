@@ -12,6 +12,10 @@ Developing#releases.
 
 ### 2026-11
 
+- 11-24: Claude on the NAS shares the laptop's Hindsight memory bank (#435): the container runs
+  the same plugin, and `deploy/claude/deploy.sh` copies the laptop's server, key and bank into
+  `env.local` where they're empty. The nightly checkup DMs when Hindsight is down or refuses the
+  key. Wiki: Claude-on-the-NAS (Memory).
 - 11-24: a Modal transcription whose FLAC would be over `[transcribe] modal_opus_over_mb` (700 MB,
   about a 10 h stream) uploads opus instead. An 18 h stream's 1.3 GB upload ran the NAS out of
   memory (#422). A stage stopped by a signal now says so in run.json and the worker log

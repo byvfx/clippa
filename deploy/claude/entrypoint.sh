@@ -37,6 +37,18 @@ if ! claude auth status >/dev/null 2>&1; then
     echo "signed in"
 fi
 
+# Memory (#435): the Hindsight bank the laptop's Claude uses, through the same plugin. Its
+# settings are all environment (compose.yaml, .env); installing puts its hooks in
+# ~/.claude/settings.json and its MCP server in ~/.claude.json, from the image's pinned copy.
+# Without HINDSIGHT_API_URL memory is off, and hooks from an earlier start stay quiet.
+if [ -n "${HINDSIGHT_API_URL:-}" ]; then
+    node /opt/hindsight-coding-agents/dist/installer.js install claude-code </dev/null >/tmp/hindsight-install.log 2>&1 \
+        || echo "Hindsight plugin install failed, see /tmp/hindsight-install.log" >&2
+    hindsight-check >&2 || true
+else
+    export HINDSIGHT_DISABLED=1
+fi
+
 # The nightly checkup (#185) at CHECKUP_AT (HH:MM, the container's TZ; "" = off), in the
 # background beside the session: checkup.sh runs `clippa checkup` and, when it finds
 # something, a read-only `claude -p` that DMs one report.

@@ -84,7 +84,8 @@ DRY RUN: don't run \`clippa alert send\`; put the message at the top of your fin
         "Bash(clippa doctor --offline)" "Bash(clippa doctor --offline --role claude)" \
         "Bash(clippa record status)" "Bash(clippa worker --status)" "Bash(clippa alert send:*)" \
         "Bash(checkup-git:*)"
-    if ! claude -p "$prompt" --max-turns 80 \
+    # HINDSIGHT_DISABLED: as in checkup.sh, an unattended run isn't remembered (#435).
+    if ! HINDSIGHT_DISABLED=1 claude -p "$prompt" --max-turns 80 \
             --disallowedTools Edit Write NotebookEdit WebFetch WebSearch \
             --allowedTools "$@" </dev/null >/tmp/audit-deep.md; then
         # Signed out or a usage limit: the facts still go out, and next month's run reads them again.

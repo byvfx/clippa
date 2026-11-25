@@ -127,6 +127,10 @@ Windows notes above don't apply.
   show is live (`clippa record status`).
 - The user reads on a phone: keep replies short, give the cost before any model rerun and
   wait for a yes, and never deploy or restart the recorder from here.
+- Memory is the laptop's Hindsight bank, through the same plugin (wiki Claude-on-the-NAS#memory):
+  search its pages before acting, as the session banner says; the session is written back by
+  itself. Save a decision of the user's with `hindsight_ingest_document`, not in
+  `~/.claude/projects/-app/memory` (kept as a fallback for when Hindsight is down).
 
 ## Checks
 

@@ -29,6 +29,9 @@ dm() {  # the DM: stdin
     if [ -n "$DRY" ]; then echo "--- DM (dry run, not sent):"; cat; else clippa alert send --kind checkup -; fi
 }
 
+# Memory (#435): a stopped Hindsight or a lost key gets a DM of its own, whatever the checkup finds.
+hs=$(hindsight-check) || echo "Checkup $day: $hs" | dm
+
 if [ ! -d "$WT/.git" ] && [ ! -f "$WT/.git" ]; then
     git -C /app worktree prune
     git -C /app worktree add -q --detach "$WT" "origin/$REF" || { echo "can't make $WT" >&2; exit 1; }
@@ -80,7 +83,9 @@ set -- Read Grep Glob "Edit(/$FIX/**)" "Write(/$FIX/**)" "Bash(checkup-pr:*)" \
     "Bash(clippa doctor --offline)" "Bash(clippa doctor --offline --role claude)" \
     "Bash(clippa record status)" "Bash(clippa worker --status)" "Bash(clippa alert send:*)" \
     "Bash(checkup-git:*)"
-if ! claude -p "$prompt" --max-turns 40 \
+# HINDSIGHT_DISABLED: a nightly run's session isn't one to remember (#435), and its first-prompt
+# reflect would cost a model call on the Hindsight server each night.
+if ! HINDSIGHT_DISABLED=1 claude -p "$prompt" --max-turns 40 \
         --disallowedTools NotebookEdit WebFetch WebSearch \
         --allowedTools "$@" </dev/null; then
     # No diagnosis (signed out, usage limit): the findings alone still go out (alert send cuts

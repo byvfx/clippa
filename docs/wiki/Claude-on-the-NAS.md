@@ -75,6 +75,33 @@ names it.
 
 Session transcripts are plaintext in `home/.claude/projects` on the NAS, like on the laptop.
 
+## Memory
+
+The container remembers through the same Hindsight bank as the laptop's Claude Code, so the two
+know the same decisions: what one is told, the other can recall. It runs the same plugin
+(`@vectorize-io/hindsight-coding-agents`, pinned in the Dockerfile), installed into `home/` at
+every start; its hooks recall at the start of a session and write the session back at the end.
+
+The deploy fills these in `env.local` from the laptop's `~/.hindsight/coding-agent.json` when
+they are empty:
+
+| `env.local` | What | Empty means |
+| --- | --- | --- |
+| `HINDSIGHT_API_URL` | the Hindsight server | the laptop's (`off` turns memory off) |
+| `HINDSIGHT_API_TOKEN` | its key | the laptop's `apiToken` |
+| `HINDSIGHT_SERVER_MODE` | `self-hosted` or `cloud` | the laptop's |
+| `HINDSIGHT_BANK_ID` | the bank | `coding-agent::<the checkout's folder>`, the plugin's default on the laptop |
+
+The bank is named explicitly because the clone on the NAS is called `/app`, which would
+otherwise give it a bank of its own. The laptop seeds the bank from git history and surveys the
+code; the container does neither (that would add a second copy under the name `app`) and only
+recalls and writes back its sessions. The nightly checkup and audit runs aren't written back.
+
+Hindsight isn't required: with no server on the laptop or `HINDSIGHT_API_URL=off`, memory is off
+and the session uses Claude Code's own file memory in `home/`. When it is on, the container's
+log says at start if the server doesn't answer or refuses the key, and the nightly checkup DMs
+the same line, with the fix.
+
 ## Check
 
 ```bash
