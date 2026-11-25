@@ -17,6 +17,18 @@ Developing#releases.
   as the release budget already scaled. An 18 h stream had got the same 30 windows and about as many
   clips as a 6 h night (#430). Pass B is told a long stream's length; shorter streams are unchanged.
   `[scoring] scale_with_length = false` turns it off.
+- 11-24: Claude on the NAS shares the laptop's Hindsight memory bank (#435): the container runs
+  the same plugin, and `deploy/claude/deploy.sh` copies the laptop's server, key and bank into
+  `env.local` where they're empty. The nightly checkup DMs when Hindsight is down or refuses the
+  key. Wiki: Claude-on-the-NAS (Memory).
+- 11-25: a long compilation's Kitsu preview now fits `[review] max_upload_mb`: it drops to 360p or
+  240p (15 fps) instead of stopping at 150 kbps, and encodes once more when the encoder overshoots.
+  One that still won't fit is skipped with a line in the log, so the rest of the stream still
+  publishes; one already in Kitsu goes back to waiting for approval with a comment that the
+  video there is the previous cut. A 5.2 h GTA 6 compilation's 762 MB preview ended the review stage halfway.
+- 11-25: a Kitsu upload that fails no longer leaves an empty revision on the item (its comment is
+  removed again), and a preview Windows can't read off the NAS share in one go (`OSError: [Errno
+  22] Invalid argument`, a review run from the laptop) is uploaded from a local copy instead.
 - 11-24: a Modal transcription whose FLAC would be over `[transcribe] modal_opus_over_mb` (700 MB,
   about a 10 h stream) uploads opus instead. An 18 h stream's 1.3 GB upload ran the NAS out of
   memory (#422). A stage stopped by a signal now says so in run.json and the worker log

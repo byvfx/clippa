@@ -31,7 +31,8 @@ Every Modal call also writes a start and an end line to `[paths]
 modal_runs` (`logs/modal_runs.jsonl`). `clippa modal` (and the war room's Modal panel) shows
 GPUs up, runs going now, failures, recent runs, each archive's progress and ETA, and the
 month's spend from Modal's own billing: metered, credit, billed, the last 24 h and the rate
-over the last 3 hours. The per-run estimates are only a guide; billing is the real number.
+over the last 3 hours. The per-run estimates are only a guide; billing is the real number, and
+a parallel run's estimates add up to more than it ([Bugs to remember](Bugs-to-remember)).
 The bot DMs (`[notify]` kind `spend`) each time the month passes a multiple of `[modal]
 alert_every_usd` (25); set `monthly_budget_usd` to show the month against your own ceiling.
 The process that serves the war room (`clippa serve`) needs the Modal token, as the worker does.
@@ -43,7 +44,8 @@ On a new install, `clippa modal --backfill` adds the runs from before the log, o
 ### A long stream's transcribe is killed during the upload
 
 Signs: `run_transcribe.log` stops at `encoded ... MB flac`, `modal_runs.jsonl` has a start and no
-end, and run.json says `transcribe killed by SIGTERM (-15)` (`exited -15` before 11-24).
+end, and run.json says `transcribe killed by SIGTERM (-15)` (`exited -15` on a worker from before
+the fix).
 
 The audio goes to Modal as one payload held in memory, and Modal's client makes copies of it. From
 1 GiB it uploads the file in parts, all at once. An 18 h stream's 1.3 GB FLAC (2026-11-24, #422)
@@ -59,3 +61,5 @@ has gone up fine is 884 MB (12.2 h); the limit stays below it. Opus is slow to e
 (an 18 h stream took 8 min, FLAC 30 s). To transcribe one stream
 from opus whatever its length, put `[transcribe] modal_audio = "opus"` in its
 `streams/<id>/config.toml`.
+
+How to tell it from the other upload failures: [Bugs to remember](Bugs-to-remember).

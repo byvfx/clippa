@@ -635,6 +635,7 @@ preview_fps = 30
 preview_codec = ""             # empty = cut.clip_codec
 preview_quality = 28
 max_upload_mb = 480            # Kitsu's proxy rejects bigger uploads; longer previews re-encode to fit
+                               # (a long compilation at 360p/240p), one that still won't is skipped
 normalize = false              # true = Kitsu re-encodes uploads on the NAS
 # Pre-flight checks (`clippa review check`, #259): what the reviewer would look at, before they
 # do. Text (house words, YouTube's limits, an unmasked bleep), a Short's webcam panels (a face

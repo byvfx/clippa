@@ -4,11 +4,34 @@ from anywhere while the laptop sleeps. It runs `claude remote-control` in a cont
 own clone of the repo. The NAS dials out to Anthropic: no port forwarding, no tailnet, nothing
 exposed.
 
+## What it's for
+
+Ask it when something on the NAS looks wrong or you have a question about it, especially from
+the phone: it sees the same streams, config and logs that serve, the bot and the worker use.
+Its job is to find out what's wrong and write it up; the agents fix it.
+
+- **Find the cause** of something broken, in the logs and state files.
+- **Answer "is it working?"**: where a stream is, whether a retry went through, whether Modal
+  is still running.
+- **Test an idea cheaply**: reproduce a bug, measure something. It gives the cost first and
+  waits for your yes.
+- **Write tickets**: what it finds becomes a GitHub issue an agent can pick up without the
+  chat (evidence, cause, a checklist and the scope).
+- **Band-aids you ask for**: a one-stream setting (say a stream's own `config.toml`), so the
+  pipeline keeps moving until the real fix lands.
+- **Questions about how Clippa works**: config, the pipeline, why something was picked or
+  skipped.
+
+What it's not for: code fixes (those go to other agents through the tickets), deploys and
+restarts (it can't reach Docker or ssh, and the recorder is off limits), uploading or
+publishing unless you ask, and heavy work while a show is live.
+
 ## What it can do
 
 - Run any stage on any stream, read logs and state in the NAS folder, edit `clipper.toml` (it
   backs it up first, as on the laptop).
-- Change code in its clone (`/app`) on a branch, run the tests, push and open a PR.
+- Work on a branch in its clone (`/app`) and commit notes. It doesn't write code fixes, but it
+  writes notes and ticket write-ups, and pushes or opens a PR for those only when asked.
 
 What it can't: restart or deploy containers (no Docker socket, no ssh). serve, the bot and the
 worker keep running the code of the last hub deploy; a merged change reaches them when you run
@@ -74,6 +97,35 @@ each command or edit); switch one to Accept edits or Auto in the app. `CLAUDE_SE
 names it.
 
 Session transcripts are plaintext in `home/.claude/projects` on the NAS, like on the laptop.
+
+## Memory
+
+The container remembers through the same Hindsight bank as the laptop's Claude Code, so the two
+know the same decisions: what one is told, the other can recall. It runs the same plugin
+(`@vectorize-io/hindsight-coding-agents`, pinned in the Dockerfile), installed into `home/` at
+every start; its hooks recall at the start of a session and write the session back at the end.
+
+The deploy fills these in `env.local` from the laptop's `~/.hindsight/coding-agent.json` when
+they are empty:
+
+| `env.local` | What | Empty means |
+| --- | --- | --- |
+| `HINDSIGHT_API_URL` | the Hindsight server | the laptop's (`off` turns memory off) |
+| `HINDSIGHT_API_TOKEN` | its key | the laptop's `apiToken`, when the URL is the laptop's server |
+| `HINDSIGHT_SERVER_MODE` | `self-hosted` or `cloud` | the laptop's |
+| `HINDSIGHT_BANK_ID` | the bank | `coding-agent::<the checkout's folder>`, the plugin's default on the laptop |
+
+The bank is named explicitly because the clone on the NAS is called `/app`, which would
+otherwise give it a bank of its own. The laptop seeds the bank from git history and surveys the
+code; the container does neither (that would add a second copy under the name `app`) and only
+recalls and writes back its sessions. The nightly checkup and audit runs aren't written back.
+
+Hindsight isn't required: with no server on the laptop or `HINDSIGHT_API_URL=off`, memory is off
+(the next start takes the plugin's hooks out again) and the session uses Claude Code's own file
+memory in `home/`. A key copied from the laptop goes only with the laptop's server: name another
+server in `env.local` and give its key there too. When memory is on, the container's log says at
+start if the server doesn't answer or refuses the key; `clippa doctor --role claude` shows it as
+a `hindsight` line, and the nightly checkup DMs it, with the fix.
 
 ## Check
 

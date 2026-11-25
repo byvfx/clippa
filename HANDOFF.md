@@ -28,6 +28,14 @@ Project memory (`~/.claude/projects/C--clipper/memory/`, MEMORY.md first) holds 
   dropped by `docs_site/convert.py`, so that note is not on the site. The case study stays at
   https://byvfx.github.io/clippa/. Do not enable Pages on `byvfx/clippa`, and do not edit
   `byvfx/byvfx.github.io`. Repo About > Website still needs setting to the docs URL (the gear next to About).
+- The wiki's **Bugs-to-remember** page (11-25, #426) collects the bugs whose symptom points away from the cause
+  or comes back with new hardware, a recorder or an ffmpeg: symptom, cause, how to tell, band-aid, fix. First
+  entry: the 18 h stream's transcribe killed by SIGTERM during the 1.3 GB Modal upload (#422, fixed by
+  `[transcribe] modal_opus_over_mb = 700` in PR #431). #427/#428 added 22 more under six groups (timing and
+  sync, shared state over the NAS, services, tools, review surfaces, limits and estimates), each checked against
+  the code; the page states its own safety rules (deploy/restart only on the user's word, never during a show or
+  a job, no by-hand upload/publish, nothing twice on the laptop). A closed issue labelled `bug-to-remember` gets
+  its entry in the fix's PR (AGENTS.md Rules); #440 (the 821.7 s VOD, still open) is one.
 - Keys are Windows **User** env vars (ANTHROPIC_API_KEY, KITSU_TOKEN, ...); agent shells must load them:
   `export KITSU_TOKEN="$(powershell.exe -NoProfile -Command "[Environment]::GetEnvironmentVariable('KITSU_TOKEN','User')" | tr -d '\r')"`
 
@@ -147,7 +155,7 @@ Around it (each a subcommand; details in the wiki and the log): `record`, `worke
 - **NAS** (192.168.0.155) also runs the recorder container (`deploy/record`, `clippa-record`, redeployed 11-22 at 6ac5d37,
   watching kinocasinogaming + donflurgundy; chudlogic off since 11-10, user: catch up on Kino and Don), Kitsu :8090, the cut container, the streams and photos
   shares. `kick-138291641-2` is Kino 11-17 after the show ended early (Andy playing a game): recorded only, held
-  from the worker by `run.json` `{"status": "skip"}`; delete it whenever you like. The `claude` container (`deploy/claude`, wiki Claude-on-the-NAS) drives Clippa from the phone.
+  from the worker by `run.json` `{"status": "skip"}`; delete it whenever you like. The `claude` container (`deploy/claude`, wiki Claude-on-the-NAS) drives Clippa from the phone. **Its role is in `AGENTS.md` since #424 (11-24): investigate, test and file tickets, not fix code** — no fix branches or PRs unless asked, cheap tests with the cost stated first and the user's yes, band-aids (a stream's `config.toml`) when asked; a ticket must stand alone (evidence, cause, checklist, scope). Asked what it can do, it gives the answer written there word for word. Its `gh` token creates issues but can't comment on or edit them.
 - **Mac `lofn`** (Apple Silicon, setup's `control` role, 11-07): a dev/control station that runs nothing
   unattended. Clone `~/clipper`; `CLIPPER_CONFIG=/Volumes/docker/clipper/clipper.toml` and
   `CLIPPER_LOCAL_CONFIG=~/clipper/clipper.local.toml` in `~/.zshrc` (mount the share in Finder first); ssh
