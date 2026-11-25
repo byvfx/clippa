@@ -551,7 +551,8 @@ def for_length(cfg: dict, hours: float) -> dict:
     if picks > cfg["scoring"]["max_picks"]:
         # Pass B hears its length only when its cap rose: with top_n alone up (8.3 h), a note
         # saying "1.0x a usual stream ... not one" would contradict itself (Grok on #432)
-        out["_length"] = {"hours": round(hours, 2), "scale": round(scale, 2)}
+        out["_length"] = {"hours": round(hours, 2), "scale": round(scale, 2),
+                          "usual_hours": budget, "usual_picks": cfg["scoring"]["max_picks"]}
     return out
 
 

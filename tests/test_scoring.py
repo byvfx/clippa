@@ -138,4 +138,7 @@ def test_pass_b_hears_a_long_streams_length_and_cap(defaults):
     from clippa import config
     defaults["scoring"]["max_picks"] = 14
     note = scoring.length_note(config.for_length(defaults, 18.3))
-    assert "18.3 hours" in note and "2.3x" in note and "32 picks" in note
+    assert "18.3 hours" in note and "usual 8" in note and "32 picks instead of 14" in note
+    # 8.3 h: the cap rises 14 -> 15 at a 1.04 scale; no "1.0x ... not one" (Grok on #432)
+    note = scoring.length_note(config.for_length(defaults, 8.3))
+    assert "15 picks instead of 14" in note and "x a usual" not in note

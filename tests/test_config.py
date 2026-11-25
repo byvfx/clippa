@@ -348,7 +348,8 @@ def test_for_length_scales_top_n_and_max_picks_for_a_long_stream_only(defaults):
     defaults["signals"]["top_n"], defaults["scoring"]["max_picks"] = 30, 14
     long = config.for_length(defaults, 18.3)
     assert (long["signals"]["top_n"], long["scoring"]["max_picks"]) == (69, 32)
-    assert long["_length"] == {"hours": 18.3, "scale": 2.29}
+    assert long["_length"] == {"hours": 18.3, "scale": 2.29, "usual_hours": 8.0,
+                               "usual_picks": 14}
     assert (defaults["signals"]["top_n"], defaults["scoring"]["max_picks"]) == (30, 14)  # not changed in place
     assert config.for_length(defaults, 5.5) is defaults
     assert config.for_length(defaults, 8.0) is defaults

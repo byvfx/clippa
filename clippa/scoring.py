@@ -365,10 +365,11 @@ def length_note(cfg: dict) -> str:
     length = cfg.get("_length")
     if not length:
         return ""
-    return (f"<stream_length>\nThis stream ran {length['hours']:.1f} hours, {length['scale']:.1f}x a "
-            f"usual stream, so the cap is {cfg['scoring']['max_picks']} picks. Still pick by quality, "
-            f"but judge it as {length['scale']:.1f} streams' worth of moments, not one.\n"
-            "</stream_length>\n\n")
+    # No "N.Nx" multiplier: 1.04 printed as "1.0x" next to a raised cap contradicted itself (Grok, #432)
+    return (f"<stream_length>\nThis stream ran {length['hours']:.1f} hours, longer than the usual "
+            f"{length['usual_hours']:g}, so the cap is {cfg['scoring']['max_picks']} picks instead of "
+            f"{length['usual_picks']}. Still pick by quality, but judge it against its length, not as "
+            "one usual stream's worth of moments.\n</stream_length>\n\n")
 
 
 def run_pass_b(kept: list[dict], summary: list[dict], words: list[dict], cfg: dict,
