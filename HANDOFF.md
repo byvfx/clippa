@@ -31,8 +31,11 @@ Project memory (`~/.claude/projects/C--clipper/memory/`, MEMORY.md first) holds 
 - The wiki's **Bugs-to-remember** page (11-25, #426) collects the bugs whose symptom points away from the cause
   or comes back with new hardware, a recorder or an ffmpeg: symptom, cause, how to tell, band-aid, fix. First
   entry: the 18 h stream's transcribe killed by SIGTERM during the 1.3 GB Modal upload (#422, fixed by
-  `[transcribe] modal_opus_over_mb = 700` in PR #431). A closed issue labelled `bug-to-remember` gets its entry
-  in the fix's PR (AGENTS.md Rules); #427/#428 add more entries.
+  `[transcribe] modal_opus_over_mb = 700` in PR #431). #427/#428 added 22 more under six groups (timing and
+  sync, shared state over the NAS, services, tools, review surfaces, limits and estimates), each checked against
+  the code; the page states its own safety rules (deploy/restart only on the user's word, never during a show or
+  a job, no by-hand upload/publish, nothing twice on the laptop). A closed issue labelled `bug-to-remember` gets
+  its entry in the fix's PR (AGENTS.md Rules); #440 (the 821.7 s VOD, still open) is one.
 - Keys are Windows **User** env vars (ANTHROPIC_API_KEY, KITSU_TOKEN, ...); agent shells must load them:
   `export KITSU_TOKEN="$(powershell.exe -NoProfile -Command "[Environment]::GetEnvironmentVariable('KITSU_TOKEN','User')" | tr -d '\r')"`
 

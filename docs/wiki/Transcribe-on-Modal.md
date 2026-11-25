@@ -31,7 +31,8 @@ Every Modal call also writes a start and an end line to `[paths]
 modal_runs` (`logs/modal_runs.jsonl`). `clippa modal` (and the war room's Modal panel) shows
 GPUs up, runs going now, failures, recent runs, each archive's progress and ETA, and the
 month's spend from Modal's own billing: metered, credit, billed, the last 24 h and the rate
-over the last 3 hours. The per-run estimates are only a guide; billing is the real number.
+over the last 3 hours. The per-run estimates are only a guide; billing is the real number, and
+a parallel run's estimates add up to more than it ([Bugs to remember](Bugs-to-remember)).
 The bot DMs (`[notify]` kind `spend`) each time the month passes a multiple of `[modal]
 alert_every_usd` (25); set `monthly_budget_usd` to show the month against your own ceiling.
 The process that serves the war room (`clippa serve`) needs the Modal token, as the worker does.
