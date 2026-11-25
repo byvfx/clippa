@@ -46,7 +46,9 @@ from __future__ import annotations
 
 import bisect
 import os
+import shutil
 import subprocess
+import tempfile
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -373,26 +375,56 @@ def render_preview(src: Path, dst: Path, rc: dict, codec: str) -> Path:
     return dst
 
 
+def fit_settings(max_mb: float, duration_s: float, fps: int) -> tuple[int, int, int, int]:
+    """(height, fps, video kbps, audio kbps) that land a preview of duration_s at ~90% of
+    max_mb. A long one (a 5 h compilation) drops to 360p or 240p and fewer frames rather than
+    asking for a bitrate the encoder won't go down to (QSV overshot 150 kbps at 540p)."""
+    total = max_mb * 8e3 * 0.9 / max(duration_s, 1)
+    audio = 64 if total >= 600 else 32
+    video = max(40, int(total) - audio)
+    height = 540 if video >= 700 else 360 if video >= 250 else 240
+    return height, (fps if video >= 250 else min(fps, 15)), video, audio
+
+
 def render_to_size(src: Path, big: Path, duration_s: float, rc: dict, codec: str) -> Path:
-    """A preview that fits Kitsu's upload limit (its proxy rejects bigger files): 540p at
-    the bitrate that lands ~90% of max_upload_mb. Kept as <preview>.small.mp4 and reused
-    while it's newer than the full preview."""
+    """A preview that fits Kitsu's upload limit (its proxy rejects bigger files), at the
+    size fit_settings picks; one more pass aimed lower by the overshoot when the encoder
+    doesn't hold the bitrate. Kept as <preview>.small.mp4 and reused while it's newer than
+    the full preview and fits, or was this code's best (<preview>.small.over beside it: not
+    encoded again until the full preview changes; push_previews skips it)."""
     dst = big.with_name(big.stem + ".small.mp4")
-    if dst.exists() and dst.stat().st_mtime >= big.stat().st_mtime:
+    over = dst.with_suffix(".over")
+    limit = rc["max_upload_mb"] * 1e6
+    if dst.exists() and dst.stat().st_mtime >= big.stat().st_mtime and (
+            dst.stat().st_size <= limit or over.exists()):
         return dst
-    audio_kbps = 64
-    video_kbps = max(150, int(rc["max_upload_mb"] * 8e3 * 0.9 / duration_s) - audio_kbps)
-    vf = "scale=-2:540" + (",format=nv12" if codec == "h264_qsv" else "")
+    height, fps, video_kbps, audio_kbps = fit_settings(rc["max_upload_mb"], duration_s,
+                                                       rc["preview_fps"])
+    vf = f"scale=-2:{height}" + (",format=nv12" if codec == "h264_qsv" else "")
     venc = "libx264" if codec in ("copy", "") else codec
     tmp = dst.with_name(dst.stem + ".tmp.mp4")
-    print(f"preview {big.stem}: {big.stat().st_size / 1e6:.0f} MB is over "
-          f"{rc['max_upload_mb']} MB; re-encoding at {video_kbps} kbps", flush=True)
-    subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
-                    "-vf", vf, "-r", str(rc["preview_fps"]), "-c:v", venc,
-                    "-b:v", f"{video_kbps}k", "-maxrate", f"{video_kbps * 2}k",
-                    "-bufsize", f"{video_kbps * 4}k", "-c:a", "aac", "-b:a", f"{audio_kbps}k",
-                    "-ac", "1", "-movflags", "+faststart", str(tmp)], check=True)
+    audio_bytes = audio_kbps * 1e3 / 8 * duration_s
+    why = f"{big.stat().st_size / 1e6:.0f} MB is over {rc['max_upload_mb']} MB"
+    for _ in range(2):
+        print(f"preview {big.stem}: {why}; re-encoding at {height}p {fps} fps "
+              f"{video_kbps} kbps", flush=True)
+        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
+                        "-vf", vf, "-r", str(fps), "-c:v", venc,
+                        "-b:v", f"{video_kbps}k", "-maxrate", f"{video_kbps * 2}k",
+                        "-bufsize", f"{video_kbps * 4}k", "-c:a", "aac", "-b:a", f"{audio_kbps}k",
+                        "-ac", "1", "-movflags", "+faststart", str(tmp)], check=True)
+        size = tmp.stat().st_size
+        if size <= limit:
+            break
+        # the encoder overshot: aim the video (all but the fixed audio) lower by as much
+        why = f"that came out at {size / 1e6:.0f} MB"
+        video_kbps = max(20, int(video_kbps * max(limit * 0.9 - audio_bytes, 1)
+                                 / max(size - audio_bytes, 1)))
     tmp.replace(dst)
+    if size > limit:
+        over.touch()
+    else:
+        over.unlink(missing_ok=True)
     return dst
 
 
@@ -553,11 +585,46 @@ def render_previews(stream_dir: Path, cfg: dict, todo: list[dict]) -> None:
               f"({time.time() - t:.0f}s)", flush=True)
 
 
+def upload_preview(gazu, task: dict, wfa: dict, text: str, path: Path, normalize: bool) -> dict:
+    """gazu's publish_preview in its three steps (the comment, the preview record, the file), so
+    an upload that fails leaves no empty revision in Kitsu: its comment is removed again. A file
+    read that fails is tried once more from a local copy: Windows can refuse requests' one big
+    read of a preview on the NAS share (OSError EINVAL, a laptop publish of kick-139915441)."""
+    import requests
+
+    comment = gazu.task.add_comment(task, wfa, text)
+    try:
+        preview = gazu.task.create_preview(task, comment)
+        try:
+            preview = gazu.task.upload_preview_file(preview, str(path), normalize_movie=normalize)
+        except OSError as e:
+            if isinstance(e, requests.RequestException):  # the network, not the read
+                raise
+            print(f"  reading {path.name} failed ({e}); uploading a local copy", flush=True)
+            # a temp file Windows still holds mustn't undo the upload that just went through
+            with tempfile.TemporaryDirectory(prefix="clippa-preview-",
+                                             ignore_cleanup_errors=True) as tmp:
+                local = Path(tmp) / path.name
+                shutil.copyfile(path, local)
+                preview = gazu.task.upload_preview_file(preview, str(local),
+                                                        normalize_movie=normalize)
+    except BaseException:
+        try:
+            gazu.task.remove_comment(comment)  # and the empty preview with it
+        except Exception as e:  # noqa: BLE001  # the upload's error is the one to raise
+            print(f"  could not remove the comment of the failed upload: {e}", flush=True)
+        raise
+    gazu.task.set_main_preview(preview)
+    return preview
+
+
 def push_previews(gazu, stream_dir: Path, rc: dict, proj: dict, ep: dict, types: dict,
-                  wfa: dict, todo: list[dict], force: bool) -> tuple[dict, list[str]]:
+                  wfa: dict, todo: list[dict], force: bool) -> tuple[dict, list[str], list[str]]:
     """Each item whose preview changed (or all, with force) as a new revision of its
     task, with status wfa (waiting for approval); its ids in review_state.json. Returns
-    (that state, the keys published)."""
+    (that state, the keys published, the keys skipped: a preview still over max_upload_mb).
+    A skipped item already in Kitsu keeps its old revision, so its task goes back to wfa
+    with a comment saying the new cut couldn't go up (once per preview)."""
     seqs: dict[str, dict] = {}
 
     def sequence(name: str, title: str) -> dict:
@@ -573,11 +640,32 @@ def push_previews(gazu, stream_dir: Path, rc: dict, proj: dict, ep: dict, types:
     state_path = stream_dir / "review_state.json"
     state = jsonstate.read(state_path, {})
     published: list[str] = []
+    skipped: list[str] = []
     for it in todo:
-        seq = sequence(it["seq"], it["seq_title"])
         mtime = it["preview"].stat().st_mtime
         if not force and state.get(it["key"], {}).get("preview_mtime") == mtime:
             continue
+        if (size := it["preview"].stat().st_size) > rc["max_upload_mb"] * 1e6:
+            # Kitsu's proxy would refuse it and end the stage for every item after this one
+            print(f"skipped {it['key']}: preview is {size / 1e6:.0f} MB, over [review] "
+                  f"max_upload_mb ({rc['max_upload_mb']})", flush=True)
+            skipped.append(it["key"])
+            old = state.get(it["key"])
+            if old and old.get("over_mtime") != mtime:
+                # Kitsu still shows the previous cut: an approval of it doesn't cover this one
+                from . import review_auto
+
+                gazu.task.add_comment({"id": old["task_id"]}, wfa,
+                                      f"A new cut is on disk ({it['file'].name}) but its "
+                                      f"{size / 1e6:.0f} MB preview is over the "
+                                      f"{rc['max_upload_mb']} MB upload limit: the video "
+                                      "here is the previous cut. Check the file before "
+                                      "approving.")
+                review_auto.republished(stream_dir, it["key"])
+                state[it["key"]] = {**old, "over_mtime": mtime}
+                state = jsonstate.merge(state_path, state, [it["key"]])
+            continue
+        seq = sequence(it["seq"], it["seq_title"])  # after the skips: no empty sequence (Grok)
         if it["kind"] in SEQUENCE_KINDS:
             entity = seq
         else:
@@ -586,10 +674,7 @@ def push_previews(gazu, stream_dir: Path, rc: dict, proj: dict, ep: dict, types:
                 description=it["title"], data={"file": it["file"].name})
         task = ensure_task(gazu, entity, types[it["type"]])
         t = time.time()
-        _, preview = gazu.task.publish_preview(task, wfa, comment=it["text"],
-                                               preview_file_path=str(it["preview"]),
-                                               normalize_movie=rc["normalize"],
-                                               set_thumbnail=True)
+        preview = upload_preview(gazu, task, wfa, it["text"], it["preview"], rc["normalize"])
         old = state.get(it["key"], {})  # keep what we last proposed, for the columns
         if old:   # a new revision goes back to wfa: an automatic approval no longer stands
             from . import review_auto
@@ -609,7 +694,7 @@ def push_previews(gazu, stream_dir: Path, rc: dict, proj: dict, ep: dict, types:
         state = jsonstate.merge(state_path, state, [it["key"]])  # a retake may write it too
         print(f"published {it['seq']}/{it.get('shot', '')} rev {preview.get('revision')} "
               f"({time.time() - t:.0f}s)", flush=True)
-    return state, published
+    return state, published, skipped
 
 
 def columns_to_fill(values: dict, before: dict, current: dict, tf: str | None,
@@ -713,13 +798,19 @@ def publish(stream_dir: Path, cfg: dict, force: bool = False,
     ep_name = episode_name(stream_dir, rc, cfg["schedule"]["timezone"])
     ep = gazu.shot.get_episode_by_name(proj, ep_name) or gazu.shot.new_episode(proj, ep_name)
     state_path = stream_dir / "review_state.json"
-    state, published = push_previews(gazu, stream_dir, rc, proj, ep, types, wfa, todo, force)
-    state = fill_columns(gazu, proj, todo, state, state_path)
+    state, published, skipped = push_previews(gazu, stream_dir, rc, proj, ep, types, wfa, todo,
+                                              force)
+    # a skipped item's columns and cover would land on the old revision, the previous cut's
+    shown = [it for it in todo if it["key"] not in skipped]
+    state = fill_columns(gazu, proj, shown, state, state_path)
     make_playlists(gazu, stream_dir, proj, ep, state)
-    print(f"{len(todo)} items in Kitsu: {rc['host'].removesuffix('/api')} "
-          f"({project_name(cfg)} / {ep_name})")
+    print(f"{len(shown)} items in Kitsu: {rc['host'].removesuffix('/api')} "
+          f"({project_name(cfg)} / {ep_name})"
+          + (f"; {len(skipped)} skipped, over max_upload_mb: {', '.join(skipped)}" if skipped else ""))
     if cfg["thumbnail"]["kitsu"]:
-        attach_thumbnails(stream_dir, cfg, gazu, keys=[it["key"] for it in todo] if only else None)
+        keys = ([it["key"] for it in shown] if only
+                else [k for k in state if k not in skipped] if skipped else None)
+        attach_thumbnails(stream_dir, cfg, gazu, keys=keys)
     return list(published)
 
 
