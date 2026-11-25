@@ -53,10 +53,11 @@ def test_fetch_picks_the_source(defaults, monkeypatch):
     monkeypatch.setattr(ytvod, "fetch", lambda *a: seen.append(("youtube", a[1])))
     monkeypatch.setattr(kick, "resolve", lambda *a: seen.append("kick") or (_ for _ in ()).throw(ClipperError("stop")))
     for url in ("https://www.twitch.tv/videos/1", "https://youtu.be/dQw4w9WgXcQ"):
-        cli.cmd_fetch(defaults, SimpleNamespace(url=url, no_video=True, no_chat=True))
+        cli.cmd_fetch(defaults, SimpleNamespace(url=url, no_video=True, no_chat=True, fixup=False))
     assert [s[0] for s in seen] == ["twitch", "youtube"]
     with pytest.raises(ClipperError):
-        cli.cmd_fetch(defaults, SimpleNamespace(url="https://kick.com/a/videos/b", no_video=True, no_chat=True))
+        cli.cmd_fetch(defaults, SimpleNamespace(url="https://kick.com/a/videos/b", no_video=True,
+                                                no_chat=True, fixup=False))
 
 
 def test_twitch_ytdlp_gets_a_private_netscape_copy(tmp_path, monkeypatch):

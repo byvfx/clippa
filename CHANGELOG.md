@@ -29,6 +29,38 @@ Developing#releases.
 - 11-25: a Kitsu upload that fails no longer leaves an empty revision on the item (its comment is
   removed again), and a preview Windows can't read off the NAS share in one go (`OSError: [Errno
   22] Invalid argument`, a review run from the laptop) is uploaded from a local copy instead.
+- 11-25: `clippa transcribe` refuses a source whose timestamps jump backwards (#440): when
+  `audio.wav` runs more than 1 s past the container it names the stream and both lengths, and
+  prints `clippa fetch <url> --fixup` for a Kick VOD. `--fixup` remuxes an existing or just
+  downloaded Kick source with fresh timestamps, checks the result no longer steps back before it
+  replaces the source, and keeps the jump as `timeline_overlap_s`; a source already in order is
+  left byte for byte as it was, and a source it rewrites has its stale `audio.wav` dropped so the
+  next transcribe decodes the repaired file (as it does any `audio.wav` older than its source by
+  more than the 2 s a FAT/SMB share rounds timestamps by; a source stamped in the future is no
+  exemption). A decode that outlives a replacement of its source installs nothing (the source's own
+  size and time are read either side of it; a repair can leave the two lengths agreeing, so the
+  timeline check can't see the difference), and a download marks any `audio.wav` beside it stale,
+  since yt-dlp stamps the VOD's `Last-Modified` and the mtime rule would otherwise serve the
+  previous file's audio. With `--no-video` it repairs the `source.ts` already
+  there; a source that is still downloading (yt-dlp's `source.ts.ytdl` beside it) is refused in one
+  line by `--fixup --no-video`, and by a repair with no metadata, since those can't download: a
+  plain fetch resumes from the note, and a `--fixup` that runs the video resumes first and then
+  repairs the whole file. A source whose audio is *shorter* than its container only warns. `clippa archive transcribe`
+  checks while the item's source is still on disk and keeps a refused download as
+  `source.refused.ts` (or, where the share refuses that rename, with a `.refused` marker beside it),
+  so the next run reuses it rather than downloading it again or dropping it; the marker is written
+  only once the rename has failed, and counts only while `source.ts` is there (one left with no
+  source is dropped, and the item downloads again), and where neither can be written the line says
+  the download is still `source.ts` and a later run may replace it (as does a drop that fails after
+  the download, which marks the finished one so the next run reuses it); a re-refused item names
+  the copy it is kept under;
+  a link or junction at `audio.wav`, `source.refused.ts` or `.refused` is removed (the link alone,
+  never its target) so it can't block a run, and a `source.mp4` or `source.refused.ts` that is a
+  link or empty is not a copy kept here: dropped before the audio is read, after any download, so
+  one planted while yt-dlp runs can't stick the item.
+  With `--fixup` and Kick's api down, a stream already on disk is repaired from its folder, and a
+  chat that can't be fetched is said in one line rather than stopping the repair.
+
 - 11-24: a Modal transcription whose FLAC would be over `[transcribe] modal_opus_over_mb` (700 MB,
   about a 10 h stream) uploads opus instead. An 18 h stream's 1.3 GB upload ran the NAS out of
   memory (#422). A stage stopped by a signal now says so in run.json and the worker log
