@@ -23,6 +23,7 @@ set -euo pipefail
 HOST=${CLAUDE_SSH_HOST:-${HUB_SSH_HOST:-${RECORD_SSH_HOST:-nas}}}
 DIR=${CLAUDE_COMPOSE:-clippa-claude}
 HERE=$(cd "$(dirname "$0")" && pwd)
+ROOT=$(cd "$HERE/../.." && pwd)
 ENV_LOCAL=$HERE/env.local
 FORCE=
 while [ $# -gt 0 ]; do
@@ -35,7 +36,7 @@ while [ $# -gt 0 ]; do
     shift
 done
 source "$HERE/../mainguard.sh"
-require_main "$HERE/../.." deploy/claude/deploy.sh "$FORCE"
+require_main "$ROOT" deploy/claude/deploy.sh "$FORCE"
 
 if [ "$ENV_LOCAL" != "$HERE/env.local" ] && [ ! -f "$ENV_LOCAL" ]; then
     echo "no $ENV_LOCAL (--env)" >&2
@@ -71,9 +72,9 @@ fill() {  # fill KEY's empty line in .env (or add one) with a value
     echo "$1=$2" >> "$TMP/env.new"
     mv "$TMP/env.new" "$TMP/.env"
 }
-[ -n "$(setting CLIPPA_REPO)$(setting CLIPPER_REPO)" ] || fill CLIPPA_REPO "$(git remote get-url origin | sed -E 's#^git@github.com:#https://github.com/#')"
-[ -n "$(setting GIT_USER_NAME)" ] || fill GIT_USER_NAME "$(git config user.name || true)"
-[ -n "$(setting GIT_USER_EMAIL)" ] || fill GIT_USER_EMAIL "$(git config user.email || true)"
+[ -n "$(setting CLIPPA_REPO)$(setting CLIPPER_REPO)" ] || fill CLIPPA_REPO "$(git -C "$ROOT" remote get-url origin | sed -E 's#^git@github.com:#https://github.com/#')"
+[ -n "$(setting GIT_USER_NAME)" ] || fill GIT_USER_NAME "$(git -C "$ROOT" config user.name || true)"
+[ -n "$(setting GIT_USER_EMAIL)" ] || fill GIT_USER_EMAIL "$(git -C "$ROOT" config user.email || true)"
 # Memory (#435): the laptop's Hindsight server, key and bank, wherever env.local leaves one empty,
 # so both Claudes share one bank. HINDSIGHT_API_URL=off turns it off.
 HSCFG=${HINDSIGHT_CONFIG:-$HOME/.hindsight/coding-agent.json}
@@ -110,7 +111,7 @@ if [ -n "$HS_URL" ] && [ "$HS_URL" != off ]; then
     fi
     # The plugin's own default, coding-agent::<the main checkout's folder>, unless it names a bank
     BANK=$(hs_conf bankId)
-    [ -n "$BANK" ] || BANK="coding-agent::$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
+    [ -n "$BANK" ] || BANK="coding-agent::$(basename "$(dirname "$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir)")")"
     [ -n "$(setting HINDSIGHT_BANK_ID)" ] || fill HINDSIGHT_BANK_ID "$BANK"
 fi
 # The Anthropic key goes in as a file (a compose secret), never in the environment: Remote

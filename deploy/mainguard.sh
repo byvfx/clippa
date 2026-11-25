@@ -33,8 +33,9 @@ require_main() {
         echo "this checkout is $branch at $head, $behind commit(s) behind origin/main ($main):" \
              "a deploy from it ships older files than main's" >&2
         if [ -z "$force" ]; then
-            echo "deploy from main (git switch main && git pull), or from a worktree of origin/main" \
-                 "with --env pointing at this checkout's env.local; to deploy this anyway: bash $script --force" >&2
+            echo "deploy from main: git switch main && git pull, or in a worktree of main" \
+                 "git checkout --detach origin/main (with --env at your main checkout's env.local);" \
+                 "to deploy this anyway: bash $script --force" >&2
             exit 1
         fi
         echo "--force: deploying it anyway" >&2
