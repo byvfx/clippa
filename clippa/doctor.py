@@ -748,7 +748,27 @@ def check_online(cfg: dict, role: str) -> None:
         online_modal(cfg)
         online_nas_cut(cfg)
         online_preshow_feeds(cfg)  # the worker grabs pre-shows
+    if role == "claude":
+        online_hindsight()
     online_kick(cfg)
+
+
+def online_hindsight() -> None:
+    """The claude container's memory (#435): its `hindsight-check` script, which knows the
+    server's endpoints. Nothing to check where memory is off or the script isn't there."""
+    script = shutil.which("hindsight-check")
+    if not os.environ.get("HINDSIGHT_API_URL") or not script:
+        return
+    try:
+        r = run([script], timeout=30)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        fail("hindsight", f"hindsight-check didn't run: {e}", wiki.page("Claude-on-the-NAS", "memory"))
+        return
+    if r.returncode == 0:
+        ok("hindsight", "the memory bank answers and takes the key")
+    else:
+        fail("hindsight", (r.stdout or r.stderr).strip() or f"hindsight-check exited {r.returncode}",
+             wiki.page("Claude-on-the-NAS", "memory"))
 
 
 def online_elevenlabs(cfg: dict) -> None:

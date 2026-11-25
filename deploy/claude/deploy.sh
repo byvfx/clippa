@@ -40,7 +40,7 @@ CDIR=$(setting CLAUDE_DIR); CDIR=${CDIR:-/volume1/docker/clipper-claude}
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/src"
-cp "$HERE/Dockerfile" "$HERE/entrypoint.sh" "$HERE/checkup.sh" "$HERE/checkup-git.sh" "$HERE/checkup-pr.sh" "$HERE/checkup.md" \
+cp "$HERE/Dockerfile" "$HERE/entrypoint.sh" "$HERE/hindsight-check.sh" "$HERE/checkup.sh" "$HERE/checkup-git.sh" "$HERE/checkup-pr.sh" "$HERE/checkup.md" \
     "$HERE/audit.sh" "$HERE/audit-deep.md" "$TMP/src/"
 cp "$HERE/compose.yaml" "$TMP/"
 cp "$ENV_LOCAL" "$TMP/.env"
@@ -54,6 +54,45 @@ fill() {  # fill KEY's empty line in .env (or add one) with a value
 [ -n "$(setting CLIPPA_REPO)$(setting CLIPPER_REPO)" ] || fill CLIPPA_REPO "$(git remote get-url origin | sed -E 's#^git@github.com:#https://github.com/#')"
 [ -n "$(setting GIT_USER_NAME)" ] || fill GIT_USER_NAME "$(git config user.name || true)"
 [ -n "$(setting GIT_USER_EMAIL)" ] || fill GIT_USER_EMAIL "$(git config user.email || true)"
+# Memory (#435): the laptop's Hindsight server, key and bank, wherever env.local leaves one empty,
+# so both Claudes share one bank. HINDSIGHT_API_URL=off turns it off.
+HSCFG=${HINDSIGHT_CONFIG:-$HOME/.hindsight/coding-agent.json}
+hs_conf() {  # a string field of the laptop's Hindsight config (one JSON file), or nothing
+    [ -f "$HSCFG" ] || return 0
+    sed -n "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" "$HSCFG" | head -1
+}
+HS_URL=$(setting HINDSIGHT_API_URL)
+if [ "$HS_URL" = off ]; then
+    fill HINDSIGHT_API_URL ""
+elif [ -z "$HS_URL" ]; then
+    # The laptop's server, and its mode with it.
+    HS_URL=$(hs_conf apiUrl)
+    case "$(hs_conf serverMode):$HS_URL" in
+        daemon:*) HS_URL=""; echo "note: the laptop's Hindsight is a local daemon the NAS can't reach: memory stays off there" >&2 ;;
+        *://localhost*|*://127.*|*://\[::1\]*)
+            HS_URL=""; echo "note: the laptop's Hindsight is on the laptop itself ($(hs_conf apiUrl)): set HINDSIGHT_API_URL in $ENV_LOCAL to an address the NAS can reach, and HINDSIGHT_API_TOKEN if it takes a key" >&2 ;;
+    esac
+    fill HINDSIGHT_API_URL "$HS_URL"
+    if [ -n "$HS_URL" ]; then
+        [ -n "$(setting HINDSIGHT_SERVER_MODE)" ] || fill HINDSIGHT_SERVER_MODE "$(hs_conf serverMode | sed 's/^$/self-hosted/')"
+    fi
+fi
+if [ -n "$HS_URL" ] && [ "$HS_URL" != off ]; then
+    [ -n "$(setting HINDSIGHT_SERVER_MODE)" ] || grep -q '^HINDSIGHT_SERVER_MODE=.' "$TMP/.env" || fill HINDSIGHT_SERVER_MODE self-hosted
+    # The laptop's key goes only with the laptop's server; any other server's comes from env.local.
+    if [ -z "$(setting HINDSIGHT_API_TOKEN)" ]; then
+        LAPTOP_URL=$(hs_conf apiUrl)
+        if [ "${HS_URL%/}" = "${LAPTOP_URL%/}" ]; then
+            fill HINDSIGHT_API_TOKEN "$(hs_conf apiToken)"
+        elif [ -n "$(hs_conf apiToken)" ]; then
+            echo "note: HINDSIGHT_API_TOKEN is empty in $ENV_LOCAL and $HS_URL isn't the laptop's server ($LAPTOP_URL): set it there if that server takes a key" >&2
+        fi
+    fi
+    # The plugin's own default, coding-agent::<the main checkout's folder>, unless it names a bank
+    BANK=$(hs_conf bankId)
+    [ -n "$BANK" ] || BANK="coding-agent::$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
+    [ -n "$(setting HINDSIGHT_BANK_ID)" ] || fill HINDSIGHT_BANK_ID "$BANK"
+fi
 # The Anthropic key goes in as a file (a compose secret), never in the environment: Remote
 # Control refuses to start where ANTHROPIC_API_KEY is set.
 KEY=$(setting ANTHROPIC_API_KEY)

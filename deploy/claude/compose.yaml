@@ -29,6 +29,14 @@ services:
       CLIPPER_CUT_BACKEND: local
       CLIPPER_YOUTUBE_COOKIES_FROM_BROWSER: ""
       CLIPPER_PATHS_ANTHROPIC_KEY: /run/secrets/anthropic_key
+      # Memory (#435): the laptop's Hindsight bank, through the same plugin (entrypoint.sh).
+      # HINDSIGHT_SERVER_MODE, _API_URL, _API_TOKEN and _BANK_ID come from .env. The laptop seeds
+      # the bank from git and surveys the code; here the clone is called /app, so doing either
+      # would add a second copy under another name. This one reads and writes back its sessions.
+      HINDSIGHT_GIT_INGEST: none
+      HINDSIGHT_AUTO_SEED: "false"
+      HINDSIGHT_CODEBASE_SURVEY: "false"
+      HINDSIGHT_AUTO_UPDATE: "false"   # the image pins the plugin's version
     secrets:
       - anthropic_key
     devices:

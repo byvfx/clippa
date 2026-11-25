@@ -47,3 +47,23 @@ def test_control_checks_the_hub_and_war_room_not_discord_or_modal(defaults, monk
     called.clear()
     doctor.check_online(cfg, "all")
     assert "online_discord" in called and "online_modal" in called and "online_hub" not in called
+
+
+def test_hindsight_is_checked_only_where_memory_is_on(monkeypatch):
+    # The claude container's memory (#435): doctor runs its hindsight-check script and passes
+    # on the script's one line as the failure.
+    import subprocess
+
+    from clippa import doctor as d
+
+    monkeypatch.setattr(d.shutil, "which", lambda name: "/usr/local/bin/hindsight-check")
+    monkeypatch.delenv("HINDSIGHT_API_URL", raising=False)
+    assert d.collect(d.online_hindsight) == []
+    monkeypatch.setenv("HINDSIGHT_API_URL", "http://127.0.0.1:8888")
+    answers = iter([subprocess.CompletedProcess([], 0, "", ""),
+                    subprocess.CompletedProcess([], 1, "Hindsight refused the key: set it\n", "")])
+    monkeypatch.setattr(d, "run", lambda cmd, timeout=30: next(answers))
+    (status, area, _, _), = d.collect(d.online_hindsight)
+    assert (status, area) == ("OK", "hindsight")
+    (status, area, what, hint), = d.collect(d.online_hindsight)
+    assert (status, what) == ("FAIL", "Hindsight refused the key: set it") and hint.endswith("#memory")
