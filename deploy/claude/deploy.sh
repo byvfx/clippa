@@ -65,21 +65,29 @@ HS_URL=$(setting HINDSIGHT_API_URL)
 if [ "$HS_URL" = off ]; then
     fill HINDSIGHT_API_URL ""
 elif [ -z "$HS_URL" ]; then
-    # The laptop's server, and its key and mode with it (only then: the key is for that server).
+    # The laptop's server, and its mode with it.
     HS_URL=$(hs_conf apiUrl)
     case "$(hs_conf serverMode):$HS_URL" in
         daemon:*) HS_URL=""; echo "note: the laptop's Hindsight is a local daemon the NAS can't reach: memory stays off there" >&2 ;;
         *://localhost*|*://127.*|*://\[::1\]*)
-            HS_URL=""; echo "note: the laptop's Hindsight is on the laptop itself ($(hs_conf apiUrl)): set HINDSIGHT_API_URL in $ENV_LOCAL to an address the NAS can reach" >&2 ;;
+            HS_URL=""; echo "note: the laptop's Hindsight is on the laptop itself ($(hs_conf apiUrl)): set HINDSIGHT_API_URL in $ENV_LOCAL to an address the NAS can reach, and HINDSIGHT_API_TOKEN if it takes a key" >&2 ;;
     esac
     fill HINDSIGHT_API_URL "$HS_URL"
     if [ -n "$HS_URL" ]; then
         [ -n "$(setting HINDSIGHT_SERVER_MODE)" ] || fill HINDSIGHT_SERVER_MODE "$(hs_conf serverMode | sed 's/^$/self-hosted/')"
-        [ -n "$(setting HINDSIGHT_API_TOKEN)" ] || fill HINDSIGHT_API_TOKEN "$(hs_conf apiToken)"
     fi
 fi
 if [ -n "$HS_URL" ] && [ "$HS_URL" != off ]; then
     [ -n "$(setting HINDSIGHT_SERVER_MODE)" ] || grep -q '^HINDSIGHT_SERVER_MODE=.' "$TMP/.env" || fill HINDSIGHT_SERVER_MODE self-hosted
+    # The laptop's key goes only with the laptop's server; any other server's comes from env.local.
+    if [ -z "$(setting HINDSIGHT_API_TOKEN)" ]; then
+        LAPTOP_URL=$(hs_conf apiUrl)
+        if [ "${HS_URL%/}" = "${LAPTOP_URL%/}" ]; then
+            fill HINDSIGHT_API_TOKEN "$(hs_conf apiToken)"
+        elif [ -n "$(hs_conf apiToken)" ]; then
+            echo "note: HINDSIGHT_API_TOKEN is empty in $ENV_LOCAL and $HS_URL isn't the laptop's server ($LAPTOP_URL): set it there if that server takes a key" >&2
+        fi
+    fi
     # The plugin's own default, coding-agent::<the main checkout's folder>, unless it names a bank
     BANK=$(hs_conf bankId)
     [ -n "$BANK" ] || BANK="coding-agent::$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"

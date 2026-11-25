@@ -88,7 +88,7 @@ they are empty:
 | `env.local` | What | Empty means |
 | --- | --- | --- |
 | `HINDSIGHT_API_URL` | the Hindsight server | the laptop's (`off` turns memory off) |
-| `HINDSIGHT_API_TOKEN` | its key | the laptop's `apiToken` |
+| `HINDSIGHT_API_TOKEN` | its key | the laptop's `apiToken`, when the URL is the laptop's server |
 | `HINDSIGHT_SERVER_MODE` | `self-hosted` or `cloud` | the laptop's |
 | `HINDSIGHT_BANK_ID` | the bank | `coding-agent::<the checkout's folder>`, the plugin's default on the laptop |
 

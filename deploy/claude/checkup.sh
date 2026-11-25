@@ -29,10 +29,6 @@ dm() {  # the DM: stdin
     if [ -n "$DRY" ]; then echo "--- DM (dry run, not sent):"; cat; else clippa alert send --kind checkup -; fi
 }
 
-# Memory (#435): a stopped Hindsight or a lost key gets a DM of its own, whatever the checkup finds.
-hs_note=""
-hs=$(hindsight-check) || { echo "Checkup $day: $hs" | dm; hs_note=" but for Hindsight (above)"; }
-
 if [ ! -d "$WT/.git" ] && [ ! -f "$WT/.git" ]; then
     git -C /app worktree prune
     git -C /app worktree add -q --detach "$WT" "origin/$REF" || { echo "can't make $WT" >&2; exit 1; }
@@ -48,6 +44,11 @@ printf '#!/bin/sh\nexec python -m clippa.cli "$@"\n' > "$HOME/.checkup-bin/clipp
 chmod 755 "$HOME/.checkup-bin/clippa.$$" && mv -f "$HOME/.checkup-bin/clippa.$$" "$HOME/.checkup-bin/clippa"
 export PATH="$HOME/.checkup-bin:$PATH"
 cd "$WT"
+
+# Memory (#435): a stopped Hindsight or a lost key gets a DM of its own, whatever the checkup
+# finds. Here, once dm's `clippa` is the worktree's.
+hs_note=""
+hs=$(hindsight-check) || { echo "Checkup $day: $hs" | dm; hs_note=" but for Hindsight (above)"; }
 
 if ! clippa checkup -h >/dev/null 2>&1; then
     echo "Checkup $day: origin/$REF has no \`clippa checkup\` yet (#185 not merged?), so nothing was checked." | dm
