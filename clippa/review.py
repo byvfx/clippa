@@ -601,7 +601,9 @@ def upload_preview(gazu, task: dict, wfa: dict, text: str, path: Path, normalize
             if isinstance(e, requests.RequestException):  # the network, not the read
                 raise
             print(f"  reading {path.name} failed ({e}); uploading a local copy", flush=True)
-            with tempfile.TemporaryDirectory(prefix="clippa-preview-") as tmp:
+            # a temp file Windows still holds mustn't undo the upload that just went through
+            with tempfile.TemporaryDirectory(prefix="clippa-preview-",
+                                             ignore_cleanup_errors=True) as tmp:
                 local = Path(tmp) / path.name
                 shutil.copyfile(path, local)
                 preview = gazu.task.upload_preview_file(preview, str(local),
@@ -640,7 +642,6 @@ def push_previews(gazu, stream_dir: Path, rc: dict, proj: dict, ep: dict, types:
     published: list[str] = []
     skipped: list[str] = []
     for it in todo:
-        seq = sequence(it["seq"], it["seq_title"])
         mtime = it["preview"].stat().st_mtime
         if not force and state.get(it["key"], {}).get("preview_mtime") == mtime:
             continue
@@ -664,6 +665,7 @@ def push_previews(gazu, stream_dir: Path, rc: dict, proj: dict, ep: dict, types:
                 state[it["key"]] = {**old, "over_mtime": mtime}
                 state = jsonstate.merge(state_path, state, [it["key"]])
             continue
+        seq = sequence(it["seq"], it["seq_title"])  # after the skips: no empty sequence (Grok)
         if it["kind"] in SEQUENCE_KINDS:
             entity = seq
         else:

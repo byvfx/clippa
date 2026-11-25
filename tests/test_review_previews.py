@@ -68,12 +68,13 @@ def test_render_to_size_keeps_its_best_when_both_passes_miss(tmp_path, monkeypat
 
 def test_push_previews_skips_one_too_big_and_publishes_the_rest(tmp_path, capsys,
                                                                  monkeypatch):
-    published = []
+    published, lookups = [], []
     monkeypatch.setattr(review, "upload_preview",
                         lambda gazu, task, wfa, text, path, normalize:
                         published.append(path) or {"id": "p1", "revision": 1})
     gazu = SimpleNamespace(
-        shot=SimpleNamespace(get_sequence_by_name=lambda *a, **k: {"id": "seq"}),
+        shot=SimpleNamespace(get_sequence_by_name=lambda proj, name, **k: lookups.append(name)
+                             or {"id": "seq"}),
         task=SimpleNamespace(get_task=lambda *a: None))
     monkeypatch.setattr(review, "ensure_task", lambda gazu, entity, ttype: {"id": "t1"})
     items = []
@@ -89,6 +90,7 @@ def test_push_previews_skips_one_too_big_and_publishes_the_rest(tmp_path, capsys
                                             {"Compilation": {"id": "tt"}}, {"id": "wfa"},
                                             items, force=False)
     assert keys == ["comp-h3"] and skipped == ["comp-gta-6"] and len(published) == 1
+    assert lookups == ["comp-h3"]   # no empty sequence for the skipped one (Grok)
     assert "skipped comp-gta-6: preview is 2 MB" in capsys.readouterr().out
 
 
@@ -96,9 +98,10 @@ def test_a_skipped_recut_sends_its_old_revision_back_for_review_once(tmp_path, m
     """Grok on #436: Kitsu keeps the previous cut, so its approval mustn't cover the new one."""
     from clippa import jsonstate, review_auto
 
-    comments, again = [], []
+    comments, again, lookups = [], [], []
     gazu = SimpleNamespace(
-        shot=SimpleNamespace(get_sequence_by_name=lambda *a, **k: {"id": "seq"}),
+        shot=SimpleNamespace(get_sequence_by_name=lambda proj, name, **k: lookups.append(name)
+                             or {"id": "seq"}),
         task=SimpleNamespace(add_comment=lambda task, status, text: comments.append(
             (task["id"], status["id"], text))))
     monkeypatch.setattr(review_auto, "republished", lambda sdir, key: again.append(key))
@@ -115,7 +118,7 @@ def test_a_skipped_recut_sends_its_old_revision_back_for_review_once(tmp_path, m
         state, keys, skipped = review.push_previews(gazu, tmp_path, rc, {"id": "pr"},
                                                     {"id": "ep"}, {}, {"id": "wfa"}, [it],
                                                     force=False)
-    assert keys == [] and skipped == ["comp-dsp"]
+    assert keys == [] and skipped == ["comp-dsp"] and lookups == []
     assert len(comments) == 1 and comments[0][:2] == ("t9", "wfa")
     assert "previous cut" in comments[0][2] and again == ["comp-dsp"]
     saved = jsonstate.load(tmp_path / "review_state.json")["comp-dsp"]
