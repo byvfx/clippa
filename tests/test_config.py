@@ -353,6 +353,9 @@ def test_for_length_scales_top_n_and_max_picks_for_a_long_stream_only(defaults):
     assert config.for_length(defaults, 5.5) is defaults
     assert config.for_length(defaults, 8.0) is defaults
     assert config.for_length(defaults, 28801 / 3600) is defaults   # 8 h 1 s: nothing rounds up, no note
+    barely = config.for_length(defaults, 8.2)   # one more window, the same cap: no note (Grok, #432)
+    assert (barely["signals"]["top_n"], barely["scoring"]["max_picks"]) == (31, 14)
+    assert "_length" not in barely
     defaults["schedule"]["budget_hours"] = 0     # a doctor warning, not a crash in signals or score
     assert config.for_length(defaults, 18.3) is defaults
     defaults["schedule"]["budget_hours"] = 8.0

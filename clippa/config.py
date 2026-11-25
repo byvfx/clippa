@@ -546,9 +546,13 @@ def for_length(cfg: dict, hours: float) -> dict:
     top_n, picks = scaled(cfg["signals"]["top_n"], scale), scaled(cfg["scoring"]["max_picks"], scale)
     if (top_n, picks) == (cfg["signals"]["top_n"], cfg["scoring"]["max_picks"]):
         return cfg  # just over budget_hours: nothing rounds up, so no note for Pass B either
-    return {**cfg, "_length": {"hours": round(hours, 2), "scale": round(scale, 2)},
-            "signals": {**cfg["signals"], "top_n": top_n},
-            "scoring": {**cfg["scoring"], "max_picks": picks}}
+    out = {**cfg, "signals": {**cfg["signals"], "top_n": top_n},
+           "scoring": {**cfg["scoring"], "max_picks": picks}}
+    if picks > cfg["scoring"]["max_picks"]:
+        # Pass B hears its length only when its cap rose: with top_n alone up (8.3 h), a note
+        # saying "1.0x a usual stream ... not one" would contradict itself (Grok on #432)
+        out["_length"] = {"hours": round(hours, 2), "scale": round(scale, 2)}
+    return out
 
 
 def stream_hours(sdir: Path) -> float:
