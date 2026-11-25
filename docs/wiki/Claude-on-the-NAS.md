@@ -4,11 +4,34 @@ from anywhere while the laptop sleeps. It runs `claude remote-control` in a cont
 own clone of the repo. The NAS dials out to Anthropic: no port forwarding, no tailnet, nothing
 exposed.
 
+## What it's for
+
+Ask it when something on the NAS looks wrong or you have a question about it, especially from
+the phone: it sees the same streams, config and logs that serve, the bot and the worker use.
+Its job is to find out what's wrong and write it up; the agents fix it.
+
+- **Find the cause** of something broken, in the logs and state files.
+- **Answer "is it working?"**: where a stream is, whether a retry went through, whether Modal
+  is still running.
+- **Test an idea cheaply**: reproduce a bug, measure something. It gives the cost first and
+  waits for your yes.
+- **Write tickets**: what it finds becomes a GitHub issue an agent can pick up without the
+  chat (evidence, cause, a checklist and the scope).
+- **Band-aids you ask for**: a one-stream setting (say a stream's own `config.toml`), so the
+  pipeline keeps moving until the real fix lands.
+- **Questions about how Clippa works**: config, the pipeline, why something was picked or
+  skipped.
+
+What it's not for: code fixes (those go to other agents through the tickets), deploys and
+restarts (it can't reach Docker or ssh, and the recorder is off limits), uploading or
+publishing unless you ask, and heavy work while a show is live.
+
 ## What it can do
 
 - Run any stage on any stream, read logs and state in the NAS folder, edit `clipper.toml` (it
   backs it up first, as on the laptop).
-- Change code in its clone (`/app`) on a branch, run the tests, push and open a PR.
+- Work on a branch in its clone (`/app`) and commit notes. It doesn't write code fixes, but it
+  writes notes and ticket write-ups, and pushes or opens a PR for those only when asked.
 
 What it can't: restart or deploy containers (no Docker socket, no ssh). serve, the bot and the
 worker keep running the code of the last hub deploy; a merged change reaches them when you run

@@ -239,3 +239,6 @@ already: the build skips a file whose name starts with `_`.
   headings or the sidebar, and no colours of your own in the Mermaid diagrams (GitHub's theme
   handles light and dark). The tabloid style belongs to the covers and the weekly, not to these
   pages.
+- A bug worth remembering (its symptom misleads, or new hardware, a recorder or an ffmpeg brings it
+  back) gets its entry on [Bugs to remember](Bugs-to-remember) in the same PR as the fix; the
+  `bug-to-remember` label marks candidates.

@@ -19,6 +19,7 @@ TITLES: dict[str, str] = {
     "B-roll": "B-roll",
     "Backups": "Backups",
     "Blind-items": "Blind items",
+    "Bugs-to-remember": "Bugs to remember",
     "Cast-library": "Cast library",
     "Character-pieces": "Character pieces",
     "Checkup": "Checkup",

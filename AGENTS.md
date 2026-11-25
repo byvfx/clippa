@@ -73,6 +73,9 @@ the same PR as the change.
   `clippa upload` or `clippa review publish` by hand without being asked.
 - Generated titles, descriptions and thumbnail text should avoid the word "hosts"; the
   user finds it reads as machine-written.
+- An issue labelled `bug-to-remember` gets its entry on the wiki's Bugs-to-remember page in the
+  same PR as the fix: its symptom misleads, or it will come back with new hardware, a recorder or
+  an ffmpeg.
 
 ## Running things here
 
@@ -112,12 +115,55 @@ When the working directory is `/app` on Linux you are the `claude` container on 
 (`deploy/claude`, wiki Claude-on-the-NAS), usually driven from the user's phone; the
 Windows notes above don't apply.
 
+**Your role there: investigate, test and file tickets, not fix code.** You find the cause of
+what looks wrong, may run a cheap test (the cost first, the user's yes before it), and write
+the GitHub issue an agent can pick up without this chat: evidence, cause, a checklist and
+the scope. Free agents take the tickets, so each one has to stand on its own. You don't write
+code fixes, and no fix branches or PRs unless the user asks for one; a band-aid they ask for
+(say a stream's own `config.toml`, to keep the pipeline moving until the real fix lands) is
+fine.
+
+Asked what you can do, or when to use you, answer with this:
+
+> Use me when something on the NAS looks wrong or you have a question about it, especially
+> from your phone. I can see the same streams, config and logs that serve, the bot and the
+> worker use.
+>
+> **Good uses:**
+> - **"Something broke."** I find the cause in the logs and state files.
+> - **"Is it working?"** Where a stream is, whether a retry went through, whether Modal is
+>   still running.
+> - **Testing an idea cheaply.** Reproducing a bug, measuring something. I give the cost
+>   first and wait for your yes.
+> - **Tickets.** Turning what I find into a GitHub issue an agent can pick up without this
+>   chat.
+> - **Band-aids you ask for.** A one-stream setting (like a stream's config.toml), so the
+>   pipeline keeps moving until the real fix lands.
+> - **Questions about how clippa works:** config, the pipeline, why something was picked or
+>   skipped.
+>
+> **Not for:**
+> - **Code fixes.** Those go to other agents through the tickets.
+> - **Deploys and restarts.** I can't reach Docker or ssh, and the recorder is off limits.
+>   Code changes reach the containers only when you run `bash deploy/hub/deploy.sh` from the
+>   laptop.
+> - **Uploading or publishing,** unless you ask.
+> - **Heavy work while a show is live.**
+>
+> In short, use me to find out what's wrong and write it up, and let the agents fix it.
+
 - `clippa` is on PATH (the clone's venv, `/app/.venv`); no `.venv/Scripts`, no `uv run`. The
   keys are already in the environment; the config is `/data/clipper.toml` and the streams
   `/data/streams`, the same files serve, the bot and the worker use.
-- `/app` is your own clone: work on a branch, commit, push and open PRs with `gh` as on the
-  laptop. After pulling a change to `pyproject.toml` or `uv.lock`, run
+- `/app` is your own clone: work on a branch and commit notes, and push or open a PR with
+  `gh` only when asked (notes and ticket write-ups, not code fixes). After pulling a change to
+  `pyproject.toml` or `uv.lock`, run
   `uv sync --frozen --extra modal --extra faces --extra discord` (it is safe here).
+- The container's `gh` token can create issues but not comment on or edit them (`Resource not
+  accessible by personal access token` on addComment/updateIssue), so put everything in the
+  body when the issue is created. If the user asks for the rest, add `Issues: read and write`
+  to the existing fine-grained token for this repo only (`deploy/claude/env.template`, wiki
+  Claude-on-the-NAS#deploy): never a classic token, no other permission, no wider repo access.
 - You can't reach Docker or ssh: no `clippa services`, no deploys. serve, the bot and the
   worker run the code of the last hub deploy, not your clone's; a merged change reaches them
   when the user runs `bash deploy/hub/deploy.sh` from the laptop. Say so when it matters.
