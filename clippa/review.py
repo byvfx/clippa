@@ -373,26 +373,56 @@ def render_preview(src: Path, dst: Path, rc: dict, codec: str) -> Path:
     return dst
 
 
+def fit_settings(max_mb: float, duration_s: float, fps: int) -> tuple[int, int, int, int]:
+    """(height, fps, video kbps, audio kbps) that land a preview of duration_s at ~90% of
+    max_mb. A long one (a 5 h compilation) drops to 360p or 240p and fewer frames rather than
+    asking for a bitrate the encoder won't go down to (QSV overshot 150 kbps at 540p)."""
+    total = max_mb * 8e3 * 0.9 / max(duration_s, 1)
+    audio = 64 if total >= 600 else 32
+    video = max(40, int(total) - audio)
+    height = 540 if video >= 700 else 360 if video >= 250 else 240
+    return height, (fps if video >= 250 else min(fps, 15)), video, audio
+
+
 def render_to_size(src: Path, big: Path, duration_s: float, rc: dict, codec: str) -> Path:
-    """A preview that fits Kitsu's upload limit (its proxy rejects bigger files): 540p at
-    the bitrate that lands ~90% of max_upload_mb. Kept as <preview>.small.mp4 and reused
-    while it's newer than the full preview."""
+    """A preview that fits Kitsu's upload limit (its proxy rejects bigger files), at the
+    size fit_settings picks; one more pass aimed lower by the overshoot when the encoder
+    doesn't hold the bitrate. Kept as <preview>.small.mp4 and reused while it's newer than
+    the full preview and fits, or was this code's best (<preview>.small.over beside it: not
+    encoded again until the full preview changes; push_previews skips it)."""
     dst = big.with_name(big.stem + ".small.mp4")
-    if dst.exists() and dst.stat().st_mtime >= big.stat().st_mtime:
+    over = dst.with_suffix(".over")
+    limit = rc["max_upload_mb"] * 1e6
+    if dst.exists() and dst.stat().st_mtime >= big.stat().st_mtime and (
+            dst.stat().st_size <= limit or over.exists()):
         return dst
-    audio_kbps = 64
-    video_kbps = max(150, int(rc["max_upload_mb"] * 8e3 * 0.9 / duration_s) - audio_kbps)
-    vf = "scale=-2:540" + (",format=nv12" if codec == "h264_qsv" else "")
+    height, fps, video_kbps, audio_kbps = fit_settings(rc["max_upload_mb"], duration_s,
+                                                       rc["preview_fps"])
+    vf = f"scale=-2:{height}" + (",format=nv12" if codec == "h264_qsv" else "")
     venc = "libx264" if codec in ("copy", "") else codec
     tmp = dst.with_name(dst.stem + ".tmp.mp4")
-    print(f"preview {big.stem}: {big.stat().st_size / 1e6:.0f} MB is over "
-          f"{rc['max_upload_mb']} MB; re-encoding at {video_kbps} kbps", flush=True)
-    subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
-                    "-vf", vf, "-r", str(rc["preview_fps"]), "-c:v", venc,
-                    "-b:v", f"{video_kbps}k", "-maxrate", f"{video_kbps * 2}k",
-                    "-bufsize", f"{video_kbps * 4}k", "-c:a", "aac", "-b:a", f"{audio_kbps}k",
-                    "-ac", "1", "-movflags", "+faststart", str(tmp)], check=True)
+    audio_bytes = audio_kbps * 1e3 / 8 * duration_s
+    why = f"{big.stat().st_size / 1e6:.0f} MB is over {rc['max_upload_mb']} MB"
+    for _ in range(2):
+        print(f"preview {big.stem}: {why}; re-encoding at {height}p {fps} fps "
+              f"{video_kbps} kbps", flush=True)
+        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
+                        "-vf", vf, "-r", str(fps), "-c:v", venc,
+                        "-b:v", f"{video_kbps}k", "-maxrate", f"{video_kbps * 2}k",
+                        "-bufsize", f"{video_kbps * 4}k", "-c:a", "aac", "-b:a", f"{audio_kbps}k",
+                        "-ac", "1", "-movflags", "+faststart", str(tmp)], check=True)
+        size = tmp.stat().st_size
+        if size <= limit:
+            break
+        # the encoder overshot: aim the video (all but the fixed audio) lower by as much
+        why = f"that came out at {size / 1e6:.0f} MB"
+        video_kbps = max(20, int(video_kbps * max(limit * 0.9 - audio_bytes, 1)
+                                 / max(size - audio_bytes, 1)))
     tmp.replace(dst)
+    if size > limit:
+        over.touch()
+    else:
+        over.unlink(missing_ok=True)
     return dst
 
 
@@ -577,6 +607,11 @@ def push_previews(gazu, stream_dir: Path, rc: dict, proj: dict, ep: dict, types:
         seq = sequence(it["seq"], it["seq_title"])
         mtime = it["preview"].stat().st_mtime
         if not force and state.get(it["key"], {}).get("preview_mtime") == mtime:
+            continue
+        if (size := it["preview"].stat().st_size) > rc["max_upload_mb"] * 1e6:
+            # Kitsu's proxy would refuse it and end the stage for every item after this one
+            print(f"skipped {it['key']}: preview is {size / 1e6:.0f} MB, over [review] "
+                  f"max_upload_mb ({rc['max_upload_mb']})", flush=True)
             continue
         if it["kind"] in SEQUENCE_KINDS:
             entity = seq
