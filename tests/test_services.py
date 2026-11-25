@@ -242,3 +242,55 @@ def test_cd_compose_picks_the_live_folder(tmp_path):
     assert where("clipper-hub/compose.yaml.retired-1", "clippa-hub/compose.yaml") == "clippa-hub"
     assert where("clippa-hub/compose.yaml") == "clippa-hub"                               # a new install
     assert where() == "fails"
+
+
+@pytest.mark.skipif(shutil.which("bash") is None or shutil.which("git") is None or sys.platform == "win32",
+                    reason="needs bash and git (on Windows `bash` may be WSL's, which reads no C:/ paths)")
+def test_require_main_refuses_a_checkout_behind_origin_main(tmp_path):
+    """deploy/mainguard.sh (2026-11-25: a claude deploy from a pre-#437 branch shipped an image
+    without nodejs): behind origin/main stops the deploy, naming the branch and how far; --force,
+    a branch at or past main, and an origin that can't be fetched let it go on."""
+    guard = Path(__file__).resolve().parent.parent / "deploy" / "mainguard.sh"
+    env = {"PATH": os.environ["PATH"], "HOME": str(tmp_path), "GIT_CONFIG_NOSYSTEM": "1",
+           "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t",
+           "GIT_COMMITTER_EMAIL": "t@t"}
+
+    def git(cwd, *args):
+        subprocess.run(["git", *args], cwd=cwd, env=env, check=True, capture_output=True)
+
+    origin, work = tmp_path / "origin.git", tmp_path / "work"
+    git(tmp_path, "init", "-q", "--bare", "-b", "main", str(origin))
+    git(tmp_path, "clone", "-q", str(origin), str(work))
+    git(work, "commit", "-q", "--allow-empty", "-m", "one")
+    git(work, "push", "-q", "origin", "HEAD:main")
+    git(work, "switch", "-q", "-c", "old")
+    git(work, "switch", "-q", "main")
+    git(work, "commit", "-q", "--allow-empty", "-m", "two")
+    git(work, "push", "-q", "origin", "main")
+    git(work, "reset", "-q", "--hard", "HEAD~1")    # main locally behind too; the fetch must see it
+    git(work, "update-ref", "refs/remotes/origin/main", "HEAD")
+
+    def run(force=""):
+        script = f'source "{guard.as_posix()}"; require_main "{work.as_posix()}" deploy/x.sh "{force}"; echo go'
+        return subprocess.run(["bash", "-c", script], env=env, capture_output=True, text=True,
+                              stdin=subprocess.DEVNULL)
+
+    r = run()
+    assert r.returncode == 1 and "go" not in r.stdout
+    assert "main at " in r.stderr and "1 commit(s) behind origin/main" in r.stderr
+    assert "bash deploy/x.sh --force" in r.stderr
+    r = run(force="1")
+    assert r.returncode == 0 and "go" in r.stdout and "--force" in r.stderr
+    git(work, "pull", "-q", "--ff-only")
+    r = run()
+    assert r.returncode == 0 and "go" in r.stdout and r.stderr == ""
+    git(work, "switch", "-q", "old")
+    r = run()
+    assert r.returncode == 1 and "old at " in r.stderr
+    git(work, "remote", "set-url", "origin", str(tmp_path / "gone.git"))   # offline: last fetched main
+    r = run()
+    assert r.returncode == 1 and "couldn't fetch origin/main" in r.stderr
+    git(work, "switch", "-q", "main")
+    git(work, "commit", "-q", "--allow-empty", "-m", "three")
+    r = run()
+    assert r.returncode == 0 and "1 commit(s) that aren't on origin/main" in r.stderr

@@ -17,6 +17,34 @@ a deploy stops (a running stage or upload). A recorder's deploy must never run w
 live ([NAS recorder](NAS-recorder)); never `--force` it — the page documents `--force` as the
 override this rule forbids.
 
+### Every Hindsight hook says `node: not found` after a deploy (2026-11-25)
+
+**Symptom.** Right after a `deploy/claude/deploy.sh`, every Hindsight hook in the NAS `claude`
+container fails with `node: not found` (session start, each prompt, session end), and the
+Hindsight MCP server doesn't start; the container itself comes up and Remote Control works. A
+deploy minutes earlier had worked.
+
+**Cause.** The deploy ran from a checkout of an old branch (one without
+[#437](https://github.com/byvfx/clippa/pull/437)). `deploy.sh` copies `deploy/claude/*` from
+whatever checkout runs it, so Docker rebuilt the image from the old Dockerfile, which has no
+nodejs (its cached layers made it quick). The home volume kept what the newer image's entrypoint
+had installed: the plugin, its hooks in `settings.json` and its MCP entry, all of which call
+`node`. The hub's deploy has the same trap with the code: old code goes back on the NAS.
+
+**How to tell.** `git -C <the checkout you deployed from> log -1 --oneline` and
+`git rev-list --count HEAD..origin/main`: behind main. In the container,
+`command -v node` prints nothing.
+
+**Band-aid.** Deploy again from main (`git switch main && git pull`, or a worktree of
+`origin/main` with `--env` at the main checkout's `env.local`): the image gets nodejs back and the
+hooks work at once, nothing in `home/` to clean up. Not while a nightly checkup runs (it ends the
+open session).
+
+**Fix.** `deploy/hub/deploy.sh` and `deploy/claude/deploy.sh` fetch `origin/main` and refuse
+(exit 1) from a checkout behind it, naming the branch, the commit and how many commits behind
+(`deploy/mainguard.sh`); `--force` deploys it anyway. Offline they check the last fetched main
+and say so. ([Claude on the NAS](Claude-on-the-NAS#deploy).)
+
 ### A long stream's transcribe dies with SIGTERM (2026-11-24)
 
 **Symptom.** `run.json` says `transcribe killed by SIGTERM (-15)` (`exited -15` on a worker from

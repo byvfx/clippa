@@ -3,8 +3,12 @@
 # tailscale (deploy/hub/compose.yaml). Its own compose project: the recorder (deploy/record)
 # is never restarted by this.
 #
-# Run from the repo root:  bash deploy/hub/deploy.sh [service ...]
-#   No services = all of them. The image is rebuilt from this checkout (the code, prompts included).
+# Run from the repo root:  bash deploy/hub/deploy.sh [--force] [--env PATH] [service ...]
+#   No services = all of them. The image is rebuilt from this checkout (the code, prompts included),
+#   so it is refused when this checkout is behind origin/main (deploy/mainguard.sh); --force
+#   deploys it anyway.
+#   --env PATH    the env.local to deploy (default: deploy/hub/env.local here), so a worktree
+#                 of main can deploy with the main checkout's env.local
 #   HUB_SSH_HOST  ssh host alias (default: $RECORD_SSH_HOST, else nas)
 #   HUB_DIR       compose dir on the NAS, relative to the ssh user's home (default: clippa-hub;
 #                 the first deploy after #286 pass 3 stops the old clipper-hub project and
@@ -23,7 +27,26 @@ DIR=${HUB_DIR:-clippa-hub}
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../.." && pwd)
 ENV_LOCAL=$HERE/env.local
+FORCE=
+SERVICES=()
+while [ $# -gt 0 ]; do
+    case $1 in
+        --force) FORCE=1 ;;
+        --env) [ $# -ge 2 ] || { echo "--env needs a path" >&2; exit 2; }; ENV_LOCAL=$2; shift ;;
+        --env=*) ENV_LOCAL=${1#--env=} ;;
+        -*) echo "usage: bash deploy/hub/deploy.sh [--force] [--env PATH] [service ...]" >&2; exit 2 ;;
+        *) SERVICES+=("$1") ;;
+    esac
+    shift
+done
+set -- ${SERVICES[@]+"${SERVICES[@]}"}
+source "$HERE/../mainguard.sh"
+require_main "$ROOT" deploy/hub/deploy.sh "$FORCE"
 
+if [ "$ENV_LOCAL" != "$HERE/env.local" ] && [ ! -f "$ENV_LOCAL" ]; then
+    echo "no $ENV_LOCAL (--env)" >&2
+    exit 1
+fi
 if [ ! -f "$ENV_LOCAL" ]; then
     cp "$HERE/env.template" "$ENV_LOCAL"
     chmod 600 "$ENV_LOCAL"

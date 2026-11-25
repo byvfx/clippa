@@ -51,6 +51,26 @@ ends a Claude session. Re-running it rebuilds the image (a newer Claude Code at 
 and restarts the container, which ends the session open in the app; the clone and the sign-in
 stay.
 
+Deploy from a checkout of main: the image is built from this checkout's `deploy/claude` files,
+so an old branch's Dockerfile goes back on the NAS (one without nodejs breaks every Hindsight
+hook, [Bugs to remember](Bugs-to-remember#every-hindsight-hook-says-node-not-found-after-a-deploy-2026-11-25)).
+The deploy fetches `origin/main` first and refuses (exit 1) when the checkout is behind it, with
+the branch, the commit and how many commits behind; `--force` deploys it anyway. Offline it
+checks against the last fetched main and says so. Commits main doesn't have yet, and uncommitted
+changes, are only noted. The hub's deploy does the same ([NAS-hub](NAS-hub#deploy)).
+
+`env.local` is gitignored, so it lives in the checkout you first deployed from, often
+`C:\clipper`, which may be on a feature branch. To deploy main without switching it, use a
+worktree of `origin/main` and point `--env` at that file:
+
+```bash
+git worktree add --detach ../clippa-main origin/main   # once; later: git -C ../clippa-main checkout --detach origin/main
+cd ../clippa-main && bash deploy/claude/deploy.sh --env /c/clipper/deploy/claude/env.local
+```
+
+`--env` never creates the file; without it the deploy uses `deploy/claude/env.local` beside
+the script.
+
 The first run copies `deploy/claude/env.template` to `deploy/claude/env.local` (gitignored) and
 stops. Fill in:
 
