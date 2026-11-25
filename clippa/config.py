@@ -529,6 +529,38 @@ def for_stream(cfg: dict, sdir: Path) -> dict:
     return {**res, "_pinned": True} if cfg.get("_pinned") else res
 
 
+def scaled(n: int, scale: float) -> int:
+    """n for a stream `scale` times the usual length: more for a long one, never fewer."""
+    return max(n, round(n * scale))
+
+
+def for_length(cfg: dict, hours: float) -> dict:
+    """#430: a stream longer than [schedule] budget_hours gets more chat windows ([signals] top_n)
+    and Pass B picks ([scoring] max_picks) in proportion, as schedule.budget_for scales its
+    release budget; a shorter one keeps the configured numbers. [scoring] scale_with_length =
+    false keeps them flat. A scaled config carries `_length` (hours, scale) for Pass B's note."""
+    budget = cfg["schedule"]["budget_hours"]
+    if not cfg["scoring"]["scale_with_length"] or budget <= 0 or hours / budget <= 1:
+        return cfg  # budget_hours <= 0 is a doctor warning (config.problems), not a crash here
+    scale = hours / budget
+    top_n, picks = scaled(cfg["signals"]["top_n"], scale), scaled(cfg["scoring"]["max_picks"], scale)
+    if (top_n, picks) == (cfg["signals"]["top_n"], cfg["scoring"]["max_picks"]):
+        return cfg  # just over budget_hours: nothing rounds up, so no note for Pass B either
+    out = {**cfg, "signals": {**cfg["signals"], "top_n": top_n},
+           "scoring": {**cfg["scoring"], "max_picks": picks}}
+    if picks > cfg["scoring"]["max_picks"]:
+        # Pass B hears its length only when its cap rose: with top_n alone up (8.3 h), a note
+        # saying "1.0x a usual stream ... not one" would contradict itself (Grok on #432)
+        out["_length"] = {"hours": round(hours, 2), "scale": round(scale, 2),
+                          "usual_hours": budget, "usual_picks": cfg["scoring"]["max_picks"]}
+    return out
+
+
+def stream_hours(sdir: Path) -> float:
+    """The stream's length in hours, from its meta.json."""
+    return jsonstate.load(Path(sdir) / "meta.json")["duration_s"] / 3600
+
+
 def explain(cfg: dict, name: str, sdir: Path | None = None) -> dict:
     """Where "section.key" comes from: every layer that sets it, in the order they apply
     (default < clipper.toml < show < stream config.toml < clipper.local.toml < env), and the

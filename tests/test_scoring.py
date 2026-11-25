@@ -130,3 +130,15 @@ def test_pass_a_schema_why_first_from_v9():
         assert list(s["properties"])[0] == "why"
         assert set(s["properties"]) == set(scoring.PASS_A_SCHEMA["properties"])
         assert sorted(s["required"]) == sorted(scoring.PASS_A_SCHEMA["required"])
+
+
+def test_pass_b_hears_a_long_streams_length_and_cap(defaults):
+    """#430: Pass B's input names the length and the raised cap only when for_length scaled it."""
+    assert scoring.length_note(defaults) == ""
+    from clippa import config
+    defaults["scoring"]["max_picks"] = 14
+    note = scoring.length_note(config.for_length(defaults, 18.3))
+    assert "18.3 hours" in note and "usual 8" in note and "32 picks instead of 14" in note
+    # 8.3 h: the cap rises 14 -> 15 at a 1.04 scale; no "1.0x ... not one" (Grok on #432)
+    note = scoring.length_note(config.for_length(defaults, 8.3))
+    assert "15 picks instead of 14" in note and "x a usual" not in note

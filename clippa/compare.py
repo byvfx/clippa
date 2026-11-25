@@ -28,7 +28,7 @@ from collections import Counter
 from pathlib import Path
 
 from . import jsonstate, llm
-from .config import EFFORTS, for_stream
+from .config import EFFORTS, for_length, for_stream, stream_hours
 from .errors import ClipperError
 from .llm import Claude, preflight
 from .prompts import Prompts
@@ -229,6 +229,16 @@ def estimate(cfg: dict, prompts: Prompts, which: str, windows: list[dict], n_kep
     return usd + llm.estimate(cfg, model_b, tokens_b, out_tokens(model_b, cfg["scoring"]["effort_b"], "b"))
 
 
+def length_notes(cfg: dict, base: dict) -> list[str]:
+    """#430: a long stream scored before picks scaled with its length gets a scaled Pass B here,
+    so even --repeat differs from its baseline by more than a rerun."""
+    if not cfg.get("_length") or base.get("length"):
+        return []
+    return [f"the baseline was scored before picks scaled with length (#430): this run's Pass B may pick "
+            f"up to {cfg['scoring']['max_picks']} and hears the stream's length, so even --repeat "
+            "differs by more than a rerun"]
+
+
 def compare_score(sdir: Path, cfg: dict, model: str, which: str = "a", budget: float = 2.0,
                   dry_run: bool = False, model_b: str = "", effort: str = "", prompt_version: str = "",
                   repeat: bool = False) -> dict:
@@ -240,10 +250,10 @@ def compare_score(sdir: Path, cfg: dict, model: str, which: str = "a", budget: f
 
     if which not in ("a", "b", "ab"):
         raise ClipperError(f"--pass {which}: a, b or ab")
-    cfg = copy.deepcopy(for_stream(cfg, sdir))
     base = jsonstate.read(sdir / "candidates.json")
     if not base:
         raise ClipperError(f"{sdir.name} isn't scored yet (no candidates.json): nothing to compare with")
+    cfg = copy.deepcopy(for_length(for_stream(cfg, sdir), stream_hours(sdir)))
     sc = cfg["scoring"]
     # The windows and summary are the stream's own (its prompt version's caches); the calls use
     # --prompt-version when given, so a new prompt can be tried on the same windows.
@@ -276,6 +286,7 @@ def compare_score(sdir: Path, cfg: dict, model: str, which: str = "a", budget: f
 
     hand, base_a, base_picks = scored_only(base)
     notes = [f"{len(hand)} hand pick(s) left out on both sides"] if hand else []
+    notes += length_notes(cfg, base)
     if base.get("windows_sha") not in (None, file_sha(sdir / "windows.json")):
         notes.append("windows.json changed since the stream was scored: only windows that still match are compared")
     words, sig = load_words(sdir), load_signals(sdir)

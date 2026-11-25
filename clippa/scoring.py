@@ -19,7 +19,7 @@ from pathlib import Path
 import numpy as np
 
 from . import jsonstate
-from .config import for_stream
+from .config import for_length, for_stream, stream_hours
 from .errors import ClipperError, OpenRouterLimit
 from .llm import Claude, estimate_lines, preflight, tokens
 from .prompts import Prompts
@@ -358,6 +358,20 @@ def run_pass_a(windows: list[dict], words: list[dict], sig: dict, cfg: dict,
         return list(pool.map(one, windows))
 
 
+def length_note(cfg: dict) -> str:
+    """#430: for a long stream (config.for_length scaled it), its length and the raised cap, so
+    "by quality, not by count" isn't read as one night's worth of picks. Empty otherwise: a
+    usual stream's Pass B input is as before."""
+    length = cfg.get("_length")
+    if not length:
+        return ""
+    # No "N.Nx" multiplier: 1.04 printed as "1.0x" next to a raised cap contradicted itself (Grok, #432)
+    return (f"<stream_length>\nThis stream ran {length['hours']:.1f} hours, longer than the usual "
+            f"{length['usual_hours']:g}, so the cap is {cfg['scoring']['max_picks']} picks instead of "
+            f"{length['usual_picks']}. Still pick by quality, but judge it against its length, not as "
+            "one usual stream's worth of moments.\n</stream_length>\n\n")
+
+
 def run_pass_b(kept: list[dict], summary: list[dict], words: list[dict], cfg: dict,
                claude: Claude, prompts: Prompts) -> dict:
     sc = cfg["scoring"]
@@ -373,7 +387,7 @@ def run_pass_b(kept: list[dict], summary: list[dict], words: list[dict], cfg: di
             f"transcript: {text}\n</candidate>")
     from .analytics import feedback_block
 
-    user = (feedback_block(cfg, cfg["show"]["key"])
+    user = (feedback_block(cfg, cfg["show"]["key"]) + length_note(cfg)
             + f"<stream_timeline>\n{timeline}\n</stream_timeline>\n\n" + "\n\n".join(cands))
     out, meta = claude.json_call(sc["model_b"], prompts.get("score_b"), user, PASS_B_SCHEMA,
                                  sc["effort_b"], fallback=True)
@@ -443,11 +457,11 @@ def estimate(stream_dir: Path, cfg: dict, prompts: Prompts, windows: list[dict],
 
 
 def run(stream_dir: Path, cfg: dict, dry_run: bool = False, force: bool = False) -> dict:
-    cfg = for_stream(cfg, stream_dir)
-    sc = cfg["scoring"]
     if not dry_run and not force and (stream_dir / "candidates.json").exists():
         raise ClipperError(f"{stream_dir.name} is scored (candidates.json); scoring again pays every Pass A "
                            "window again: clippa score <stream> --force (or clippa run <stream> --from score)")
+    cfg = for_length(for_stream(cfg, stream_dir), stream_hours(stream_dir))
+    sc = cfg["scoring"]
     prompts = Prompts(cfg)
     meta = jsonstate.load(stream_dir / "meta.json")
     windows = jsonstate.load(stream_dir / "windows.json")["windows"]
@@ -540,7 +554,8 @@ def _finish(stream_dir: Path, cfg: dict, meta: dict, prompts: Prompts, claude: C
         old_b, pass_b.get("picks", []) + [p for p in old_b.get("picks", []) if p["id"] in hand_ids])
     out = {"stream_id": stream_dir.name, "title": meta.get("title"),
            "prompt_version": prompts.version, "cost_usd": round(claude.cost, 4),
-           "windows_sha": windows_sha, "pass_a": results, "pass_b": pass_b}
+           "windows_sha": windows_sha, "pass_a": results, "pass_b": pass_b,
+           "length": cfg.get("_length")}  # #430: set when max_picks was scaled for a long stream
     jsonstate.write(stream_dir / "candidates.json", out)
     ckpt.unlink(missing_ok=True)
 

@@ -12,6 +12,11 @@ Developing#releases.
 
 ### 2026-11
 
+- 11-24: a stream longer than `[schedule] budget_hours` (8 h) gets more chat windows and more
+  Pass B picks, in proportion: `[signals] top_n` and `[scoring] max_picks` times hours / budget_hours,
+  as the release budget already scaled. An 18 h stream had got the same 30 windows and about as many
+  clips as a 6 h night (#430). Pass B is told a long stream's length; shorter streams are unchanged.
+  `[scoring] scale_with_length = false` turns it off.
 - 11-24: Claude on the NAS shares the laptop's Hindsight memory bank (#435): the container runs
   the same plugin, and `deploy/claude/deploy.sh` copies the laptop's server, key and bank into
   `env.local` where they're empty. The nightly checkup DMs when Hindsight is down or refuses the

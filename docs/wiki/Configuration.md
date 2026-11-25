@@ -25,6 +25,8 @@ priority = true` so its items go out ahead of the backlog. Unknown keys there ar
 [`docs/big-story.toml`](https://github.com/byvfx/clippa/blob/main/docs/big-story.toml) is the ready-made one to copy: more picks and Shorts, priority, and the
 night's compilation. A `[schedule] stream_budget` kind at 0 goes only when pinned, so
 `compilation = 0` there keeps compilations for big-story nights.
+A long stream's `[signals] top_n` and `[scoring] max_picks` scale with its length on their own
+([Pipeline](Pipeline#stages)); a stream config's own values are scaled the same way.
 `clippa/defaults.toml` documents every key with its default; `clipper.toml` holds only what
 differs (`clippa setup` starts a new one that way, and `clipper.example.toml` is a starter to
 copy). `clipper.toml` itself is gitignored because it holds your
