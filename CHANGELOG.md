@@ -17,6 +17,9 @@ Developing#releases.
   One that still won't fit is skipped with a line in the log, so the rest of the stream still
   publishes; one already in Kitsu goes back to waiting for approval with a comment that the
   video there is the previous cut. A 5.2 h GTA 6 compilation's 762 MB preview ended the review stage halfway.
+- 11-25: a Kitsu upload that fails no longer leaves an empty revision on the item (its comment is
+  removed again), and a preview Windows can't read off the NAS share in one go (`OSError: [Errno
+  22] Invalid argument`, a review run from the laptop) is uploaded from a local copy instead.
 - 11-24: a Modal transcription whose FLAC would be over `[transcribe] modal_opus_over_mb` (700 MB,
   about a 10 h stream) uploads opus instead. An 18 h stream's 1.3 GB upload ran the NAS out of
   memory (#422). A stage stopped by a signal now says so in run.json and the worker log

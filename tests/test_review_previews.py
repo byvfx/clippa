@@ -1,4 +1,5 @@
 """Kitsu previews that fit its upload limit, and a stage that goes on when one doesn't."""
+from pathlib import Path
 from types import SimpleNamespace
 
 from clippa import review
@@ -68,14 +69,12 @@ def test_render_to_size_keeps_its_best_when_both_passes_miss(tmp_path, monkeypat
 def test_push_previews_skips_one_too_big_and_publishes_the_rest(tmp_path, capsys,
                                                                  monkeypatch):
     published = []
-
-    def publish_preview(task, status, comment, preview_file_path, **kw):
-        published.append(preview_file_path)
-        return None, {"id": "p1", "revision": 1}
-
+    monkeypatch.setattr(review, "upload_preview",
+                        lambda gazu, task, wfa, text, path, normalize:
+                        published.append(path) or {"id": "p1", "revision": 1})
     gazu = SimpleNamespace(
         shot=SimpleNamespace(get_sequence_by_name=lambda *a, **k: {"id": "seq"}),
-        task=SimpleNamespace(get_task=lambda *a: None, publish_preview=publish_preview))
+        task=SimpleNamespace(get_task=lambda *a: None))
     monkeypatch.setattr(review, "ensure_task", lambda gazu, entity, ttype: {"id": "t1"})
     items = []
     for key, size in (("comp-gta-6", 2_000_000), ("comp-h3", 500_000)):
@@ -121,3 +120,58 @@ def test_a_skipped_recut_sends_its_old_revision_back_for_review_once(tmp_path, m
     assert "previous cut" in comments[0][2] and again == ["comp-dsp"]
     saved = jsonstate.load(tmp_path / "review_state.json")["comp-dsp"]
     assert saved["fields"] == {"a": "b"} and saved["over_mtime"] == f.stat().st_mtime
+
+
+class _FakeTask:
+    """gazu.task's preview calls; `fails` are what each upload_preview_file call raises."""
+
+    def __init__(self, fails=()):
+        self.fails, self.calls, self.uploaded = list(fails), [], []
+
+    def add_comment(self, task, status, text):
+        self.calls.append("comment")
+        return {"id": "c1"}
+
+    def create_preview(self, task, comment):
+        self.calls.append("preview")
+        return {"id": "p1"}
+
+    def upload_preview_file(self, preview, path, normalize_movie):
+        self.calls.append("upload")
+        if self.fails:
+            raise self.fails.pop(0)
+        self.uploaded.append(Path(path).read_bytes())
+        return {"id": preview["id"], "revision": 2}
+
+    def set_main_preview(self, preview):
+        self.calls.append("main")
+
+    def remove_comment(self, comment):
+        self.calls.append("remove")
+
+
+def test_upload_preview_retries_a_failed_read_from_a_local_copy(tmp_path, capsys):
+    """Windows refused one big read of a preview on the NAS share (EINVAL), kick-139915441."""
+    f = tmp_path / "comp-gta-6.small.mp4"
+    f.write_bytes(b"video")
+    task = _FakeTask([OSError(22, "Invalid argument")])
+    preview = review.upload_preview(SimpleNamespace(task=task), {"id": "t1"}, {"id": "wfa"},
+                                    "", f, False)
+    assert preview == {"id": "p1", "revision": 2} and task.uploaded == [b"video"]
+    assert task.calls == ["comment", "preview", "upload", "upload", "main"]
+    assert "uploading a local copy" in capsys.readouterr().out
+
+
+def test_a_failed_upload_leaves_no_empty_revision(tmp_path):
+    import pytest
+    import requests
+
+    f = tmp_path / "s10.small.mp4"
+    f.write_bytes(b"video")
+    for fails, uploads in (([requests.ConnectionError("reset")], 1),   # not retried
+                           ([OSError(22, "x"), OSError(22, "x")], 2)):
+        task = _FakeTask(fails)
+        with pytest.raises(OSError):
+            review.upload_preview(SimpleNamespace(task=task), {"id": "t1"}, {"id": "wfa"},
+                                  "", f, False)
+        assert task.calls == ["comment", "preview"] + ["upload"] * uploads + ["remove"]

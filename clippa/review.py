@@ -46,7 +46,9 @@ from __future__ import annotations
 
 import bisect
 import os
+import shutil
 import subprocess
+import tempfile
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -583,6 +585,37 @@ def render_previews(stream_dir: Path, cfg: dict, todo: list[dict]) -> None:
               f"({time.time() - t:.0f}s)", flush=True)
 
 
+def upload_preview(gazu, task: dict, wfa: dict, text: str, path: Path, normalize: bool) -> dict:
+    """gazu's publish_preview in its three steps (the comment, the preview record, the file), so
+    an upload that fails leaves no empty revision in Kitsu: its comment is removed again. A file
+    read that fails is tried once more from a local copy: Windows can refuse requests' one big
+    read of a preview on the NAS share (OSError EINVAL, a laptop publish of kick-139915441)."""
+    import requests
+
+    comment = gazu.task.add_comment(task, wfa, text)
+    try:
+        preview = gazu.task.create_preview(task, comment)
+        try:
+            preview = gazu.task.upload_preview_file(preview, str(path), normalize_movie=normalize)
+        except OSError as e:
+            if isinstance(e, requests.RequestException):  # the network, not the read
+                raise
+            print(f"  reading {path.name} failed ({e}); uploading a local copy", flush=True)
+            with tempfile.TemporaryDirectory(prefix="clippa-preview-") as tmp:
+                local = Path(tmp) / path.name
+                shutil.copyfile(path, local)
+                preview = gazu.task.upload_preview_file(preview, str(local),
+                                                        normalize_movie=normalize)
+    except BaseException:
+        try:
+            gazu.task.remove_comment(comment)  # and the empty preview with it
+        except Exception as e:  # noqa: BLE001  # the upload's error is the one to raise
+            print(f"  could not remove the comment of the failed upload: {e}", flush=True)
+        raise
+    gazu.task.set_main_preview(preview)
+    return preview
+
+
 def push_previews(gazu, stream_dir: Path, rc: dict, proj: dict, ep: dict, types: dict,
                   wfa: dict, todo: list[dict], force: bool) -> tuple[dict, list[str], list[str]]:
     """Each item whose preview changed (or all, with force) as a new revision of its
@@ -639,10 +672,7 @@ def push_previews(gazu, stream_dir: Path, rc: dict, proj: dict, ep: dict, types:
                 description=it["title"], data={"file": it["file"].name})
         task = ensure_task(gazu, entity, types[it["type"]])
         t = time.time()
-        _, preview = gazu.task.publish_preview(task, wfa, comment=it["text"],
-                                               preview_file_path=str(it["preview"]),
-                                               normalize_movie=rc["normalize"],
-                                               set_thumbnail=True)
+        preview = upload_preview(gazu, task, wfa, it["text"], it["preview"], rc["normalize"])
         old = state.get(it["key"], {})  # keep what we last proposed, for the columns
         if old:   # a new revision goes back to wfa: an automatic approval no longer stands
             from . import review_auto
