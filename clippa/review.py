@@ -584,10 +584,12 @@ def render_previews(stream_dir: Path, cfg: dict, todo: list[dict]) -> None:
 
 
 def push_previews(gazu, stream_dir: Path, rc: dict, proj: dict, ep: dict, types: dict,
-                  wfa: dict, todo: list[dict], force: bool) -> tuple[dict, list[str]]:
+                  wfa: dict, todo: list[dict], force: bool) -> tuple[dict, list[str], list[str]]:
     """Each item whose preview changed (or all, with force) as a new revision of its
     task, with status wfa (waiting for approval); its ids in review_state.json. Returns
-    (that state, the keys published)."""
+    (that state, the keys published, the keys skipped: a preview still over max_upload_mb).
+    A skipped item already in Kitsu keeps its old revision, so its task goes back to wfa
+    with a comment saying the new cut couldn't go up (once per preview)."""
     seqs: dict[str, dict] = {}
 
     def sequence(name: str, title: str) -> dict:
@@ -603,6 +605,7 @@ def push_previews(gazu, stream_dir: Path, rc: dict, proj: dict, ep: dict, types:
     state_path = stream_dir / "review_state.json"
     state = jsonstate.read(state_path, {})
     published: list[str] = []
+    skipped: list[str] = []
     for it in todo:
         seq = sequence(it["seq"], it["seq_title"])
         mtime = it["preview"].stat().st_mtime
@@ -612,6 +615,21 @@ def push_previews(gazu, stream_dir: Path, rc: dict, proj: dict, ep: dict, types:
             # Kitsu's proxy would refuse it and end the stage for every item after this one
             print(f"skipped {it['key']}: preview is {size / 1e6:.0f} MB, over [review] "
                   f"max_upload_mb ({rc['max_upload_mb']})", flush=True)
+            skipped.append(it["key"])
+            old = state.get(it["key"])
+            if old and old.get("over_mtime") != mtime:
+                # Kitsu still shows the previous cut: an approval of it doesn't cover this one
+                from . import review_auto
+
+                gazu.task.add_comment({"id": old["task_id"]}, wfa,
+                                      f"A new cut is on disk ({it['file'].name}) but its "
+                                      f"{size / 1e6:.0f} MB preview is over the "
+                                      f"{rc['max_upload_mb']} MB upload limit: the video "
+                                      "here is the previous cut. Check the file before "
+                                      "approving.")
+                review_auto.republished(stream_dir, it["key"])
+                state[it["key"]] = {**old, "over_mtime": mtime}
+                state = jsonstate.merge(state_path, state, [it["key"]])
             continue
         if it["kind"] in SEQUENCE_KINDS:
             entity = seq
@@ -644,7 +662,7 @@ def push_previews(gazu, stream_dir: Path, rc: dict, proj: dict, ep: dict, types:
         state = jsonstate.merge(state_path, state, [it["key"]])  # a retake may write it too
         print(f"published {it['seq']}/{it.get('shot', '')} rev {preview.get('revision')} "
               f"({time.time() - t:.0f}s)", flush=True)
-    return state, published
+    return state, published, skipped
 
 
 def columns_to_fill(values: dict, before: dict, current: dict, tf: str | None,
@@ -748,13 +766,19 @@ def publish(stream_dir: Path, cfg: dict, force: bool = False,
     ep_name = episode_name(stream_dir, rc, cfg["schedule"]["timezone"])
     ep = gazu.shot.get_episode_by_name(proj, ep_name) or gazu.shot.new_episode(proj, ep_name)
     state_path = stream_dir / "review_state.json"
-    state, published = push_previews(gazu, stream_dir, rc, proj, ep, types, wfa, todo, force)
-    state = fill_columns(gazu, proj, todo, state, state_path)
+    state, published, skipped = push_previews(gazu, stream_dir, rc, proj, ep, types, wfa, todo,
+                                              force)
+    # a skipped item's columns and cover would land on the old revision, the previous cut's
+    shown = [it for it in todo if it["key"] not in skipped]
+    state = fill_columns(gazu, proj, shown, state, state_path)
     make_playlists(gazu, stream_dir, proj, ep, state)
-    print(f"{len(todo)} items in Kitsu: {rc['host'].removesuffix('/api')} "
-          f"({project_name(cfg)} / {ep_name})")
+    print(f"{len(shown)} items in Kitsu: {rc['host'].removesuffix('/api')} "
+          f"({project_name(cfg)} / {ep_name})"
+          + (f"; {len(skipped)} skipped, over max_upload_mb: {', '.join(skipped)}" if skipped else ""))
     if cfg["thumbnail"]["kitsu"]:
-        attach_thumbnails(stream_dir, cfg, gazu, keys=[it["key"] for it in todo] if only else None)
+        keys = ([it["key"] for it in shown] if only
+                else [k for k in state if k not in skipped] if skipped else None)
+        attach_thumbnails(stream_dir, cfg, gazu, keys=keys)
     return list(published)
 
 

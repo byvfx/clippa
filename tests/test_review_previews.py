@@ -86,8 +86,38 @@ def test_push_previews_skips_one_too_big_and_publishes_the_rest(tmp_path, capsys
                       "type": "Compilation", "meta": {"id": key}})
     rc = {"max_upload_mb": 1, "preview_fps": 30, "normalize": False,
           "host": "http://kitsu.test/api"}
-    _, keys = review.push_previews(gazu, tmp_path, rc, {"id": "pr"}, {"id": "ep"},
-                                   {"Compilation": {"id": "tt"}}, {"id": "wfa"}, items,
-                                   force=False)
-    assert keys == ["comp-h3"] and len(published) == 1
+    _, keys, skipped = review.push_previews(gazu, tmp_path, rc, {"id": "pr"}, {"id": "ep"},
+                                            {"Compilation": {"id": "tt"}}, {"id": "wfa"},
+                                            items, force=False)
+    assert keys == ["comp-h3"] and skipped == ["comp-gta-6"] and len(published) == 1
     assert "skipped comp-gta-6: preview is 2 MB" in capsys.readouterr().out
+
+
+def test_a_skipped_recut_sends_its_old_revision_back_for_review_once(tmp_path, monkeypatch):
+    """Grok on #436: Kitsu keeps the previous cut, so its approval mustn't cover the new one."""
+    from clippa import jsonstate, review_auto
+
+    comments, again = [], []
+    gazu = SimpleNamespace(
+        shot=SimpleNamespace(get_sequence_by_name=lambda *a, **k: {"id": "seq"}),
+        task=SimpleNamespace(add_comment=lambda task, status, text: comments.append(
+            (task["id"], status["id"], text))))
+    monkeypatch.setattr(review_auto, "republished", lambda sdir, key: again.append(key))
+    f = tmp_path / "comp-dsp.mp4"
+    f.write_bytes(b"x" * 2_000_000)
+    jsonstate.write(tmp_path / "review_state.json",
+                    {"comp-dsp": {"task_id": "t9", "preview_mtime": 1.0, "fields": {"a": "b"}}})
+    it = {"key": "comp-dsp", "kind": "compilation", "seq": "dsp", "seq_title": "DSP",
+          "preview": f, "file": f, "duration_s": 60, "text": "", "type": "Compilation",
+          "meta": {"id": "comp-dsp"}}
+    rc = {"max_upload_mb": 1, "preview_fps": 30, "normalize": False,
+          "host": "http://kitsu.test/api"}
+    for _ in range(2):
+        state, keys, skipped = review.push_previews(gazu, tmp_path, rc, {"id": "pr"},
+                                                    {"id": "ep"}, {}, {"id": "wfa"}, [it],
+                                                    force=False)
+    assert keys == [] and skipped == ["comp-dsp"]
+    assert len(comments) == 1 and comments[0][:2] == ("t9", "wfa")
+    assert "previous cut" in comments[0][2] and again == ["comp-dsp"]
+    saved = jsonstate.load(tmp_path / "review_state.json")["comp-dsp"]
+    assert saved["fields"] == {"a": "b"} and saved["over_mtime"] == f.stat().st_mtime
