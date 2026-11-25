@@ -71,7 +71,9 @@ stays on the server. `--budget` on a run is Clippa's own guard for that one run;
 only explains it. The OpenRouter cap covers every run on the key.
 
 Modal's own billing is the real number for transcription ([Transcribe on Modal](Transcribe-on-Modal#watching-modal));
-the bot DMs each time the month passes a multiple of `[modal] alert_every_usd`.
+the bot DMs each time the month passes a multiple of `[modal] alert_every_usd`. Don't add the
+per-run `est_usd` figures up and call it the bill: each is an upper bound, and a parallel run's
+sum runs above what Modal charges ([Bugs to remember](Bugs-to-remember)).
 
 ## What things cost
 
