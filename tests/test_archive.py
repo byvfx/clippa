@@ -375,6 +375,31 @@ def test_a_download_that_transcribes_is_unlinked_as_before(kick_cfg, tmp_path, m
     assert cost["duration_s"] == 33011.2
 
 
+def test_a_source_a_fixup_replaces_under_the_read_is_not_transcribed(kick_cfg, tmp_path, monkeypatch):
+    """Grok on #453: an `archive fixup` lands between the reused wav and the timeline check, so the
+    old wav and the new container agree and the check passes; the source is not the file the audio
+    came from, so nothing is transcribed and the copy waits for the next run."""
+    idir = tmp_path / "archive" / "s" / "kick-1"
+    idir.mkdir(parents=True)
+    (idir / "source.refused.ts").write_bytes(b"jumping")
+    runs, seen = [], []
+    _downloads(monkeypatch, idir, runs, seen, wav_s=33833.0, container_s=33833.0)
+    _transcribes(monkeypatch)
+    real = archive.transcribe.extract_audio
+
+    def extract_then_fixup(stream_dir, *, trust_mtime=True):
+        wav = real(stream_dir, trust_mtime=trust_mtime)
+        (stream_dir / "source.refused.ts").write_bytes(b"remuxed!")  # the fixup's replace
+        os.utime(stream_dir / "source.refused.ts", ns=(10**18, 10**18))
+        return wav
+
+    monkeypatch.setattr(archive.transcribe, "extract_audio", extract_then_fixup)
+    with pytest.raises(ClipperError, match="was replaced while its audio was read"):
+        archive.transcribe_item(kick_cfg, idir, _item(), "L4")
+    assert not (idir / "words.jsonl").exists() and runs == []
+    assert (idir / "source.refused.ts").read_bytes() == b"remuxed!"
+
+
 def test_a_kept_video_is_used_and_never_unlinked(kick_cfg, tmp_path, monkeypatch):
     """`archive video` saved source.mp4: it is the source, nothing is downloaded, and it stays
     (the refused name never comes into it)."""

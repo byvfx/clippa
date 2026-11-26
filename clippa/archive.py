@@ -300,6 +300,30 @@ def call_overhead_s(cfg: dict, subject: str, gpu: str) -> tuple[float, str]:
     return max(over, 0.0), f"{subject}'s last {len(runs)} runs on {gpu}"
 
 
+def _file_id(path: Path) -> tuple[int, int] | None:
+    """(size, mtime_ns) of the file at `path`, or None when the share won't say."""
+    try:
+        st = path.lstat()
+    except OSError:
+        return None
+    return st.st_size, st.st_mtime_ns
+
+
+def _refuse_if_replaced(idir: Path, src: Path, read_from: tuple[int, int] | None) -> None:
+    """Grok on #453: an `archive fixup` of this item can replace its source while this run reads it
+    (the fixup takes no lock this run honours). After the replace the old wav and the new container
+    agree in length, so the timeline check passes on audio of the jumping copy, and the transcript
+    would be done with its times. The source is the same file it was before the audio was read, or
+    nothing is transcribed: the stale marker the fixup wrote makes the next run decode the repaired
+    copy. Checked after the timeline check, as from then on the wav is all that is read. One the share wouldn't time either side is let through, as the
+    decode's own check does."""
+    now = _file_id(src)
+    if read_from is None or now is None or now == read_from:
+        return
+    raise ClipperError(f"{idir.name}: its {src.name} was replaced while its audio was read (an "
+                       f"`archive fixup`?); nothing transcribed, the next run reads the new copy")
+
+
 def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[str, ...] = ytdl.AGE) -> dict:
     """One item: words.jsonl and transcript.json in idir; returns the cost record. retry_on: the
     YouTube errors retried signed in (ytdl.AGE; a story adds ytdl.BOT when [story] allows it)."""
@@ -393,6 +417,7 @@ def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[s
         # link at source.refused.ts on a non-fresh run would otherwise meet the refusal's rename
         # (which cannot replace a link) and stick the item with both it and its finished source.ts
         _drop_shadowing_or_mark(idir, src, fresh)
+        read_from = _file_id(src)  # what the audio below comes from (see _refuse_if_replaced)
         # trust_mtime False: a wav here is only ever a failed run's leftover, and one with no stamp
         # beside it (#448) can't say which download it came from, so it is decoded again
         wav = transcribe.extract_audio(idir, trust_mtime=False)
@@ -428,6 +453,7 @@ def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[s
                 raise ClipperError(f"{why} (the download is still {src.name}: {reason})") from None
             _clear_marker(idir)  # a marker from an earlier rename must not outlive this one
             raise ClipperError(f"{why}{_kept_note(idir, refused, None)}") from None
+        _refuse_if_replaced(idir, src, read_from)
         if fresh:
             src.unlink()
         enc = idir / "audio.flac"
@@ -857,15 +883,18 @@ def fixup_item(cfg: dict, subject: str, item_id: str, force: bool = False) -> fl
 def _in_order_note(idir: Path, subject: str, src: Path) -> str:
     """Why a copy whose timestamps are already in order has nothing to repair, and what is next. A
     `.refused` marker is not only the timeline's: a download whose stale mark or shadow drop failed
-    is marked too, and that copy is fine, so the wav is measured before anything is said. One that
-    runs past the container was decoded from these very bytes (the rename aside keeps them), so
-    unlike a stream's in-order --fixup (#448) it stays: dropping it would only buy a decode refused
-    again."""
+    is marked too, and that copy is fine, so the wav is looked at before anything is said. Only a
+    wav the next run would reuse (its stamp names this copy: an archive item trusts no mtime) and
+    that runs past the container makes the overrun this copy's own; it was decoded from these very
+    bytes, so unlike a stream's in-order --fixup (#448) it stays, since dropping it would only buy a
+    decode refused again. Any other wav is decoded again by the next run, which may well finish."""
     head = f"{idir.name}: {src.name}'s timestamps are already in order, so a remux has nothing to take out"
-    try:
-        lengths = transcribe.audio_lengths(idir)
-    except (OSError, ClipperError):  # the guard judges it on the next run
-        lengths = None
+    lengths = None
+    if transcribe.reuses_wav(idir, trust_mtime=False):
+        try:
+            lengths = transcribe.audio_lengths(idir)
+        except (OSError, ClipperError):  # the guard judges it on the next run
+            lengths = None
     if lengths and lengths[0] - lengths[1] > timeline.TOLERANCE_S:
         return (f"{head}; its audio.wav runs {lengths[0] - lengths[1]:.1f} s past the container for "
                 f"another reason, which this repair can't fix")

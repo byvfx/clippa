@@ -157,6 +157,44 @@ def _write_stamp(stream_dir: Path, decoded: tuple[int, int] | None) -> None:
         pass
 
 
+def _wav_is_for(stream_dir: Path, src: Path, trust_mtime: bool) -> bool:
+    """Whether the audio.wav here (which exists) is reused for `src` by extract_audio's rules."""
+    wav, marker = stream_dir / "audio.wav", stream_dir / STALE_MARKER
+    try:  # lstat: only these two regular files' own times decide which is newer
+        src_st = src.lstat()
+    except OSError:  # can't be stat'ed: its times say nothing (the marker still does)
+        src_st = None
+    try:
+        wav_st = wav.lstat()
+    except OSError:
+        wav_st = None
+    stamp = _stamp_says(stream_dir, src_st)
+    # With no stamp, a wav up to the share's rounding older than its source is not older:
+    # keep it. Anything older was decoded from a different file, so it is dropped and the
+    # source decoded again. The marker says the same outright, whatever the stamp or the
+    # mtime reads: a fast remux can leave a wav from the old source looking younger than the
+    # one that replaced it. It is dropped even when the times can't be compared, since it is
+    # the one thing that knows.
+    by_mtime = (trust_mtime and src_st is not None and wav_st is not None
+                and wav_st.st_mtime_ns >= src_st.st_mtime_ns - int(MTIME_ROUNDING_S * 10**9))
+    return not marker.exists() and bool(stamp if stamp is not None else by_mtime)
+
+
+def reuses_wav(stream_dir: Path, *, trust_mtime: bool = True) -> bool:
+    """Whether the next extract_audio would read the audio.wav already here rather than decode
+    the source again: read-only, and False whenever that can't be told (no wav, no source, a link,
+    a share that won't answer), since then a decode is what the next run does or tries."""
+    try:
+        if not (stream_dir / "audio.wav").exists():
+            return False
+        src = source_file(stream_dir)
+        if is_link(src):
+            return False
+        return _wav_is_for(stream_dir, src, trust_mtime)
+    except (OSError, ClipperError):
+        return False
+
+
 def extract_audio(stream_dir: Path, *, trust_mtime: bool = True) -> Path:
     """The stream's audio.wav: the one already here when it was decoded from this source, else the
     source decoded again (gaps filled with silence, 16 kHz mono).
@@ -168,7 +206,6 @@ def extract_audio(stream_dir: Path, *, trust_mtime: bool = True) -> Path:
     archive item's wav is only ever a failed run's leftover, so one with no stamp is decoded
     again rather than trusted)."""
     wav = stream_dir / "audio.wav"
-    marker = stream_dir / STALE_MARKER
     _drop_link(wav, stream_dir.name)  # a link is not a cache of ours: drop the link, never its target
     try:
         src = source_file(stream_dir)
@@ -180,24 +217,7 @@ def extract_audio(stream_dir: Path, *, trust_mtime: bool = True) -> Path:
         raise ClipperError(f"{stream_dir.name}: its source is a link, not a file; "
                            f"refusing to read it")
     if wav.exists():
-        try:  # lstat: only these two regular files' own times decide which is newer
-            src_st = src.lstat()
-        except OSError:  # can't be stat'ed: its times say nothing (the marker still does)
-            src_st = None
-        try:
-            wav_st = wav.lstat()
-        except OSError:
-            wav_st = None
-        stamp = _stamp_says(stream_dir, src_st)
-        # With no stamp, a wav up to the share's rounding older than its source is not older:
-        # keep it. Anything older was decoded from a different file, so it is dropped and the
-        # source decoded again. The marker says the same outright, whatever the stamp or the
-        # mtime reads: a fast remux can leave a wav from the old source looking younger than the
-        # one that replaced it. It is dropped even when the times can't be compared, since it is
-        # the one thing that knows.
-        by_mtime = (trust_mtime and src_st is not None and wav_st is not None
-                    and wav_st.st_mtime_ns >= src_st.st_mtime_ns - int(MTIME_ROUNDING_S * 10**9))
-        if not marker.exists() and (stamp if stamp is not None else by_mtime):
+        if _wav_is_for(stream_dir, src, trust_mtime):
             return wav
         try:
             wav.unlink()  # marked, or not this source's by its stamp or its mtime

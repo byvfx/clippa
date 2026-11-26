@@ -23,6 +23,8 @@ Developing#releases.
   come back) and let the next run download a `.ts`. It waits while a show
   is live (`--force` overrides), and the chat offers it as a card. `archive transcribe` no longer
   skips a dead link whose item keeps a copy here (a video, or a source set aside): it reads it.
+  An `archive transcribe` whose source a fixup replaces while it reads the audio transcribes nothing,
+  and the next run reads the repaired copy.
 - 11-26: every stage now reads media as local files only (#447): cut, Shorts, previews, thumbnails,
   faces, the war room's low-res copies, the archive's flac and the rest pass `-protocol_whitelist file`
   to ffmpeg and ffprobe, so a file that is really a playlist (or a concat list naming an address) fails

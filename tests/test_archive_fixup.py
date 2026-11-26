@@ -62,6 +62,8 @@ def test_an_in_order_copy_is_refused_and_its_wav_kept(acfg, monkeypatch, capsys)
     d = idir(acfg)
     (d / "source.refused.ts").write_bytes(b"in order")
     (d / "audio.wav").write_bytes(b"wav")
+    st = (d / "source.refused.ts").stat()  # its stamp names this copy: the next run would reuse it
+    jsonstate.write(d / "audio.wav.src", {"size": st.st_size, "mtime_ns": st.st_mtime_ns})
     monkeypatch.setattr(archive.subprocess, "run", FakeFf([REPAIRED, REPAIRED], packets=IN_ORDER, wav_s=33900.0))
     with pytest.raises(ClipperError, match="already in order, so a remux has nothing to take out; its audio.wav runs 67.3 s past"):
         archive.fixup_item(acfg, "s", "kick-1")
@@ -80,6 +82,22 @@ def test_an_in_order_copy_kept_for_a_failed_stale_mark_is_sent_to_transcribe(acf
         archive.fixup_item(acfg, "s", "kick-1")
     assert "can't fix" not in str(err.value)
     assert (d / "source.ts").read_bytes() == b"in order"
+
+
+@pytest.mark.parametrize("stamp", [None, {"size": 1, "mtime_ns": 1}], ids=["no-stamp", "another-files-stamp"])
+def test_an_overrunning_wav_the_next_run_would_decode_again_is_not_final(acfg, monkeypatch, stamp):
+    """Grok on #453: a wav whose stamp doesn't name this copy (an archive item trusts no mtime) is
+    decoded again by the next run, so its overrun says nothing about this copy."""
+    d = idir(acfg)
+    (d / "source.ts").write_bytes(b"in order")
+    (d / ".refused").write_text("couldn't mark audio.wav stale\n", encoding="utf-8")
+    (d / "audio.wav").write_bytes(b"wav of an earlier, jumping decode")
+    if stamp:
+        jsonstate.write(d / "audio.wav.src", stamp)
+    monkeypatch.setattr(archive.subprocess, "run", FakeFf([REPAIRED, REPAIRED], packets=IN_ORDER, wav_s=33900.0))
+    with pytest.raises(ClipperError, match=r"`clippa archive transcribe s` reads it as it is") as err:
+        archive.fixup_item(acfg, "s", "kick-1")
+    assert "can't fix" not in str(err.value)
 
 
 def test_a_copy_changed_during_the_remux_is_not_replaced(acfg, monkeypatch):
