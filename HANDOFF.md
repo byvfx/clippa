@@ -67,8 +67,13 @@ transcribe`) marks a wav beside it stale, since yt-dlp stamps the VOD's Last-Mod
 `--fixup` drops a wav that runs past the container. So re-fetching is not needed and
 a re-transcribe decodes the fixed file: `clippa fetch <url> --fixup` then `clippa transcribe <id>` (about
 three reads of the 33 GB and one 33 GB rewrite). `kick-132975332` is still waiting for that repair.
-Open from the review (not in #444): #448 is on branch `fix/wav-source-stamp-448` (PR open, 11-26), #446 (an archive item's refused source has no repair path), #447 (whitelist the
-other stages' ffmpeg calls), #449 (`is_link` on a share that won't stat is a traceback, not one line).
+Open from the review (not in #444), as stacked PRs (11-26), each based on the one before; retarget the next
+to main as each merges: #450 (#448, the stamp) <- #451 (#449, `media.link_or_raise`: a share that won't stat is
+one line) <- #452 (#447, `-protocol_whitelist file` on every local ffmpeg/ffprobe input, a test's AST scan; the
+recorder's concat is allow-listed until it is tried on its bookworm ffmpeg 5.1) <- the #446 PR (`clippa archive
+fixup <subject> <item>`: remuxes a refused item's kept copy in place under the name the next run reads, drops
+its wav, waits while live unless `--force`; a catalog SPEND card `archive_fixup`; a kept source.mp4 is named,
+not remuxed).
 
 
 ## User decisions (keep)

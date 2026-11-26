@@ -6,6 +6,7 @@ clippa archive add jer https://www.youtube.com/@TheQuartering   # list long-form
 clippa archive transcribe jer --limit 100 --dry-run              # hours and estimated cost
 clippa archive transcribe jer --limit 100                        # WhisperX on Modal, 8 at once; log in archive/jer/transcribe.log
 clippa archive transcribe jer --diarize                          # speaker turns too (~+80% GPU), named against voices/jer.json
+clippa archive fixup jer kick-123                                # remux an item whose timeline was refused, in place
 clippa archive status
 clippa modal                                                     # GPUs up, runs, spend, archive ETA
 clippa costs [--month 2026-10]                                   # month's spend: models + Modal + fixed, by stage/show/stream
@@ -39,6 +40,13 @@ calls alone cost at least.
 whether each item is alive, restricted (private, embedding off, blocked) or dead, kept in
 `links.json` with when it changed, and reruns report what died since. A dead link with a
 transcript is a receipt whose source is gone; `transcribe` skips dead links.
+
+An item whose source's timestamps jump backwards is refused by `transcribe` and its download kept
+(`source.refused.ts`): `clippa archive fixup <subject> <item>` remuxes it in place with the
+timestamps regenerated, free and on this machine, and the next `transcribe` finishes it
+([Bugs to remember](Bugs-to-remember)). It waits while a show is live, since it rewrites a whole
+source on the share (`--force` overrides). A kept `source.mp4` can't be remuxed this way: delete it
+and the next `transcribe` downloads a `.ts` that can.
 `clippa archive check jer --items yt-<id> ...` checks just the items you are about to link to.
 
 It needs the Modal backend set up ([Transcribe on Modal](Transcribe-on-Modal)). YouTube audio is

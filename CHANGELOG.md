@@ -12,6 +12,12 @@ Developing#releases.
 
 ### 2026-11
 
+- 11-26: an archive item whose source `clippa archive transcribe` refused for a jumping timeline
+  can now be repaired (#446): `clippa archive fixup <subject> <item>` remuxes the kept copy in place
+  (Kick and HEI alike, no new download), drops the audio decoded from the old one and says to run
+  `archive transcribe` again. The refusal's line names that command; a kept `source.mp4` can't be
+  remuxed, so its line says to delete it and let the next run download a `.ts`. It waits while a show
+  is live (`--force` overrides), and the chat offers it as a card.
 - 11-26: every stage now reads media as local files only (#447): cut, Shorts, previews, thumbnails,
   faces, the war room's low-res copies, the archive's flac and the rest pass `-protocol_whitelist file`
   to ffmpeg and ffprobe, so a file that is really a playlist (or a concat list naming an address) fails

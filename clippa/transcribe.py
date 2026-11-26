@@ -105,6 +105,21 @@ def forget_stamp(stream_dir: Path) -> None:
         pass
 
 
+def drop_wav(stream_dir: Path) -> None:
+    """audio.wav and its stamp gone, after mark_stale and under the caller's lock (a --fixup's, or
+    `archive fixup`'s): a wav the share won't remove is a line, as the marker beside it already
+    says it is stale, so the next extract_audio decodes it again."""
+    try:
+        (stream_dir / "audio.wav").unlink(missing_ok=True)
+    except OSError as e:  # the source may be replaced already: the caller still has to finish
+        print(f"{stream_dir.name}: the old audio.wav couldn't be removed "
+              f"({e.strerror or 'the system refused it'}); it is marked stale, so the "
+              f"next transcribe decodes it again")
+    else:
+        clear_stale(stream_dir)
+        forget_stamp(stream_dir)
+
+
 def _stamp_says(stream_dir: Path, src_st: os.stat_result | None) -> bool | None:
     """Whether audio.wav.src says the wav was decoded from the file `src_st` describes; None when
     there is no stamp (a wav decoded before #448, or one whose stamp couldn't be written), which the

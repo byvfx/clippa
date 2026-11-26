@@ -367,7 +367,7 @@ def _remux_guarded(stream_dir: Path, path: Path, cfg: dict) -> float:
             # The wav beside it was decoded from the old source, and the growth remux_verified
             # returns can be 0.0 after a real rewrite (the lengths agree within tolerance): it
             # goes with the replace, which is the one moment the source is known to have changed.
-            _drop_wav(stream_dir)
+            transcribe.drop_wav(stream_dir)
 
     growth = timeline.remux_verified(path, stream_dir.name, put_in_place)
     if not replaced:
@@ -400,25 +400,11 @@ def _drop_overrunning_wav(stream_dir: Path, refuse_busy: Callable[[], None]) -> 
             transcribe.mark_stale(stream_dir)
             print(f"{stream_dir.name}: audio.wav runs {over:.1f} s past the source's container; "
                   f"dropped, so the next transcribe decodes the source again")
-            _drop_wav(stream_dir)
+            transcribe.drop_wav(stream_dir)
     except (OSError, ClipperError) as e:  # an OSError: a busy check the share wouldn't answer
         why = f"{stream_dir.name}: {e.strerror or 'the system refused it'}" if isinstance(e, OSError) else str(e)
         print(f"{why} (audio.wav runs {over:.1f} s past the container and is left; delete it, or "
               f"--fixup again)")
-
-
-def _drop_wav(stream_dir: Path) -> None:
-    """audio.wav and its stamp gone, under the run lock, after transcribe.mark_stale: a wav the share
-    won't remove is a line, as the marker beside it already says it is stale."""
-    try:
-        (stream_dir / "audio.wav").unlink(missing_ok=True)
-    except OSError as e:  # the source may be replaced already: _store_jump still has to run
-        print(f"{stream_dir.name}: the old audio.wav couldn't be removed "
-              f"({e.strerror or 'the system refused it'}); it is marked stale, so the "
-              f"next transcribe decodes it again")
-    else:
-        transcribe.clear_stale(stream_dir)
-        transcribe.forget_stamp(stream_dir)
 
 
 @contextmanager
