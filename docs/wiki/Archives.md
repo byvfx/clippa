@@ -39,7 +39,8 @@ calls alone cost at least.
 `check` downloads nothing and costs nothing: YouTube's oEmbed endpoint and Odysee's resolve say
 whether each item is alive, restricted (private, embedding off, blocked) or dead, kept in
 `links.json` with when it changed, and reruns report what died since. A dead link with a
-transcript is a receipt whose source is gone; `transcribe` skips dead links.
+transcript is a receipt whose source is gone; `transcribe` skips dead links, except an item
+with a copy kept here (its video, or a source set aside), which it reads in place.
 
 An item whose source's timestamps jump backwards is refused by `transcribe` and its download kept
 (`source.refused.ts`): `clippa archive fixup <subject> <item>` remuxes it in place with the

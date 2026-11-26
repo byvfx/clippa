@@ -31,7 +31,8 @@ anything: YouTube's oEmbed endpoint (no key, no quota) and Odysee's resolve. Res
 <subject>/links.json: status alive | restricted (private, embedding off, or blocked) | dead,
 the reason, when it was checked and since when it has had that status. A link that cannot be
 checked (network, rate limit) keeps its last result. Items not checked within
-[archive] link_recheck_days are checked again; `transcribe` skips items whose link is dead.
+[archive] link_recheck_days are checked again; `transcribe` skips items whose link is dead,
+unless a copy is kept in the item's folder (a video, or a source set aside), which it reads.
 """
 
 from __future__ import annotations
@@ -486,7 +487,10 @@ def run_transcribe(cfg: dict, subject: str, limit: int | None, oldest: bool, gpu
     # transcribes it there (item_dir), so it is never paid for again here.
     todo = [it for it in cat.values() if not it.get("dir") and not (d / it["id"] / "words.jsonl").exists()]
     links = load_links(d)
-    dead = {i for i, lk in links.items() if lk["status"] == "dead"}
+    # a dead link is no download, but a copy kept here (a video, or a source set aside and
+    # repaired by `archive fixup`) is read in place: the VOD being gone is when it matters most
+    dead = {i for i, lk in links.items() if lk["status"] == "dead"
+            and not (cat.get(i, {}).get("source") in ("kick", "hei") and any(set_aside(d / i)))}
     if skipped := sum(1 for it in todo if it["id"] in dead):
         print(f"{subject}: {skipped} skipped, source link dead (clippa archive links {subject})")
         todo = [it for it in todo if it["id"] not in dead]
@@ -842,8 +846,13 @@ def fixup_item(cfg: dict, subject: str, item_id: str, force: bool = False) -> fl
 
 
 def _stream_fixup(it: dict) -> str:
-    """The repair for an item that is one of our streams: its own --fixup, by url when the catalog has one."""
-    return f"`clippa fetch {it['url']} --fixup`" if it.get("url") else "`clippa fetch <the VOD's url> --fixup`"
+    """The repair for an item that is one of our streams: its own `fetch --fixup`, which takes a
+    canonical Kick VOD url only (it remuxes an mpegts copy), so any other url is not offered."""
+    from .kick import canonical_vod_url
+
+    if url := canonical_vod_url(it.get("url")):
+        return f"`clippa fetch {url} --fixup`"
+    return "`clippa fetch <its Kick VOD url> --fixup` (a stream from elsewhere has no remux repair)"
 
 
 def kept_video(idir: Path) -> Path | None:

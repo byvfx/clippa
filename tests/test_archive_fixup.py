@@ -92,11 +92,11 @@ def test_a_copy_changed_during_the_remux_is_not_replaced(acfg, monkeypatch):
 def test_a_stream_of_ours_is_pointed_at_its_own_fixup(acfg):
     d = acfg["paths"]["archive"] / "s"
     jsonstate.write(d / "catalog.json", {"kick-9": {"id": "kick-9", "source": "kick", "dir": "streams/kick-9",
-                                                    "url": "https://kick.com/x/videos/abc"}})
-    with pytest.raises(ClipperError, match=r"`clippa fetch https://kick.com/x/videos/abc --fixup`"):
+                                                    "url": "https://kick.com/x/videos/c7ab4ab0-9c62-47a7-81d6-7f5ec581b091"}})
+    with pytest.raises(ClipperError, match=r"`clippa fetch https://kick.com/x/videos/c7ab4ab0-9c62-47a7-81d6-7f5ec581b091 --fixup`"):
         archive.fixup_item(acfg, "s", "kick-9")
     p = catalog.prepare(acfg, "archive_fixup", {"subject": "s", "item": "kick-9"})
-    assert p.kind == "answer" and "clippa fetch https://kick.com/x/videos/abc --fixup" in p.text
+    assert p.kind == "answer" and "clippa fetch https://kick.com/x/videos/c7ab4ab0-9c62-47a7-81d6-7f5ec581b091 --fixup" in p.text
 
 
 def test_the_card_leaves_the_folder_as_it_is(acfg):
@@ -178,3 +178,28 @@ def test_the_cards_argv_parses_as_meant():
 
     a = build_parser().parse_args(["archive", "fixup", "--", "s", "-dashed1"])
     assert (a.action, a.subject, a.item, a.force) == ("fixup", "s", "-dashed1", False)
+
+
+def test_a_youtube_stream_of_ours_is_not_pointed_at_a_fetch_that_refuses_it(acfg):
+    """Grok on #453: `fetch --fixup` takes a canonical Kick VOD url only."""
+    d = acfg["paths"]["archive"] / "s"
+    jsonstate.write(d / "catalog.json", {"yt-9": {"id": "yt-9", "source": "youtube", "dir": "streams/yt-9",
+                                                  "url": "https://www.youtube.com/watch?v=abc"}})
+    with pytest.raises(ClipperError) as err:
+        archive.fixup_item(acfg, "s", "yt-9")
+    assert "youtube.com" not in str(err.value) and "has no remux repair" in str(err.value)
+
+
+@pytest.mark.parametrize("copy, todo", [("source.refused.ts", ["kick-1"]), (None, [])], ids=["kept", "none"])
+def test_a_dead_link_with_a_copy_kept_here_is_still_transcribed(acfg, monkeypatch, capsys, copy, todo):
+    """Grok on #453: a repaired copy of a VOD that is gone is the case the repair is for, so the dead
+    link only skips an item with nothing here to read."""
+    d = acfg["paths"]["archive"] / "s"
+    if copy:
+        (d / "kick-1" / copy).write_bytes(b"repaired")
+    archive.save_json(d, "links.json", {"kick-1": {"status": "dead", "since": "2026-11-01T00:00:00", "reason": "gone"}})
+    seen = []
+    monkeypatch.setattr(archive, "transcribe_estimate", lambda cfg, s, todo, gpu, par: seen.append(todo) or "")
+    archive.run_transcribe(acfg, "s", None, False, "L4", 1, dry_run=True)
+    assert [it["id"] for it in seen[0]] == todo
+    assert ("1 skipped, source link dead" in capsys.readouterr().out) is (copy is None)
