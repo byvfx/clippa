@@ -18,7 +18,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -366,16 +366,32 @@ def _remux_guarded(stream_dir: Path, path: Path, cfg: dict) -> float:
             _drop_wav(stream_dir)
 
     growth = timeline.remux_verified(path, stream_dir.name, put_in_place)
-    if not replaced and (stream_dir / "audio.wav").exists():
-        lengths = transcribe.audio_lengths(stream_dir)
-        if lengths and lengths[0] - lengths[1] > timeline.TOLERANCE_S:
-            with _run_lock(stream_dir):
-                refuse_busy()
-                transcribe.mark_stale(stream_dir)  # one that can't be written is the run's one line
-                print(f"{stream_dir.name}: audio.wav ran {lengths[0] - lengths[1]:.1f} s past the "
-                      f"source's container, so it was decoded from an earlier file; dropping it")
-                _drop_wav(stream_dir)
+    if not replaced:
+        _drop_overrunning_wav(stream_dir, refuse_busy)
     return growth
+
+
+def _drop_overrunning_wav(stream_dir: Path, refuse_busy: Callable[[], None]) -> None:
+    """#448, for a source already in order: a wav that runs past its container by more than
+    timeline.TOLERANCE_S is marked stale and dropped under the run lock. Best effort: the fixup
+    itself worked, so a busy worker, a lock that isn't free or a marker the share won't write is a
+    line, never an error that would skip the caller's _store_jump."""
+    if not (stream_dir / "audio.wav").exists():
+        return
+    lengths = transcribe.audio_lengths(stream_dir)
+    if not lengths or lengths[0] - lengths[1] <= timeline.TOLERANCE_S:
+        return
+    over = lengths[0] - lengths[1]
+    try:
+        with _run_lock(stream_dir):
+            refuse_busy()
+            transcribe.mark_stale(stream_dir)
+            print(f"{stream_dir.name}: audio.wav runs {over:.1f} s past the source's container; "
+                  f"dropped, so the next transcribe decodes the source again")
+            _drop_wav(stream_dir)
+    except ClipperError as why:
+        print(f"{why} (audio.wav runs {over:.1f} s past the container and is left; delete it, or "
+              f"--fixup again)")
 
 
 def _drop_wav(stream_dir: Path) -> None:

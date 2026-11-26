@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from clippa import cli, kick, timeline, transcribe
+from clippa import cli, jsonstate, kick, timeline, transcribe
 from clippa.errors import ClipperError
 
 
@@ -570,7 +570,7 @@ def test_an_in_order_fixup_drops_a_wav_that_runs_past_the_container(defaults, tm
     assert not (tmp_path / "audio.wav.stale").exists()  # the wav went, so the marker did too
     out = capsys.readouterr().out
     assert "the timeline is already in order" in out
-    assert "audio.wav ran 67.3 s past the source's container" in out
+    assert "audio.wav runs 67.3 s past the source's container; dropped" in out
 
 
 def test_an_in_order_fixup_keeps_a_wav_within_the_tolerance(defaults, tmp_path, monkeypatch):
@@ -583,20 +583,42 @@ def test_an_in_order_fixup_keeps_a_wav_within_the_tolerance(defaults, tmp_path, 
     assert not (tmp_path / "audio.wav.stale").exists()
 
 
-def test_an_in_order_fixup_that_cannot_mark_the_wav_is_one_line(defaults, tmp_path, monkeypatch):
+def test_an_in_order_fixup_that_cannot_mark_the_wav_still_finishes(defaults, tmp_path, monkeypatch, capsys):
     """The marker goes in before the wav is dropped, as it does before a replace: one the share won't
-    write is the run's one line, and the wav (whose drop would then be unrecorded) is left."""
+    write leaves the wav, says so in a line, and the fixup still stores what it found (the in-order
+    source clears a timeline_overlap_s an earlier repair left)."""
     (tmp_path / "source.ts").write_bytes(b"in order")
     (tmp_path / "audio.wav").write_bytes(b"wav")
+    jsonstate.write(tmp_path / "meta.json", {"stream_id": "kick-1", "timeline_overlap_s": 821.7})
     monkeypatch.setattr(kick.subprocess, "run", FakeFf([REPAIRED, REPAIRED], packets=IN_ORDER, wav_s=33900.0))
 
     def denied(stream_dir):
         raise ClipperError(f"{stream_dir.name}: couldn't record that its audio.wav is stale (Access is denied)")
 
     monkeypatch.setattr(kick.transcribe, "mark_stale", denied)
-    with pytest.raises(ClipperError, match=r"couldn't record that its audio\.wav is stale"):
-        kick.fixup(tmp_path, defaults)
+    kick.fixup(tmp_path, defaults)
     assert (tmp_path / "audio.wav").read_bytes() == b"wav"
+    assert jsonstate.load(tmp_path / "meta.json") == {"stream_id": "kick-1"}
+    assert "is left; delete it, or --fixup again" in capsys.readouterr().out
+
+
+def test_an_in_order_fixup_leaves_the_wav_to_a_busy_worker(defaults, tmp_path, monkeypatch, capsys):
+    """A worker on the stream may be reading the wav: it is left, the fixup says why and finishes."""
+    (tmp_path / "source.ts").write_bytes(b"in order")
+    (tmp_path / "audio.wav").write_bytes(b"wav")
+    monkeypatch.setattr(kick.subprocess, "run", FakeFf([REPAIRED, REPAIRED], packets=IN_ORDER, wav_s=33900.0))
+    calls = []
+
+    def busy(stream_dir, cfg):
+        calls.append(1)
+        return "the worker" if len(calls) > 1 else ""  # free before the check, busy at the drop
+
+    monkeypatch.setattr("clippa.pick.worker_busy", busy)
+    kick.fixup(tmp_path, defaults)
+    assert (tmp_path / "audio.wav").read_bytes() == b"wav"
+    assert not (tmp_path / "audio.wav.stale").exists()
+    out = capsys.readouterr().out
+    assert "the worker is running it" in out and "is left" in out
 
 
 def test_a_redownload_marks_the_wav_it_replaces_stale(defaults, tmp_path, monkeypatch):
