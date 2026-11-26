@@ -12,6 +12,9 @@ Developing#releases.
 
 ### 2026-11
 
+- 11-26: a `clippa fetch --fixup` that rewrites a source already transcribed (one done before #440's
+  check) now says its `words.jsonl` has the old timeline's times and names `clippa transcribe <id>
+  --force`, since a plain transcribe keeps it as done.
 - 11-26: an archive item whose source `clippa archive transcribe` refused for a jumping timeline
   can now be repaired (#446): `clippa archive fixup <subject> <item>` remuxes the kept copy in place
   (Kick and HEI alike, no new download), drops the audio decoded from the old one and says to run

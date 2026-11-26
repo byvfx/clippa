@@ -372,7 +372,25 @@ def _remux_guarded(stream_dir: Path, path: Path, cfg: dict) -> float:
     growth = timeline.remux_verified(path, stream_dir.name, put_in_place)
     if not replaced:
         _drop_overrunning_wav(stream_dir, refuse_busy)
+    else:
+        _name_forced_transcribe(stream_dir)
     return growth
+
+
+def _name_forced_transcribe(stream_dir: Path) -> None:
+    """A transcript from before the repair (one made before #440's check) has the old timeline's
+    times, and a plain transcribe keeps it as done: say what makes it again. The source is already
+    replaced, so a share that won't stat the name (#449) gets the line hedged, never a traceback
+    that would skip the caller's _store_jump."""
+    fix = f"`clippa transcribe {stream_dir.name} --force` makes it again"
+    try:
+        there = (stream_dir / "words.jsonl").exists()
+    except OSError:
+        print(f"{stream_dir.name}: couldn't tell whether words.jsonl is here; if it is, it has the old "
+              f"timeline's times and {fix}")
+        return
+    if there:
+        print(f"{stream_dir.name}: words.jsonl was made from the old timeline; {fix}")
 
 
 def _drop_overrunning_wav(stream_dir: Path, refuse_busy: Callable[[], None]) -> None:

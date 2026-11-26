@@ -125,7 +125,9 @@ A `--fixup` that rewrites the source marks `audio.wav.stale` before the replace 
 `audio.wav` decoded from the old one, so the transcribe after it reads the repaired file (its
 samples differ: `aresample` stretched across the jump); the marker is the durable half, written
 before anything is replaced, because a fast remux can leave the wav looking current and after a
-repair the two lengths agree, so the timeline check can't tell them apart. A plain `clippa fetch`, and `clippa archive transcribe`'s own download, mark a wav beside a source
+repair the two lengths agree, so the timeline check can't tell them apart. A stream transcribed
+before the check has a `words.jsonl` from the jumping copy, which a plain transcribe keeps as done:
+the `--fixup` that rewrites its source names `clippa transcribe <id> --force`. A plain `clippa fetch`, and `clippa archive transcribe`'s own download, mark a wav beside a source
 they downloaded stale too, since yt-dlp stamps the VOD's `Last-Modified`, older than the wav. `extract_audio` decodes again a marked wav whatever else says, then goes by
 `audio.wav.src`, the stamp each decode writes beside the wav: the source's size and mtime when the decode
 began ([#448](https://github.com/byvfx/clippa/issues/448)). A wav is reused only when the stamp still
