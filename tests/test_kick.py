@@ -602,6 +602,47 @@ def test_an_in_order_fixup_that_cannot_mark_the_wav_still_finishes(defaults, tmp
     assert "is left; delete it, or --fixup again" in capsys.readouterr().out
 
 
+def test_an_in_order_fixup_whose_wav_will_not_stat_still_stores_the_timeline(
+        defaults, tmp_path, monkeypatch, capsys):
+    """#450 review: a wav the share won't stat (pathlib re-raises EACCES on 3.12) is not an error
+    that skips _store_jump: the wav is left, with a line, and the in-order source clears the
+    timeline_overlap_s an earlier repair stored."""
+    (tmp_path / "source.ts").write_bytes(b"in order")
+    (tmp_path / "audio.wav").write_bytes(b"wav")
+    jsonstate.write(tmp_path / "meta.json", {"stream_id": "kick-1", "timeline_overlap_s": 821.7})
+    monkeypatch.setattr(kick.subprocess, "run", FakeFf([REPAIRED, REPAIRED], packets=IN_ORDER, wav_s=33900.0))
+    real = Path.exists
+
+    def refused(self, *a, **kw):
+        if self.name == "audio.wav":
+            raise PermissionError(13, "Access is denied")
+        return real(self, *a, **kw)
+
+    monkeypatch.setattr(Path, "exists", refused)
+    kick.fixup(tmp_path, defaults)
+    monkeypatch.setattr(Path, "exists", real)
+    assert (tmp_path / "audio.wav").read_bytes() == b"wav"
+    assert jsonstate.load(tmp_path / "meta.json") == {"stream_id": "kick-1"}
+    out = capsys.readouterr().out
+    assert "couldn't compare audio.wav with the source (Access is denied); it is left as it is" in out
+    assert str(tmp_path) not in out
+
+
+def test_an_in_order_fixup_whose_source_has_no_duration_still_stores_the_timeline(
+        defaults, tmp_path, monkeypatch, capsys):
+    """#450 review: the second probe giving no container duration is a line too, never a raise past
+    _store_jump."""
+    (tmp_path / "source.ts").write_bytes(b"in order")
+    (tmp_path / "audio.wav").write_bytes(b"wav")
+    jsonstate.write(tmp_path / "meta.json", {"stream_id": "kick-1", "timeline_overlap_s": 821.7})
+    no_duration = json.dumps({"format": {"start_time": "62.016667"}})
+    monkeypatch.setattr(kick.subprocess, "run", FakeFf([REPAIRED, no_duration], packets=IN_ORDER, wav_s=33900.0))
+    kick.fixup(tmp_path, defaults)
+    assert (tmp_path / "audio.wav").read_bytes() == b"wav"
+    assert jsonstate.load(tmp_path / "meta.json") == {"stream_id": "kick-1"}
+    assert "couldn't compare audio.wav with the source (ffprobe gave no container duration" in capsys.readouterr().out
+
+
 def test_an_in_order_fixup_leaves_the_wav_to_a_busy_worker(defaults, tmp_path, monkeypatch, capsys):
     """A worker on the stream may be reading the wav: it is left, the fixup says why and finishes."""
     (tmp_path / "source.ts").write_bytes(b"in order")

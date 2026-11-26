@@ -375,10 +375,18 @@ def _drop_overrunning_wav(stream_dir: Path, refuse_busy: Callable[[], None]) -> 
     """#448, for a source already in order: a wav that runs past its container by more than
     timeline.TOLERANCE_S is marked stale and dropped under the run lock. Best effort: the fixup
     itself worked, so a busy worker, a lock that isn't free or a marker the share won't write is a
-    line, never an error that would skip the caller's _store_jump."""
-    if not (stream_dir / "audio.wav").exists():
+    line, never an error that would skip the caller's _store_jump. That includes the check itself:
+    a wav the share won't stat (pathlib re-raises EACCES) or a source ffprobe can't time leaves the
+    wav as it is, with a line, and transcribe's guard still judges it."""
+    try:
+        if not (stream_dir / "audio.wav").exists():
+            return
+        lengths = transcribe.audio_lengths(stream_dir)
+    except (OSError, ClipperError) as e:
+        why = (e.strerror or "the system refused it") if isinstance(e, OSError) else str(e)
+        print(f"{stream_dir.name}: couldn't compare audio.wav with the source ({why}); it is left "
+              f"as it is")
         return
-    lengths = transcribe.audio_lengths(stream_dir)
     if not lengths or lengths[0] - lengths[1] <= timeline.TOLERANCE_S:
         return
     over = lengths[0] - lengths[1]
@@ -389,7 +397,8 @@ def _drop_overrunning_wav(stream_dir: Path, refuse_busy: Callable[[], None]) -> 
             print(f"{stream_dir.name}: audio.wav runs {over:.1f} s past the source's container; "
                   f"dropped, so the next transcribe decodes the source again")
             _drop_wav(stream_dir)
-    except ClipperError as why:
+    except (OSError, ClipperError) as e:  # an OSError: a busy check the share wouldn't answer
+        why = f"{stream_dir.name}: {e.strerror or 'the system refused it'}" if isinstance(e, OSError) else str(e)
         print(f"{why} (audio.wav runs {over:.1f} s past the container and is left; delete it, or "
               f"--fixup again)")
 
