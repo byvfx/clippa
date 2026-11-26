@@ -20,6 +20,10 @@ ALLOWED = {
     # HLS for a stream).
     ("broll.py", "length_of"): "address or file",
     ("broll.py", "encode"): "address or file",
+    # The recorder joins the parts it wrote itself, and its image is Debian 12's ffmpeg 5.1, where a
+    # whitelisted concat hasn't been tried: a join that broke would leave a show unjoined. Pin it
+    # in a PR of its own, tested in that image, before a recorder deploy.
+    ("record/finalize.py", "join"): "the recorder's own parts",
 }
 
 
@@ -83,8 +87,8 @@ def package_findings() -> dict[tuple[str, str], list[int]]:
 
 def test_every_local_ffmpeg_input_is_pinned_to_files():
     bad = {k: v for k, v in package_findings().items() if k not in ALLOWED}
-    assert not bad, ("put \"-protocol_whitelist\", \"file\" before each input (or allow-list a url input "
-                     "here, with its reason): " + ", ".join(f"{m}:{n} ({fn})" for (m, fn), ns in bad.items()
+    assert not bad, ("put \"-protocol_whitelist\", \"file\" before each input (or allow-list a url input, "
+                     "or a `-i` that isn't ffmpeg's, such as ssh's, here with its reason): " + ", ".join(f"{m}:{n} ({fn})" for (m, fn), ns in bad.items()
                                                          for n in ns))
 
 
