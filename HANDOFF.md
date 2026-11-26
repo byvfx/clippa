@@ -59,14 +59,15 @@ and a transcript would be off after it. It names the stream, both lengths and, f
 `clippa fetch <url> --fixup`; `--fixup` remuxes `source.ts` with fresh timestamps (`clippa/timeline.py`,
 Kick only, `.ts` only) into a fresh `.timeline-*.part`, and replaces the original only when the probe, the
 packet order (both streams) and a 90% size floor all pass. The repair writes `audio.wav.stale` before the
-replace and drops the wav decoded from the old source (`extract_audio` honours the marker whatever the
-mtime, re-decodes a wav older than its source by more than a share's 2 s rounding, and refuses to install
-audio whose source changed under the decode); every download (`fetch`, `archive transcribe`) marks a wav
-beside it stale, since yt-dlp stamps the VOD's Last-Modified. So re-fetching is not needed and
+replace and drops the wav decoded from the old source (`extract_audio` honours the marker whatever else
+says, then reuses a wav only when `audio.wav.src`, the size+mtime stamp each decode writes (#448), still
+names the source; a wav from before the stamps falls back to the 2 s mtime rule, except in an archive item;
+it refuses to install audio whose source changed under the decode); every download (`fetch`, `archive
+transcribe`) marks a wav beside it stale, since yt-dlp stamps the VOD's Last-Modified. An in-order
+`--fixup` drops a wav that runs past the container. So re-fetching is not needed and
 a re-transcribe decodes the fixed file: `clippa fetch <url> --fixup` then `clippa transcribe <id>` (about
 three reads of the 33 GB and one 33 GB rewrite). `kick-132975332` is still waiting for that repair.
-Open from the review (not in #444): #448 (an `audio.wav.src` stamp, and an in-order `--fixup` clearing a
-wav the guard calls stale), #446 (an archive item's refused source has no repair path), #447 (whitelist the
+Open from the review (not in #444): #448 is on branch `fix/wav-source-stamp-448` (PR open, 11-26), #446 (an archive item's refused source has no repair path), #447 (whitelist the
 other stages' ffmpeg calls), #449 (`is_link` on a share that won't stat is a traceback, not one line).
 
 
