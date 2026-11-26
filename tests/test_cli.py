@@ -72,6 +72,8 @@ def test_flags_mean_the_same_everywhere():
     assert parse("shorts", "kick-1", "--save-example", "cams", "--at", "90.5").at == 90.5
     assert parse("upload", "--max", "3").limit == 3 == parse("upload", "--limit", "3").limit
     assert parse("review", "status").sync is False   # a status never writes (a sync can post to Kitsu)
+    assert parse("fetch", "https://kick.com/a/videos/b", "--fixup").fixup is True
+    assert parse("fetch", "https://kick.com/a/videos/b").fixup is False
 
 
 @pytest.mark.parametrize("argv", [

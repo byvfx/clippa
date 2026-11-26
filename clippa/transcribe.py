@@ -25,35 +25,298 @@ from __future__ import annotations
 
 import gc
 import json
+import math
 import os
+import shlex
 import subprocess
 import sys
 import time
 from pathlib import Path
 
-from . import jsonstate, wiki
-from .errors import ClipperError
-from .media import source_file
+from . import jsonstate, timeline, wiki
+from .errors import ClipperError, exit_code
+from .media import is_link, link_or_raise, remove_link, source_file, try_duration
 
 
-def extract_audio(stream_dir: Path) -> Path:
+class TimelineJump(ClipperError):
+    """#440: the source's timeline jumps back, so every time after it would be off. `.reason` is
+    the message without the advice, for a caller whose copy must not carry a url or a command
+    (`archive` writes the exception into error.txt); `str()` adds the `clippa fetch <url> --fixup`
+    line when that would repair this source."""
+
+    def __init__(self, reason: str, advice: str = "") -> None:
+        self.reason = reason
+        super().__init__(f"{reason}: {advice}" if advice else reason)
+
+
+# FAT and SMB round timestamps by as much as 2 s, so a wav written just after its source can read
+# as older than it; that much is rounding. Anything older was decoded from a different file —
+# whatever the source's own stamp says, and never compared with this clock (a source stamped in
+# the future says nothing about which file the wav was made from).
+MTIME_ROUNDING_S = 2.0
+
+# Beside audio.wav: it was decoded from a source that is not the one here any more, so it has to be
+# decoded again. An mtime can't say that on its own (a fast remux leaves the wav looking younger
+# than the share rounds by), and the marker holds where the wav itself couldn't be dropped.
+STALE_MARKER = "audio.wav.stale"
+
+# Beside audio.wav (#448): which file it was decoded from, as that file's own lstat read when the
+# decode began ({"size", "mtime_ns"}). An mtime alone is not an identity: a source put back from a
+# backup, or moved in by hand, can carry any stamp, older than the wav included. The size must
+# match exactly and the mtime within MTIME_ROUNDING_S, since the laptop over SMB and a container
+# on the NAS's own disk read the same file's time at different precisions.
+SRC_STAMP = "audio.wav.src"
+
+
+def _drop_link(p: Path, label: str) -> None:
+    """A link where ffmpeg is about to write with `-y`: ffmpeg follows it and would truncate what
+    it names, so the link goes first (the link alone, never what it names). One that can't be
+    removed is a one-line error naming the stream and the system's reason, with no path."""
+    if not link_or_raise(p, label):  # a share that won't say is one line too (#449)
+        return
+    try:
+        remove_link(p)
+    except OSError as e:
+        raise ClipperError(f"{label}: couldn't drop the linked {p.name} "
+                           f"({e.strerror or 'the system refused it'})") from None
+
+
+def mark_stale(stream_dir: Path) -> None:
+    """Record that this stream's `audio.wav` was decoded from another source, so the next
+    transcribe decodes it again (a --fixup calls this before it replaces source.ts, which is why
+    the fact outlives a drop of the wav the share refused). A marker that can't be written is one
+    line: the caller keeps the source it was about to replace, which the wav still matches."""
+    marker = stream_dir / STALE_MARKER
+    _drop_link(marker, stream_dir.name)  # a link here is not a marker: the link goes, never its target
+    try:
+        marker.touch(exist_ok=True)
+    except OSError as e:
+        raise ClipperError(f"{stream_dir.name}: couldn't record that its audio.wav is stale "
+                           f"({e.strerror or 'the system refused it'})") from None
+
+
+def clear_stale(stream_dir: Path) -> None:
+    """Best effort: a marker left beside a wav that was decoded again only costs one more decode,
+    so failing to remove it must never turn a good decode or replace into an error."""
+    try:
+        (stream_dir / STALE_MARKER).unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def forget_stamp(stream_dir: Path) -> None:
+    """Best effort, with the wav it describes gone: a stamp left behind only ever says the next
+    wav is of another file (it was written for an earlier decode), which costs a decode, never a
+    wrong reuse."""
+    try:
+        (stream_dir / SRC_STAMP).unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def _stamp_says(stream_dir: Path, src_st: os.stat_result | None) -> bool | None:
+    """Whether audio.wav.src says the wav was decoded from the file `src_st` describes; None when
+    there is no stamp (a wav decoded before #448, or one whose stamp couldn't be written), which the
+    mtime rule decides. A stamp that is a link, can't be read or isn't one is a no: it is the
+    record, and one this can't read can't vouch for the wav. A source the share won't stat
+    matches nothing."""
+    path = stream_dir / SRC_STAMP
+    try:
+        if is_link(path):
+            return False
+        stamp = jsonstate.load(path)
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError):
+        return False
+    if src_st is None or not isinstance(stamp, dict):
+        return False
+    size, mtime = stamp.get("size"), stamp.get("mtime_ns")
+    if type(size) is not int or type(mtime) is not int:  # bool is an int: not a size
+        return False
+    return size == src_st.st_size and abs(mtime - src_st.st_mtime_ns) <= int(MTIME_ROUNDING_S * 10**9)
+
+
+def _write_stamp(stream_dir: Path, decoded: tuple[int, int] | None) -> None:
+    """Best effort after a decode is installed: with no stamp the wav falls back to the mtime rule,
+    which a wav written just now passes. A share that won't take it leaves an earlier stamp at
+    worst (forget_stamp went with the earlier wav, so one here is a failed drop's), which names
+    another file and costs one decode."""
+    if decoded is None:  # the source's times couldn't be read: nothing to record
+        forget_stamp(stream_dir)
+        return
+    try:
+        jsonstate.write(stream_dir / SRC_STAMP, {"size": decoded[0], "mtime_ns": decoded[1]}, indent=None)
+    except OSError:
+        pass
+
+
+def extract_audio(stream_dir: Path, *, trust_mtime: bool = True) -> Path:
+    """The stream's audio.wav: the one already here when it was decoded from this source, else the
+    source decoded again (gaps filled with silence, 16 kHz mono).
+
+    Which file a cached wav came from is decided in this order: the stale marker (a --fixup or a
+    download wrote it: decode again, whatever else says); then the stamp beside it, audio.wav.src
+    (#448: reuse only when it names this source's size and mtime); then, for a wav decoded before
+    there were stamps, its mtime against the source's. trust_mtime False drops that last rule (an
+    archive item's wav is only ever a failed run's leftover, so one with no stamp is decoded
+    again rather than trusted)."""
     wav = stream_dir / "audio.wav"
+    marker = stream_dir / STALE_MARKER
+    _drop_link(wav, stream_dir.name)  # a link is not a cache of ours: drop the link, never its target
+    try:
+        src = source_file(stream_dir)
+    except ClipperError:
+        if wav.exists():  # no source (any more): the wav is all there is to read
+            return wav
+        raise
+    if link_or_raise(src, stream_dir.name):  # ffmpeg must not be sent through a link to somewhere else
+        raise ClipperError(f"{stream_dir.name}: its source is a link, not a file; "
+                           f"refusing to read it")
     if wav.exists():
-        return wav
-    src = source_file(stream_dir)
+        try:  # lstat: only these two regular files' own times decide which is newer
+            src_st = src.lstat()
+        except OSError:  # can't be stat'ed: its times say nothing (the marker still does)
+            src_st = None
+        try:
+            wav_st = wav.lstat()
+        except OSError:
+            wav_st = None
+        stamp = _stamp_says(stream_dir, src_st)
+        # With no stamp, a wav up to the share's rounding older than its source is not older:
+        # keep it. Anything older was decoded from a different file, so it is dropped and the
+        # source decoded again. The marker says the same outright, whatever the stamp or the
+        # mtime reads: a fast remux can leave a wav from the old source looking younger than the
+        # one that replaced it. It is dropped even when the times can't be compared, since it is
+        # the one thing that knows.
+        by_mtime = (trust_mtime and src_st is not None and wav_st is not None
+                    and wav_st.st_mtime_ns >= src_st.st_mtime_ns - int(MTIME_ROUNDING_S * 10**9))
+        if not marker.exists() and (stamp if stamp is not None else by_mtime):
+            return wav
+        try:
+            wav.unlink()  # marked, or not this source's by its stamp or its mtime
+        except OSError as e:
+            raise ClipperError(f"{stream_dir.name}: couldn't drop the stale audio.wav "
+                               f"({e.strerror or 'the system refused it'})") from None
+        clear_stale(stream_dir)  # the wav it was about is gone
+        forget_stamp(stream_dir)  # and so is the file it named
     tmp = wav.with_suffix(".tmp.wav")
+    # Which file this decode reads, as its own lstat says: a --fixup or a re-download can replace the
+    # source while a long decode is still on the old one, and audio of a file that is gone must not
+    # be installed for this one (after a repair the two lengths agree, so the timeline check cannot
+    # tell). A share that won't read its times gives nothing to compare, so the decode runs.
+    try:
+        st = src.lstat()
+        decoding = (st.st_size, st.st_mtime_ns)
+    except OSError:
+        decoding = None
     # A recording with dropped segments has timestamp jumps; WAV has no timestamps, so
     # without aresample the samples close up over each gap and every transcript time
     # after it runs early against the video (kick-132733064 ended 47 s apart). async=1
     # fills each gap with silence, first_pts=0 keeps the start where the source starts.
-    subprocess.run(
-        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-         "-i", str(src), "-vn", "-af", "aresample=async=1:first_pts=0",
-         "-ac", "1", "-ar", "16000", str(tmp)],
-        check=True,
-    )
-    tmp.replace(wav)
+    # -protocol_whitelist file: the source is a local file, so one that is really an HLS
+    # playlist can't send ffmpeg to a url. The whitelist does not stop a link at the
+    # output, though: ffmpeg follows it and would truncate the target, so it goes first.
+    _drop_link(tmp, stream_dir.name)
+    try:
+        try:
+            subprocess.run(
+                ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-protocol_whitelist", "file",
+                 "-i", str(src), "-vn", "-af", "aresample=async=1:first_pts=0",
+                 "-ac", "1", "-ar", "16000", str(tmp)],
+                check=True,
+            )
+        except subprocess.CalledProcessError as e:  # a file ffmpeg can't read is one line, no stderr
+            raise ClipperError(f"{stream_dir.name}: ffmpeg couldn't decode its source "
+                               f"(exit {exit_code(e.returncode)})") from None
+        try:
+            st = src.lstat()
+            decoded = (st.st_size, st.st_mtime_ns)
+        except OSError:  # gone or unreadable: not the file this audio came from either
+            decoded = None
+        if decoding is not None and decoded != decoding:
+            # This tmp goes with the finally below, the wav on disk stays as another run left it,
+            # and so does a marker that run wrote: that one is about the wav, not this tmp.
+            raise ClipperError(f"{stream_dir.name}: its source changed while its audio was being "
+                               f"decoded; run it again")
+        tmp.replace(wav)
+        clear_stale(stream_dir)  # a marker from an earlier failed drop must not hold this wav back
+        _write_stamp(stream_dir, decoding)  # which file this wav is of (#448); equal to decoded here
+    finally:  # a decode that failed midway leaves no partial wav to be read as one
+        try:  # best effort: the error that brought us here is the one to report
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
     return wav
+
+
+def check_audio_timeline(stream_dir: Path) -> None:
+    """#440: a source whose timestamps jump back decodes to an audio.wav longer than the source's
+    own container (the second stretch's audio runs on past the container's end, which the
+    container's duration doesn't show), and every transcript time after the jump would be off by
+    it. Such a stream is refused until its source is rebuilt with `clippa fetch <url> --fixup`,
+    which only a Kick VOD's source can be (the message names the command when meta.json says it
+    would work); an audio shorter than the container is only a warning. The refusal is a
+    TimelineJump, whose `.reason` is the message without that command. A .wav source is the
+    audio itself, so there is nothing to compare and no probe is made."""
+    lengths = audio_lengths(stream_dir)
+    if lengths is None:
+        return
+    wav_s, container_s = lengths
+    jump = wav_s - container_s
+    if jump <= timeline.TOLERANCE_S:
+        if jump < -timeline.TOLERANCE_S:
+            print(f"{stream_dir.name}: warning: audio.wav is {abs(jump):.1f} s shorter than its "
+                  f"source's container; the transcript may end early", flush=True)
+        return
+    # The fixup command is advice: a meta.json that is unreadable or not an object must not change
+    # what is raised (a corrupt one would otherwise turn the refusal into a ValueError)
+    try:
+        meta = jsonstate.read(stream_dir / "meta.json", {})
+    except (OSError, ValueError):
+        meta = {}
+    url = _fixup_command(meta)
+    if url:
+        raise TimelineJump(
+            f"{stream_dir.name}: the source's timeline jumps back {jump:.1f} s (audio.wav, "
+            f"{wav_s:.1f} s, runs past a container of {container_s:.1f} s), so the transcript "
+            "would be off after it", url)
+    raise TimelineJump(
+        f"{stream_dir.name}: the source's timeline and its audio disagree by {jump:.1f} s "
+        f"(audio.wav, {wav_s:.1f} s, runs past a container of {container_s:.1f} s), so the "
+        f"transcript would be off after it")
+
+
+def audio_lengths(stream_dir: Path) -> tuple[float, float] | None:
+    """(audio.wav's length, its source's container length) in seconds, as the timeline guard
+    compares them; None when there is nothing to compare: no source, a .wav source (the audio is
+    the source), or a wav ffprobe can't time. A source ffprobe can't time is a ClipperError, as it
+    is for the guard."""
+    try:
+        src = source_file(stream_dir)
+    except ClipperError:  # no source to compare the audio with
+        return None
+    if src.suffix == ".wav":  # the audio is the source: nothing to compare it with
+        return None
+    wav_s = try_duration(stream_dir / "audio.wav")
+    if wav_s is None or not math.isfinite(wav_s):  # ffprobe can't tell, or gave a nan
+        return None
+    return wav_s, timeline.container_duration(timeline.probe(src))
+
+
+def _fixup_command(meta: object) -> str:
+    """`clippa fetch <url> --fixup` for this stream's source, or "" when that would fetch the
+    wrong thing or nothing: --fixup is Kick's only (its remux is an mpegts copy), a recording's
+    meta names a channel rather than a VOD, and a query or fragment after a VOD's id is not the
+    VOD."""
+    if not isinstance(meta, dict):  # advice only: a list or a string names no source
+        return ""
+    if meta.get("platform") != "kick" and meta.get("source") != "kick":
+        return ""
+    from . import kick  # here only: kick brings the network stack
+
+    url = kick.canonical_vod_url(meta.get("url"))
+    return f"clippa fetch {shlex.quote(url)} --fixup" if url else ""
 
 
 def fill_missing_times(words: list[dict]) -> int:
@@ -119,12 +382,19 @@ def modal_encode(wav: Path, fmt: str) -> tuple[bytes, str]:
     """The wav encoded for the Modal upload ([transcribe] modal_audio): its bytes and suffix."""
     suffix, codec = MODAL_CODECS[fmt]
     enc = wav.with_name(f"audio.modal{suffix}")
+    _drop_link(enc, wav.parent.name)  # a link the encode would follow and truncate what it names
     try:
-        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(wav), *codec,
-                        str(enc)], check=True)
+        # -protocol_whitelist file: a cached audio.wav (or one beside no source) never went
+        # through extract_audio's decode, so a playlist under that name must not send ffmpeg to a
+        # url here either. No -f: the suffix is the wav's own.
+        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-protocol_whitelist", "file",
+                        "-i", str(wav), *codec, str(enc)], check=True)
         return enc.read_bytes(), suffix
     finally:  # never leave a GB of audio beside the stream, a failed encode included
-        enc.unlink(missing_ok=True)
+        try:  # best effort: the error that brought us here is the one to report
+            enc.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def too_big_for_flac(tc: dict, fmt: str, size: int) -> bool:
@@ -229,8 +499,12 @@ def write_diarization(stream_dir: Path, diarization: dict, cost: dict | None = N
 
 
 def diarize(stream_dir: Path, tc: dict, runs: Path | None = None) -> None:
-    """Speaker turns for a stream already transcribed (no new transcript): diarization.json."""
+    """Speaker turns for a stream already transcribed (no new transcript): diarization.json.
+    The timeline guard runs after the audio is extracted, as in `run` (#440): `clippa speakers
+    <stream> --diarize` can be the first stage on a source whose audio runs past its container,
+    and its diarization times would be off by the jump as a transcript's are."""
     wav = extract_audio(stream_dir)
+    check_audio_timeline(stream_dir)
     if tc["backend"] == "modal":
         out, cost = transcribe_modal(wav, tc, runs, method="diarize")
         return write_diarization(stream_dir, out["diarization"], cost)
@@ -256,6 +530,7 @@ def modal_cost(gpu: str, wall: float, out: dict) -> dict:
 def run(stream_dir: Path, tc: dict, runs: Path | None = None) -> None:
     t0 = time.time()
     wav = extract_audio(stream_dir)
+    check_audio_timeline(stream_dir)
     if tc["backend"] == "mlx":
         if tc["diarize"]:
             print("[transcribe] diarize needs backend whisperx or modal; skipped on mlx", flush=True)

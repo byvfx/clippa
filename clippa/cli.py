@@ -92,9 +92,115 @@ def refuse(args: argparse.Namespace, mode: str, *others: str) -> None:
         raise ClipperError(f"{mode} doesn't combine with {', '.join(given)}")
 
 
+_HOSTNAME = re.compile(r"[a-z0-9.-]+", re.I)
+
+
+def _fetch_host(url: str) -> str:
+    """The host a fetch url names, or "" when it names no plain hostname: a path, a UNC share and
+    a `file:` url can all come back from a "host" match, and this is the only string of a url a
+    message carries (that message is logged, said in a chat and stored in run.json)."""
+    s = url.strip()
+    m = (re.match(r"[a-z][\w+.-]*://(?:[^/@]*@)?([^/:?#]+)", s, re.I) if "://" in s
+         else re.match(r"(?:[^/@]*@)?([^/:?#]+)", s))
+    host = (m.group(1) if m else "").lower()
+    return host if _HOSTNAME.fullmatch(host) else ""
+
+
+def _site(host: str) -> str:
+    """A host as a person knows the site: Twitch, YouTube, or the host itself."""
+    for name, site in (("twitch.tv", "Twitch"), ("youtube.com", "YouTube"), ("youtu.be", "YouTube")):
+        if host == name or host.endswith("." + name):
+            return site
+    return host
+
+
+def _stream_for_vod(cfg: dict, url: str) -> Path | None:
+    """The stream folder a Kick VOD url names, found from the url alone: a repair needs no
+    metadata, and the API is the one part of `kick.resolve` that fails for a VOD whose source
+    is still here (it left the channel's recent list, or it is throttled)."""
+    from . import kick
+
+    # a link (a symlink, or on Windows a junction) is not a stream folder, so a repair can't
+    # rewrite source.ts and drop audio.wav through it
+    from .media import is_link
+
+    _, vid = kick.parse_url(url)  # a url that names no VOD raises here, as it does for resolve
+    want = kick.canonical_vod_url(url)
+    root = Path(cfg["paths"]["streams"])
+    try:
+        entries = list(root.iterdir())
+    except OSError:  # no streams folder (or it can't be listed) is no match, not a crash
+        return None
+    folders = []
+    for d in sorted(entries):
+        try:
+            # a link here is not a stream folder: a repair would rewrite source.ts through it and
+            # out of the streams tree, so only a real folder is a candidate (is_relative_to is the
+            # backstop for one that resolves out of the tree without being a link at all)
+            if not is_link(d) and d.is_dir():
+                folders.append(d)
+        except OSError:  # one entry the share won't stat doesn't hide the folders after it
+            continue
+    found = []
+    for d in folders:
+        try:
+            meta = jsonstate.read(d / "meta.json", {})
+        except (OSError, ValueError):  # one unreadable meta.json doesn't hide the others
+            continue
+        if not isinstance(meta, dict):
+            continue
+        if meta.get("video_uuid") == vid:
+            found.append(d)
+        elif want and kick.canonical_vod_url(meta.get("url")) == want:
+            # #444 review: a v7 url is resolved by its start time, so meta's video_uuid is the
+            # video's own uuid and not the one the url names; the url it was fetched from (the one
+            # transcribe's printed command carries) is the identity then. Never the raw url.
+            found.append(d)
+    real = []
+    try:
+        inside = root.resolve()
+    except (OSError, RuntimeError):  # a share that won't resolve, or a link loop, names none either
+        return None
+    for d in found:  # a folder that resolves out of the streams tree is not one of ours
+        try:
+            if d.resolve().is_relative_to(inside):
+                real.append(d)
+        except (OSError, RuntimeError):  # a link loop, or a path that can't be read
+            continue
+    found = real
+    if len(found) > 1:  # repairing the wrong copy of a video is worse than not repairing any
+        raise ClipperError(f"{', '.join(d.name for d in found)}: more than one folder holds this "
+                           f"video; move the extra copy away and try again")
+    return found[0] if found else None
+
+
+def _refuse_link_stream(cfg: dict, d: Path) -> None:
+    """#444: a resolve that succeeds names the folder to fetch into, and `mkdir(exist_ok=True)`
+    takes a link (a symlink, or on Windows a junction) as a folder: yt-dlp's download, the remux's
+    replace and the wav's removal would all happen where it points. A link at that name, or a
+    folder that resolves out of the streams tree, is refused before anything writes into it. The
+    message names the folder only: it is logged, said in a chat and stored in run.json, so it
+    carries no path and no url."""
+    from .media import link_or_raise
+
+    try:
+        inside = d.resolve().is_relative_to(Path(cfg["paths"]["streams"]).resolve())
+    except (OSError, RuntimeError):  # a share that won't resolve, or a link loop: nothing says it is ours
+        inside = False
+    if link_or_raise(d, d.name, "the stream folder") or not inside:
+        raise ClipperError(f"{d.name}: that stream folder is a link or outside the streams folder; "
+                           f"refusing to fetch into it")
+
+
 def cmd_fetch(cfg: dict, args: argparse.Namespace) -> None:
     from . import kick
 
+    host = _fetch_host(args.url)
+    if args.fixup and host != "kick.com" and not host.endswith(".kick.com"):
+        # a url that names no plain hostname is "that url": nothing it holds is read back
+        tail = (f"{_site(host)} sources are not repaired this way" if host
+                else "that url is not repaired this way")
+        raise ClipperError("--fixup is for Kick sources (the remux is an mpegts copy); " + tail)
     if re.match(r"(?:https?://)?(?:www\.|m\.)?twitch\.tv/", args.url):
         from . import twitch
 
@@ -105,19 +211,44 @@ def cmd_fetch(cfg: dict, args: argparse.Namespace) -> None:
 
         ytvod.fetch(cfg, args.url, args.no_video, args.no_chat)
         return
-    meta = kick.resolve(args.url, cfg)
+    try:
+        meta = kick.resolve(args.url, cfg)
+    except ClipperError:
+        # --fixup repairs the source.ts already on disk, so it needs no metadata: the API is the
+        # one part that fails for a VOD whose source is still here, and without this fallback the
+        # command transcribe's refusal prints can't run on the stream it refused.
+        d = _stream_for_vod(cfg, args.url) if args.fixup else None
+        if d is None:
+            raise
+        print(f"{d.name}: Kick's api couldn't resolve this video; "
+              f"repairing the source already here")
+        kick.fixup(d, cfg, api_down=True)
+        return
     d = cfg["paths"]["streams"] / meta["stream_id"]
+    _refuse_link_stream(cfg, d)  # before mkdir takes a link for a folder and every write goes through it
     d.mkdir(parents=True, exist_ok=True)
     # a rerun (for the chat, say) keeps what the first download found, as long as that video stays
     old = jsonstate.read(d / "meta.json", {})
-    if "skipped_fragments" in old and (d / "source.ts").exists():
-        meta["skipped_fragments"] = old["skipped_fragments"]
+    if (d / "source.ts").exists():
+        for key in ("skipped_fragments", "timeline_overlap_s"):
+            if key in old:
+                meta[key] = old[key]
     jsonstate.write(d / "meta.json", meta)
     print(f"{meta['stream_id']}: {meta['title']} ({meta['duration_s'] / 3600:.2f} h)")
     if not args.no_chat:
-        kick.fetch_chat(d, meta, cfg)
+        try:
+            kick.fetch_chat(d, meta, cfg)
+        except ClipperError:
+            if not args.fixup:
+                raise
+            # #444 review: the command the refusal prints carries no --no-chat, and a 429 or a dead
+            # chat endpoint would otherwise raise before the repair ran. The chat is not what is
+            # being repaired, so it is said and passed over.
+            print(f"{d.name}: the chat couldn't be fetched; repairing the source anyway", flush=True)
     if not args.no_video:
-        kick.fetch_video(d, meta, cfg)
+        kick.fetch_video(d, meta, cfg, args.fixup)
+    elif args.fixup:  # --no-video with --fixup: repair the source.ts already here, no download
+        kick.fixup(d, cfg)
 
 
 def cmd_record(cfg: dict, args: argparse.Namespace) -> None:
@@ -1325,6 +1456,9 @@ def add_pipeline(sub) -> None:
                                "youtube.com/watch?v=<id>)")
     p.add_argument("--no-video", action="store_true", help="chat and meta only; no video download")
     p.add_argument("--no-chat", action="store_true", help="video and meta only; no chat replay")
+    p.add_argument("--fixup", action="store_true",
+                   help="remux a Kick source video with fresh timestamps, for a stream transcribe "
+                        "flagged as jumping back; it rewrites the whole file, so not for a whim")
     p.set_defaults(fn=cmd_fetch)
 
     p = sub.add_parser("preshow", help="grab a show's pre-show from its YouTube channel, as one whole video")

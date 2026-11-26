@@ -52,6 +52,7 @@ import requests
 
 from . import hei, jsonstate, speakers, transcribe, ytdl
 from .errors import ClipperError
+from .media import is_link, link_or_raise, remove_link
 from .modalmon import head_record, tracked
 
 log = logging.getLogger(__name__)
@@ -222,7 +223,11 @@ def _merge_listing(d: Path, cat: dict[str, dict], found: list[dict], min_s: floa
             old["date"] = it["date"]
         if it["duration_s"] and not old.get("duration_s"):
             idir = item_dir(d, old)
-            if it["duration_s"] < min_s and not (idir / "words.jsonl").exists() and not kept_video(idir):
+            # Only a kept video the share positively says is not a copy drops the item: kept_video
+            # reads a stat it refuses as absent, and dropping the item there orphans a real
+            # source.mp4 that no listing adds back (a short item is filtered out).
+            if (it["duration_s"] < min_s and not (idir / "words.jsonl").exists()
+                    and not kept_video(idir) and not _unreadable(idir / "source.mp4")):
                 del cat[it["id"]]  # too short after all, and nothing made of it yet
             else:
                 old["duration_s"] = it["duration_s"]
@@ -340,10 +345,26 @@ def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[s
     elif it["source"] in ("kick", "hei"):
         # The video `archive video` kept, else the stream's smallest download: Kick's HLS
         # variants carry video and audio together (no audio-only format), HEI's has an audio
-        # rendition. Its audio goes to Modal as flac, as a stream's does.
-        kept = kept_video(idir)
-        src = kept or idir / "source.ts"
-        if not kept:
+        # rendition. Its audio goes to Modal as flac, as a stream's does. item_source says which
+        # copy that is, and whether this run has to fetch it.
+        _kept, src, fresh = item_source(idir)
+        refused = idir / "source.refused.ts"
+        marker = idir / ".refused"
+        kept_name = idir / "source.mp4"
+        if fresh:
+            # Left there, a link under that name sorts before source.ts in extract_audio's
+            # `source.*` glob and is refused as a link, so no run ever advanced and the next one
+            # dropped the download this one made. Removing it (never its target) is what lets the
+            # item finish; one that can't be removed stops the run before a download is spent on
+            # nothing.
+            _drop_link(refused, idir.name)
+            _drop_link(marker, idir.name)  # likewise: the refusal below would be written through it
+            # And the kept video's name: kept_video found no real copy there, so a link or an
+            # empty file is all that is left. Dropped here, before the download, not only after
+            # it (below): one the share won't clear would otherwise fail the run *with* a
+            # finished source.ts beside it, and the next run takes that for a partial and
+            # unlinks it before downloading its replacement
+            _drop_shadowing(idir, kept_name)
             fmt, referer = ((cfg["archive"]["kick_format"], "https://kick.com/") if it["source"] == "kick"
                             else (cfg["archive"]["hei_audio_format"], hei.SITE + "/"))
             m3u8 = hei.fresh_m3u8(cfg["paths"]["hei_cookies"], it) if it["source"] == "hei" else it["m3u8"]
@@ -357,13 +378,62 @@ def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[s
             if r.returncode or not src.exists():
                 _drop_partial(src)
                 raise RuntimeError(hei.scrub(f"yt-dlp: {ytdl.last_error(r)}"))
-        wav = transcribe.extract_audio(idir)
-        if not kept:
+            # yt-dlp stamps source.ts with the VOD's Last-Modified (there is no --no-mtime here),
+            # which can be older than an audio.wav a failed earlier run left behind: the mtime rule
+            # would then serve that file's audio, and where the two lengths agree the timeline
+            # check can't see the difference (#444 review). The marker is the record; one that
+            # can't be written stops the run, since a wrong transcript outlives the run.
+            _mark_stale_or_refuse(idir, src)
+        # #444: a link or an empty file at either name extract_audio's `source.*` glob meets before
+        # source.ts is no copy kept here (kept_video and _real_copy say so, and this run downloads),
+        # but it would shadow the copy just read: dropped (the link alone, never what it names).
+        # After the download, so one planted while it ran is caught too, and unconditionally: a
+        # link at source.refused.ts on a non-fresh run would otherwise meet the refusal's rename
+        # (which cannot replace a link) and stick the item with both it and its finished source.ts
+        _drop_shadowing_or_mark(idir, src, fresh)
+        # trust_mtime False: a wav here is only ever a failed run's leftover, and one with no stamp
+        # beside it (#448) can't say which download it came from, so it is decoded again
+        wav = transcribe.extract_audio(idir, trust_mtime=False)
+        # #440: a source whose timestamps jump back would have every time after the jump wrong,
+        # so it is refused; a download it refuses is renamed aside as source.refused.ts (the only
+        # complete copy) and waits there until that file is rebuilt
+        try:
+            transcribe.check_audio_timeline(idir)
+        except transcribe.TimelineJump as e:
+            # #444 review: only a jump is a property of the content, so only it is set aside;
+            # a probe that couldn't read a fresh download (or gave no container duration) is a
+            # read failure a retry may replace, so it propagates and the next run downloads again.
+            # #444: error.txt and the log line carry this exception, so the advice (a `clippa
+            # fetch <url> --fixup` command) is kept out of it; `.reason` has the same numbers
+            why = e.reason
+            if not fresh:  # a kept video, or a source already set aside: unchanged
+                # the copy is kept here, so the line says which name it is under (never a path or
+                # a url): the aside file when that is the one read, the download when it is marked
+                where = "" if _kept else f" (kept as {src.name})"
+                raise ClipperError(f"{why}{where}") from None
+            try:
+                src.replace(refused)  # renamed, not copied: it is the only complete copy
+            except OSError as err:  # a share that won't rename it must not hide the guard's line
+                reason = err.strerror or "the system refused it"
+                try:
+                    # only now, with the rename failed, is the marker the record of the refusal:
+                    # a rename that worked leaves source.refused.ts as its own record
+                    _write_marker(idir, why)
+                except ClipperError:
+                    # nothing durable can be written here: say what is true, not that it is kept
+                    raise ClipperError(
+                        f"{why} (the download is still {src.name}: {reason}; it couldn't be set "
+                        "aside or marked, so a later run may replace it)") from None
+                raise ClipperError(f"{why} (the download is still {src.name}: {reason})") from None
+            _clear_marker(idir)  # a marker from an earlier rename must not outlive this one
+            raise ClipperError(f"{why} (kept as {refused.name})") from None
+        if fresh:
             src.unlink()
         enc = idir / "audio.flac"
         subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(wav), "-c:a", "flac",
                         str(enc)], check=True)
         wav.unlink()
+        transcribe.forget_stamp(idir)
         out, cost = call(worker.transcribe, enc.read_bytes(), ".flac", settings)
         enc.unlink()
     else:
@@ -378,6 +448,7 @@ def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[s
         transcribe.write_diarization(idir, out["diarization"], cost)
         speakers.apply(idir, item_cfg(cfg, idir))
     (idir / "error.txt").unlink(missing_ok=True)
+    _clear_marker(idir)  # the item is through: a stale refusal must not hold it back next run
     return {**cost, "signed_in": signed_in, "duration_s": meta["duration_s"]}
 
 
@@ -474,17 +545,259 @@ def _transcribe_all(cfg: dict, d: Path, subject: str, todo: list[dict], gpu: str
 VIDEO_SOURCES = ("youtube", "hei")
 
 
+def _drop_link(path: Path, label: str) -> None:
+    """Remove a link (a symlink, or on Windows a junction) sitting where this run must have a real
+    file, saying so in one line. Only the link goes, never what it names: a junction is a folder
+    to `unlink`, so `remove_link` rmdirs it. One that can't be removed is a one-line error
+    naming it and the system's reason, so nothing is downloaded over it (no path: label is the
+    stream). A share that won't say whether the name is a link is one line too: a drop that
+    guessed would either act on what it names or download behind a name nobody could read."""
+    if not link_or_raise(path, label):
+        return
+    try:
+        remove_link(path)
+    except OSError as err:
+        raise ClipperError(f"{label}: couldn't remove the link at {path.name} "
+                           f"({err.strerror or 'the system refused it'})") from None
+    print(f"{label}: removed a link at {path.name}", flush=True)
+
+
 def _drop_partial(src: Path) -> None:
     """A download's file and yt-dlp's resume note for it, left by a run that failed."""
     src.unlink(missing_ok=True)
     src.with_name(src.name + ".ytdl").unlink(missing_ok=True)
 
 
+def _write_marker(idir: Path, why: str) -> None:
+    """Record in the item's folder that the source at source.ts is a refusal kept here (or a
+    finished download this run could not get out of the way): the marker item_source reads so the
+    next run reuses it rather than taking it for a partial and unlinking it. A link at the name is
+    dropped first, never written through: the download is the long part, so one planted since the
+    folder was last checked would otherwise take the write outside it. "x" refuses a file already
+    there (a stale marker, or what a journal made of the name) rather than appending to it. One
+    that can't be written is a one-line error naming the stream, so the caller says what is true
+    instead."""
+    marker = idir / ".refused"
+    try:
+        _drop_link(marker, idir.name)
+        with open(marker, "x", encoding="utf-8") as f:
+            f.write(f"{why}\n")
+    except OSError as err:
+        raise ClipperError(f"{idir.name}: couldn't write the refusal marker (.refused) "
+                           f"({err.strerror or 'the system refused it'})") from None
+
+
+def _clear_marker(idir: Path) -> None:
+    """#444: the refusal marker goes once it stops standing for anything (the rename happened, the
+    source is now in order, or there is no source left to refuse): left there, the next run would
+    treat the folder as refused and find no source at all. Only the marker goes, never what a link
+    at that name points at, and a share that won't take it away is one printed line rather than a
+    failure of a finished item."""
+    marker = idir / ".refused"
+    try:
+        if is_link(marker):
+            remove_link(marker)
+        else:
+            marker.unlink(missing_ok=True)
+    except OSError as err:
+        print(f"{idir.name}: couldn't remove the refusal marker (.refused): "
+              f"{err.strerror or 'the system refused it'}", flush=True)
+
+
+def _unreadable(path: Path) -> bool:
+    """Whether the share won't say whether `path` is there: an lstat that fails for any reason but
+    the file being absent. `_real_copy` reads a failed stat as absent, which is right for a name
+    nothing is under and wrong for a share that won't answer: a marker beside an unstattable
+    source.ts is no marker standing for nothing, and that file may be the only complete copy."""
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return True
+    return False
+
+
+def _real_copy(path: Path) -> bool:
+    """Whether `path` is a copy kept here — the kept video (source.mp4) or a source the timeline
+    refused (source.refused.ts): a regular, non-link file that has something in it. A zero-byte one
+    is what a failure leaves before a download's first byte, and no run can read it (the timeline
+    check has nothing to compare and extract_audio gets no audio), so it counts as absent. A stat
+    that fails (a share that won't answer) counts as absent too, whichever test of it fails: on
+    Python 3.12 `is_symlink` and `is_file` re-raise a refused stat rather than answer it, so each
+    sits in the same try as the size."""
+    try:
+        return not is_link(path) and path.is_file() and path.stat().st_size > 0
+    except OSError:
+        return False
+
+
+def _there(path: Path) -> bool:
+    """Whether the name is there — or the share wouldn't say, which counts as there: an unstattable
+    name is never taken for one nothing is under (a marker a share won't answer for is still a
+    marker, and dropping it can lose the only copy left). `exists` re-raises a refused stat on
+    Python 3.12, as `is_file` and `is_symlink` do: only the errnos it reads as absence are one."""
+    try:
+        return path.exists()
+    except OSError:
+        return True
+
+
+def _link(path: Path) -> bool:
+    """`is_link` for a caller testing a name: a share that won't stat it is answered False, since
+    an unreadable name is no link to drop. `_drop_link` keeps the strict test: there a name it
+    can't tell about must stop the run before anything is written over it."""
+    try:
+        return is_link(path)
+    except OSError:
+        return False
+
+
+def _drop_empty(path: Path, label: str) -> None:
+    """Remove an empty file left at a name this run must have a real copy under, saying so in one
+    line. source.refused.ts sorts before source.ts in extract_audio's `source.*` glob, so an empty
+    one there would be read in place of the download and the item would never advance. Only an
+    empty regular file goes, never a link or what it names, and one that can't be removed is a
+    one-line error naming it, so nothing is downloaded to sit behind it. A share that won't say
+    what the name is is one line as well: left there, it would be read instead of the download."""
+    try:
+        if is_link(path) or not path.is_file():
+            return
+    except OSError as err:
+        raise ClipperError(f"{label}: couldn't tell what {path.name} is "
+                           f"({err.strerror or 'the system refused it'})") from None
+    try:
+        if path.stat().st_size:
+            return
+    except OSError:
+        return
+    try:
+        path.unlink()
+    except OSError as err:
+        raise ClipperError(f"{label}: couldn't remove the empty {path.name} "
+                           f"({err.strerror or 'the system refused it'})") from None
+    print(f"{label}: removed an empty {path.name}", flush=True)
+
+
+def _drop_shadowing(idir: Path, *names: Path) -> None:
+    """A link or an empty file at any of `names` would be the source extract_audio reads: each of
+    them sorts before source.ts in its `source.*` glob, and a link there is refused as one. Each
+    goes (the link alone, never what it names), so a name nobody can read can't stall the item."""
+    for name in names:
+        _drop_link(name, idir.name)
+        _drop_empty(name, idir.name)
+
+
+def _drop_shadowing_or_mark(idir: Path, src: Path, fresh: bool) -> None:
+    """`_drop_shadowing` after the download, recording a download it could not get out of the way.
+
+    Dropped after a long download, it can fail with a finished source.ts already in the folder (a
+    name planted while the download ran). Raised alone, the next run sees no kept video, no aside
+    file and no marker, so item_source says fresh and _drop_partial unlinks that download before
+    fetching another (a Kick m3u8 is never refreshed, so a re-download that then fails leaves
+    nothing at all). Where this run made the source, the marker makes it the copy it left: the
+    next run reuses it as a source, the timeline guard decides what it is, and a good one
+    transcribes and clears the marker. A copy already kept here (not fresh) is nothing this run
+    made, so its error is the run's to report as it is."""
+    try:
+        _drop_shadowing(idir, idir / "source.mp4", idir / "source.refused.ts")
+    except ClipperError as err:
+        if not fresh:  # the copy is already kept here: nothing this run made is at risk
+            raise
+        try:
+            _write_marker(idir, str(err))
+        except ClipperError:
+            # nothing durable can be written either: say what is true, not that it is kept
+            raise ClipperError(
+                f"{err} (the download is still {src.name}: it couldn't be marked, so a later run "
+                "may replace it)") from None
+        raise
+
+
+def _mark_stale_or_refuse(idir: Path, src: Path) -> None:
+    """`transcribe.mark_stale` after a download, recording a download whose stale mark it could not
+    write.
+
+    Raised alone, the stale mark's error leaves the finished source.ts with nothing said about it:
+    the next run sees no kept video, no aside file and no marker, takes it for a partial and
+    unlinks it before fetching another (a Kick m3u8 is never refreshed, so a re-download that then
+    fails leaves nothing at all). The refusal marker makes the download the copy this run left: the
+    next run reuses it as a source, the timeline guard decides what it is, and a good one
+    transcribes and clears the marker."""
+    try:
+        transcribe.mark_stale(idir)
+    except ClipperError as err:
+        try:
+            _write_marker(idir, str(err))
+        except ClipperError:
+            # nothing durable can be written either: say what is true, not that it is kept
+            raise ClipperError(
+                f"{err} (the download is still {src.name}: it couldn't be marked, so a later run "
+                "may replace it)") from None
+        raise
+
+
 def kept_video(idir: Path) -> Path | None:
     """The video `archive video` kept for an item, if any (written under another name and
-    renamed when complete, so this is never a partial download)."""
+    renamed when complete, so this is never a partial download). Only a real copy counts: a link
+    at that name is not one kept here, nor can it be read (extract_audio refuses a linked source),
+    and a zero-byte or unstattable one has no video in it, so each is absent and the item
+    downloads rather than stalling on a name that will never advance."""
     p = idir / "source.mp4"
-    return p if p.is_file() else None
+    return p if _real_copy(p) else None
+
+
+def item_source(idir: Path) -> tuple[Path | None, Path, bool]:
+    """(the kept video, the source a kick/hei item reads, whether this run downloads it).
+
+    A source the timeline check refused is renamed aside and reused, never re-downloaded over and
+    never dropped: it is the only complete copy (a Kick VOD's m3u8 is never refreshed, so a
+    download that fails after leaving nothing leaves nothing at all). The name matters three ways:
+    source.* matches media.source_file's glob, so extract_audio reads it; _drop_partial unlinks
+    only source.ts, so it is never taken for a partial; and it sorts before source.ts (and after a
+    kept source.mp4), so a leftover can't be bypassed and a kept video still wins. Reused rather
+    than re-fetched on purpose: an HEI download uses --abort-on-unavailable-fragments, so a file
+    that completed is the VOD's own content, and a deterministic jump would otherwise cost a full
+    re-download every run. The copy that is here is the one read: source.refused.ts before
+    source.ts.
+
+    Where the share refuses that rename the refusal is marked in a dotfile as well, so the next
+    run doesn't take the complete download for a partial and unlink it. The marker counts only
+    while the download it stands for is still here: with no source.ts (deleted, say) there is
+    nothing to refuse, and trusting the marker alone would serve a stale audio.wav and transcribe
+    the very times the guard keeps out. A link under any of these names (a symlink, or on Windows
+    a junction, which is_symlink misses) is not a copy or a marker kept here, nor one the rename
+    writes through: it is treated as absent, so the download path runs (and removes it there —
+    source.mp4 too, since a linked one would shadow what that download leaves). An empty file is no
+    copy either: an empty source.refused.ts or source.mp4 would otherwise be read in place of
+    the download, and an empty source.ts would hold a marker that stands for nothing, so each is
+    treated as absent and the empty one is removed.
+
+    #444 review: a share that won't stat a name is neither absent nor a copy, so it is told apart
+    from one nothing is under (_unreadable). A marker beside such a source.ts is not cleared: the
+    file may be the only complete copy, and clearing it lets _drop_partial unlink it before a
+    download that may fail, leaving neither the copy nor the refusal. The same holds for the
+    marker itself: one the share won't stat is still a marker (_there), never an absent one, and a
+    stat that fails on the kept video, a source or a link test reads as the absence of the thing
+    tested (_real_copy, _link) rather than stopping the run before the decision is made."""
+    kept = kept_video(idir)
+    refused = idir / "source.refused.ts"
+    marker = idir / ".refused"
+    downloaded = idir / "source.ts"
+    have_download = _real_copy(downloaded)
+    have_aside = _real_copy(refused)
+    if not have_aside and not kept:
+        _drop_empty(refused, idir.name)  # left there, it shadows this run's download
+    marked = _there(marker) and not _link(marker)
+    unreadable = _unreadable(downloaded)  # the share won't say: not the same as gone
+    if marked and not have_aside and not have_download and not unreadable:
+        # the source it stood for is gone: dropped, the item downloads a replacement as if it had
+        # never been refused (and one that stays is still not trusted, `marked` goes false anyway)
+        print(f"{idir.name}: removed the refusal marker, no source left to refuse", flush=True)
+        _clear_marker(idir)
+        marked = False
+    refused_here = have_aside or (marked and (have_download or unreadable))
+    return kept, kept or (refused if have_aside else downloaded), not kept and not refused_here
 
 
 def keep_video(cfg: dict, idir: Path, it: dict) -> Path:

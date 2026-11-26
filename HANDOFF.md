@@ -35,7 +35,8 @@ Project memory (`~/.claude/projects/C--clipper/memory/`, MEMORY.md first) holds 
   sync, shared state over the NAS, services, tools, review surfaces, limits and estimates), each checked against
   the code; the page states its own safety rules (deploy/restart only on the user's word, never during a show or
   a job, no by-hand upload/publish, nothing twice on the laptop). A closed issue labelled `bug-to-remember` gets
-  its entry in the fix's PR (AGENTS.md Rules); #440 (the 821.7 s VOD, still open) is one.
+  its entry in the fix's PR (AGENTS.md Rules); #440 (the 821.7 s VOD) is one, fixed 11-25 by the transcribe
+  check and `clippa fetch --fixup` (below).
 - Keys are Windows **User** env vars (ANTHROPIC_API_KEY, KITSU_TOKEN, ...); agent shells must load them:
   `export KITSU_TOKEN="$(powershell.exe -NoProfile -Command "[Environment]::GetEnvironmentVariable('KITSU_TOKEN','User')" | tr -d '\r')"`
 
@@ -51,6 +52,24 @@ replan + upload, pre-show grabs, retakes, daily jobs), the Discord bot (`clippa 
 Around it (each a subcommand; details in the wiki and the log): `record`, `worker`, `shorts`, `retake`, `preshow`, `pick`, `weekly`,
 `receipts`, `archive`, `investigate`, `story` (the swarm, `clippa/swarm.py`), `people`, `faces`, `cast`, `speakers`, `narrate` /
 `perform` (Mother Moo), `tiktok`, `x`, `rumble`, `analytics`, `costs`, `compare` / `models`, `status`, `services`, `alert`, `doctor`.
+
+Timeline check (#440, 11-25, ten review rounds to 11-26): `transcribe` (and `speakers --diarize`, and `archive transcribe` before it drops the
+source) refuses a source whose `audio.wav` runs >1 s past its container - the source's timestamps jump back
+and a transcript would be off after it. It names the stream, both lengths and, for a Kick VOD,
+`clippa fetch <url> --fixup`; `--fixup` remuxes `source.ts` with fresh timestamps (`clippa/timeline.py`,
+Kick only, `.ts` only) into a fresh `.timeline-*.part`, and replaces the original only when the probe, the
+packet order (both streams) and a 90% size floor all pass. The repair writes `audio.wav.stale` before the
+replace and drops the wav decoded from the old source (`extract_audio` honours the marker whatever else
+says, then reuses a wav only when `audio.wav.src`, the size+mtime stamp each decode writes (#448), still
+names the source; a wav from before the stamps falls back to the 2 s mtime rule, except in an archive item;
+it refuses to install audio whose source changed under the decode); every download (`fetch`, `archive
+transcribe`) marks a wav beside it stale, since yt-dlp stamps the VOD's Last-Modified. An in-order
+`--fixup` drops a wav that runs past the container. So re-fetching is not needed and
+a re-transcribe decodes the fixed file: `clippa fetch <url> --fixup` then `clippa transcribe <id>` (about
+three reads of the 33 GB and one 33 GB rewrite). `kick-132975332` is still waiting for that repair.
+Open from the review (not in #444): #448 is on branch `fix/wav-source-stamp-448` (PR open, 11-26), #446 (an archive item's refused source has no repair path), #447 (whitelist the
+other stages' ffmpeg calls), #449 (`is_link` on a share that won't stat is a traceback, not one line).
+
 
 ## User decisions (keep)
 - The NAS hub's YouTube cookies come from the laptop (11-09, user: "lets just setup that task but note it that it

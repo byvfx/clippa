@@ -6,6 +6,12 @@ stderr, status 1). Long-running callers (the bot, the war room, the worker) catc
 any other exception, so one bad stream or button press can't stop them."""
 
 
+def exit_code(code: int) -> int:
+    """ffmpeg's failure is a negative errno, which Windows hands back unsigned (0xBEBEBE37): read
+    it as the signed 32-bit value a shell prints, so a message says -1094995529, not 3199971767."""
+    return code - 2**32 if code >= 2**31 else code
+
+
 def did_you_mean(name: str, choices, n: int = 3, cutoff: float = 0.6) -> str:
     """"did you mean a, b?" for the choices nearest a mistyped name, or "" when none is near."""
     import difflib
