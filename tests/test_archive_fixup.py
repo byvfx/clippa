@@ -1,6 +1,7 @@
 """`clippa archive fixup` (#446): an archive item whose timeline check refused its source is
 repaired in place, under the name the next run reads, and the chat offers it as a card."""
 import os
+import re
 
 import pytest
 from test_kick import BACKWARD, IN_ORDER, REPAIRED, FakeFf
@@ -62,10 +63,23 @@ def test_an_in_order_copy_is_refused_and_its_wav_kept(acfg, monkeypatch, capsys)
     (d / "source.refused.ts").write_bytes(b"in order")
     (d / "audio.wav").write_bytes(b"wav")
     monkeypatch.setattr(archive.subprocess, "run", FakeFf([REPAIRED, REPAIRED], packets=IN_ORDER, wav_s=33900.0))
-    with pytest.raises(ClipperError, match="already in order, so a remux has nothing to take out"):
+    with pytest.raises(ClipperError, match="already in order, so a remux has nothing to take out; its audio.wav runs 67.3 s past"):
         archive.fixup_item(acfg, "s", "kick-1")
     assert (d / "source.refused.ts").read_bytes() == b"in order" and (d / "audio.wav").exists()
     assert "finishes it now" not in capsys.readouterr().out
+
+
+def test_an_in_order_copy_kept_for_a_failed_stale_mark_is_sent_to_transcribe(acfg, monkeypatch):
+    """Grok on #453: `.refused` also marks a finished download whose stale mark couldn't be written;
+    that copy is fine, so the fixup says transcribe reads it as it is, not that it can't be fixed."""
+    d = idir(acfg)
+    (d / "source.ts").write_bytes(b"in order")
+    (d / ".refused").write_text("couldn't mark audio.wav stale\n", encoding="utf-8")
+    monkeypatch.setattr(archive.subprocess, "run", FakeFf([REPAIRED, REPAIRED], packets=IN_ORDER))
+    with pytest.raises(ClipperError, match=r"`clippa archive transcribe s` reads it as it is") as err:
+        archive.fixup_item(acfg, "s", "kick-1")
+    assert "can't fix" not in str(err.value)
+    assert (d / "source.ts").read_bytes() == b"in order"
 
 
 def test_a_copy_changed_during_the_remux_is_not_replaced(acfg, monkeypatch):
@@ -108,16 +122,21 @@ def test_the_card_leaves_the_folder_as_it_is(acfg):
 
 
 @pytest.mark.parametrize("setup, msg", [
-    ("kept", "its source is the kept source.mp4, which --fixup can't remux; delete it"),
+    ("kept", "the kept source.mp4, which --fixup can't remux; move source.mp4 out of the item folder (keep it: "
+             "a VOD that is gone can't be downloaded again) and the next `clippa archive transcribe` downloads"),
+    ("kept+aside", "move source.mp4 out of the item folder (keep it) and `clippa archive fixup s kick-1` repairs "
+                   "the source.refused.ts beside it"),
     ("nothing", "nothing set aside to repair"),
-], ids=["kept-video", "nothing"])
+], ids=["kept-video", "kept-video-and-aside", "nothing"])
 def test_what_it_cannot_repair_is_one_line_and_nothing_runs(acfg, monkeypatch, setup, msg):
+    """Grok on #453: a kept video is never to be deleted, as it may be the only copy left."""
     d = idir(acfg)
-    if setup == "kept":
+    if setup.startswith("kept"):
         (d / "source.mp4").write_bytes(b"kept video")
+    if setup == "kept+aside":
         (d / "source.refused.ts").write_bytes(b"broken")
     monkeypatch.setattr(archive.subprocess, "run", lambda *a, **kw: pytest.fail("probed"))
-    with pytest.raises(ClipperError, match=msg):
+    with pytest.raises(ClipperError, match=re.escape(msg)):
         archive.fixup_item(acfg, "s", "kick-1")
 
 

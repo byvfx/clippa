@@ -46,8 +46,12 @@ An item whose source's timestamps jump backwards is refused by `transcribe` and 
 (`source.refused.ts`): `clippa archive fixup <subject> <item>` remuxes it in place with the
 timestamps regenerated, free and on this machine, and the next `transcribe` finishes it
 ([Bugs to remember](Bugs-to-remember)). It waits while a show is live, since it rewrites a whole
-source on the share (`--force` overrides). A kept `source.mp4` can't be remuxed this way: delete it
-and the next `transcribe` downloads a `.ts` that can.
+source on the share (`--force` overrides). A kept `source.mp4` can't be remuxed this way: move it out
+of the item folder (keep it, since a VOD that is gone can't be downloaded again) and the next `transcribe`
+downloads a `.ts` that can, or the fixup repairs a `.ts` already set aside beside it. A copy whose
+timestamps are already in order isn't rewritten: the fixup says whether its audio runs past the
+container for another reason or whether `transcribe` can just read it as it is (a download kept for a
+failed stale mark is marked the same way).
 `clippa archive check jer --items yt-<id> ...` checks just the items you are about to link to.
 
 It needs the Modal backend set up ([Transcribe on Modal](Transcribe-on-Modal)). YouTube audio is

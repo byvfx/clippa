@@ -829,8 +829,9 @@ def _archive_fixup_prepare(cfg: dict, args: dict) -> Plan:
     except OSError as e:
         return Plan("answer", text=f"{item}: its folder can't be read ({e.strerror or 'the share refused it'}).")
     if kept is not None:
-        return Plan("answer", text=f"{item} reads its kept {kept.name}, which can't be remuxed: delete it "
-                                   f"and the next archive transcribe downloads a .ts.")
+        idir = archive.subject_dir(cfg, subject) / item
+        return Plan("answer", text=f"{item} reads its kept {kept.name}, which can't be remuxed: "
+                                   f"{archive.kept_advice(idir, kept)}.")
     if src is None:
         return Plan("answer", text=f"{item} has nothing set aside to repair.")
     lines = [f"{subject} / {item}: {src.name} remuxed with fresh timestamps",

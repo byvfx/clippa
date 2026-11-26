@@ -19,7 +19,8 @@ Developing#releases.
   can now be repaired (#446): `clippa archive fixup <subject> <item>` remuxes the kept copy in place
   (Kick and HEI alike, no new download), drops the audio decoded from the old one and says to run
   `archive transcribe` again. The refusal's line names that command; a kept `source.mp4` can't be
-  remuxed, so its line says to delete it and let the next run download a `.ts`. It waits while a show
+  remuxed, so its line says to move it out of the folder (kept, never deleted: a gone VOD can't
+  come back) and let the next run download a `.ts`. It waits while a show
   is live (`--force` overrides), and the chat offers it as a card. `archive transcribe` no longer
   skips a dead link whose item keeps a copy here (a video, or a source set aside): it reads it.
 - 11-26: every stage now reads media as local files only (#447): cut, Shorts, previews, thumbnails,
