@@ -443,13 +443,19 @@ def resolve(url: str, cfg: dict | None = None) -> dict:
 # --- the library
 
 
+def src_opts(src: str | Path) -> list[str]:
+    """The input options for src: an address is fetched with our user agent and ffmpeg's own
+    protocols (https, and HLS for a stream), a file is pinned to local files (#447), so one that is
+    really a playlist can't send ffmpeg to an url."""
+    return ["-user_agent", UA] if str(src).startswith("http") else ["-protocol_whitelist", "file"]
+
+
 def length_of(src: str) -> float | None:
     """A video's length by ffprobe, a file or an address (read from its header, not downloaded);
     None when it can't tell."""
-    ua = ["-user_agent", UA] if str(src).startswith("http") else []
     try:
-        r = subprocess.run(["ffprobe", "-v", "error", *ua, "-show_entries", "format=duration", "-of", "csv=p=0",
-                            str(src)], capture_output=True, text=True, timeout=60)
+        r = subprocess.run(["ffprobe", "-v", "error", *src_opts(src), "-show_entries", "format=duration",
+                            "-of", "csv=p=0", str(src)], capture_output=True, text=True, timeout=60)
     except (OSError, subprocess.TimeoutExpired):
         return None
     return seconds((r.stdout or "").strip().splitlines()[0] if r.returncode == 0 and r.stdout.strip() else None)
@@ -473,11 +479,8 @@ def encode(cfg: dict, src: str, dst: Path, start: float | None = None, end: floa
     seek = ["-ss", f"{start:.3f}"] if start else []
     length = ["-t", f"{end - (start or 0):.3f}"] if end else []
     tmp = dst.with_suffix(".part.mp4")
-    cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-user_agent", UA, *seek, "-i", src, *length,
+    cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", *src_opts(src), *seek, "-i", src, *length,
            "-vf", vf, *args, *([] if bc["audio"] else ["-an"]), "-movflags", "+faststart", str(tmp)]
-    if not str(src).startswith("http"):
-        cmd.remove("-user_agent")
-        cmd.remove(UA)
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=bc["timeout_s"])
     except subprocess.TimeoutExpired as e:

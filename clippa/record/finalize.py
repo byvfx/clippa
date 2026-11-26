@@ -91,7 +91,7 @@ def join(d: Path, st: State, ext: str) -> list[Part]:
                                    for p in parts), encoding="utf-8")
         log.info("%s: joining %d part(s) -> %s", st.stream_id, len(parts), src.name)
         subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-                        "-f", "concat", "-safe", "0", "-i", str(listing),
+                        "-f", "concat", "-safe", "0", "-protocol_whitelist", "file", "-i", str(listing),
                         "-map", "0:v:0", "-map", "0:a:0?", "-c", "copy", str(tmp)], check=True)
         tmp.replace(src)
     return parts

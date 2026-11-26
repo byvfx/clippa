@@ -46,6 +46,22 @@ def remove_link(p: Path) -> None:
         p.unlink()
 
 
+def drop_output_link(p: Path, label: str) -> None:
+    """A link where ffmpeg is about to write with `-y`: ffmpeg follows it and would truncate what
+    it names, so the link goes first (the link alone, never what it names). One that can't be
+    removed is a one-line error naming the stream (label) and the system's reason, with no path.
+    Inputs get the other half (#447): `-protocol_whitelist file` before each `-i` of a local file,
+    so a file that is really a playlist can't send ffmpeg to an url (tests/test_ffmpeg_whitelist).
+    A share that won't say whether the name is a link is one line too (link_or_raise, #449)."""
+    if not link_or_raise(p, label):
+        return
+    try:
+        remove_link(p)
+    except OSError as e:
+        raise ClipperError(f"{label}: couldn't drop the linked {p.name} "
+                           f"({e.strerror or 'the system refused it'})") from None
+
+
 def _probe(path: Path, entries: str, stream: str | None = None) -> str:
     # -protocol_whitelist file: every path here is a local file, so one that is really an HLS
     # playlist can't send ffprobe to a url. `-f` isn't needed: ffprobe still reads the file.

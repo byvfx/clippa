@@ -58,6 +58,7 @@ from pathlib import Path
 from . import jsonstate, tighten
 from .config import for_stream
 from .errors import ClipperError
+from .media import drop_output_link
 from .segments import slug
 from .states import ENTITY, Decision
 
@@ -368,7 +369,9 @@ def render_preview(src: Path, dst: Path, rc: dict, codec: str) -> Path:
     vf = f"scale=-2:{rc['preview_height']}" + (",format=nv12" if codec == "h264_qsv" else "")
     args = [a if a != "192k" else "128k" for a in encode_args(codec, rc["preview_quality"])]
     tmp = dst.with_name(dst.stem + ".tmp.mp4")
-    subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
+    drop_output_link(tmp, dst.parent.name)
+    subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                    "-protocol_whitelist", "file", "-i", str(src),
                     "-vf", vf, "-r", str(rc["preview_fps"]), *args,
                     "-movflags", "+faststart", str(tmp)], check=True)
     tmp.replace(dst)
@@ -405,10 +408,12 @@ def render_to_size(src: Path, big: Path, duration_s: float, rc: dict, codec: str
     tmp = dst.with_name(dst.stem + ".tmp.mp4")
     audio_bytes = audio_kbps * 1e3 / 8 * duration_s
     why = f"{big.stat().st_size / 1e6:.0f} MB is over {rc['max_upload_mb']} MB"
+    drop_output_link(tmp, dst.parent.name)
     for _ in range(2):
         print(f"preview {big.stem}: {why}; re-encoding at {height}p {fps} fps "
               f"{video_kbps} kbps", flush=True)
-        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
+        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                        "-protocol_whitelist", "file", "-i", str(src),
                         "-vf", vf, "-r", str(fps), "-c:v", venc,
                         "-b:v", f"{video_kbps}k", "-maxrate", f"{video_kbps * 2}k",
                         "-bufsize", f"{video_kbps * 4}k", "-c:a", "aac", "-b:a", f"{audio_kbps}k",
@@ -437,8 +442,9 @@ def concat_previews(parts: list[Path], dst: Path) -> Path:
                        encoding="utf-8")
     tmp = dst.with_name(dst.stem + ".tmp.mp4")
     try:
+        drop_output_link(tmp, dst.parent.name)
         subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "concat",
-                        "-safe", "0", "-i", str(listing), "-c", "copy",
+                        "-safe", "0", "-protocol_whitelist", "file", "-i", str(listing), "-c", "copy",
                         "-movflags", "+faststart", str(tmp)], check=True)
     finally:
         listing.unlink(missing_ok=True)

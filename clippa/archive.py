@@ -430,7 +430,12 @@ def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[s
         if fresh:
             src.unlink()
         enc = idir / "audio.flac"
-        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(wav), "-c:a", "flac",
+        # #447: a link at audio.flac would be followed and truncated by -y (the unlink below
+        # takes only the link), so it goes first; and a cached audio.wav that is really a
+        # playlist must not send ffmpeg to an url (the timeline check above can't time one).
+        _drop_link(enc, idir.name)
+        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                        "-protocol_whitelist", "file", "-i", str(wav), "-c:a", "flac",
                         str(enc)], check=True)
         wav.unlink()
         transcribe.forget_stamp(idir)

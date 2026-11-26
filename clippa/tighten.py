@@ -25,7 +25,8 @@ KEYS = ("max_gap_s", "keep_gap_s", "keep_turn_s", "min_cut_s", "silence_db")
 def quiet_spans(video: Path, ec: dict) -> list[tuple[float, float]]:
     """(start, end) of the stretches of `video` quieter than [edit] silence_db for at least
     min_cut_s, in seconds from its start. A silence still going at the end runs to inf."""
-    log = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(video), "-vn", "-af",
+    log = subprocess.run(["ffmpeg", "-hide_banner", "-nostats",
+                          "-protocol_whitelist", "file", "-i", str(video), "-vn", "-af",
                           f"silencedetect=noise={ec['silence_db']}dB:d={ec['min_cut_s']}",
                           "-f", "null", "-"], check=True, capture_output=True, text=True,
                          encoding="utf-8", errors="replace").stderr
