@@ -181,13 +181,13 @@ def _refuse_link_stream(cfg: dict, d: Path) -> None:
     folder that resolves out of the streams tree, is refused before anything writes into it. The
     message names the folder only: it is logged, said in a chat and stored in run.json, so it
     carries no path and no url."""
-    from .media import is_link
+    from .media import link_or_raise
 
     try:
         inside = d.resolve().is_relative_to(Path(cfg["paths"]["streams"]).resolve())
     except (OSError, RuntimeError):  # a share that won't resolve, or a link loop: nothing says it is ours
         inside = False
-    if is_link(d) or not inside:
+    if link_or_raise(d, d.name, "the stream folder") or not inside:
         raise ClipperError(f"{d.name}: that stream folder is a link or outside the streams folder; "
                            f"refusing to fetch into it")
 

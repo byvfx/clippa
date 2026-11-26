@@ -1,6 +1,7 @@
 """media: the probe facts it gives, its source lookup, and what counts as a link (#444)."""
 import os
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -73,3 +74,33 @@ def test_a_duration_with_a_field_after_it_is_still_a_duration(tmp_path, monkeypa
                         lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, "3600.0,\n", ""))
     assert media.try_duration(tmp_path / "audio.wav") == 3600.0
     assert media.try_duration(tmp_path / "source.ts", video=True) == 3600.0
+
+
+def refuse_stat(monkeypatch, name):
+    """Path.is_symlink as a share that won't stat `name` answers on 3.12: EACCES re-raised."""
+    real = Path.is_symlink
+
+    def is_symlink(self):
+        if self.name == name:
+            raise PermissionError(13, "Access is denied")
+        return real(self)
+
+    monkeypatch.setattr(Path, "is_symlink", is_symlink)
+
+
+def test_a_link_test_the_share_refuses_is_one_line(tmp_path, monkeypatch):
+    """#449: a guard must have an answer, and a refused stat is not "no link": one line naming the
+    label (the stream) and the reason, never a path."""
+    refuse_stat(monkeypatch, "source.ts")
+    with pytest.raises(ClipperError) as err:
+        media.link_or_raise(tmp_path / "source.ts", "kick-1")
+    assert str(err.value) == "kick-1: couldn't tell whether source.ts is a link (Access is denied)"
+    assert str(tmp_path) not in str(err.value)
+
+
+def test_link_or_raise_answers_like_is_link(tmp_path, link_or_skip):
+    plain = tmp_path / "source.ts"
+    plain.write_bytes(b"x")
+    assert media.link_or_raise(plain, "kick-1") is False
+    link_or_skip(plain, tmp_path / "link.ts")
+    assert media.link_or_raise(tmp_path / "link.ts", "kick-1") is True

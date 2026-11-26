@@ -124,6 +124,7 @@ def test_a_marked_wav_is_extracted_again_when_its_times_cannot_be_read(tmp_path,
 
     monkeypatch.setattr(Path, "lstat", denied)
     monkeypatch.setattr(transcribe, "is_link", lambda p: False)  # the patched lstat is not ours to read
+    monkeypatch.setattr(transcribe, "link_or_raise", lambda p, label: False)  # nor the link guards' (#449)
     monkeypatch.setattr(transcribe.subprocess, "run",
                         lambda cmd, check: Path(cmd[-1]).write_bytes(b"decoded again"))
     assert transcribe.extract_audio(d) == d / "audio.wav"
@@ -872,3 +873,24 @@ def test_a_cleanup_that_fails_does_not_mask_the_clipperror(tmp_path, monkeypatch
     with pytest.raises(ClipperError, match=r"^kick-1: ffmpeg couldn't decode its source \(exit 1\)$"):
         transcribe.extract_audio(d)
 
+
+@pytest.mark.parametrize("name", ["audio.wav", "source.ts"])
+def test_a_link_test_the_share_refuses_is_one_line_before_any_decode(tmp_path, monkeypatch, name):
+    """#449: extract_audio's two guards (a link at audio.wav, which ffmpeg would write through, and a
+    linked source, which it would read through) ask the share; a refused stat is one line naming
+    the stream, no path, and nothing is decoded or removed."""
+    d = stream_dir(tmp_path)
+    real = Path.is_symlink
+
+    def is_symlink(self):
+        if self == d / name:
+            raise PermissionError(13, "Access is denied")
+        return real(self)
+
+    monkeypatch.setattr(Path, "is_symlink", is_symlink)
+    monkeypatch.setattr(transcribe.subprocess, "run", lambda *a, **kw: pytest.fail("decoded"))
+    with pytest.raises(ClipperError) as err:
+        transcribe.extract_audio(d)
+    assert str(err.value) == f"kick-1: couldn't tell whether {name} is a link (Access is denied)"
+    assert str(tmp_path) not in str(err.value)
+    assert (d / "audio.wav").read_bytes() == b"wav" and (d / "source.ts").read_bytes() == b"source"
