@@ -13,6 +13,12 @@ live, with chat, into the streams share, and the worker takes each recording fro
 new recording part) and when the recorder's state can't be read: `clippa record status` shows
 what the recorder is doing, from the heartbeat it writes to the share (exit 3 while live, 1 when
 the heartbeat is unreadable), and `deploy.sh --force` deploys anyway.
+
+It also refuses from a checkout behind `origin/main`, which it fetches first, since the image is
+built from this checkout's code. Here the override is `--any-branch`, not `--force`, so neither
+override skips the other check. `--env PATH` deploys another checkout's `env.local` from a
+worktree of main, and the live check then runs the `clippa` on PATH or the main checkout's
+`.venv` ([Claude on the NAS](Claude-on-the-NAS#deploy) has the worktree recipe).
 `clippa services stop|restart recorder` stops or restarts it over ssh without a new build,
 with the same check.
 

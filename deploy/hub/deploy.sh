@@ -47,6 +47,7 @@ if [ "$ENV_LOCAL" != "$HERE/env.local" ] && [ ! -f "$ENV_LOCAL" ]; then
     echo "no $ENV_LOCAL (--env)" >&2
     exit 1
 fi
+need_env "$ROOT" "$ENV_LOCAL" deploy/hub/env.local   # a worktree of main: the main checkout's, by --env
 if [ ! -f "$ENV_LOCAL" ]; then
     cp "$HERE/env.template" "$ENV_LOCAL"
     chmod 600 "$ENV_LOCAL"

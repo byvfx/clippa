@@ -270,8 +270,9 @@ def test_require_main_refuses_a_checkout_behind_origin_main(tmp_path):
     git(work, "reset", "-q", "--hard", "HEAD~1")    # main locally behind too; the fetch must see it
     git(work, "update-ref", "refs/remotes/origin/main", "HEAD")
 
-    def run(force=""):
-        script = f'source "{guard.as_posix()}"; require_main "{work.as_posix()}" deploy/x.sh "{force}"; echo go'
+    def run(force="", flag=""):
+        script = (f'source "{guard.as_posix()}"; require_main "{work.as_posix()}" deploy/x.sh "{force}" {flag};'
+                  ' echo go')
         return subprocess.run(["bash", "-c", script], env=env, capture_output=True, text=True,
                               stdin=subprocess.DEVNULL)
 
@@ -279,6 +280,8 @@ def test_require_main_refuses_a_checkout_behind_origin_main(tmp_path):
     assert r.returncode == 1 and "go" not in r.stdout
     assert "main at " in r.stderr and "1 commit(s) behind origin/main" in r.stderr
     assert "bash deploy/x.sh --force" in r.stderr
+    r = run(flag="--any-branch")              # deploy/record: its --force is the live check's
+    assert r.returncode == 1 and "bash deploy/x.sh --any-branch" in r.stderr
     r = run(force="1")
     assert r.returncode == 0 and "go" in r.stdout and "--force" in r.stderr
     git(work, "pull", "-q", "--ff-only")

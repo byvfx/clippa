@@ -40,9 +40,9 @@ had installed: the plugin, its hooks in `settings.json` and its MCP entry, all o
 hooks work at once, nothing in `home/` to clean up. Not while a nightly checkup runs (it ends the
 open session).
 
-**Fix.** `deploy/hub/deploy.sh` and `deploy/claude/deploy.sh` fetch `origin/main` and refuse
+**Fix.** Every deploy script (hub, claude, agent, record) fetches `origin/main` and refuses
 (exit 1) from a checkout behind it, naming the branch, the commit and how many commits behind
-(`deploy/mainguard.sh`); `--force` deploys it anyway. Offline they check the last fetched main
+(`deploy/mainguard.sh`); `--force` deploys it anyway (`--any-branch` for the recorder, whose `--force` skips the live check). Offline they check the last fetched main
 and say so. ([Claude on the NAS](Claude-on-the-NAS#deploy).)
 
 ### A long stream's transcribe dies with SIGTERM (2026-11-24)

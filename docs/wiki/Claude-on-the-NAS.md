@@ -57,7 +57,7 @@ hook, [Bugs to remember](Bugs-to-remember#every-hindsight-hook-says-node-not-fou
 The deploy fetches `origin/main` first and refuses (exit 1) when the checkout is behind it, with
 the branch, the commit and how many commits behind; `--force` deploys it anyway. Offline it
 checks against the last fetched main and says so. Commits main doesn't have yet, and uncommitted
-changes, are only noted. The hub's deploy does the same ([NAS-hub](NAS-hub#deploy)).
+changes, are only noted. The hub, agent and recorder deploys do the same ([NAS-hub](NAS-hub#deploy); the recorder's override is `--any-branch`, [NAS recorder](NAS-recorder#deploy)).
 
 `env.local` is gitignored, so it lives in the checkout you first deployed from, often
 `C:\clipper`, which may be on a feature branch. To deploy main without switching it, use a
@@ -68,8 +68,9 @@ git worktree add --detach ../clippa-main origin/main   # once; later: git -C ../
 cd ../clippa-main && bash deploy/claude/deploy.sh --env /c/clipper/deploy/claude/env.local
 ```
 
-`--env` never creates the file; without it the deploy uses `deploy/claude/env.local` beside
-the script.
+`--env` never creates the file. Without it the deploy uses `deploy/claude/env.local` beside
+the script. In a worktree that has none while the main checkout has one, every deploy stops and names that one for `--env`, instead of deploying a fresh copy of the template
+(that would cost the recorder its alert webhook).
 
 The first run copies `deploy/claude/env.template` to `deploy/claude/env.local` (gitignored) and
 stops. Fill in:

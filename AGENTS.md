@@ -101,7 +101,9 @@ the same PR as the change.
   them unattended, on any Docker host.
 - The NAS recorder is deployed with `bash deploy/record/deploy.sh`, only when no show is live:
   the restart starts a new recording part. The script refuses while `clippa record status`
-  shows a recording (exit 3); `--force` overrides it.
+  shows a recording (exit 3); `--force` overrides it. Every deploy script (hub, claude, agent,
+  record) also refuses from a checkout behind `origin/main`: `--force` overrides that, but on
+  the recorder it's `--any-branch`. `--env PATH` deploys from a worktree of main.
 - Model calls cost money. Say what a rerun of `score`, `segments`, `meta` or `thumbs` will
   cost before doing it on a long stream. `score` refuses a rerun without `--force` (`clippa run
   --from` passes it), `cut` keeps picks whose in/out points are unchanged, `thumbs` keeps a cover
