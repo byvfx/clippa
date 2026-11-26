@@ -187,7 +187,7 @@ def _refuse_link_stream(cfg: dict, d: Path) -> None:
         inside = d.resolve().is_relative_to(Path(cfg["paths"]["streams"]).resolve())
     except (OSError, RuntimeError):  # a share that won't resolve, or a link loop: nothing says it is ours
         inside = False
-    if link_or_raise(d, d.name) or not inside:
+    if link_or_raise(d, d.name, "the stream folder") or not inside:
         raise ClipperError(f"{d.name}: that stream folder is a link or outside the streams folder; "
                            f"refusing to fetch into it")
 

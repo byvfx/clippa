@@ -182,7 +182,7 @@ def _refuse_link(stream_dir: Path) -> None:
     ours: a download into it, the remux's replace and the wav's removal would all happen where it
     points. Only the link is refused, not where the folder is (cmd_fetch checks the streams tree;
     archive may repair an item folder anywhere, #446), but no caller can skip this."""
-    if link_or_raise(stream_dir, stream_dir.name):
+    if link_or_raise(stream_dir, stream_dir.name, "the stream folder"):
         raise ClipperError(f"{stream_dir.name}: the stream folder is a link; refusing to write "
                            f"its source through it")
 
@@ -202,7 +202,12 @@ def _refuse_downloading(stream_dir: Path) -> None:
     the next fetch would resume into the repaired file. Only the path that can't download refuses
     (`fixup`, `--fixup --no-video` and the api-down fallback), in one line naming the stream: a
     plain fetch finishes the download, and --fixup then repairs what it left."""
-    if (stream_dir / "source.ts.ytdl").exists():
+    try:  # a share that won't stat the note is one line too (#449): pathlib re-raises EACCES
+        downloading = (stream_dir / "source.ts.ytdl").exists()
+    except OSError as e:
+        raise ClipperError(f"{stream_dir.name}: couldn't tell whether its source is still downloading "
+                           f"({e.strerror or 'the system refused it'})") from None
+    if downloading:
         raise ClipperError(f"{stream_dir.name}: its source is still downloading (source.ts.ytdl); "
                            f"let the fetch finish, then --fixup")
 
@@ -272,9 +277,8 @@ def fetch_video(stream_dir: Path, meta: dict, cfg: dict, fixup: bool = False) ->
     if out.exists():  # what a finished download left; a wav here is the previous file's audio now
         try:
             transcribe.mark_stale(stream_dir)
-        except ClipperError:
-            print(f"{stream_dir.name}: couldn't record that its audio.wav is stale; a transcribe "
-                  f"may reuse it", file=sys.stderr)
+        except ClipperError as why:  # its own reason: the marker's write, or a link test refused (#449)
+            print(f"{why}; a transcribe may reuse it", file=sys.stderr)
     if skipped:
         print(f"{stream_dir.name}: warning: {skipped} video segments were missing on Kick; "
               f"the source has gaps there")

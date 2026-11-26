@@ -708,8 +708,8 @@ def test_a_marker_the_share_will_not_write_does_not_fail_the_download(defaults, 
     assert kick.fetch_video(tmp_path, {"source": "u"}, defaults) == tmp_path / "source.ts"
     assert (tmp_path / "source.ts").read_bytes() == b"ts"
     assert not (tmp_path / "audio.wav.stale").exists()
-    assert (f"{tmp_path.name}: couldn't record that its audio.wav is stale; a transcribe may reuse "
-            "it" in capsys.readouterr().err)
+    assert (f"{tmp_path.name}: couldn't record that its audio.wav is stale (Access is denied); a "
+            "transcribe may reuse it" in capsys.readouterr().err)  # #449 review: the reason is kept
 
 
 def test_a_refused_fixup_leaves_the_wav_alone(defaults, tmp_path, monkeypatch):
@@ -1579,7 +1579,7 @@ def _refuse_stat(monkeypatch, path):
 
 
 @pytest.mark.parametrize("repair", ["fixup", "fetch_video"])
-@pytest.mark.parametrize("name, what", [("", "kick-1"), ("source.ts", "source.ts")],
+@pytest.mark.parametrize("name, what", [("", "the stream folder"), ("source.ts", "source.ts")],
                          ids=["folder", "source"])
 def test_a_link_test_the_share_refuses_is_one_line_and_nothing_runs(defaults, tmp_path, monkeypatch,
                                                                      repair, name, what):
@@ -1615,4 +1615,25 @@ def test_a_stream_folder_the_share_will_not_stat_is_refused_by_fetch(defaults, t
     with pytest.raises(ClipperError) as err:
         cli.cmd_fetch(defaults, argparse.Namespace(url="https://kick.com/kino/videos/abc123", no_chat=False,
                                                    no_video=False, fixup=False))
-    assert str(err.value) == "kick-1: couldn't tell whether kick-1 is a link (Access is denied)"
+    assert str(err.value) == "kick-1: couldn't tell whether the stream folder is a link (Access is denied)"
+
+
+def test_a_resume_note_the_share_will_not_stat_is_one_line(defaults, tmp_path, monkeypatch):
+    """#449 review: the fixup's first guard asks whether yt-dlp's resume note is there; a refused
+    stat (3.12 re-raises EACCES from exists) is one line, not a traceback, and nothing runs."""
+    d = tmp_path / "kick-1"
+    d.mkdir()
+    (d / "source.ts").write_bytes(b"ts")
+    real = Path.exists
+
+    def exists(self, *a, **kw):
+        if self.name == "source.ts.ytdl":
+            raise PermissionError(13, "Access is denied")
+        return real(self, *a, **kw)
+
+    monkeypatch.setattr(Path, "exists", exists)
+    monkeypatch.setattr(kick.subprocess, "run", lambda *a, **kw: pytest.fail("probed"))
+    with pytest.raises(ClipperError) as err:
+        kick.fixup(d, defaults)
+    assert str(err.value) == ("kick-1: couldn't tell whether its source is still downloading "
+                              "(Access is denied)")

@@ -18,16 +18,17 @@ def is_link(p: Path) -> bool:
     return p.is_symlink() or (hasattr(os.path, "isjunction") and os.path.isjunction(p))
 
 
-def link_or_raise(p: Path, label: str) -> bool:
+def link_or_raise(p: Path, label: str, what: str = "") -> bool:
     """`is_link` for a guard that must have an answer before it reads or writes at `p` (#449): on
     Python 3.12 `is_symlink` and `isjunction` re-raise a stat the share refuses (EACCES, a stale
     handle), which would be a traceback out of a stage. That is one line naming `label` (the stream)
     and the system's reason, never a path: a guard that guessed would act through a name nobody
-    could read."""
+    could read. `what` names the thing in the message where its file name wouldn't (a stream
+    folder's name is the label already)."""
     try:
         return is_link(p)
     except OSError as e:
-        raise ClipperError(f"{label}: couldn't tell whether {p.name} is a link "
+        raise ClipperError(f"{label}: couldn't tell whether {what or p.name} is a link "
                            f"({e.strerror or 'the system refused it'})") from None
 
 
