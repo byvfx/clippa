@@ -814,22 +814,24 @@ def _archive_fixup_prepare(cfg: dict, args: dict) -> Plan:
     if "/" in subject + item or "\\" in subject + item or ".." in subject + item:
         return Plan("answer", text=f"{subject!r} / {item!r} isn't an archive item.")
     it = archive.load_catalog(archive.subject_dir(cfg, subject)).get(item)
-    if it is None or it.get("dir"):
+    if it is None:
         return Plan("answer", text=f"{subject} has no archive item {item!r} to repair.")
+    if it.get("dir"):
+        return Plan("answer", text=f"{item} is one of our streams: {archive._stream_fixup(it)} repairs it.")
     rec = services.recorder(cfg)
     if rec.get("error") or rec["live"]:
         why = f"{', '.join(rec['live'])} is live" if rec["live"] else "I can't tell whether a show is live"
         return Plan("answer", text=f"{why}; a repair rewrites a whole source on the NAS, so it waits "
                                    f"until the show is over.")
-    try:
-        kept, src, fresh = archive.item_source(archive.subject_dir(cfg, subject) / item)
-        gb = src.stat().st_size / 1e9 if not (kept or fresh) else 0.0
+    try:  # read-only: item_source tidies the folder, which a preview must not do
+        kept, src = archive.set_aside(archive.subject_dir(cfg, subject) / item)
+        gb = src.stat().st_size / 1e9 if src is not None and kept is None else 0.0
     except OSError as e:
         return Plan("answer", text=f"{item}: its folder can't be read ({e.strerror or 'the share refused it'}).")
     if kept is not None:
         return Plan("answer", text=f"{item} reads its kept {kept.name}, which can't be remuxed: delete it "
                                    f"and the next archive transcribe downloads a .ts.")
-    if fresh:
+    if src is None:
         return Plan("answer", text=f"{item} has nothing set aside to repair.")
     lines = [f"{subject} / {item}: {src.name} remuxed with fresh timestamps",
              f"reads its {gb:.1f} GB three times and writes it once, on the NAS",

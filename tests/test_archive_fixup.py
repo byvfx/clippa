@@ -1,5 +1,7 @@
 """`clippa archive fixup` (#446): an archive item whose timeline check refused its source is
 repaired in place, under the name the next run reads, and the chat offers it as a card."""
+import os
+
 import pytest
 from test_kick import BACKWARD, IN_ORDER, REPAIRED, FakeFf
 
@@ -53,17 +55,56 @@ def test_a_marked_download_is_repaired_in_place_and_stays_marked(acfg, monkeypat
     assert archive.item_source(d)[2] is False
 
 
-def test_an_in_order_copy_is_left_but_a_wav_past_it_goes(acfg, monkeypatch, capsys):
-    """Nothing to remux, but the wav its run decoded runs past the container (the guard's refusal):
-    it is dropped so the next run decodes the copy again, and the copy keeps its bytes."""
+def test_an_in_order_copy_is_refused_and_its_wav_kept(acfg, monkeypatch, capsys):
+    """Nothing to remux: the wav here was decoded from these very bytes, so dropping it would only
+    buy a decode that is refused again. It says so instead of claiming the next run finishes."""
     d = idir(acfg)
     (d / "source.refused.ts").write_bytes(b"in order")
     (d / "audio.wav").write_bytes(b"wav")
     monkeypatch.setattr(archive.subprocess, "run", FakeFf([REPAIRED, REPAIRED], packets=IN_ORDER, wav_s=33900.0))
-    assert archive.fixup_item(acfg, "s", "kick-1") == 0.0
-    assert (d / "source.refused.ts").read_bytes() == b"in order"
-    assert not (d / "audio.wav").exists()
-    assert "audio.wav runs 67.3 s past its source; dropped" in capsys.readouterr().out
+    with pytest.raises(ClipperError, match="already in order, so a remux has nothing to take out"):
+        archive.fixup_item(acfg, "s", "kick-1")
+    assert (d / "source.refused.ts").read_bytes() == b"in order" and (d / "audio.wav").exists()
+    assert "finishes it now" not in capsys.readouterr().out
+
+
+def test_a_copy_changed_during_the_remux_is_not_replaced(acfg, monkeypatch):
+    """Another clippa moved or rewrote the copy while it was remuxed: what was verified is no longer
+    the file at that name, so nothing is put in its place and the wav stays."""
+    d = idir(acfg)
+    (d / "source.refused.ts").write_bytes(b"broken")
+    ff = FakeFf([BACKWARD, REPAIRED])
+
+    def run(cmd, *a, **kw):
+        out = ff(cmd, *a, **kw)
+        if cmd[0] == "ffmpeg":  # the remux: another run rewrites the copy meanwhile
+            (d / "source.refused.ts").write_bytes(b"BROKEN")  # same size, a new time
+            os.utime(d / "source.refused.ts", ns=(10**18, 10**18))
+        return out
+
+    monkeypatch.setattr(archive.subprocess, "run", run)
+    with pytest.raises(ClipperError, match="changed while it was remuxed"):
+        archive.fixup_item(acfg, "s", "kick-1")
+    assert (d / "source.refused.ts").read_bytes() == b"BROKEN"
+    assert not list(d.glob(".timeline-*"))
+
+
+def test_a_stream_of_ours_is_pointed_at_its_own_fixup(acfg):
+    d = acfg["paths"]["archive"] / "s"
+    jsonstate.write(d / "catalog.json", {"kick-9": {"id": "kick-9", "source": "kick", "dir": "streams/kick-9",
+                                                    "url": "https://kick.com/x/videos/abc"}})
+    with pytest.raises(ClipperError, match=r"`clippa fetch https://kick.com/x/videos/abc --fixup`"):
+        archive.fixup_item(acfg, "s", "kick-9")
+    p = catalog.prepare(acfg, "archive_fixup", {"subject": "s", "item": "kick-9"})
+    assert p.kind == "answer" and "clippa fetch https://kick.com/x/videos/abc --fixup" in p.text
+
+
+def test_the_card_leaves_the_folder_as_it_is(acfg):
+    """A preview reads; item_source's tidying (a marker with no source left) is the run's to do."""
+    (idir(acfg) / ".refused").write_text("x", encoding="utf-8")
+    p = catalog.prepare(acfg, "archive_fixup", {"subject": "s", "item": "kick-1"})
+    assert p.kind == "answer" and "nothing set aside" in p.text
+    assert (idir(acfg) / ".refused").exists()
 
 
 @pytest.mark.parametrize("setup, msg", [
