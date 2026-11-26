@@ -391,7 +391,9 @@ def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[s
         # link at source.refused.ts on a non-fresh run would otherwise meet the refusal's rename
         # (which cannot replace a link) and stick the item with both it and its finished source.ts
         _drop_shadowing_or_mark(idir, src, fresh)
-        wav = transcribe.extract_audio(idir)
+        # trust_mtime False: a wav here is only ever a failed run's leftover, and one with no stamp
+        # beside it (#448) can't say which download it came from, so it is decoded again
+        wav = transcribe.extract_audio(idir, trust_mtime=False)
         # #440: a source whose timestamps jump back would have every time after the jump wrong,
         # so it is refused; a download it refuses is renamed aside as source.refused.ts (the only
         # complete copy) and waits there until that file is rebuilt
@@ -431,6 +433,7 @@ def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[s
         subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(wav), "-c:a", "flac",
                         str(enc)], check=True)
         wav.unlink()
+        transcribe.forget_stamp(idir)
         out, cost = call(worker.transcribe, enc.read_bytes(), ".flac", settings)
         enc.unlink()
     else:

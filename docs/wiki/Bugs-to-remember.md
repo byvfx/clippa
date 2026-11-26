@@ -123,11 +123,20 @@ A `--fixup` that rewrites the source marks `audio.wav.stale` before the replace 
 samples differ: `aresample` stretched across the jump); the marker is the durable half, written
 before anything is replaced, because a fast remux can leave the wav looking current and after a
 repair the two lengths agree, so the timeline check can't tell them apart. A plain `clippa fetch`, and `clippa archive transcribe`'s own download, mark a wav beside a source
-they downloaded stale too, since yt-dlp stamps the VOD's `Last-Modified`, older than the wav. `extract_audio` decodes again a marked wav whatever its mtime, and any
-`audio.wav` older than its source by more than the 2 s a FAT/SMB share rounds timestamps by, so a
-source replaced by other means never reads a wav made from the one before it - a source stamped in
-the future is no exemption, since only the two files' own times are compared (such a source decodes
-once per call, which is the price of never reusing another file's audio). A decode that outlives a
+they downloaded stale too, since yt-dlp stamps the VOD's `Last-Modified`, older than the wav. `extract_audio` decodes again a marked wav whatever else says, then goes by
+`audio.wav.src`, the stamp each decode writes beside the wav: the source's size and mtime when the decode
+began ([#448](https://github.com/byvfx/clippa/issues/448)). A wav is reused only when the stamp still
+names the source (the size exactly, the mtime within the 2 s a FAT/SMB share rounds timestamps by, since
+the laptop over SMB and a container on the NAS read one file's time at different precisions), so a
+source moved in by hand or put back from a backup never reads a wav made from another file, whatever
+its date; a stamp that is a link or isn't one is a no. A stream folder copied without its times kept (a plain copy, `rsync` without
+`-t`) no longer matches its stamps, so each wav is decoded once again: copy with the times kept. A wav from before the stamps falls back to the
+mtime rule: any `audio.wav` older than its source by more than those 2 s is decoded again (a source
+stamped in the future is no exemption, since only the two files' own times are compared), except in an
+archive item, where a wav is only ever a failed run's leftover and one with no stamp is always decoded
+again. A `--fixup` on a source already in order rewrites nothing, but drops an `audio.wav` that runs
+past the container by more than the guard's 1 s (it was decoded from an earlier file), so the stream
+is never left refusing until the wav is deleted by hand. A decode that outlives a
 replacement of its source is not installed at all: the source's own size and time are read before
 and after it, and the run asks to be repeated, since the check above can't see the difference once
 the lengths agree. A link or junction sitting at `audio.wav`, `audio.tmp.wav` or

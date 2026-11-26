@@ -12,6 +12,13 @@ Developing#releases.
 
 ### 2026-11
 
+- 11-26: `audio.wav` now says which file it was decoded from (#448): `audio.wav.src` beside it
+  holds the source's size and mtime, and a wav is reused only when they still match (the mtime within
+  a share's 2 s), so a source put back from a backup or moved in by hand, whatever its date, gets its
+  own audio (a stream folder copied without its times kept decodes once again). A wav decoded before this keeps the old rule (reused unless older than its source), except
+  in an archive item, where it is decoded again. `clippa fetch <url> --fixup` on a source already in
+  order now drops an `audio.wav` that runs past the container, so the next transcribe isn't refused
+  until the wav is deleted by hand.
 - 11-24: a stream longer than `[schedule] budget_hours` (8 h) gets more chat windows and more
   Pass B picks, in proportion: `[signals] top_n` and `[scoring] max_picks` times hours / budget_hours,
   as the release budget already scaled. An 18 h stream had got the same 30 windows and about as many

@@ -129,7 +129,8 @@ def _downloads(monkeypatch, idir, runs, seen, wav_s=33833.0, container_s=33011.2
     monkeypatch.setattr(archive.transcribe, "modal_settings", lambda *a, **k: {})
     monkeypatch.setattr(archive.transcribe, "modal_worker", lambda *a: object())
 
-    def extract(stream_dir):
+    def extract(stream_dir, *, trust_mtime=True):
+        assert trust_mtime is False  # #448: an archive item's wav needs its stamp
         seen.append(archive.transcribe.source_file(stream_dir).name)
         (stream_dir / "audio.wav").write_bytes(b"wav")
         return stream_dir / "audio.wav"

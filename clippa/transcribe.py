@@ -60,6 +60,13 @@ MTIME_ROUNDING_S = 2.0
 # than the share rounds by), and the marker holds where the wav itself couldn't be dropped.
 STALE_MARKER = "audio.wav.stale"
 
+# Beside audio.wav (#448): which file it was decoded from, as that file's own lstat read when the
+# decode began ({"size", "mtime_ns"}). An mtime alone is not an identity: a source put back from a
+# backup, or moved in by hand, can carry any stamp, older than the wav included. The size must
+# match exactly and the mtime within MTIME_ROUNDING_S, since the laptop over SMB and a container
+# on the NAS's own disk read the same file's time at different precisions.
+SRC_STAMP = "audio.wav.src"
+
 
 def _drop_link(p: Path, label: str) -> None:
     """A link where ffmpeg is about to write with `-y`: ffmpeg follows it and would truncate what
@@ -97,7 +104,63 @@ def clear_stale(stream_dir: Path) -> None:
         pass
 
 
-def extract_audio(stream_dir: Path) -> Path:
+def forget_stamp(stream_dir: Path) -> None:
+    """Best effort, with the wav it describes gone: a stamp left behind only ever says the next
+    wav is of another file (it was written for an earlier decode), which costs a decode, never a
+    wrong reuse."""
+    try:
+        (stream_dir / SRC_STAMP).unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def _stamp_says(stream_dir: Path, src_st: os.stat_result | None) -> bool | None:
+    """Whether audio.wav.src says the wav was decoded from the file `src_st` describes; None when
+    there is no stamp (a wav decoded before #448, or one whose stamp couldn't be written), which the
+    mtime rule decides. A stamp that is a link, can't be read or isn't one is a no: it is the
+    record, and one this can't read can't vouch for the wav. A source the share won't stat
+    matches nothing."""
+    path = stream_dir / SRC_STAMP
+    try:
+        if is_link(path):
+            return False
+        stamp = jsonstate.load(path)
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError):
+        return False
+    if src_st is None or not isinstance(stamp, dict):
+        return False
+    size, mtime = stamp.get("size"), stamp.get("mtime_ns")
+    if type(size) is not int or type(mtime) is not int:  # bool is an int: not a size
+        return False
+    return size == src_st.st_size and abs(mtime - src_st.st_mtime_ns) <= int(MTIME_ROUNDING_S * 10**9)
+
+
+def _write_stamp(stream_dir: Path, decoded: tuple[int, int] | None) -> None:
+    """Best effort after a decode is installed: with no stamp the wav falls back to the mtime rule,
+    which a wav written just now passes. A share that won't take it leaves an earlier stamp at
+    worst (forget_stamp went with the earlier wav, so one here is a failed drop's), which names
+    another file and costs one decode."""
+    if decoded is None:  # the source's times couldn't be read: nothing to record
+        forget_stamp(stream_dir)
+        return
+    try:
+        jsonstate.write(stream_dir / SRC_STAMP, {"size": decoded[0], "mtime_ns": decoded[1]}, indent=None)
+    except OSError:
+        pass
+
+
+def extract_audio(stream_dir: Path, *, trust_mtime: bool = True) -> Path:
+    """The stream's audio.wav: the one already here when it was decoded from this source, else the
+    source decoded again (gaps filled with silence, 16 kHz mono).
+
+    Which file a cached wav came from is decided in this order: the stale marker (a --fixup or a
+    download wrote it: decode again, whatever else says); then the stamp beside it, audio.wav.src
+    (#448: reuse only when it names this source's size and mtime); then, for a wav decoded before
+    there were stamps, its mtime against the source's. trust_mtime False drops that last rule (an
+    archive item's wav is only ever a failed run's leftover, so one with no stamp is decoded
+    again rather than trusted)."""
     wav = stream_dir / "audio.wav"
     marker = stream_dir / STALE_MARKER
     _drop_link(wav, stream_dir.name)  # a link is not a cache of ours: drop the link, never its target
@@ -112,23 +175,31 @@ def extract_audio(stream_dir: Path) -> Path:
                            f"refusing to read it")
     if wav.exists():
         try:  # lstat: only these two regular files' own times decide which is newer
-            src_st, wav_st = src.lstat(), wav.lstat()
-        except OSError:  # one can't be stat'ed: its times say nothing (the marker still does)
-            src_st = wav_st = None
-        # a wav up to the share's rounding older than its source is not older: keep it. Anything
-        # older was decoded from a different file, so it is dropped and the source decoded again.
-        # The marker says the same outright, whatever the mtime reads: a fast remux can leave a
-        # wav from the old source looking younger than the one that replaced it. It is dropped
-        # even when the two times can't be compared, since it is the one thing that knows.
-        if (not marker.exists() and src_st is not None and wav_st is not None
-                and wav_st.st_mtime_ns >= src_st.st_mtime_ns - int(MTIME_ROUNDING_S * 10**9)):
+            src_st = src.lstat()
+        except OSError:  # can't be stat'ed: its times say nothing (the marker still does)
+            src_st = None
+        try:
+            wav_st = wav.lstat()
+        except OSError:
+            wav_st = None
+        stamp = _stamp_says(stream_dir, src_st)
+        # With no stamp, a wav up to the share's rounding older than its source is not older:
+        # keep it. Anything older was decoded from a different file, so it is dropped and the
+        # source decoded again. The marker says the same outright, whatever the stamp or the
+        # mtime reads: a fast remux can leave a wav from the old source looking younger than the
+        # one that replaced it. It is dropped even when the times can't be compared, since it is
+        # the one thing that knows.
+        by_mtime = (trust_mtime and src_st is not None and wav_st is not None
+                    and wav_st.st_mtime_ns >= src_st.st_mtime_ns - int(MTIME_ROUNDING_S * 10**9))
+        if not marker.exists() and (stamp if stamp is not None else by_mtime):
             return wav
         try:
-            wav.unlink()  # older than its source, or marked: decoded from a different file
+            wav.unlink()  # marked, or not this source's by its stamp or its mtime
         except OSError as e:
             raise ClipperError(f"{stream_dir.name}: couldn't drop the stale audio.wav "
                                f"({e.strerror or 'the system refused it'})") from None
         clear_stale(stream_dir)  # the wav it was about is gone
+        forget_stamp(stream_dir)  # and so is the file it named
     tmp = wav.with_suffix(".tmp.wav")
     # Which file this decode reads, as its own lstat says: a --fixup or a re-download can replace the
     # source while a long decode is still on the old one, and audio of a file that is gone must not
@@ -170,6 +241,7 @@ def extract_audio(stream_dir: Path) -> Path:
                                f"decoded; run it again")
         tmp.replace(wav)
         clear_stale(stream_dir)  # a marker from an earlier failed drop must not hold this wav back
+        _write_stamp(stream_dir, decoding)  # which file this wav is of (#448); equal to decoded here
     finally:  # a decode that failed midway leaves no partial wav to be read as one
         try:  # best effort: the error that brought us here is the one to report
             tmp.unlink(missing_ok=True)
@@ -187,16 +259,10 @@ def check_audio_timeline(stream_dir: Path) -> None:
     would work); an audio shorter than the container is only a warning. The refusal is a
     TimelineJump, whose `.reason` is the message without that command. A .wav source is the
     audio itself, so there is nothing to compare and no probe is made."""
-    try:
-        src = source_file(stream_dir)
-    except ClipperError:  # no source to compare the audio with
+    lengths = audio_lengths(stream_dir)
+    if lengths is None:
         return
-    if src.suffix == ".wav":  # the audio is the source: nothing to compare it with
-        return
-    wav_s = try_duration(stream_dir / "audio.wav")
-    if wav_s is None or not math.isfinite(wav_s):  # ffprobe can't tell, or gave a nan
-        return
-    container_s = timeline.container_duration(timeline.probe(src))
+    wav_s, container_s = lengths
     jump = wav_s - container_s
     if jump <= timeline.TOLERANCE_S:
         if jump < -timeline.TOLERANCE_S:
@@ -219,6 +285,23 @@ def check_audio_timeline(stream_dir: Path) -> None:
         f"{stream_dir.name}: the source's timeline and its audio disagree by {jump:.1f} s "
         f"(audio.wav, {wav_s:.1f} s, runs past a container of {container_s:.1f} s), so the "
         f"transcript would be off after it")
+
+
+def audio_lengths(stream_dir: Path) -> tuple[float, float] | None:
+    """(audio.wav's length, its source's container length) in seconds, as the timeline guard
+    compares them; None when there is nothing to compare: no source, a .wav source (the audio is
+    the source), or a wav ffprobe can't time. A source ffprobe can't time is a ClipperError, as it
+    is for the guard."""
+    try:
+        src = source_file(stream_dir)
+    except ClipperError:  # no source to compare the audio with
+        return None
+    if src.suffix == ".wav":  # the audio is the source: nothing to compare it with
+        return None
+    wav_s = try_duration(stream_dir / "audio.wav")
+    if wav_s is None or not math.isfinite(wav_s):  # ffprobe can't tell, or gave a nan
+        return None
+    return wav_s, timeline.container_duration(timeline.probe(src))
 
 
 def _fixup_command(meta: object) -> str:

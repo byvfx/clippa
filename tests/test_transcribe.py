@@ -154,6 +154,7 @@ def test_a_source_replaced_during_the_decode_installs_no_audio(tmp_path, monkeyp
     assert not (d / "audio.wav").exists()  # the old source's audio is not this stream's
     assert not (d / "audio.tmp.wav").exists()  # nor left beside it
     assert (d / "audio.wav.stale").exists()  # still says the wav here is of another source
+    assert not (d / "audio.wav.src").exists()  # and no stamp vouches for audio that wasn't installed
 
 
 def test_a_wav_with_no_source_is_served_as_it_is(tmp_path, monkeypatch):
@@ -366,6 +367,141 @@ def test_a_wav_more_than_the_rounding_older_than_its_source_is_extracted_again(t
     monkeypatch.setattr(transcribe.subprocess, "run", run)
     assert transcribe.extract_audio(d) == d / "audio.wav"
     assert ran and (d / "audio.wav").read_bytes() == b"the wav of this source"
+
+
+def stamp(d, size, mtime_ns):
+    """audio.wav.src as extract_audio writes it (#448): the source the wav was decoded from."""
+    jsonstate.write(d / "audio.wav.src", {"size": size, "mtime_ns": mtime_ns}, indent=None)
+
+
+def decodes(monkeypatch, ran):
+    """subprocess.run as ffmpeg: it records the call and writes the new wav."""
+    def run(cmd, check):
+        ran.append(cmd)
+        Path(cmd[-1]).write_bytes(b"the wav of this source")
+    monkeypatch.setattr(transcribe.subprocess, "run", run)
+
+
+def test_a_decode_records_which_source_its_wav_is_of(tmp_path, monkeypatch):
+    """#448: the stamp is the source's own size and mtime, as its lstat read them for the decode."""
+    d = stream_dir(tmp_path)
+    (d / "audio.wav").unlink()
+    decodes(monkeypatch, [])
+    transcribe.extract_audio(d)
+    st = (d / "source.ts").lstat()
+    assert jsonstate.load(d / "audio.wav.src") == {"size": st.st_size, "mtime_ns": st.st_mtime_ns}
+
+
+def test_a_stamp_of_another_source_decodes_again_though_the_wav_is_newer(tmp_path, monkeypatch):
+    """#448: a source moved in by hand or put back from a backup can carry an mtime older than the
+    wav, which the mtime rule alone would reuse: the stamp says the wav is of another file."""
+    d = stream_dir(tmp_path)
+    old = time.time_ns() - 3600 * 10**9  # the replacement's own stamp, an hour before the wav
+    os.utime(d / "source.ts", ns=(old, old))
+    stamp(d, size=999, mtime_ns=old)  # the file the wav was decoded from was another size
+    ran = []
+    decodes(monkeypatch, ran)
+    assert transcribe.extract_audio(d) == d / "audio.wav"
+    assert ran and (d / "audio.wav").read_bytes() == b"the wav of this source"
+    st = (d / "source.ts").lstat()
+    assert jsonstate.load(d / "audio.wav.src") == {"size": st.st_size, "mtime_ns": st.st_mtime_ns}
+
+
+def test_a_stamp_of_this_source_keeps_the_wav_within_the_shares_rounding(tmp_path, monkeypatch):
+    """The laptop over SMB and a container on the NAS's disk read one file's time at different
+    precisions, so a stamp up to MTIME_ROUNDING_S off is still this source: no 33 GB decode for it."""
+    d = stream_dir(tmp_path)
+    st = (d / "source.ts").lstat()
+    stamp(d, size=st.st_size, mtime_ns=st.st_mtime_ns - 1_500_000_000)
+    monkeypatch.setattr(transcribe.subprocess, "run", lambda *a, **kw: pytest.fail("decoded again"))
+    assert transcribe.extract_audio(d) == d / "audio.wav"
+    assert (d / "audio.wav").read_bytes() == b"wav"
+
+
+def test_a_matching_stamp_keeps_a_wav_the_mtime_rule_would_drop(tmp_path, monkeypatch):
+    """The stamp is the record: a wav whose own mtime reads older (copied back with its folder, say)
+    is still the audio of the file the stamp names."""
+    d = stream_dir(tmp_path)
+    old = time.time_ns() - 3600 * 10**9
+    os.utime(d / "audio.wav", ns=(old, old))
+    st = (d / "source.ts").lstat()
+    stamp(d, size=st.st_size, mtime_ns=st.st_mtime_ns)
+    monkeypatch.setattr(transcribe.subprocess, "run", lambda *a, **kw: pytest.fail("decoded again"))
+    assert transcribe.extract_audio(d) == d / "audio.wav"
+
+
+def test_the_marker_wins_over_a_matching_stamp(tmp_path, monkeypatch):
+    """A download or a --fixup marks the wav stale before the source changes: what the stamp said
+    then is not evidence now."""
+    d = stream_dir(tmp_path)
+    st = (d / "source.ts").lstat()
+    stamp(d, size=st.st_size, mtime_ns=st.st_mtime_ns)
+    transcribe.mark_stale(d)
+    ran = []
+    decodes(monkeypatch, ran)
+    transcribe.extract_audio(d)
+    assert ran and not (d / "audio.wav.stale").exists()
+
+
+@pytest.mark.parametrize("body", [b"not json", b"[1, 2]", b'{"size": true, "mtime_ns": 1}',
+                                  b'{"size": 6}'], ids=["garbage", "list", "bool", "partial"])
+def test_a_stamp_that_is_not_one_decodes_again(tmp_path, monkeypatch, body):
+    """A broken stamp can't vouch for the wav, and it is not the absence of one either (that would
+    fall back to the mtime rule, which this wav, newer than its source, passes)."""
+    d = stream_dir(tmp_path)
+    old = time.time_ns() - 3600 * 10**9
+    os.utime(d / "source.ts", ns=(old, old))
+    (d / "audio.wav.src").write_bytes(body)
+    ran = []
+    decodes(monkeypatch, ran)
+    transcribe.extract_audio(d)
+    assert ran
+
+
+def test_a_linked_stamp_is_not_read(tmp_path, monkeypatch, link_or_skip):
+    """A link at the stamp's name says nothing about this wav, whatever the file it names holds."""
+    d = stream_dir(tmp_path)
+    st = (d / "source.ts").lstat()
+    elsewhere = tmp_path / "elsewhere.json"
+    jsonstate.write(elsewhere, {"size": st.st_size, "mtime_ns": st.st_mtime_ns})
+    link_or_skip(elsewhere, d / "audio.wav.src")
+    ran = []
+    decodes(monkeypatch, ran)
+    transcribe.extract_audio(d)
+    assert ran
+    assert jsonstate.load(elsewhere) == {"size": st.st_size, "mtime_ns": st.st_mtime_ns}  # untouched
+
+
+@pytest.mark.parametrize("stamped", [False, True], ids=["no-stamp", "stamped"])
+def test_an_archive_wav_with_no_stamp_is_decoded_again(tmp_path, monkeypatch, stamped):
+    """trust_mtime False (archive): a wav with no stamp is a failed run's leftover of an unknown
+    download, so it is decoded again; one stamped for this source is still reused."""
+    d = stream_dir(tmp_path)
+    old = time.time_ns() - 3600 * 10**9
+    os.utime(d / "source.ts", ns=(old, old))  # yt-dlp's Last-Modified: the mtime rule would keep it
+    if stamped:
+        st = (d / "source.ts").lstat()
+        stamp(d, size=st.st_size, mtime_ns=st.st_mtime_ns)
+    ran = []
+    decodes(monkeypatch, ran)
+    transcribe.extract_audio(d, trust_mtime=False)
+    assert bool(ran) is not stamped
+
+
+def test_a_stale_wav_goes_with_its_stamp(tmp_path, monkeypatch):
+    """The stamp names the file the dropped wav was of: it goes with it, so a decode that then fails
+    leaves no stamp behind to vouch for nothing."""
+    d = stream_dir(tmp_path)
+    stamp(d, size=999, mtime_ns=1)
+    transcribe.mark_stale(d)
+
+    def failed(cmd, check):
+        raise subprocess.CalledProcessError(1, cmd)
+
+    monkeypatch.setattr(transcribe.subprocess, "run", failed)
+    with pytest.raises(ClipperError):
+        transcribe.extract_audio(d)
+    assert not (d / "audio.wav").exists() and not (d / "audio.wav.src").exists()
 
 
 def test_a_source_stamped_in_the_future_does_not_save_an_older_wav(tmp_path, monkeypatch):

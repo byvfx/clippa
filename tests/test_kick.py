@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from clippa import cli, kick, timeline, transcribe
+from clippa import cli, jsonstate, kick, timeline, transcribe
 from clippa.errors import ClipperError
 
 
@@ -58,11 +58,15 @@ class FakeFf:
     `by_bytes` makes the probe read the file it is given where the file's bytes are one of its
     keys, and answer that entry's `(format JSON, packet list)` instead: a source is then probed as
     what is actually on disk, so a version that reads the partial download and one that reads the
-    finished file get different timelines, as they would from ffprobe."""
+    finished file get different timelines, as they would from ffprobe.
+
+    `wav_s` is audio.wav's length as try_duration reads it (#448: an in-order --fixup compares it
+    with the container); "" is a wav ffprobe can't time."""
 
     def __init__(self, probes, remux_code=0, remux_stderr="", packets=JUMPS, fixed=IN_ORDER,
-                 by_bytes=None):
+                 by_bytes=None, wav_s=""):
         self.probes, self.remux_code, self.remux_stderr = list(probes), remux_code, remux_stderr
+        self.wav_s = wav_s
         self.packets, self.fixed, self.by_bytes = packets, fixed, by_bytes or {}
         self.calls = []
 
@@ -78,6 +82,8 @@ class FakeFf:
                 return subprocess.CompletedProcess(args, 0, self.fixed if temp else self.packets, "")
             if "stream=codec_type" in args:
                 return subprocess.CompletedProcess(args, 0, STREAMS, "")
+            if "format=duration" in args:  # try_duration, which only transcribe's audio_lengths asks
+                return subprocess.CompletedProcess(args, 0, str(self.wav_s), "")
             return subprocess.CompletedProcess(args, 0, seen[0] if seen else self.probes.pop(0), "")
         assert args[0] == "ffmpeg", args
         if not self.remux_code:
@@ -530,11 +536,13 @@ def test_a_fixup_that_replaces_the_source_drops_the_old_wav(defaults, tmp_path, 
     what the next transcribe would read, and has to go."""
     (tmp_path / "source.ts").write_bytes(b"broken")
     (tmp_path / "audio.wav").write_bytes(b"wav of the old source")
+    (tmp_path / "audio.wav.src").write_text('{"size": 6, "mtime_ns": 1}', encoding="utf-8")
     monkeypatch.setattr(kick.subprocess, "run", FakeFf([BACKWARD, REPAIRED]))
     kick.fetch_video(tmp_path, {"source": "u"}, defaults, fixup=True)
     assert (tmp_path / "source.ts").read_bytes() == b"remuxed"
     assert not (tmp_path / "audio.wav").exists()
     assert not (tmp_path / "audio.wav.stale").exists()  # the wav went, so the marker did too
+    assert not (tmp_path / "audio.wav.src").exists()  # and the stamp of the old source with it
 
 
 def test_an_in_order_fixup_leaves_the_wav_alone(defaults, tmp_path, monkeypatch):
@@ -546,6 +554,112 @@ def test_an_in_order_fixup_leaves_the_wav_alone(defaults, tmp_path, monkeypatch)
     assert (tmp_path / "source.ts").read_bytes() == b"broken"  # untouched
     assert (tmp_path / "audio.wav").read_bytes() == b"wav"
     assert not (tmp_path / "audio.wav.stale").exists()  # nothing was replaced
+
+
+def test_an_in_order_fixup_drops_a_wav_that_runs_past_the_container(defaults, tmp_path, monkeypatch, capsys):
+    """#448: the source is already in order, so nothing is remuxed, but a wav beside it running past
+    the container by more than the guard's tolerance was decoded from an earlier file: left, every
+    transcribe would refuse on it until it was deleted by hand. It goes, with its stamp."""
+    (tmp_path / "source.ts").write_bytes(b"in order")
+    (tmp_path / "audio.wav").write_bytes(b"wav of the jumping source")
+    (tmp_path / "audio.wav.src").write_text('{"size": 1, "mtime_ns": 1}', encoding="utf-8")
+    monkeypatch.setattr(kick.subprocess, "run", FakeFf([REPAIRED, REPAIRED], packets=IN_ORDER, wav_s=33900.0))
+    kick.fixup(tmp_path, defaults)
+    assert (tmp_path / "source.ts").read_bytes() == b"in order"  # untouched
+    assert not (tmp_path / "audio.wav").exists() and not (tmp_path / "audio.wav.src").exists()
+    assert not (tmp_path / "audio.wav.stale").exists()  # the wav went, so the marker did too
+    out = capsys.readouterr().out
+    assert "the timeline is already in order" in out
+    assert "audio.wav runs 67.3 s past the source's container; dropped" in out
+
+
+def test_an_in_order_fixup_keeps_a_wav_within_the_tolerance(defaults, tmp_path, monkeypatch):
+    """ffprobe's rounding is not a wav of another file: the guard would pass it, so it stays."""
+    (tmp_path / "source.ts").write_bytes(b"in order")
+    (tmp_path / "audio.wav").write_bytes(b"wav")
+    monkeypatch.setattr(kick.subprocess, "run", FakeFf([REPAIRED, REPAIRED], packets=IN_ORDER, wav_s=33833.5))
+    kick.fixup(tmp_path, defaults)
+    assert (tmp_path / "audio.wav").read_bytes() == b"wav"
+    assert not (tmp_path / "audio.wav.stale").exists()
+
+
+def test_an_in_order_fixup_that_cannot_mark_the_wav_still_finishes(defaults, tmp_path, monkeypatch, capsys):
+    """The marker goes in before the wav is dropped, as it does before a replace: one the share won't
+    write leaves the wav, says so in a line, and the fixup still stores what it found (the in-order
+    source clears a timeline_overlap_s an earlier repair left)."""
+    (tmp_path / "source.ts").write_bytes(b"in order")
+    (tmp_path / "audio.wav").write_bytes(b"wav")
+    jsonstate.write(tmp_path / "meta.json", {"stream_id": "kick-1", "timeline_overlap_s": 821.7})
+    monkeypatch.setattr(kick.subprocess, "run", FakeFf([REPAIRED, REPAIRED], packets=IN_ORDER, wav_s=33900.0))
+
+    def denied(stream_dir):
+        raise ClipperError(f"{stream_dir.name}: couldn't record that its audio.wav is stale (Access is denied)")
+
+    monkeypatch.setattr(kick.transcribe, "mark_stale", denied)
+    kick.fixup(tmp_path, defaults)
+    assert (tmp_path / "audio.wav").read_bytes() == b"wav"
+    assert jsonstate.load(tmp_path / "meta.json") == {"stream_id": "kick-1"}
+    assert "is left; delete it, or --fixup again" in capsys.readouterr().out
+
+
+def test_an_in_order_fixup_whose_wav_will_not_stat_still_stores_the_timeline(
+        defaults, tmp_path, monkeypatch, capsys):
+    """#450 review: a wav the share won't stat (pathlib re-raises EACCES on 3.12) is not an error
+    that skips _store_jump: the wav is left, with a line, and the in-order source clears the
+    timeline_overlap_s an earlier repair stored."""
+    (tmp_path / "source.ts").write_bytes(b"in order")
+    (tmp_path / "audio.wav").write_bytes(b"wav")
+    jsonstate.write(tmp_path / "meta.json", {"stream_id": "kick-1", "timeline_overlap_s": 821.7})
+    monkeypatch.setattr(kick.subprocess, "run", FakeFf([REPAIRED, REPAIRED], packets=IN_ORDER, wav_s=33900.0))
+    real = Path.exists
+
+    def refused(self, *a, **kw):
+        if self.name == "audio.wav":
+            raise PermissionError(13, "Access is denied")
+        return real(self, *a, **kw)
+
+    monkeypatch.setattr(Path, "exists", refused)
+    kick.fixup(tmp_path, defaults)
+    monkeypatch.setattr(Path, "exists", real)
+    assert (tmp_path / "audio.wav").read_bytes() == b"wav"
+    assert jsonstate.load(tmp_path / "meta.json") == {"stream_id": "kick-1"}
+    out = capsys.readouterr().out
+    assert "couldn't compare audio.wav with the source (Access is denied); it is left as it is" in out
+    assert str(tmp_path) not in out
+
+
+def test_an_in_order_fixup_whose_source_has_no_duration_still_stores_the_timeline(
+        defaults, tmp_path, monkeypatch, capsys):
+    """#450 review: the second probe giving no container duration is a line too, never a raise past
+    _store_jump."""
+    (tmp_path / "source.ts").write_bytes(b"in order")
+    (tmp_path / "audio.wav").write_bytes(b"wav")
+    jsonstate.write(tmp_path / "meta.json", {"stream_id": "kick-1", "timeline_overlap_s": 821.7})
+    no_duration = json.dumps({"format": {"start_time": "62.016667"}})
+    monkeypatch.setattr(kick.subprocess, "run", FakeFf([REPAIRED, no_duration], packets=IN_ORDER, wav_s=33900.0))
+    kick.fixup(tmp_path, defaults)
+    assert (tmp_path / "audio.wav").read_bytes() == b"wav"
+    assert jsonstate.load(tmp_path / "meta.json") == {"stream_id": "kick-1"}
+    assert "couldn't compare audio.wav with the source (ffprobe gave no container duration" in capsys.readouterr().out
+
+
+def test_an_in_order_fixup_leaves_the_wav_to_a_busy_worker(defaults, tmp_path, monkeypatch, capsys):
+    """A worker on the stream may be reading the wav: it is left, the fixup says why and finishes."""
+    (tmp_path / "source.ts").write_bytes(b"in order")
+    (tmp_path / "audio.wav").write_bytes(b"wav")
+    monkeypatch.setattr(kick.subprocess, "run", FakeFf([REPAIRED, REPAIRED], packets=IN_ORDER, wav_s=33900.0))
+    calls = []
+
+    def busy(stream_dir, cfg):
+        calls.append(1)
+        return "the worker" if len(calls) > 1 else ""  # free before the check, busy at the drop
+
+    monkeypatch.setattr("clippa.pick.worker_busy", busy)
+    kick.fixup(tmp_path, defaults)
+    assert (tmp_path / "audio.wav").read_bytes() == b"wav"
+    assert not (tmp_path / "audio.wav.stale").exists()
+    out = capsys.readouterr().out
+    assert "the worker is running it" in out and "is left" in out
 
 
 def test_a_redownload_marks_the_wav_it_replaces_stale(defaults, tmp_path, monkeypatch):
