@@ -32,3 +32,13 @@ def test_the_current_release_has_notes_before_its_first_month_block():
     lead = body.split("\n### ", 1)[0]
     assert lead.strip(), "write the release's notes (a short lead and highlights) before its first ### block"
     assert len(lead.splitlines()) < 40, "the lead is the release page: keep it short, detail goes under ###"
+
+
+def test_no_merge_conflict_marker_is_left_in_it():
+    """A rebase that resolved this file by hand can leave a `<<<<<<<` behind, and the release
+    workflow and every reader then see it (#440 shipped one)."""
+    text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    markers = [f"{n}: {line}" for n, line in enumerate(text.splitlines(), 1)
+               if re.match(r"^(<{7}|={7}|>{7})( |$)", line)]
+    assert not markers, markers
+

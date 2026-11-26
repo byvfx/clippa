@@ -86,12 +86,66 @@ GOPs also drop frames after an input seek.
 **How to tell.** `ffprobe` the source's format duration against its audio stream's: 33011 s against
 33833 s is this stream's signature, and a backwards `pts` jump sits just before a round time.
 
-**Band-aid.** None. It is fetched and transcribed only: do **not** `clippa run` it, or every cut,
-caption and thumbnail after 7:28 is 821.7 s late.
+**Band-aid.** `clippa transcribe` refuses such a source instead of writing a transcript that
+would be wrong after the jump: when `audio.wav` is more than 1 s longer than the source's
+container it says so, naming the stream and both lengths, and prints `clippa fetch <url> --fixup`
+when meta.json holds a Kick VOD's url (a recording's channel link has nothing to fetch).
+`--fixup` remuxes the source with its timestamps regenerated — or the video it has just
+downloaded, so a fresh download can be repaired in one go — and keeps the jump it found as
+`timeline_overlap_s` in meta.json. It rewrites the whole file, so it never runs by itself:
+without it a download is taken as it comes, which is right for every file but this one. A source
+that is still downloading (yt-dlp's `source.ts.ytdl` resume note beside it) is never remuxed as a
+partial: `--fixup --no-video`, and a repair with no metadata, say so and stop since they can't
+download (rewriting the partial in place would leave the note for the next fetch to resume into),
+while a plain `clippa fetch` resumes from the note, and a `--fixup` that runs the video resumes
+first and then repairs the whole file. An
+audio *shorter* than its container only warns.
 
-**Fix.** Open: fetch has to rebuild the timeline over the jumps
-([#440](https://github.com/byvfx/clippa/issues/440), filed 2026-11-25, labelled `bug-to-remember`).
-When it lands, its PR adds a fuller entry here. (`docs/log/2026-11.md`, 2026-11-04.)
+**Fix.** `clippa transcribe` checks the timeline after `extract_audio` and before it uses any
+times (`check_audio_timeline`, `clippa/transcribe.py`), `clippa speakers <stream> --diarize` runs
+the same check after its audio extraction, and `clippa archive transcribe` makes the check while
+the item's source is still on disk: a refused download is renamed `source.refused.ts` (or, where the
+share refuses that rename, remembered by a `.refused` marker beside `source.ts`, written only then
+and counted only while `source.ts` is still there — one left with no source is dropped and the item
+downloads again, since a marker trusted alone would serve a stale `audio.wav`), reused by
+the next run instead of downloaded again (`_drop_partial` only ever unlinks `source.ts`, so it
+can't take the kept file), and the item waits for its jump to be fixed. Where neither the rename
+nor the marker can be written the item says the download is still `source.ts` and a later run may
+replace it; a re-refused item's line names the copy it is kept under. A kept `source.mp4` gets the
+same treatment as the other two names: a link or an empty one is not a kept video and is dropped
+before the audio is read, so a bogus name cannot stall the item. A link or an empty file at
+`source.mp4` or `source.refused.ts` is dropped after the download, before the audio is read
+(`source.refused.ts` also before it, since a download would otherwise be shadowed): one
+planted while yt-dlp runs would otherwise be the name `extract_audio` reads (and the refusal's
+rename cannot replace a link), so the item would stick with both it and its finished `source.ts`.
+A `--fixup` that rewrites the source marks `audio.wav.stale` before the replace and drops the
+`audio.wav` decoded from the old one, so the transcribe after it reads the repaired file (its
+samples differ: `aresample` stretched across the jump); the marker is the durable half, written
+before anything is replaced, because a fast remux can leave the wav looking current and after a
+repair the two lengths agree, so the timeline check can't tell them apart. A plain `clippa fetch`, and `clippa archive transcribe`'s own download, mark a wav beside a source
+they downloaded stale too, since yt-dlp stamps the VOD's `Last-Modified`, older than the wav. `extract_audio` decodes again a marked wav whatever its mtime, and any
+`audio.wav` older than its source by more than the 2 s a FAT/SMB share rounds timestamps by, so a
+source replaced by other means never reads a wav made from the one before it - a source stamped in
+the future is no exemption, since only the two files' own times are compared (such a source decodes
+once per call, which is the price of never reusing another file's audio). A decode that outlives a
+replacement of its source is not installed at all: the source's own size and time are read before
+and after it, and the run asks to be repeated, since the check above can't see the difference once
+the lengths agree. A link or junction sitting at `audio.wav`, `audio.tmp.wav` or
+`audio.modal*` is removed (the link alone, never what it names) before ffmpeg is given that name to
+write, so ffmpeg can't truncate what the link names; one at `source.refused.ts` or `.refused` is
+removed for the same reason (the marker's is never written through), so it can't stop every run. A
+link at a stream folder, or at its `source.ts`, is refused instead, naming the stream, before
+anything reads or writes through it. The remux is
+`clippa/timeline.py`: a `-fflags +genpts` copy into a fresh temp file beside the source, its
+length probed and its own packet timestamps checked for a backwards step — the length alone can't
+tell a repaired file from a remux that changed nothing — and only a result that lost nothing and
+no longer jumps goes in place; the temp goes on every exit. The stream's run lock is taken for a
+moment before the remux and again around the replace (a 33 GB remux outlasts a lock), so a worker
+that starts meanwhile still sees the old source and is stopped by the transcribe check, not
+raced. A source it can't compare (a `.wav` source, no source at all, or an `audio.wav` whose
+length ffprobe can't give) is passed over, not refused; a source container with no duration at
+all is an error, since then there is nothing to compare it with. ([#440](https://github.com/byvfx/clippa/issues/440),
+filed 2026-11-25, labelled `bug-to-remember`; `docs/log/2026-11.md`, 2026-11-04.)
 
 ### Audio drifts on a stream-copy cut (2026-10-28)
 

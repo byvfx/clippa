@@ -6,7 +6,7 @@ import pytest
 from conftest import ROOT
 
 from clippa import cli, setup
-from clippa.errors import ClipperError
+from clippa.errors import ClipperError, exit_code
 
 
 def run_cli(monkeypatch, tmp_path, *argv):
@@ -14,6 +14,19 @@ def run_cli(monkeypatch, tmp_path, *argv):
     with pytest.raises(SystemExit) as e:
         cli.main()
     return e.value.code
+
+
+@pytest.mark.parametrize("raw, signed", [
+    (1, 1),  # an ordinary failure: unchanged
+    (-9, -9),  # already signed (POSIX): unchanged
+    (3199971767, -1094995529),  # 0xBEBEBE37, Windows' unsigned form of ffmpeg's negative errno
+    (4294967295, -1),  # 0xFFFFFFFF: ffmpeg's "no code" as the shell shows it
+], ids=["small", "already-signed", "windows-ffmpeg", "all-bits"])
+def test_exit_code_reads_what_windows_hands_back_as_signed(raw, signed):
+    """A tool's negative errno comes back unsigned from Windows (0xBEBEBE37, 3199971767): a
+    message must say -1094995529, the signed 32-bit value a person's shell prints, and leave a
+    small or already-signed code alone."""
+    assert exit_code(raw) == signed
 
 
 def test_clipper_error_exits_1_with_its_message(tmp_path, monkeypatch, capsys):
