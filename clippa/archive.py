@@ -52,7 +52,7 @@ import requests
 
 from . import hei, jsonstate, speakers, transcribe, ytdl
 from .errors import ClipperError
-from .media import is_link, remove_link
+from .media import is_link, link_or_raise, remove_link
 from .modalmon import head_record, tracked
 
 log = logging.getLogger(__name__)
@@ -552,12 +552,7 @@ def _drop_link(path: Path, label: str) -> None:
     naming it and the system's reason, so nothing is downloaded over it (no path: label is the
     stream). A share that won't say whether the name is a link is one line too: a drop that
     guessed would either act on what it names or download behind a name nobody could read."""
-    try:
-        linked = is_link(path)
-    except OSError as err:
-        raise ClipperError(f"{label}: couldn't tell whether {path.name} is a link "
-                           f"({err.strerror or 'the system refused it'})") from None
-    if not linked:
+    if not link_or_raise(path, label):
         return
     try:
         remove_link(path)

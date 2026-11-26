@@ -35,7 +35,7 @@ from pathlib import Path
 
 from . import jsonstate, timeline, wiki
 from .errors import ClipperError, exit_code
-from .media import is_link, remove_link, source_file, try_duration
+from .media import is_link, link_or_raise, remove_link, source_file, try_duration
 
 
 class TimelineJump(ClipperError):
@@ -72,7 +72,7 @@ def _drop_link(p: Path, label: str) -> None:
     """A link where ffmpeg is about to write with `-y`: ffmpeg follows it and would truncate what
     it names, so the link goes first (the link alone, never what it names). One that can't be
     removed is a one-line error naming the stream and the system's reason, with no path."""
-    if not is_link(p):
+    if not link_or_raise(p, label):  # a share that won't say is one line too (#449)
         return
     try:
         remove_link(p)
@@ -170,7 +170,7 @@ def extract_audio(stream_dir: Path, *, trust_mtime: bool = True) -> Path:
         if wav.exists():  # no source (any more): the wav is all there is to read
             return wav
         raise
-    if is_link(src):  # ffmpeg must not be sent through a link to somewhere else
+    if link_or_raise(src, stream_dir.name):  # ffmpeg must not be sent through a link to somewhere else
         raise ClipperError(f"{stream_dir.name}: its source is a link, not a file; "
                            f"refusing to read it")
     if wav.exists():

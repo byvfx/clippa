@@ -1565,3 +1565,54 @@ def test_a_vod_url_with_a_backslash_for_a_channel_is_not_canonical():
     good = f"https://kick.com/kino/videos/{uuid}"
     assert kick.canonical_vod_url(good) == good
 
+
+def _refuse_stat(monkeypatch, path):
+    """Path.is_symlink as a share that won't stat `path` answers on 3.12: EACCES re-raised."""
+    real = Path.is_symlink
+
+    def is_symlink(self):
+        if self == path:
+            raise PermissionError(13, "Access is denied")
+        return real(self)
+
+    monkeypatch.setattr(Path, "is_symlink", is_symlink)
+
+
+@pytest.mark.parametrize("repair", ["fixup", "fetch_video"])
+@pytest.mark.parametrize("name, what", [("", "kick-1"), ("source.ts", "source.ts")],
+                         ids=["folder", "source"])
+def test_a_link_test_the_share_refuses_is_one_line_and_nothing_runs(defaults, tmp_path, monkeypatch,
+                                                                     repair, name, what):
+    """#449: on 3.12 is_symlink re-raises a refused stat, which was a traceback out of fetch and
+    --fixup with no stream named. It is one line now, no path in it, and nothing is probed,
+    downloaded, swept or replaced."""
+    d = tmp_path / "kick-1"
+    d.mkdir()
+    (d / "source.ts").write_bytes(b"ts")
+    _refuse_stat(monkeypatch, d / name if name else d)
+    monkeypatch.setattr(kick.subprocess, "run", lambda *a, **kw: pytest.fail("probed"))
+    monkeypatch.setattr(kick.subprocess, "Popen", lambda *a, **kw: pytest.fail("downloaded"))
+    with pytest.raises(ClipperError) as err:
+        if repair == "fixup":
+            kick.fixup(d, defaults)
+        else:
+            kick.fetch_video(d, {"source": "u"}, defaults)
+    assert str(err.value) == f"kick-1: couldn't tell whether {what} is a link (Access is denied)"
+    assert str(tmp_path) not in str(err.value)
+    assert (d / "source.ts").read_bytes() == b"ts"
+
+
+def test_a_stream_folder_the_share_will_not_stat_is_refused_by_fetch(defaults, tmp_path, monkeypatch):
+    """#449: cmd_fetch's own guard on the folder a resolve names is one line too."""
+    streams = tmp_path / "streams"
+    (streams / "kick-1").mkdir(parents=True)
+    defaults["paths"]["streams"] = streams
+    monkeypatch.setattr(kick, "resolve",
+                        lambda url, cfg: {"stream_id": "kick-1", "title": "t", "duration_s": 3600})
+    monkeypatch.setattr(kick, "fetch_chat", lambda *a: pytest.fail("chat"))
+    monkeypatch.setattr(kick, "fetch_video", lambda *a: pytest.fail("downloaded"))
+    _refuse_stat(monkeypatch, streams / "kick-1")
+    with pytest.raises(ClipperError) as err:
+        cli.cmd_fetch(defaults, argparse.Namespace(url="https://kick.com/kino/videos/abc123", no_chat=False,
+                                                   no_video=False, fixup=False))
+    assert str(err.value) == "kick-1: couldn't tell whether kick-1 is a link (Access is denied)"

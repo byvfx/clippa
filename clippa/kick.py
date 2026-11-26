@@ -27,7 +27,7 @@ from typing import Any
 
 from . import jsonstate, timeline, transcribe
 from .errors import ClipperError
-from .media import is_link
+from .media import link_or_raise
 
 API = "https://kick.com/api/v2"
 PAGE_RETRIES = 8
@@ -182,7 +182,7 @@ def _refuse_link(stream_dir: Path) -> None:
     ours: a download into it, the remux's replace and the wav's removal would all happen where it
     points. Only the link is refused, not where the folder is (cmd_fetch checks the streams tree;
     archive may repair an item folder anywhere, #446), but no caller can skip this."""
-    if is_link(stream_dir):
+    if link_or_raise(stream_dir, stream_dir.name):
         raise ClipperError(f"{stream_dir.name}: the stream folder is a link; refusing to write "
                            f"its source through it")
 
@@ -191,7 +191,7 @@ def _refuse_link_source(stream_dir: Path) -> None:
     """A link at the source.ts this command downloads or repairs is refused before anything reads
     or writes it: ffprobe and ffmpeg follow a link, and a remux's replace would take what it names
     for the stream's own source."""
-    if is_link(stream_dir / "source.ts"):
+    if link_or_raise(stream_dir / "source.ts", stream_dir.name):
         raise ClipperError(f"{stream_dir.name}: its source.ts is a link, not a file; refusing to "
                            f"read it")
 
