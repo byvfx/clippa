@@ -400,6 +400,28 @@ def test_a_source_a_fixup_replaces_under_the_read_is_not_transcribed(kick_cfg, t
     assert (idir / "source.refused.ts").read_bytes() == b"remuxed!"
 
 
+def test_a_source_gone_under_the_read_is_not_transcribed(kick_cfg, tmp_path, monkeypatch):
+    """Grok on #453: with the source gone the timeline guard has nothing to compare the reused wav
+    with and passes it, so a vanished source is refused like a replaced one."""
+    idir = tmp_path / "archive" / "s" / "kick-1"
+    idir.mkdir(parents=True)
+    (idir / "source.refused.ts").write_bytes(b"jumping")
+    runs, seen = [], []
+    _downloads(monkeypatch, idir, runs, seen, wav_s=33833.0, container_s=33833.0)
+    _transcribes(monkeypatch)
+    real = archive.transcribe.extract_audio
+
+    def extract_then_remove(stream_dir, *, trust_mtime=True):
+        wav = real(stream_dir, trust_mtime=trust_mtime)
+        (stream_dir / "source.refused.ts").unlink()
+        return wav
+
+    monkeypatch.setattr(archive.transcribe, "extract_audio", extract_then_remove)
+    with pytest.raises(ClipperError, match="went away while its audio was read"):
+        archive.transcribe_item(kick_cfg, idir, _item(), "L4")
+    assert not (idir / "words.jsonl").exists() and runs == []
+
+
 def test_a_kept_video_is_used_and_never_unlinked(kick_cfg, tmp_path, monkeypatch):
     """`archive video` saved source.mp4: it is the source, nothing is downloaded, and it stays
     (the refused name never comes into it)."""

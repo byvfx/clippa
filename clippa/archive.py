@@ -315,10 +315,20 @@ def _refuse_if_replaced(idir: Path, src: Path, read_from: tuple[int, int] | None
     agree in length, so the timeline check passes on audio of the jumping copy, and the transcript
     would be done with its times. The source is the same file it was before the audio was read, or
     nothing is transcribed: the stale marker the fixup wrote makes the next run decode the repaired
-    copy. Checked after the timeline check, as from then on the wav is all that is read. One the share wouldn't time either side is let through, as the
-    decode's own check does."""
-    now = _file_id(src)
-    if read_from is None or now is None or now == read_from:
+    copy. Checked after the timeline check, as from then on the wav is all that is read. A source
+    gone from its name since is refused the same way (the guard has nothing to compare the wav with
+    then, so it passes it), as extract_audio's own check refuses one. One the share wouldn't time
+    either side is let through, as the decode's own check does."""
+    if read_from is None:
+        return
+    try:
+        st = src.lstat()
+    except FileNotFoundError:
+        raise ClipperError(f"{idir.name}: its {src.name} went away while its audio was read; nothing "
+                           f"transcribed, the next run reads whatever copy is there then") from None
+    except OSError:
+        return
+    if (st.st_size, st.st_mtime_ns) == read_from:
         return
     raise ClipperError(f"{idir.name}: its {src.name} was replaced while its audio was read (an "
                        f"`archive fixup`?); nothing transcribed, the next run reads the new copy")
