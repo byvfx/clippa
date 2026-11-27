@@ -35,7 +35,7 @@ from pathlib import Path
 
 from . import jsonstate, timeline, wiki
 from .errors import ClipperError, exit_code
-from .media import is_link, link_or_raise, remove_link, source_file, try_duration
+from .media import drop_output_link, is_link, link_or_raise, source_file, try_duration
 
 
 class TimelineJump(ClipperError):
@@ -68,17 +68,8 @@ STALE_MARKER = "audio.wav.stale"
 SRC_STAMP = "audio.wav.src"
 
 
-def _drop_link(p: Path, label: str) -> None:
-    """A link where ffmpeg is about to write with `-y`: ffmpeg follows it and would truncate what
-    it names, so the link goes first (the link alone, never what it names). One that can't be
-    removed is a one-line error naming the stream and the system's reason, with no path."""
-    if not link_or_raise(p, label):  # a share that won't say is one line too (#449)
-        return
-    try:
-        remove_link(p)
-    except OSError as e:
-        raise ClipperError(f"{label}: couldn't drop the linked {p.name} "
-                           f"({e.strerror or 'the system refused it'})") from None
+# A link where ffmpeg is about to write with `-y` goes first, the link alone (media's helper).
+_drop_link = drop_output_link
 
 
 def mark_stale(stream_dir: Path) -> None:

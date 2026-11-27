@@ -312,7 +312,8 @@ def still(work: Path, name: str, lines: list[tuple], rc: dict, bug: str, dst: Pa
     base = max(rc["card_s"], min_s)
     dur = max(base, media.duration(vo) + rc["vo_pad_s"]) if vo else base
     d = f"{dur:.2f}"
-    audio = ["-i", str(vo), "-af", f"{loudnorm(rc)},aresample=48000,aformat=channel_layouts=stereo,apad"] if vo \
+    audio = ["-protocol_whitelist", "file", "-i", str(vo),
+             "-af", f"{loudnorm(rc)},aresample=48000,aformat=channel_layouts=stereo,apad"] if vo \
         else ["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"]
     ffmpeg("-f", "lavfi", "-i", f"color=c=0x101010:s={W}x{H}:r={FPS}:d={d}", *audio, "-t", d,
            "-vf", ",".join(vf), "-map", "0:v", "-map", "1:a", *out_args(rc), str(dst))
@@ -450,7 +451,8 @@ def clip(cfg: dict, idir: Path, r: dict, src: Path, fonts: tuple[Path, Path], bu
         audio = f"[0:a]{loudnorm(rc)},aresample=48000[a]"
     graph.write_text(video + ";" + audio, encoding="utf-8")
     span = ["-ss", f"{r['start']:.3f}", "-t", f"{r['end'] - r['start']:.3f}"] if seek else []
-    ffmpeg(*span, "-i", str(src), "-/filter_complex", str(graph), "-map", "[v]", "-map", "[a]",
+    ffmpeg(*span,
+           "-protocol_whitelist", "file", "-i", str(src), "-/filter_complex", str(graph), "-map", "[v]", "-map", "[a]",
            *out_args(rc), str(dst))
     return len(spans)
 
@@ -458,7 +460,8 @@ def clip(cfg: dict, idir: Path, r: dict, src: Path, fonts: tuple[Path, Path], bu
 def join(parts: list[Path], lst: Path, dst: Path) -> None:
     """Parts encoded alike (out_args) into one video, without re-encoding."""
     lst.write_text("".join(f"file '{p.resolve().as_posix()}'\n" for p in parts), encoding="utf-8")
-    ffmpeg("-f", "concat", "-safe", "0", "-i", str(lst), "-c", "copy", "-movflags", "+faststart", str(dst))
+    ffmpeg("-f", "concat", "-safe", "0",
+           "-protocol_whitelist", "file", "-i", str(lst), "-c", "copy", "-movflags", "+faststart", str(dst))
 
 
 def describe(data: dict, chapters: list[tuple[float, str]]) -> str:

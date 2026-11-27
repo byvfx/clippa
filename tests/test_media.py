@@ -104,3 +104,33 @@ def test_link_or_raise_answers_like_is_link(tmp_path, link_or_skip):
     assert media.link_or_raise(plain, "kick-1") is False
     link_or_skip(plain, tmp_path / "link.ts")
     assert media.link_or_raise(tmp_path / "link.ts", "kick-1") is True
+
+
+def test_drop_output_link_takes_the_link_alone_and_leaves_a_file(tmp_path, junction_or_skip):
+    """#447: where ffmpeg will write with -y, a link goes first (its target keeps its contents);
+    an ordinary file is ffmpeg's to overwrite and stays."""
+    folder = tmp_path / "elsewhere"
+    folder.mkdir()
+    (folder / "keep.txt").write_bytes(b"someone else's")
+    junction_or_skip(folder, tmp_path / "x.tmp.mp4", directory=True)
+    media.drop_output_link(tmp_path / "x.tmp.mp4", "kick-1")
+    assert not os.path.lexists(tmp_path / "x.tmp.mp4")
+    assert (folder / "keep.txt").read_bytes() == b"someone else's"
+    plain = tmp_path / "y.tmp.mp4"
+    plain.write_bytes(b"old encode")
+    media.drop_output_link(plain, "kick-1")
+    assert plain.read_bytes() == b"old encode"
+
+
+def test_drop_output_link_that_cannot_go_is_one_line(tmp_path, junction_or_skip, monkeypatch):
+    folder = tmp_path / "elsewhere"
+    folder.mkdir()
+    junction_or_skip(folder, tmp_path / "x.tmp.mp4", directory=True)
+
+    def denied(p):
+        raise PermissionError(13, "Access is denied")
+
+    monkeypatch.setattr(media, "remove_link", denied)
+    with pytest.raises(ClipperError) as err:
+        media.drop_output_link(tmp_path / "x.tmp.mp4", "kick-1")
+    assert str(err.value) == "kick-1: couldn't drop the linked x.tmp.mp4 (Access is denied)"

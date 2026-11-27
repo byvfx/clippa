@@ -440,9 +440,10 @@ def process_take(raw: Path, dst: Path, dc: dict, keep: float) -> float:
     import numpy as np
 
     tmp = dst.with_suffix(".tmp.wav")
-    _run(["ffmpeg", "-v", "error", "-y", "-i", str(raw), *(["-af", dc["vo_filter"]] if dc["vo_filter"] else []),
+    _run(["ffmpeg", "-v", "error", "-y",
+          "-protocol_whitelist", "file", "-i", str(raw), *(["-af", dc["vo_filter"]] if dc["vo_filter"] else []),
           "-ar", str(RATE), "-ac", "1", "-c:a", "pcm_s16le", str(tmp)])
-    log = _run(["ffmpeg", "-hide_banner", "-i", str(tmp), "-af",
+    log = _run(["ffmpeg", "-hide_banner", "-protocol_whitelist", "file", "-i", str(tmp), "-af",
                 f"silencedetect=noise={dc['silence_db']}dB:d={dc['silence_min_s']}", "-f", "null", "-"]).stderr
     with wave.open(str(tmp)) as w:
         x = np.frombuffer(w.readframes(w.getnframes()), np.int16)
@@ -475,7 +476,8 @@ def hear(wav: Path, model: str) -> list[list]:
     import numpy as np
 
     # decoded by ffmpeg, not by faster-whisper's own reader (PyAV versions disagree about it)
-    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(wav), "-ar", "16000", "-ac", "1", "-f", "f32le", "-"],
+    raw = subprocess.run(["ffmpeg", "-v", "error",
+                          "-protocol_whitelist", "file", "-i", str(wav), "-ar", "16000", "-ac", "1", "-f", "f32le", "-"],
                          check=True, capture_output=True).stdout
     segs, _ = whisper(model).transcribe(np.frombuffer(raw, np.float32), word_timestamps=True)
     return [[w.word.strip(), round(w.start, 2), round(w.end, 2)] for s in segs for w in s.words or []]
@@ -870,7 +872,8 @@ def lengths(d: Path, media: dict[str, Path], names: set[str]) -> dict[str, float
 def loudness(path: Path, start: float | None = None, length: float | None = None) -> tuple[float, float]:
     """(integrated LUFS, peak dBFS) of a file or a stretch of it; -70 when nothing measures."""
     seek = [] if start is None else ["-ss", f"{start:.3f}", "-t", f"{length:.3f}"]
-    e = _run(["ffmpeg", "-hide_banner", *seek, "-i", str(path), "-vn", "-af", "ebur128=peak=true", "-f", "null", "-"]).stderr
+    e = _run(["ffmpeg", "-hide_banner", *seek,
+              "-protocol_whitelist", "file", "-i", str(path), "-vn", "-af", "ebur128=peak=true", "-f", "null", "-"]).stderr
     return parse_loudness(e)
 
 
@@ -903,8 +906,8 @@ def make_blends(d: Path, b: dict, media: dict[str, Path]) -> None:
         dst = out / f"{x['name']}.wav"
         if not dst.exists():
             fade = f"afade=t=out:st=0:d={x['dur']}" if x["kind"] == "out" else f"afade=t=in:st=0:d={x['dur']}:curve=qua"
-            _run(["ffmpeg", "-v", "error", "-y", "-ss", f"{max(0.0, x['start']):.4f}", "-t", str(x["dur"]), "-i",
-                  str(media[x["reel"]]), "-vn", "-af", fade, "-ar", str(RATE), "-ac", "2", "-c:a", "pcm_s16le", str(dst)])
+            _run(["ffmpeg", "-v", "error", "-y", "-ss", f"{max(0.0, x['start']):.4f}", "-t", str(x["dur"]),
+                  "-protocol_whitelist", "file", "-i", str(media[x["reel"]]), "-vn", "-af", fade, "-ar", str(RATE), "-ac", "2", "-c:a", "pcm_s16le", str(dst)])
         media[x["name"]] = dst
 
 
@@ -915,7 +918,8 @@ def make_tone(d: Path, src: Path, seconds: float) -> Path:
     dst = d / "work" / f"roomtone_bed_{key_of(stamp(src))[:8]}_{int(seconds) + 30}.wav"
     if dst.exists():
         return dst
-    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(src), "-f", "s16le", "-ac", "2", "-ar", str(RATE), "-"],
+    raw = subprocess.run(["ffmpeg", "-v", "error",
+                          "-protocol_whitelist", "file", "-i", str(src), "-f", "s16le", "-ac", "2", "-ar", str(RATE), "-"],
                          check=True, capture_output=True).stdout
     x = np.frombuffer(raw, np.int16).reshape(-1, 2).astype(np.float32)
     if len(x) < 4 * RATE:
@@ -941,7 +945,8 @@ def as_wav(d: Path, src: Path) -> Path:
     dst = d / "work" / "music" / f"{src.stem}_{key_of(stamp(src))[:8]}.wav"
     if not dst.exists():
         dst.parent.mkdir(parents=True, exist_ok=True)
-        _run(["ffmpeg", "-v", "error", "-y", "-i", str(src), "-ar", str(RATE), "-ac", "2", "-c:a", "pcm_s24le", str(dst)])
+        _run(["ffmpeg", "-v", "error", "-y",
+              "-protocol_whitelist", "file", "-i", str(src), "-ar", str(RATE), "-ac", "2", "-c:a", "pcm_s24le", str(dst)])
     return dst
 
 
@@ -958,7 +963,8 @@ def still_movies(d: Path, b: dict, media: dict[str, Path]) -> None:
         dst = d / "work" / "stills" / f"{src.stem}_{key_of(stamp(src))[:8]}_{secs}.mov"
         if not dst.exists():
             dst.parent.mkdir(parents=True, exist_ok=True)
-            _run(["ffmpeg", "-v", "error", "-y", "-loop", "1", "-i", str(src), "-t", str(secs), "-r", str(b["fps"]),
+            _run(["ffmpeg", "-v", "error", "-y", "-loop", "1",
+                  "-protocol_whitelist", "file", "-i", str(src), "-t", str(secs), "-r", str(b["fps"]),
                   "-c:v", "qtrle", "-pix_fmt", "argb", str(dst)])
         media[name] = dst
 
@@ -1031,7 +1037,8 @@ def master_file(src: Path, dc: dict) -> Path:
     if lufs <= -70:
         raise ClipperError(f"{src.name}: no sound to measure")
     g, filt = master_filter(lufs, dc["lufs"], dc["true_peak"])
-    _run(["ffmpeg", "-v", "error", "-y", "-i", str(src), "-c:v", "copy", "-af", filt, "-ar", str(RATE), "-c:a", "aac",
+    _run(["ffmpeg", "-v", "error", "-y",
+          "-protocol_whitelist", "file", "-i", str(src), "-c:v", "copy", "-af", filt, "-ar", str(RATE), "-c:a", "aac",
           "-b:a", "320k", "-movflags", "+faststart", str(dst)])
     after, peak2 = loudness(dst)
     print(f"{src.name}: {lufs:.1f} LUFS, peak {peak:.1f} -> gain {g:+.1f} dB -> {after:.1f} LUFS, peak {peak2:.1f} "
@@ -1137,7 +1144,8 @@ def heard_words(cfg: dict, d: Path, video: Path, dry_run: bool = False) -> list[
     if dry_run:
         return None
     wav = work / "audio.wav"
-    _run(["ffmpeg", "-v", "error", "-y", "-i", str(video), "-vn", "-ac", "1", "-ar", "16000", str(wav)])
+    _run(["ffmpeg", "-v", "error", "-y",
+          "-protocol_whitelist", "file", "-i", str(video), "-vn", "-ac", "1", "-ar", "16000", str(wav)])
     try:
         out, _ = transcribe.transcribe_modal(wav, tc, cfg["paths"]["modal_runs"])
     finally:

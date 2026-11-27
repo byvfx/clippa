@@ -502,9 +502,11 @@ def discord_preview(r: dict, dc: dict) -> tuple[Path, bool]:
     if dst.exists() and dst.stat().st_mtime >= src.stat().st_mtime and dst.stat().st_size <= limit:
         return dst, excerpt
     tmp = dst.with_name(dst.stem + ".tmp.mp4")
+    media.drop_output_link(tmp, dst.parent.name)
     for _ in range(3):
         v = int(video)
-        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
+        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                        "-protocol_whitelist", "file", "-i", str(src),
                         "-t", f"{span:.2f}", "-vf", f"scale=-2:{dc['preview_height']}", "-r", "30",
                         "-c:v", "libx264", "-preset", "veryfast", "-b:v", f"{v}k",
                         "-maxrate", f"{v}k", "-bufsize", f"{2 * v}k", "-pix_fmt", "yuv420p",

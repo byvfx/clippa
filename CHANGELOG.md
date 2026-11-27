@@ -12,6 +12,13 @@ Developing#releases.
 
 ### 2026-11
 
+- 11-26: every stage now reads media as local files only (#447): cut, Shorts, previews, thumbnails,
+  faces, the war room's low-res copies, the archive's flac and the rest pass `-protocol_whitelist file`
+  to ffmpeg and ffprobe, so a file that is really a playlist (or a concat list naming an address) fails
+  instead of making them open urls. B-roll keeps fetching its addresses as before. A link at a name
+  ffmpeg writes (the archive's `audio.flac`, the `.tmp.mp4` files) is removed first, never what it
+  points at. A test fails on a new ffmpeg call that skips it. The recorder's own join is left as
+  it was for now.
 - 11-26: a share that won't say whether a file is a link (a refused stat, a stale handle) is now one
   line naming the stream from `clippa fetch`, `--fixup` and `transcribe`, not a traceback (#449).
 - 11-26: `audio.wav` now says which file it was decoded from (#448): `audio.wav.src` beside it

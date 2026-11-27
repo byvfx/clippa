@@ -1112,3 +1112,73 @@ def test_an_hei_item_keeps_a_refused_download_and_never_fetches_it_again(kick_cf
     assert str(err.value).endswith("(kept as source.refused.ts)")  # reused, and it says where
     assert (idir / "source.refused.ts").read_bytes() == b"downloaded"
 
+
+
+def _flac_target(tmp_path, maker):
+    """What a link at audio.flac names: a file for a symlink, a folder holding one for a junction
+    (a junction can only name a folder). Returns (the link's target, the file to keep)."""
+    if maker == "link_or_skip":
+        keep = tmp_path / "someone_elses.flac"
+        keep.write_bytes(b"someone else's")
+        return keep, keep
+    folder = tmp_path / "elsewhere"
+    folder.mkdir()
+    (folder / "keep.txt").write_bytes(b"someone else's")
+    return folder, folder / "keep.txt"
+
+
+@pytest.mark.parametrize("maker", ["link_or_skip", "junction_or_skip"])
+def test_the_flac_encode_drops_a_link_at_audio_flac_first(kick_cfg, tmp_path, monkeypatch, request, maker):
+    """#447: ffmpeg's `-y` follows a link at audio.flac and truncates what it names (the unlink
+    after the upload takes only the link), so the link goes before the encode, its target intact.
+    The encode reads only local files: `-protocol_whitelist file` comes before its input."""
+    make = request.getfixturevalue(maker)
+    idir = tmp_path / "archive" / "s" / "kick-1"
+    idir.mkdir(parents=True)
+    target, keep = _flac_target(tmp_path, maker)
+    make(target, idir / "audio.flac", directory=maker != "link_or_skip")
+    runs, seen = [], []
+    _downloads(monkeypatch, idir, runs, seen, wav_s=33011.2)
+    _transcribes(monkeypatch)
+    encodes = []
+
+    def run(args, **kw):
+        flac = Path(args[-1])
+        assert not archive.is_link(flac) and not flac.exists()  # the link went, nothing in its place
+        encodes.append(list(args))
+        flac.write_bytes(b"flac")
+        return subprocess.CompletedProcess(args, 0, "", "")
+
+    monkeypatch.setattr(archive.subprocess, "run", run)
+    archive.transcribe_item(kick_cfg, idir, _item(), "L4")
+    assert len(encodes) == 1
+    args = encodes[0]
+    assert args[args.index("-i") - 2:args.index("-i")] == ["-protocol_whitelist", "file"]
+    assert keep.read_bytes() == b"someone else's"
+    assert not (idir / "audio.flac").exists()  # the upload's copy is gone after it, as before
+
+
+def test_a_link_at_audio_flac_the_share_will_not_drop_stops_before_the_encode(
+        kick_cfg, tmp_path, monkeypatch, junction_or_skip):
+    """#447: a link that can't be removed is one line naming the stream, and ffmpeg never writes
+    through it."""
+    idir = tmp_path / "archive" / "s" / "kick-1"
+    idir.mkdir(parents=True)
+    target, keep = _flac_target(tmp_path, "junction_or_skip")
+    junction_or_skip(target, idir / "audio.flac", directory=True)
+    runs, seen = [], []
+    _downloads(monkeypatch, idir, runs, seen, wav_s=33011.2)
+    _transcribes(monkeypatch)
+    monkeypatch.setattr(archive.subprocess, "run", lambda *a, **k: pytest.fail("ffmpeg ran"))
+
+    def denied(path):
+        raise PermissionError(13, "Access is denied")
+
+    monkeypatch.setattr(archive, "remove_link", denied)
+    with pytest.raises(ClipperError) as err:
+        archive.transcribe_item(kick_cfg, idir, _item(), "L4")
+    assert str(err.value) == "kick-1: couldn't remove the link at audio.flac (Access is denied)"
+    assert keep.read_bytes() == b"someone else's"
+    # #452 review: refused before the download, so no fresh copy is fetched only to be unlinked
+    # ahead of an encode that can't run
+    assert runs == []
