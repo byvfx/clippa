@@ -225,7 +225,7 @@ the callback's OSError), so don't chase it again.
   `openrouter:anthropic/claude-*-5.5`, each tagged `# OpenRouter stopgap 2026-11-26, was claude-...`
   (five sections added at the end: cast, chat, pick, archive, swarm). Backup:
   `backups/clipper.toml.before_openrouter_stopgap_2026-11-26`. Switch back once the user tops up
-  Anthropic (restore the backup if nothing else changed, else undo the tagged lines). Stages pick it
+  Anthropic by undoing the tagged lines. Don't restore that backup: it predates the 11-27 `[segments] max_s` change. Stages pick it
   up on their next run; serve and the bot were restarted on it (11-26 16:17 PT). The real fix is #454.
 - `kick-140303366` has a band-aid `config.toml` (`[shorts] codec = "libx264"`, #429 hit again on
   v05_t51, 11-26); remove it, and `kick-139915441`'s, once #429 is deployed.
@@ -305,7 +305,9 @@ the callback's OSError), so don't chase it again.
   access ends around 2026-12-22.
 - **Long segments (config-7 prep, not in production):** `[segments] split_over_s` defaults to 0
   (off). A negative value is off too; a non-number is a one-line error. The NAS `clipper.toml` does
-  not set it, and `max_s` is still 3600. Turn it on (3000, the upcoming segments prompt's 50 minutes)
+  not set it. **`[segments] max_s = 5400` (90 min) on the NAS since 2026-11-27** (user, #430 closed: 3 of 4 hour-plus
+  topics on `kick-139915441` were approved cut whole; backup `backups/clipper.toml.before_segments_max_s_90_2026-11-27`);
+  `defaults.toml` keeps 3600. Turn it on (3000, the upcoming segments prompt's 50 minutes)
   only together with that prompt. Discord cards can show the flag and a Re-split button once it is
   on; that bot change is a draft and is not deployed. Do not set 3000 in production `clipper.toml`
   until the segments prompt that goes with it is in.
