@@ -44,6 +44,32 @@ def test_passing_cause_is_whole_words_any_case():
     assert repairs.passing_cause(["Timeout"], "modal FunctionTimeoutError") == ""   # not inside a word
 
 
+def test_a_stage_a_signal_stopped_is_never_a_passing_error(defaults, tmp_path):
+    """#423: earlyoom's SIGTERM on a big Modal upload; the same payload dies again, and each retry
+    reruns a paid transcription. A "timed out" in the log tail must not make it look passing."""
+    from clippa import worker
+
+    tail = "httpx.ReadTimeout: timed out | encoded 1293 MB flac in 28s"
+    errors = [f"transcribe {worker.exit_text(-15)}: {tail}",
+              f"transcribe {worker.exit_text(-9)}: {tail}",
+              f"transcribe {worker.exit_text(-250)}: {tail}",
+              f"transcribe exited -15: {tail}"]                      # a worker from before #431
+    assert all(repairs.killed(e) for e in errors)
+    assert repairs.passing_cause(defaults["checkup"]["passing"], errors[0]) == "timed out"   # why the guard
+    assert not repairs.killed(f"transcribe {worker.exit_text(1)}: {tail}")
+    assert not repairs.killed("cut exited 1: ffmpeg said the input was killed by SIGTERM (-15)")
+    assert not repairs.killed("")
+    cfg = in_tmp(defaults, tmp_path)
+    cfg["checkup"]["fix"] = ["retry"]
+    for i, e in enumerate(errors):
+        d = failed(cfg, name=f"kick-{i}", error=e)
+        assert repairs.plan_retry(cfg, {"stream": d.name}, NOW) is None
+    for f in streams_findings(cfg, fix=True):
+        assert "repair" not in f or f["repair"]["state"] != "done"
+    assert all(jsonstate.load(cfg["paths"]["streams"] / f"kick-{i}" / "run.json")["attempts"]
+               == cfg["worker"]["max_attempts"] for i in range(len(errors)))   # no attempt given back
+
+
 def test_a_run_out_of_retries_on_a_passing_error_is_would_fix_until_enabled(defaults, tmp_path):
     cfg = in_tmp(defaults, tmp_path)
     d = failed(cfg)

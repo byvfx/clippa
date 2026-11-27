@@ -727,7 +727,8 @@ fix_minutes = 60             # serve's checkup job; 0 = off
 max_repairs = 2              # tries per finding key in 7 days; then it waits for you
 retry_after_hours = 3        # "retry": this long after the run failed
 # "retry" only when the run's error has one of these (whole words, any case): a rate limit, a
-# dropped connection, a remote server's 5xx. Anything else is for a person to read.
+# dropped connection, a remote server's 5xx. Anything else is for a person to read, and so is a
+# stage a signal stopped ("killed by SIGTERM": earlyoom on the NAS), whatever its log tail says.
 passing = ["Too Many Requests", "RateLimitError", "rate limit", "rate limited", "Error code: 429",
            "Error code: 529", "OverloadedError", "overloaded_error", "Server Error",
            "Service Unavailable", "Bad Gateway", "Gateway Timeout", "Gateway Time-out", "timed out",

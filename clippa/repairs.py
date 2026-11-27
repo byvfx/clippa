@@ -6,7 +6,8 @@ make without asking. Each repair belongs to findings by their key, and plans bef
     retry   failed:<stream>   a run out of retries ([worker] max_attempts) whose error is a
                               passing one ([checkup] passing: a rate limit, a dropped connection,
                               a remote 5xx): one attempt back, retry_after_hours after it failed,
-                              so the worker runs it again on its next pass
+                              so the worker runs it again on its next pass. Never for a stage a
+                              signal stopped (memory: the same payload dies again, #423)
     tmp     tmp:leftover      temp files a killed write left beside a state file (jsonstate's
                               `<file>.<pid>.<thread>.tmp`), a day old or more: deleted
 
@@ -75,6 +76,18 @@ def passing_cause(patterns: list[str], error: str) -> str:
     return ""
 
 
+# The worker's error for a stage a signal stopped: "transcribe killed by SIGTERM (-15): <log tail>"
+# (worker.exit_text), or "transcribe exited -15: ..." from a worker before #431.
+KILLED_RX = re.compile(r"^\S+ (killed by (SIG\w+|signal \d+) \(-\d+\)|exited -\d+)(:|$)")
+
+
+def killed(error: str) -> bool:
+    """Did a signal stop the stage (POSIX: a negative exit code)? On the NAS that is mostly
+    earlyoom, where the same payload dies again and a transcribe retry reruns a paid Modal call
+    (#423); a hand kill is left to a person too. The worker's own retries still run either way."""
+    return bool(KILLED_RX.match(error or ""))
+
+
 def _give_back(cfg: dict, d: Path) -> str:
     """One attempt back in run.json, under the worker's takeover lock, and only while no worker
     holds the stream and it is still failed with no retries left (the worker or a person may
@@ -105,7 +118,10 @@ def plan_retry(cfg: dict, f: dict, now: datetime) -> Plan | None:
     d = cfg["paths"]["streams"] / f["stream"]
     run = jsonstate.read_or(d / "run.json", {})
     ck = for_stream(cfg, d)["checkup"]
-    cause = passing_cause(ck["passing"], run.get("error", ""))
+    error = run.get("error", "")
+    if killed(error):
+        return None   # a signal stopped it: a "timed out" in the log tail isn't why
+    cause = passing_cause(ck["passing"], error)
     if not cause:
         return None   # not a passing error: a person reads the log
     failed = _when(run.get("updated")) or _mtime(d / "run.json") or now
