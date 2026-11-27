@@ -65,7 +65,7 @@ def candidate_times(x: dict, sig: dict | None, tc: dict) -> list[float]:
 def grab(video: Path, t: float, dst: Path) -> Image.Image | None:
     """Full source resolution, cropped to 16:9, so a zoomed crop stays sharp."""
     subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{t:.3f}",
-                    "-i", str(video), "-frames:v", "1", "-vf",
+                    "-protocol_whitelist", "file", "-i", str(video), "-frames:v", "1", "-vf",
                     "crop='min(iw,ih*16/9)':'min(ih,iw*9/16)'", "-q:v", "2", str(dst)],
                    check=False)
     return Image.open(dst).convert("RGB") if dst.exists() else None

@@ -173,7 +173,9 @@ def fit(video: Path, sdir: Path, max_height: int) -> Path:
         return video
     out = sdir / "x" / f"{video.stem}.mp4"
     out.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(video), "-vf", f"scale=-2:{max_height}",
+    media.drop_output_link(out, sdir.name)
+    subprocess.run(["ffmpeg", "-v", "error", "-y",
+                    "-protocol_whitelist", "file", "-i", str(video), "-vf", f"scale=-2:{max_height}",
                     "-c:v", "libx264", "-profile:v", "high", "-preset", "medium", "-crf", "18",
                     "-maxrate", "8M", "-bufsize", "16M", "-pix_fmt", "yuv420p",
                     "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(out)],

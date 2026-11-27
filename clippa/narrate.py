@@ -90,7 +90,8 @@ def save(data: bytes, fmt: str, out: Path) -> Path:
     with tempfile.TemporaryDirectory() as td:
         tmp = Path(td) / f"audio.{ext(fmt)}"
         tmp.write_bytes(data)
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(tmp), str(out)], check=True)
+        subprocess.run(["ffmpeg", "-v", "error", "-y",
+                        "-protocol_whitelist", "file", "-i", str(tmp), str(out)], check=True)
     return out
 
 
@@ -138,13 +139,15 @@ def voice(take: Path, nc: dict, voice_id: str = "", out: Path | None = None) -> 
     out = out or take.with_name(f"{take.stem}.voiced{'.mp4' if is_video else '.' + ext(nc['output_format'])}")
     with tempfile.TemporaryDirectory() as td:
         src = Path(td) / "take.wav"
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(take), "-vn", "-ac", "1", "-ar", "44100",
+        subprocess.run(["ffmpeg", "-v", "error", "-y",
+                        "-protocol_whitelist", "file", "-i", str(take), "-vn", "-ac", "1", "-ar", "44100",
                         str(src)], check=True)
         data, fmt = convert(src, nc, voice_id)
         voiced = save(data, fmt, Path(td) / f"voiced.{ext(fmt)}")
         if is_video:
             # Picture copied untouched; the new voice replaces the take's audio, same start.
-            subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(take), "-i", str(voiced),
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-protocol_whitelist", "file", "-i", str(take),
+                            "-protocol_whitelist", "file", "-i", str(voiced),
                             "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
                             "-shortest", "-movflags", "+faststart", str(out)], check=True)
         else:

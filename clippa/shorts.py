@@ -247,7 +247,8 @@ def sample_frames(src: Path, a: float, dur: float, step: float, out_dir: Path,
     for old in out_dir.glob(f"{stem}_f*.jpg"):
         old.unlink()
     subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{a:.3f}",
-                    "-t", f"{dur:.3f}", "-i", str(src), "-vf", f"fps=1/{step},scale=768:-2",
+                    "-t", f"{dur:.3f}",
+                    "-protocol_whitelist", "file", "-i", str(src), "-vf", f"fps=1/{step},scale=768:-2",
                     "-q:v", "5", str(out_dir / f"{stem}_f%03d.jpg")], check=True)
     frames = sorted(out_dir.glob(f"{stem}_f*.jpg"))
     return [(k * step, f) for k, f in enumerate(frames)]
@@ -340,7 +341,7 @@ def find_cut(src: Path, a: float, t0: float, t1: float, fps: int = 20) -> float:
     first frame that looks more like the new scene than the old one, for good."""
     w, h = 64, 36
     raw = subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-ss", f"{a + t0:.3f}",
-                          "-t", f"{t1 - t0:.3f}", "-i", str(src), "-an", "-vf",
+                          "-t", f"{t1 - t0:.3f}", "-protocol_whitelist", "file", "-i", str(src), "-an", "-vf",
                           f"fps={fps},scale={w}:{h},format=gray", "-f", "rawvideo", "-"],
                          capture_output=True, check=False).stdout
     frames = [raw[k:k + w * h] for k in range(0, len(raw) - w * h + 1, w * h)]
@@ -401,8 +402,8 @@ def save_example(stream_dir: Path, cfg: dict, name: str, at: float) -> Path:
     out = example_dir(cfg) / f"{name}.jpg"
     out.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{at:.3f}",
-                    "-i", str(source_file(stream_dir)), "-frames:v", "1", "-vf", "scale=768:-2",
-                    "-q:v", "3", str(out)], check=True)
+                    "-protocol_whitelist", "file", "-i", str(source_file(stream_dir)),
+                    "-frames:v", "1", "-vf", "scale=768:-2", "-q:v", "3", str(out)], check=True)
     print(f"{out}  (layout {name}, {stream_dir.name} at {at:.1f} s)")
     return out
 
@@ -553,7 +554,8 @@ def write_ass(words: list[dict], t0: float, dur: float, sc: dict, scenes: list[t
 # ---------- render ----------
 
 def measure_loudness(video: Path, sc: dict) -> dict:
-    r = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(video), "-vn", "-af",
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-nostats",
+                        "-protocol_whitelist", "file", "-i", str(video), "-vn", "-af",
                         (f"loudnorm=I={sc['lufs']}:TP={sc['true_peak']}:LRA={sc['lra']}"
                          ":print_format=json"), "-f", "null", "-"],
                        capture_output=True, text=True, encoding="utf-8", errors="replace",
@@ -621,8 +623,10 @@ def render(src_cut: Path, dst: Path, parts: list[tuple], ass: Path | None, dur: 
     script = dst.with_name(dst.stem + ".graph.txt")
     script.write_text(";\n".join(graph), encoding="utf-8")
     tmp = dst.with_name(dst.stem + ".tmp.mp4")
+    media.drop_output_link(tmp, dst.parent.name)
     try:
-        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(src_cut),
+        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                        "-protocol_whitelist", "file", "-i", str(src_cut),
                         "-/filter_complex", str(script), "-map", "[vout]", "-map", "[aout]",
                         "-t", f"{dur:.3f}", *encode_args(codec, sc["crf"]),
                         "-movflags", "+faststart", str(tmp)], check=True)

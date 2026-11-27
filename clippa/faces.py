@@ -154,7 +154,8 @@ def scan_frames(src: Path, frames: Path, fc: dict, models: Path) -> tuple[list[f
     times, the faces with "t" and "i", the frame number, and their embeddings)."""
     log = frames / "ffmpeg.log"
     with open(log, "w", encoding="utf-8") as err:
-        proc = subprocess.Popen(["ffmpeg", "-hide_banner", "-nostdin", "-skip_frame", "nokey", "-i", str(src),
+        proc = subprocess.Popen(["ffmpeg", "-hide_banner", "-nostdin", "-skip_frame", "nokey",
+                                 "-protocol_whitelist", "file", "-i", str(src),
                                  "-an", "-fps_mode", "passthrough", "-vf", "showinfo", "-q:v", "3",
                                  str(frames / "%05d.jpg")], stderr=err)
         n = fc["workers"] or max(1, (os.cpu_count() or 2) // 2)
@@ -541,7 +542,7 @@ _ready = ""
 def grab(video: Path, t: float, dst: Path) -> Path:
     """One full-size frame of video at t seconds, as dst (a JPEG)."""
     r = subprocess.run(["ffmpeg", "-hide_banner", "-nostdin", "-loglevel", "error", "-ss", f"{t:.3f}",
-                        "-i", str(video), "-frames:v", "1", "-q:v", "2", "-y", str(dst)],
+                        "-protocol_whitelist", "file", "-i", str(video), "-frames:v", "1", "-q:v", "2", "-y", str(dst)],
                        check=False, capture_output=True, text=True)
     if r.returncode or not dst.exists():
         raise ClipperError(f"no frame of {video.name} at {hms(t)}")

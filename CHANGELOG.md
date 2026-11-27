@@ -12,6 +12,26 @@ Developing#releases.
 
 ### 2026-11
 
+- 11-26: a `clippa fetch --fixup` that rewrites a source already transcribed (one done before #440's
+  check) now says its `words.jsonl` has the old timeline's times and names `clippa transcribe <id>
+  --force`, since a plain transcribe keeps it as done.
+- 11-26: an archive item whose source `clippa archive transcribe` refused for a jumping timeline
+  can now be repaired (#446): `clippa archive fixup <subject> <item>` remuxes the kept copy in place
+  (Kick and HEI alike, no new download), drops the audio decoded from the old one and says to run
+  `archive transcribe` again. The refusal's line names that command; a kept `source.mp4` can't be
+  remuxed, so its line says to move it out of the folder (kept, never deleted: a gone VOD can't
+  come back) and let the next run download a `.ts`. It waits while a show
+  is live (`--force` overrides), and the chat offers it as a card. `archive transcribe` no longer
+  skips a dead link whose item keeps a copy here (a video, or a source set aside): it reads it.
+  An `archive transcribe` whose source a fixup replaces while it reads the audio transcribes nothing,
+  and the next run reads the repaired copy.
+- 11-26: every stage now reads media as local files only (#447): cut, Shorts, previews, thumbnails,
+  faces, the war room's low-res copies, the archive's flac and the rest pass `-protocol_whitelist file`
+  to ffmpeg and ffprobe, so a file that is really a playlist (or a concat list naming an address) fails
+  instead of making them open urls. B-roll keeps fetching its addresses as before. A link at a name
+  ffmpeg writes (the archive's `audio.flac`, the `.tmp.mp4` files) is removed first, never what it
+  points at. A test fails on a new ffmpeg call that skips it. The recorder's own join is left as
+  it was for now.
 - 11-26: a share that won't say whether a file is a link (a refused stat, a stale handle) is now one
   line naming the stream from `clippa fetch`, `--fixup` and `transcribe`, not a traceback (#449).
 - 11-26: `audio.wav` now says which file it was decoded from (#448): `audio.wav.src` beside it

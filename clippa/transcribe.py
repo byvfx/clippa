@@ -35,7 +35,7 @@ from pathlib import Path
 
 from . import jsonstate, timeline, wiki
 from .errors import ClipperError, exit_code
-from .media import is_link, link_or_raise, remove_link, source_file, try_duration
+from .media import drop_output_link, is_link, link_or_raise, source_file, try_duration
 
 
 class TimelineJump(ClipperError):
@@ -68,17 +68,8 @@ STALE_MARKER = "audio.wav.stale"
 SRC_STAMP = "audio.wav.src"
 
 
-def _drop_link(p: Path, label: str) -> None:
-    """A link where ffmpeg is about to write with `-y`: ffmpeg follows it and would truncate what
-    it names, so the link goes first (the link alone, never what it names). One that can't be
-    removed is a one-line error naming the stream and the system's reason, with no path."""
-    if not link_or_raise(p, label):  # a share that won't say is one line too (#449)
-        return
-    try:
-        remove_link(p)
-    except OSError as e:
-        raise ClipperError(f"{label}: couldn't drop the linked {p.name} "
-                           f"({e.strerror or 'the system refused it'})") from None
+# A link where ffmpeg is about to write with `-y` goes first, the link alone (media's helper).
+_drop_link = drop_output_link
 
 
 def mark_stale(stream_dir: Path) -> None:
@@ -112,6 +103,21 @@ def forget_stamp(stream_dir: Path) -> None:
         (stream_dir / SRC_STAMP).unlink(missing_ok=True)
     except OSError:
         pass
+
+
+def drop_wav(stream_dir: Path) -> None:
+    """audio.wav and its stamp gone, after mark_stale and under the caller's lock (a --fixup's, or
+    `archive fixup`'s): a wav the share won't remove is a line, as the marker beside it already
+    says it is stale, so the next extract_audio decodes it again."""
+    try:
+        (stream_dir / "audio.wav").unlink(missing_ok=True)
+    except OSError as e:  # the source may be replaced already: the caller still has to finish
+        print(f"{stream_dir.name}: the old audio.wav couldn't be removed "
+              f"({e.strerror or 'the system refused it'}); it is marked stale, so the "
+              f"next transcribe decodes it again")
+    else:
+        clear_stale(stream_dir)
+        forget_stamp(stream_dir)
 
 
 def _stamp_says(stream_dir: Path, src_st: os.stat_result | None) -> bool | None:
@@ -151,6 +157,49 @@ def _write_stamp(stream_dir: Path, decoded: tuple[int, int] | None) -> None:
         pass
 
 
+def _wav_is_for(stream_dir: Path, src: Path, trust_mtime: bool) -> bool:
+    """Whether the audio.wav here (which exists) is reused for `src` by extract_audio's rules."""
+    wav, marker = stream_dir / "audio.wav", stream_dir / STALE_MARKER
+    try:  # lstat: only these two regular files' own times decide which is newer
+        src_st = src.lstat()
+    except OSError:  # can't be stat'ed: its times say nothing (the marker still does)
+        src_st = None
+    try:
+        wav_st = wav.lstat()
+    except OSError:
+        wav_st = None
+    stamp = _stamp_says(stream_dir, src_st)
+    # With no stamp, a wav up to the share's rounding older than its source is not older:
+    # keep it. Anything older was decoded from a different file, so it is dropped and the
+    # source decoded again. The marker says the same outright, whatever the stamp or the
+    # mtime reads: a fast remux can leave a wav from the old source looking younger than the
+    # one that replaced it. It is dropped even when the times can't be compared, since it is
+    # the one thing that knows.
+    by_mtime = (trust_mtime and src_st is not None and wav_st is not None
+                and wav_st.st_mtime_ns >= src_st.st_mtime_ns - int(MTIME_ROUNDING_S * 10**9))
+    return not marker.exists() and bool(stamp if stamp is not None else by_mtime)
+
+
+def reuses_wav(stream_dir: Path, *, trust_mtime: bool = True, src: Path | None = None) -> bool:
+    """Whether the next extract_audio would read the audio.wav already here rather than decode
+    the source again: read-only, and False whenever that can't be told (no wav, no source, a link,
+    a share that won't answer), since then a decode is what the next run does or tries. `src` is
+    the source that run reads, where the caller knows it better than the `source.*` glob (an
+    archive run drops an empty or linked name that sorts first before it reads)."""
+    try:
+        wav = stream_dir / "audio.wav"
+        # #453 review: extract_audio drops a link at audio.wav and decodes, so one is never reused
+        # (exists() would follow it, and a stamp beside it would then vouch for what it names)
+        if is_link(wav) or not wav.exists():
+            return False
+        src = src or source_file(stream_dir)
+        if is_link(src):
+            return False
+        return _wav_is_for(stream_dir, src, trust_mtime)
+    except (OSError, ClipperError):
+        return False
+
+
 def extract_audio(stream_dir: Path, *, trust_mtime: bool = True) -> Path:
     """The stream's audio.wav: the one already here when it was decoded from this source, else the
     source decoded again (gaps filled with silence, 16 kHz mono).
@@ -162,7 +211,6 @@ def extract_audio(stream_dir: Path, *, trust_mtime: bool = True) -> Path:
     archive item's wav is only ever a failed run's leftover, so one with no stamp is decoded
     again rather than trusted)."""
     wav = stream_dir / "audio.wav"
-    marker = stream_dir / STALE_MARKER
     _drop_link(wav, stream_dir.name)  # a link is not a cache of ours: drop the link, never its target
     try:
         src = source_file(stream_dir)
@@ -174,24 +222,7 @@ def extract_audio(stream_dir: Path, *, trust_mtime: bool = True) -> Path:
         raise ClipperError(f"{stream_dir.name}: its source is a link, not a file; "
                            f"refusing to read it")
     if wav.exists():
-        try:  # lstat: only these two regular files' own times decide which is newer
-            src_st = src.lstat()
-        except OSError:  # can't be stat'ed: its times say nothing (the marker still does)
-            src_st = None
-        try:
-            wav_st = wav.lstat()
-        except OSError:
-            wav_st = None
-        stamp = _stamp_says(stream_dir, src_st)
-        # With no stamp, a wav up to the share's rounding older than its source is not older:
-        # keep it. Anything older was decoded from a different file, so it is dropped and the
-        # source decoded again. The marker says the same outright, whatever the stamp or the
-        # mtime reads: a fast remux can leave a wav from the old source looking younger than the
-        # one that replaced it. It is dropped even when the times can't be compared, since it is
-        # the one thing that knows.
-        by_mtime = (trust_mtime and src_st is not None and wav_st is not None
-                    and wav_st.st_mtime_ns >= src_st.st_mtime_ns - int(MTIME_ROUNDING_S * 10**9))
-        if not marker.exists() and (stamp if stamp is not None else by_mtime):
+        if _wav_is_for(stream_dir, src, trust_mtime):
             return wav
         try:
             wav.unlink()  # marked, or not this source's by its stamp or its mtime
@@ -287,13 +318,13 @@ def check_audio_timeline(stream_dir: Path) -> None:
         f"transcript would be off after it")
 
 
-def audio_lengths(stream_dir: Path) -> tuple[float, float] | None:
+def audio_lengths(stream_dir: Path, src: Path | None = None) -> tuple[float, float] | None:
     """(audio.wav's length, its source's container length) in seconds, as the timeline guard
     compares them; None when there is nothing to compare: no source, a .wav source (the audio is
     the source), or a wav ffprobe can't time. A source ffprobe can't time is a ClipperError, as it
-    is for the guard."""
+    is for the guard. `src` as for reuses_wav."""
     try:
-        src = source_file(stream_dir)
+        src = src or source_file(stream_dir)
     except ClipperError:  # no source to compare the audio with
         return None
     if src.suffix == ".wav":  # the audio is the source: nothing to compare it with

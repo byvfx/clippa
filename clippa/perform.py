@@ -45,7 +45,8 @@ SR = 8000  # analysis sample rate for take detection
 
 
 def pcm(path: Path, sr: int = SR) -> np.ndarray:
-    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-vn", "-ac", "1", "-ar", str(sr),
+    raw = subprocess.run(["ffmpeg", "-v", "error",
+                          "-protocol_whitelist", "file", "-i", str(path), "-vn", "-ac", "1", "-ar", str(sr),
                           "-f", "s16le", "-"], capture_output=True, check=True).stdout
     x = np.frombuffer(raw, np.int16).astype(np.float32)
     return x - x.mean()
@@ -68,7 +69,7 @@ def find_takes(rec: np.ndarray, read: np.ndarray) -> list[tuple[float, float]]:
 
 def pauses(read: Path, pc: dict) -> list[tuple[float, float]]:
     """(start, end) of the silences in the read (a TTS read has clean ones)."""
-    log = subprocess.run(["ffmpeg", "-v", "info", "-i", str(read), "-af",
+    log = subprocess.run(["ffmpeg", "-v", "info", "-protocol_whitelist", "file", "-i", str(read), "-af",
                           f"silencedetect=noise={pc['silence_db']}dB:d={pc['silence_min_s']}", "-f", "null", "-"],
                          check=True, capture_output=True, text=True).stderr
     starts = [float(m) for m in re.findall(r"silence_start: ([\d.]+)", log)]
@@ -108,7 +109,8 @@ def prepare(recording: Path, read: Path, pc: dict, take: int = 1, out: Path | No
     for i, (a, b) in enumerate(pairwise(cuts), 1):
         f = out / f"piece{i}.mp4"
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{t0 + a:.3f}", "-t", f"{b - a:.3f}",
-                        "-i", str(recording), "-vf", f"fps={pc['fps']},format=yuv420p", "-c:v", "libx264",
+                        "-protocol_whitelist", "file", "-i", str(recording),
+                        "-vf", f"fps={pc['fps']},format=yuv420p", "-c:v", "libx264",
                         "-crf", str(pc["crf"]), "-preset", "slow", "-c:a", "aac", "-b:a", "128k", "-ac", "1",
                         "-movflags", "+faststart", str(f)], check=True)
         pieces.append({"piece": f.name, "render": f"render{i}.mp4", "start": a, "end": b})
@@ -140,20 +142,22 @@ def stitch(d: Path, pc: dict) -> Path:
     inputs, chains = [], []
     for i, p in enumerate(m["pieces"]):
         slot = p["end"] - p["start"]
-        inputs += ["-i", str(d / p["render"])]
+        inputs += ["-protocol_whitelist", "file", "-i", str(d / p["render"])]
         chains.append(f"[{i}:v]fps={pc['fps']},scale=1920:1080,setsar=1,trim=0:{slot:.3f},setpts=PTS-STARTPTS,"
                       f"tpad=stop_mode=clone:stop_duration={slot:.3f},trim=0:{slot:.3f},setpts=PTS-STARTPTS[v{i}]")
     n = len(m["pieces"])
     graph = ";".join(chains) + ";" + "".join(f"[v{i}]" for i in range(n)) + f"concat=n={n}:v=1:a=0[v];" \
         f"[{n}:a]aresample=48000,apad=whole_dur={m['end']:.3f}[a]"
     final = d / "final.mp4"
-    subprocess.run(["ffmpeg", "-v", "error", "-y", *inputs, "-i", m["read"], "-filter_complex", graph,
+    subprocess.run(["ffmpeg", "-v", "error", "-y", *inputs,
+                    "-protocol_whitelist", "file", "-i", m["read"], "-filter_complex", graph,
                     "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-crf", "16", "-preset", "medium",
                     "-c:a", "aac", "-b:a", "192k", "-t", f"{m['end']:.3f}", "-movflags", "+faststart", str(final)],
                    check=True)
     phone = d / "final_phone.mp4"
     # 720p keeps a minute under the 30 MB a phone message takes.
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(final), "-vf", "scale=-2:720", "-c:v", "libx264",
+    subprocess.run(["ffmpeg", "-v", "error", "-y",
+                    "-protocol_whitelist", "file", "-i", str(final), "-vf", "scale=-2:720", "-c:v", "libx264",
                     "-crf", "24", "-preset", "slow", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart",
                     str(phone)], check=True)
     print(f"{final} ({media.duration(final):.1f} s), {phone.name} ({phone.stat().st_size / 2**20:.0f} MB)")
@@ -232,11 +236,13 @@ def lipsync(target: Path, pc: dict, engine: str, audio: Path | None = None) -> P
     with tempfile.TemporaryDirectory() as td:
         wav = Path(td) / "read.wav"
         # Padded to the video's length: the models stop where the audio stops (the final hold).
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(audio), "-af", f"apad=whole_dur={media.duration(video):.3f}",
-                        "-ac", "1", "-ar", "16000", str(wav)], check=True)
+        subprocess.run(["ffmpeg", "-v", "error", "-y",
+                        "-protocol_whitelist", "file", "-i", str(audio),
+                        "-af", f"apad=whole_dur={media.duration(video):.3f}", "-ac", "1", "-ar", "16000", str(wav)], check=True)
         raw = Path(td) / "raw.mp4"
         raw.write_bytes((lipsync_latentsync if engine == "latentsync" else lipsync_sync)(video, wav, pc))
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(raw), "-i", str(audio), "-map", "0:v", "-map", "1:a",
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-protocol_whitelist", "file", "-i", str(raw),
+                        "-protocol_whitelist", "file", "-i", str(audio), "-map", "0:v", "-map", "1:a",
                         "-af", f"apad=whole_dur={media.duration(raw):.3f}", "-c:v", "libx264", "-crf", "16", "-preset",
                         "medium", "-c:a", "aac", "-b:a", "192k", "-t", f"{media.duration(raw):.3f}", "-movflags", "+faststart",
                         str(out)], check=True)

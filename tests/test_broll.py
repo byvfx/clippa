@@ -6,7 +6,8 @@ import pytest
 from clippa import broll, jsonstate
 from clippa.errors import ClipperError
 
-REAL_ENCODE = broll.encode  # before the fixture stubs it
+REAL_ENCODE = broll.encode  # before the fixture stubs them
+REAL_LENGTH_OF = broll.length_of
 
 
 @pytest.fixture
@@ -396,6 +397,35 @@ def test_encode_keeps_both_sides_even(cfg, tmp_path, monkeypatch):  # Grok's rev
     assert vf.startswith("scale=-2:'trunc(min(ih,1080)/2)*2'")
     assert ran[0][ran[0].index("-ss") + 1] == "5.000" and ran[0][ran[0].index("-t") + 1] == "5.000"
     assert "-an" in ran[0] and (tmp_path / "a.mp4").exists()
+
+
+def test_a_local_source_is_pinned_to_files_and_an_address_keeps_its_protocols(cfg, tmp_path, monkeypatch):
+    """#447: a file goes to ffmpeg and ffprobe with `-protocol_whitelist file` (one that is really
+    a playlist can't send them to an url); an address keeps our user agent and ffmpeg's own
+    protocols (https, HLS). The scan in test_ffmpeg_whitelist can't see through src_opts."""
+    ran = []
+
+    class Done:
+        returncode, stderr, stdout = 0, "", "12.5\n"
+
+    def run(cmd, **kw):
+        ran.append(cmd)
+        if cmd[0] == "ffmpeg":
+            Path(cmd[-1]).write_bytes(b"x")
+        return Done()
+
+    monkeypatch.setattr(broll.subprocess, "run", run)
+    local = tmp_path / "navy.mp4"
+    REAL_ENCODE(cfg, str(local), tmp_path / "a.mp4")
+    assert REAL_LENGTH_OF(str(local)) == 12.5
+    for cmd in ran:
+        assert cmd[cmd.index("-protocol_whitelist") + 1] == "file" and "-user_agent" not in cmd
+        assert cmd.index("-protocol_whitelist") < (cmd.index("-i") if "-i" in cmd else cmd.index(str(local)))
+    ran.clear()
+    REAL_ENCODE(cfg, "https://x/a.mp4", tmp_path / "b.mp4")
+    REAL_LENGTH_OF("https://x/a.mp4")
+    for cmd in ran:
+        assert "-protocol_whitelist" not in cmd and cmd[cmd.index("-user_agent") + 1] == broll.UA
 
 
 def test_public_domain_wording_isnt_an_owner(cfg):

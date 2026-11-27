@@ -30,7 +30,7 @@ from pathlib import Path
 from . import jsonstate
 from .config import for_stream, show_args
 from .errors import ClipperError
-from .media import source_file
+from .media import drop_output_link, source_file
 from .segments import slug
 from .states import numbered_picks
 from .timefmt import hms
@@ -42,7 +42,8 @@ def keyframes(stream_dir: Path, src: Path) -> list[float]:
     if cache.exists():
         return jsonstate.load(cache)
     probe = lambda args: subprocess.run(
-        ["ffprobe", "-v", "error", *args, str(src)], check=True, capture_output=True, text=True
+        ["ffprobe", "-v", "error", "-protocol_whitelist", "file", *args, str(src)],
+        check=True, capture_output=True, text=True
     ).stdout
     start = float(probe(["-show_entries", "format=start_time", "-of", "csv=p=0"]).strip())
     out = probe(["-select_streams", "v:0", "-skip_frame", "nokey",
@@ -91,10 +92,11 @@ def ffmpeg_cut(src: Path, dst: Path, start: float, end: float, codec: str, crf: 
             maps = ["-filter_complex", script.read_text(encoding="utf-8"), "-map", "0:v:0", "-map", "[aout]"]
             if codec == "copy":
                 codecs = ["-c:v", "copy", "-c:a", "aac", "-b:a", "192k"]
+    drop_output_link(tmp, src.parent.name)
     try:
         subprocess.run(
             ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{seek:.3f}",
-             "-i", str(src), *trim, "-t", f"{end - start:.3f}", *maps,
+             "-protocol_whitelist", "file", "-i", str(src), *trim, "-t", f"{end - start:.3f}", *maps,
              *codecs, "-avoid_negative_ts", "make_zero",
              "-movflags", "+faststart", str(tmp)],
             check=True,
@@ -121,8 +123,8 @@ def keyframe_before(stream_dir: Path, src: Path, t: float) -> float:
 
 def stream_entry(path: Path, entry: str) -> dict[str, float]:
     out = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", f"stream=codec_type,{entry}",
-         "-of", "csv=p=0", str(path)], check=True, capture_output=True, text=True).stdout
+        ["ffprobe", "-v", "error", "-protocol_whitelist", "file",
+         "-show_entries", f"stream=codec_type,{entry}", "-of", "csv=p=0", str(path)], check=True, capture_output=True, text=True).stdout
     return {kind: float(t) for kind, t in (l.split(",") for l in out.splitlines() if l)}
 
 
@@ -244,8 +246,9 @@ def cut_compilations(stream_dir: Path, cfg: dict, topics: list[str] | None = Non
         listing.write_text("".join(lines), encoding="utf-8")
         dst = out_dir / f"{slug(topic)}.mp4"
         part = dst.with_name(dst.name + ".part")  # B15: a crashed join leaves no half .mp4 behind
+        drop_output_link(part, stream_dir.name)
         subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "concat",
-                        "-safe", "0", "-i", str(listing), "-c", "copy",
+                        "-safe", "0", "-protocol_whitelist", "file", "-i", str(listing), "-c", "copy",
                         "-movflags", "+faststart", "-f", "mp4", str(part)], check=True)
         part.replace(dst)
         listing.unlink()

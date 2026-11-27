@@ -802,6 +802,47 @@ def _story_estimate(cfg: dict) -> str:
     return f"{typical}, at most ${caps:.2f} ([story] and [swarm] budgets), plus Modal for the transcripts"
 
 
+def _archive_fixup_prepare(cfg: dict, args: dict) -> Plan:
+    """#446, agent-first: the repair of an archive item whose timeline check refused its source, as a
+    card. No model or Modal cost, but disk time on the NAS: a card says how big the copy is, and
+    nothing is offered while a show is live (the command itself refuses then too)."""
+    from . import archive, services
+
+    subject, item = str(args.get("subject") or "").strip(), str(args.get("item") or "").strip()
+    if not subject or not item:
+        return Plan("answer", text="Which item? Its subject and id, as its error names them.")
+    if "/" in subject + item or "\\" in subject + item or ".." in subject + item:
+        return Plan("answer", text=f"{subject!r} / {item!r} isn't an archive item.")
+    it = archive.load_catalog(archive.subject_dir(cfg, subject)).get(item)
+    if it is None:
+        return Plan("answer", text=f"{subject} has no archive item {item!r} to repair.")
+    if it.get("dir"):
+        return Plan("answer", text=f"{item} is one of our streams: {archive._stream_fixup(it)} repairs it.")
+    rec = services.recorder(cfg)
+    if rec.get("error") or rec["live"]:
+        why = f"{', '.join(rec['live'])} is live" if rec["live"] else "I can't tell whether a show is live"
+        return Plan("answer", text=f"{why}; a repair rewrites a whole source on the NAS, so it waits "
+                                   f"until the show is over.")
+    try:  # read-only: item_source tidies the folder, which a preview must not do
+        kept, src = archive.set_aside(archive.subject_dir(cfg, subject) / item)
+        gb = src.stat().st_size / 1e9 if src is not None and kept is None else 0.0
+    except OSError as e:
+        return Plan("answer", text=f"{item}: its folder can't be read ({e.strerror or 'the share refused it'}).")
+    if kept is not None:
+        idir = archive.subject_dir(cfg, subject) / item
+        return Plan("answer", text=f"{item} reads its kept {kept.name}, which can't be remuxed: "
+                                   f"{archive.kept_advice(idir, kept)}.")
+    if src is None:
+        return Plan("answer", text=f"{item} has nothing set aside to repair.")
+    lines = [f"{subject} / {item}: {src.name} remuxed with fresh timestamps",
+             f"reads its {gb:.1f} GB three times and writes it once, on the NAS",
+             "kept as it was if the remux comes out shorter, smaller or still jumping back",
+             f"then `clippa archive transcribe {subject}` finishes it (Modal, as usual)"]
+    return Plan("card", text=f"Repair {item}'s source?", tool="archive_fixup", risk=SPEND, lines=lines,
+                estimate="no model or Modal cost; NAS disk time only",
+                argv=["archive", "fixup", "--", subject, item], args={"subject": subject, "item": item})
+
+
 def _strings(v) -> list[str]:
     """A list input as the model may send it: a list, one string, or nothing."""
     items = v if isinstance(v, list) else [v] if v else []
@@ -1120,6 +1161,11 @@ def build() -> dict[str, Tool]:
         Tool("slot", WRITE, "pin an approved item to the next open release slot of its kind",
              _obj({"item": ITEM}, ("item",)), _slot_prepare),
         Tool("story", SPEND, story_help, story_schema, _story_prepare),
+        Tool("archive_fixup", SPEND, "repair an archive item whose source's timeline jumps back (its "
+             "error names the subject and item): remux it so the next archive transcribe finishes it",
+             _obj({"subject": {"type": "string", "description": "the archive subject"},
+                   "item": {"type": "string", "description": "the item's id"}}, ("subject", "item")),
+             _archive_fixup_prepare),
         Tool("cover_redo", SPEND, "pick a new cover for an item (a vision call, maybe a second), attached in Kitsu",
              _obj({"item": ITEM}, ("item",)), _cover_prepare),
     ]

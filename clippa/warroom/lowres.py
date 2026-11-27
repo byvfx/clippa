@@ -10,6 +10,7 @@ from pathlib import Path
 from urllib.parse import quote, unquote, urlparse
 
 from ..errors import ClipperError
+from ..media import drop_output_link
 from .data import all_rows
 
 log = logging.getLogger("clippa.warroom")
@@ -45,8 +46,10 @@ def render_lowres(src: Path, height: int) -> Path:
     dst = lowres_path(src)
     dst.parent.mkdir(exist_ok=True)
     tmp = dst.with_name(dst.stem + ".tmp.mp4")
+    drop_output_link(tmp, src.parent.name)
     short_side = f"scale='if(gt(iw,ih),-2,{height})':'if(gt(iw,ih),{height},-2)'"  # Shorts too
-    cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vf", short_side,
+    cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+           "-protocol_whitelist", "file", "-i", str(src), "-vf", short_side,
            "-c:v", "libx264", "-preset", "veryfast", "-crf", "30", "-maxrate", "700k",
            "-bufsize", "1400k", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "64k", "-ac", "2",
            "-movflags", "+faststart", str(tmp)]
