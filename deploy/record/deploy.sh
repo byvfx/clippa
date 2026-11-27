@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 # Deploy or update the live recorder (`clippa record watch`) on the NAS.
 #
-# Run from the repo root:  bash deploy/record/deploy.sh [--force]
+# Run from the repo root:  bash deploy/record/deploy.sh [--force] [--any-branch] [--env PATH]
 #   Refused while a show is being recorded (`clippa record status` exits 3) and when the
 #   recorder's state can't be read (exit 1): the restart starts a new recording part. --force
-#   deploys anyway.
+#   deploys anyway (never while a show is live: wiki NAS-recorder). The check runs this
+#   checkout's .venv clippa, else the `clippa` on PATH, else the main checkout's .venv (from a
+#   worktree of main, which has none of its own).
+#   Also refused when this checkout is behind origin/main (deploy/mainguard.sh): the image is
+#   built from this checkout's code. --any-branch deploys it anyway. --force doesn't, and
+#   --any-branch doesn't skip the live check: skipping one check never skips the other.
+#   --env PATH       the env.local to deploy (default: deploy/record/env.local here), so a
+#                    worktree of main can deploy with the main checkout's env.local
 #   RECORD_SSH_HOST  ssh host alias (default: nas)
 #   RECORD_DIR       compose dir on the NAS, relative to the ssh user's home (default: clippa-record;
 #                    the first deploy after #286 pass 3 stops the old clipper-record project and
@@ -28,13 +35,35 @@ ROOT=$(cd "$HERE/../.." && pwd)
 TOML=${CLIPPA_TOML:-${CLIPPER_TOML:-}}
 source "$HERE/../retire.sh"
 ENV_LOCAL=$HERE/env.local
+FORCE=
+ANY_BRANCH=
+while [ $# -gt 0 ]; do
+    case $1 in
+        --force) FORCE=1 ;;
+        --any-branch) ANY_BRANCH=1 ;;
+        --env) [ $# -ge 2 ] || { echo "--env needs a path" >&2; exit 2; }; ENV_LOCAL=$2; shift ;;
+        --env=*) ENV_LOCAL=${1#--env=} ;;
+        *) echo "usage: bash deploy/record/deploy.sh [--force] [--any-branch] [--env PATH]" >&2; exit 2 ;;
+    esac
+    shift
+done
+source "$HERE/../mainguard.sh"
+require_main "$ROOT" deploy/record/deploy.sh "$ANY_BRANCH" --any-branch
+if [ "$ENV_LOCAL" != "$HERE/env.local" ] && [ ! -f "$ENV_LOCAL" ]; then
+    echo "no $ENV_LOCAL (--env)" >&2
+    exit 1
+fi
+need_env "$ROOT" "$ENV_LOCAL" deploy/record/env.local   # a worktree of main: the main checkout's, by --env
 
-if [ "${1:-}" != "--force" ]; then
+if [ -z "$FORCE" ]; then
     CLIPPA=
-    for c in "$ROOT/.venv/Scripts/clippa.exe" "$ROOT/.venv/bin/clippa" "$ROOT/.venv/Scripts/clipper.exe" "$ROOT/.venv/bin/clipper"; do
-        [ -x "$c" ] && { CLIPPA=$c; break; }
+    # The main checkout: a worktree's git-common-dir is its .git
+    MAIN=$(dirname "$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || echo "$ROOT/.git")")
+    for c in "$ROOT/.venv/Scripts/clippa.exe" "$ROOT/.venv/bin/clippa" "$ROOT/.venv/Scripts/clipper.exe" "$ROOT/.venv/bin/clipper" \
+             "$(command -v clippa || true)" "$MAIN/.venv/Scripts/clippa.exe" "$MAIN/.venv/bin/clippa"; do
+        [ -n "$c" ] && [ -x "$c" ] && { CLIPPA=$c; break; }
     done
-    [ -n "$CLIPPA" ] || { echo "no clippa in $ROOT/.venv: run deploy/bootstrap, or deploy with --force" >&2; exit 1; }
+    [ -n "$CLIPPA" ] || { echo "no clippa in $ROOT/.venv, on PATH or in $MAIN/.venv: run deploy/bootstrap, or deploy with --force" >&2; exit 1; }
     set +e
     (cd "$ROOT" && "$CLIPPA" record status)
     rc=$?
@@ -73,6 +102,7 @@ tar -C "$TMP" -czf - . | ssh "$HOST" "mkdir -p '$DIR' && rm -rf '$DIR/src' && ta
 if [ -n "$TOML" ]; then
     ssh "$HOST" "cat > '$DATA/clipper.toml'" < "$TOML"   # UGOS sftp is chrooted; plain ssh isn't
 elif ! ssh "$HOST" "test -f '$DATA/clipper.toml'"; then
+    [ -f "$ROOT/clipper.toml" ] || { echo "no $DATA/clipper.toml on $HOST and no $ROOT/clipper.toml: give one with CLIPPA_TOML=<file>" >&2; exit 1; }
     ssh "$HOST" "cat > '$DATA/clipper.toml'" < "$ROOT/clipper.toml"
 fi
 ssh "$HOST" "cd '$DIR' && ${RECORD_SUDO:-} docker compose build"

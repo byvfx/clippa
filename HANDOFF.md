@@ -169,7 +169,8 @@ not remuxed).
 - **Hub on the NAS** since 2026-11-05 (wiki NAS-hub): compose project `clippa-hub` in `~/clippa-hub` (since pass 3, 11-22), containers
   `serve` (war room on 127.0.0.1:8765, on the tailnet as https://clipper.taile415cd.ts.net/; heartbeat
   `streams/.serve/status.json`), `bot` (`streams/.bot/status.json`) and `worker` (cuts with QSV on the iGPU).
-  Code changes go out with `bash deploy/hub/deploy.sh` from a main checkout; `clippa services status|restart ...`
+  Code changes go out with `bash deploy/hub/deploy.sh` from a main checkout (since 11-25 every deploy script refuses from a
+  checkout behind origin/main, `--force` overrides, `--any-branch` on the recorder; `--env PATH` deploys from a worktree of main with `C:\clipper`'s env.local); `clippa services status|restart ...`
   runs docker compose there (`[serve] hub`). Last deploy 2026-11-22 22:27 PT, after Don's stream: all three at e8f0758 (#389); then serve and the bot again at
   0e2c797 (#378, with #345's dependency bumps), the worker held back until Don's 11-23 run finishes, then redeployed. **The config and
   all state are on the NAS:** `//192.168.0.155/docker/clipper` (`/data`) holds `clipper.toml` (the one copy;

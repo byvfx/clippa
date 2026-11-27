@@ -50,6 +50,13 @@ Developing#releases.
   the same plugin, and `deploy/claude/deploy.sh` copies the laptop's server, key and bank into
   `env.local` where they're empty. The nightly checkup DMs when Hindsight is down or refuses the
   key. Wiki: Claude-on-the-NAS (Memory).
+- 11-25: the hub, claude, agent and recorder deploys (`deploy/*/deploy.sh`) refuse to deploy from
+  a checkout behind `origin/main` (they fetch it first), saying the branch, commit and how far behind;
+  `--force` deploys anyway (the recorder's is `--any-branch`, since its `--force` already means
+  "while a show is live"), and offline they only warn. `--env PATH` deploys another checkout's
+  `env.local`, so a worktree of main can deploy. A claude deploy from an old branch had shipped an
+  image without nodejs and every Hindsight hook failed with `node: not found`. Wiki:
+  Claude-on-the-NAS (Deploy), NAS-recorder, Bugs-to-remember.
 - 11-25: a long compilation's Kitsu preview now fits `[review] max_upload_mb`: it drops to 360p or
   240p (15 fps) instead of stopping at 150 kbps, and encodes once more when the encoder overshoots.
   One that still won't fit is skipped with a line in the log, so the rest of the stream still

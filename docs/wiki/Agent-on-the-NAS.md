@@ -24,6 +24,9 @@ the file at `/run/secrets/openrouter_key` and sets `[paths] openrouter_key` to t
 
 `bash deploy/agent/deploy.sh` from the repo root (Git Bash; ssh alias `nas`). Its own compose
 project is `clippa-agent`. It never restarts the recorder, the hub, or `clippa-claude`.
+Like the claude deploy, it refuses from a checkout behind `origin/main` (`--force` overrides
+that) and takes `--env PATH` for a worktree of main
+([Claude on the NAS](Claude-on-the-NAS#deploy)).
 
 The first run copies `deploy/agent/env.template` to `deploy/agent/env.local` (gitignored) and
 stops. Fill in `OPENROUTER_API_KEY` and the same other keys the hub uses (`KITSU_TOKEN`, the

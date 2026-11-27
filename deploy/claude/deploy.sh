@@ -4,7 +4,11 @@
 # and the hub are never restarted by this. Restarting it ends the session that is open in the
 # Claude app (the clone and Claude's sign-in stay).
 #
-# Run from the repo root:  bash deploy/claude/deploy.sh
+# Run from the repo root:  bash deploy/claude/deploy.sh [--force] [--env PATH]
+#   Refused when this checkout is behind origin/main (deploy/mainguard.sh): the image is built
+#   from this checkout's deploy/claude files. --force deploys it anyway.
+#   --env PATH       the env.local to deploy (default: deploy/claude/env.local here), so a
+#                    worktree of main can deploy with the main checkout's env.local
 #   CLAUDE_SSH_HOST  ssh host alias (default: $HUB_SSH_HOST, else $RECORD_SSH_HOST, else nas)
 #   CLAUDE_COMPOSE   compose dir on the NAS, relative to the ssh user's home (default: clippa-claude;
 #                    the first deploy after #286 pass 3 stops the old clipper-claude project and
@@ -19,8 +23,26 @@ set -euo pipefail
 HOST=${CLAUDE_SSH_HOST:-${HUB_SSH_HOST:-${RECORD_SSH_HOST:-nas}}}
 DIR=${CLAUDE_COMPOSE:-clippa-claude}
 HERE=$(cd "$(dirname "$0")" && pwd)
+ROOT=$(cd "$HERE/../.." && pwd)
 ENV_LOCAL=$HERE/env.local
+FORCE=
+while [ $# -gt 0 ]; do
+    case $1 in
+        --force) FORCE=1 ;;
+        --env) [ $# -ge 2 ] || { echo "--env needs a path" >&2; exit 2; }; ENV_LOCAL=$2; shift ;;
+        --env=*) ENV_LOCAL=${1#--env=} ;;
+        *) echo "usage: bash deploy/claude/deploy.sh [--force] [--env PATH]" >&2; exit 2 ;;
+    esac
+    shift
+done
+source "$HERE/../mainguard.sh"
+require_main "$ROOT" deploy/claude/deploy.sh "$FORCE"
 
+if [ "$ENV_LOCAL" != "$HERE/env.local" ] && [ ! -f "$ENV_LOCAL" ]; then
+    echo "no $ENV_LOCAL (--env)" >&2
+    exit 1
+fi
+need_env "$ROOT" "$ENV_LOCAL" deploy/claude/env.local   # a worktree of main: the main checkout's, by --env
 if [ ! -f "$ENV_LOCAL" ]; then
     cp "$HERE/env.template" "$ENV_LOCAL"
     chmod 600 "$ENV_LOCAL"
@@ -51,9 +73,9 @@ fill() {  # fill KEY's empty line in .env (or add one) with a value
     echo "$1=$2" >> "$TMP/env.new"
     mv "$TMP/env.new" "$TMP/.env"
 }
-[ -n "$(setting CLIPPA_REPO)$(setting CLIPPER_REPO)" ] || fill CLIPPA_REPO "$(git remote get-url origin | sed -E 's#^git@github.com:#https://github.com/#')"
-[ -n "$(setting GIT_USER_NAME)" ] || fill GIT_USER_NAME "$(git config user.name || true)"
-[ -n "$(setting GIT_USER_EMAIL)" ] || fill GIT_USER_EMAIL "$(git config user.email || true)"
+[ -n "$(setting CLIPPA_REPO)$(setting CLIPPER_REPO)" ] || fill CLIPPA_REPO "$(git -C "$ROOT" remote get-url origin | sed -E 's#^git@github.com:#https://github.com/#')"
+[ -n "$(setting GIT_USER_NAME)" ] || fill GIT_USER_NAME "$(git -C "$ROOT" config user.name || true)"
+[ -n "$(setting GIT_USER_EMAIL)" ] || fill GIT_USER_EMAIL "$(git -C "$ROOT" config user.email || true)"
 # Memory (#435): the laptop's Hindsight server, key and bank, wherever env.local leaves one empty,
 # so both Claudes share one bank. HINDSIGHT_API_URL=off turns it off.
 HSCFG=${HINDSIGHT_CONFIG:-$HOME/.hindsight/coding-agent.json}
@@ -90,7 +112,7 @@ if [ -n "$HS_URL" ] && [ "$HS_URL" != off ]; then
     fi
     # The plugin's own default, coding-agent::<the main checkout's folder>, unless it names a bank
     BANK=$(hs_conf bankId)
-    [ -n "$BANK" ] || BANK="coding-agent::$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
+    [ -n "$BANK" ] || BANK="coding-agent::$(basename "$(dirname "$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir)")")"
     [ -n "$(setting HINDSIGHT_BANK_ID)" ] || fill HINDSIGHT_BANK_ID "$BANK"
 fi
 # The Anthropic key goes in as a file (a compose secret), never in the environment: Remote

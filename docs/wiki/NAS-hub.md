@@ -52,6 +52,12 @@ code changes: this replaces restarting serve or the bot. A stage or upload runni
 moment stops; the worker resumes the stream at its first unfinished stage, and an upload that
 didn't finish goes again on the next hourly run. `bash deploy/hub/deploy.sh bot` updates one.
 
+It refuses (exit 1) from a checkout behind `origin/main`, which it fetches first: that would put
+older code back on the NAS. `--force` deploys it anyway; offline it checks the last fetched main.
+`--env PATH` deploys another checkout's `env.local`, for a worktree of main beside a main
+checkout that is on a feature branch
+([Claude on the NAS](Claude-on-the-NAS#deploy) has the recipe).
+
 The compose project was `clipper-hub` (in `~/clipper-hub`) until the rename's pass 3 (#286). The
 first deploy after it builds the new image, then stops the old project (`docker compose down`:
 its named volumes stay) and renames its `compose.yaml` to `compose.yaml.retired-<date>`, so
