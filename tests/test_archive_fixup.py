@@ -172,10 +172,10 @@ def test_what_it_cannot_repair_is_one_line_and_nothing_runs(acfg, monkeypatch, s
         archive.fixup_item(acfg, "s", "kick-1")
 
 
-def test_a_kept_video_on_a_dead_link_is_told_to_stay_and_the_route_it_names_works(acfg, monkeypatch):
+def test_a_kept_video_on_a_dead_link_is_told_to_stay(acfg, monkeypatch):
     """Grok on #453: with the link dead no .ts is ever downloaded (transcribe skips a dead link with
-    nothing set aside), so the advice keeps the video and names a .ts made from it by hand; done
-    that way, the fixup repairs it."""
+    nothing set aside), so moving the video out would leave the item with nothing to read: the
+    advice keeps it, and never says to move it or that a download will come."""
     d = idir(acfg)
     jsonstate.write(d.parent / "links.json", {"kick-1": {"status": "dead"}})
     (d / "source.mp4").write_bytes(b"kept video")
@@ -183,17 +183,12 @@ def test_a_kept_video_on_a_dead_link_is_told_to_stay_and_the_route_it_names_work
     with pytest.raises(ClipperError) as err:
         archive.fixup_item(acfg, "s", "kick-1")
     msg = str(err.value)
-    assert "its link is dead, so no .ts will be downloaded: keep source.mp4 where it is" in msg
-    assert "`ffmpeg -i source.mp4 -c copy -f mpegts source.refused.ts`" in msg
-    assert "the next `clippa archive transcribe` downloads" not in msg
+    assert "its link is dead, so no .ts will be downloaded" in msg
+    assert "keep source.mp4 where it is (it is the only copy)" in msg
+    assert "move source.mp4 out" not in msg and "downloads a .ts" not in msg
     p = catalog.prepare(acfg, "archive_fixup", {"subject": "s", "item": "kick-1"})
     assert p.kind == "answer" and "its link is dead" in p.text
-    # the route it names: a .ts beside it, the video moved out, and the fixup repairs that .ts
-    (d / "source.refused.ts").write_bytes(b"broken")
-    (d / "source.mp4").unlink()
-    monkeypatch.setattr(archive.subprocess, "run", FakeFf([BACKWARD, REPAIRED]))
-    archive.fixup_item(acfg, "s", "kick-1")
-    assert (d / "source.refused.ts").read_bytes() == b"remuxed"
+    assert (d / "source.mp4").read_bytes() == b"kept video"
 
 
 def test_an_unreadable_links_file_gives_the_usual_advice(acfg, monkeypatch):
