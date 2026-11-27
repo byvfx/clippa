@@ -582,12 +582,10 @@ def stack(graph: list[str], src: str, crops: list[tuple], W: int, tag: str) -> s
     return tag
 
 
-def render(src_cut: Path, dst: Path, parts: list[tuple], ass: Path | None, dur: float,
-           sc: dict, codec: str, keep: str = "") -> dict:
-    """parts: (start, end, crops) per scene stretch of the Short, in order, on its own
-    clock. keep: the stretches of src_cut to keep (tighten.Timeline.select); empty = all."""
+def video_graph(parts: list[tuple], ass: Path | None, sc: dict, codec: str, keep: str = "") -> list[str]:
+    """The picture's filters for render, ending in [vout]: each scene stretch cropped to its
+    panels, joined, captioned."""
     W = sc["width"]
-    loud = measure_loudness(src_cut, sc)
     k = len(parts)
     # After fps the time base is one frame, so N lines the kept frames up exactly; STARTPTS
     # keeps the cut's first frame where it was against the sound (often a frame in).
@@ -602,13 +600,24 @@ def render(src_cut: Path, dst: Path, parts: list[tuple], ass: Path | None, dur: 
             graph.append(f"[v{j}]trim={bounds},setpts=PTS-STARTPTS[t{j}]")
             src = f"t{j}"
         outs.append(stack(graph, src, crops, W, f"c{j}"))
-    tail = "".join(f"[{o}]" for o in outs) + (f"concat=n={k}:v=1:a=0" if k > 1 else "null")
+    # concat leaves the stream with no frame rate on ffmpeg 7 (the hub's), and h264_qsv won't
+    # open without one ("Current frame rate is unsupported", #429): fps sets it again.
+    tail = "".join(f"[{o}]" for o in outs) + (f"concat=n={k}:v=1:a=0,fps={sc['fps']}" if k > 1 else "null")
     if ass:
         fonts = f":fontsdir='{esc_path(Path(sc['caption_fontsdir']))}'" if sc["caption_fontsdir"] else ""
         tail += f",subtitles=filename='{esc_path(ass)}'{fonts}"
     if codec == "h264_qsv":
         tail += ",format=nv12"
     graph.append(tail + "[vout]")
+    return graph
+
+
+def render(src_cut: Path, dst: Path, parts: list[tuple], ass: Path | None, dur: float,
+           sc: dict, codec: str, keep: str = "") -> dict:
+    """parts: (start, end, crops) per scene stretch of the Short, in order, on its own
+    clock. keep: the stretches of src_cut to keep (tighten.Timeline.select); empty = all."""
+    loud = measure_loudness(src_cut, sc)
+    graph = video_graph(parts, ass, sc, codec, keep)
     fo = min(sc["fade_out_s"], dur / 4)
     # The sound in frames one video frame long, so aselect keeps the same stretches select does.
     per_frame = round(48000 / sc["fps"])

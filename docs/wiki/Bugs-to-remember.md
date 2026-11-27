@@ -17,6 +17,32 @@ a deploy stops (a running stage or upload). A recorder's deploy must never run w
 live ([NAS recorder](NAS-recorder)); never `--force` it — the page documents `--force` as the
 override this rule forbids.
 
+### A Short that switches layout won't render on the NAS (2026-11-24)
+
+**Symptom.** `shorts` exits 1 on one Short after the ones before it rendered fine.
+`run_shorts.log` has `[h264_qsv] Current frame rate is unsupported`, then `Error while opening
+encoder` and exit status 218. The Short's `shorts/work/<key>.cut.mp4` plays fine. It hit
+`kick-139915441` (v06_t40) and `kick-140303366` (v05_t51), and each time the worker spent its
+attempts on it.
+
+**Cause.** The Short has more than one scene (its layout changes partway). `render` trims each
+stretch and joins them with the `concat` filter, and on ffmpeg 7.1 (the hub image's, Debian 13)
+concat leaves the stream with no frame rate. libx264 doesn't mind, but `h264_qsv` won't open
+without one. The laptop's ffmpeg 8.1 keeps the rate through concat, so the same Short renders
+there, and a one-scene Short has no concat at all. That is why it only showed once Shorts
+rendered on the NAS.
+
+**How to tell.** The failing Short's layouts in `shorts.json` have more than one scene, and the
+log line is the frame-rate one, not a size or bit-rate error.
+
+**Band-aid.** `[shorts] codec = "libx264"` in the stream's own `config.toml`, then reset its
+attempts. `codec` is in every Short's signature, so all of that stream's Shorts render again, on
+the NAS's CPU. Take the line out once the fix is deployed.
+
+**Fix.** [#429](https://github.com/byvfx/clippa/issues/429): `video_graph` in `clippa/shorts.py`
+puts `fps=<[shorts] fps>` right after the concat, with `format=nv12` still last for QSV. The
+graph isn't in the Short's signature, so no Short renders again because of the fix.
+
 ### Every Hindsight hook says `node: not found` after a deploy (2026-11-25)
 
 **Symptom.** Right after a `deploy/claude/deploy.sh`, every Hindsight hook in the NAS `claude`

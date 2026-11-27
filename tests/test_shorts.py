@@ -232,3 +232,19 @@ def test_signature_changes_with_the_face_and_not_without(sc):
     assert base == shorts.short_signature(sc, "h264", 1.0, 31.0, [[0.0, 30.0, "cam"]], layouts, [{}])
     assert base != shorts.short_signature(sc, "h264", 1.0, 31.0, [[0.0, 30.0, "cam"]], layouts,
                                           [{0: (0.6, 0.5)}])
+
+
+CROP = [(0, 0, 1080, 1920, 1920)]
+
+
+def test_a_multi_scene_short_sets_its_frame_rate_again_after_concat(sc):
+    # h264_qsv won't open a stream concat left without a frame rate on ffmpeg 7 (#429)
+    tail = shorts.video_graph([(0.0, 2.0, CROP), (2.0, 4.0, CROP)], None, sc, "h264_qsv")[-1]
+    assert f"concat=n=2:v=1:a=0,fps={sc['fps']}," in tail
+    assert tail.endswith(",format=nv12[vout]")  # nv12 stays last for QSV
+
+
+def test_a_one_scene_short_has_no_concat(sc):
+    graph = shorts.video_graph([(0.0, 4.0, CROP)], None, sc, "libx264")
+    assert not any("concat" in g for g in graph)
+    assert graph[-1] == "[c0]null[vout]"
