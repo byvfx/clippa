@@ -545,6 +545,47 @@ def test_a_fixup_that_replaces_the_source_drops_the_old_wav(defaults, tmp_path, 
     assert not (tmp_path / "audio.wav.src").exists()  # and the stamp of the old source with it
 
 
+@pytest.mark.parametrize("transcribed", [True, False], ids=["transcribed", "not-yet"])
+def test_a_fixup_names_the_forced_transcribe_a_late_transcript_needs(defaults, tmp_path, monkeypatch, capsys,
+                                                                     transcribed):
+    """A stream transcribed before #440's check has words.jsonl from the jumping copy, and a plain
+    transcribe refuses it as done: the repair says what makes it again, and only then."""
+    (tmp_path / "source.ts").write_bytes(b"broken")
+    if transcribed:
+        (tmp_path / "words.jsonl").write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(kick.subprocess, "run", FakeFf([BACKWARD, REPAIRED]))
+    kick.fetch_video(tmp_path, {"source": "u"}, defaults, fixup=True)
+    hint = f"`clippa transcribe {tmp_path.name} --force` makes it again"
+    assert (hint in capsys.readouterr().out) is transcribed
+    assert (tmp_path / "words.jsonl").exists() is transcribed  # a paid transcript is never dropped here
+
+
+def test_a_transcript_the_share_will_not_stat_still_finishes_the_fixup(defaults, tmp_path, monkeypatch, capsys):
+    """#449: the source is replaced by then, so a refused stat is a hedged line and the jump is stored."""
+    (tmp_path / "source.ts").write_bytes(b"broken")
+    monkeypatch.setattr(kick.subprocess, "run", FakeFf([BACKWARD, REPAIRED]))
+    real = Path.exists
+
+    def exists(self, *a, **kw):
+        if self.name == "words.jsonl":
+            raise PermissionError(13, "Permission denied")
+        return real(self, *a, **kw)
+
+    monkeypatch.setattr(Path, "exists", exists)
+    kick.fetch_video(tmp_path, {"source": "u"}, defaults, fixup=True)
+    assert "couldn't tell whether words.jsonl is here" in capsys.readouterr().out
+    assert jsonstate.read(tmp_path / "meta.json")["timeline_overlap_s"] == 821.7
+
+
+def test_an_in_order_fixup_names_no_forced_transcribe(defaults, tmp_path, monkeypatch, capsys):
+    """Nothing was rewritten, so the transcript still matches the source."""
+    (tmp_path / "source.ts").write_bytes(b"in order")
+    (tmp_path / "words.jsonl").write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(kick.subprocess, "run", FakeFf([REPAIRED], packets=IN_ORDER))
+    kick.fetch_video(tmp_path, {"source": "u"}, defaults, fixup=True)
+    assert "--force" not in capsys.readouterr().out
+
+
 def test_an_in_order_fixup_leaves_the_wav_alone(defaults, tmp_path, monkeypatch):
     """Nothing was rewritten, so the wav still describes the source: it is not thrown away."""
     (tmp_path / "source.ts").write_bytes(b"broken")

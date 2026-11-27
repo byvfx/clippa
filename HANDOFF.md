@@ -65,10 +65,15 @@ names the source; a wav from before the stamps falls back to the 2 s mtime rule,
 it refuses to install audio whose source changed under the decode); every download (`fetch`, `archive
 transcribe`) marks a wav beside it stale, since yt-dlp stamps the VOD's Last-Modified. An in-order
 `--fixup` drops a wav that runs past the container. So re-fetching is not needed and
-a re-transcribe decodes the fixed file: `clippa fetch <url> --fixup` then `clippa transcribe <id>` (about
-three reads of the 33 GB and one 33 GB rewrite). `kick-132975332` is still waiting for that repair.
-Open from the review (not in #444): #448 is on branch `fix/wav-source-stamp-448` (PR open, 11-26), #446 (an archive item's refused source has no repair path), #447 (whitelist the
-other stages' ffmpeg calls), #449 (`is_link` on a share that won't stat is a traceback, not one line).
+a re-transcribe decodes the fixed file: `clippa fetch <url> --fixup` then `clippa transcribe <id> --force`
+when it was transcribed before (the fixup now says so). `kick-132975332` was repaired that way on 11-26.
+Open from the review (not in #444), as stacked PRs (11-26), each based on the one before; retarget the next
+to main as each merges: #450 (#448, the stamp) <- #451 (#449, `media.link_or_raise`: a share that won't stat is
+one line) <- #452 (#447, `-protocol_whitelist file` on every local ffmpeg/ffprobe input, a test's AST scan; the
+recorder's concat is allow-listed until it is tried on its bookworm ffmpeg 5.1) <- the #446 PR (`clippa archive
+fixup <subject> <item>`: remuxes a refused item's kept copy in place under the name the next run reads, drops
+its wav, waits while live unless `--force`; a catalog SPEND card `archive_fixup`; a kept source.mp4 is named,
+not remuxed).
 
 
 ## User decisions (keep)
@@ -181,8 +186,8 @@ other stages' ffmpeg calls), #449 (`is_link` on a share that won't stat is a tra
   alias `nas` (user **`Brandon`**, capital B). `doctor --role control` clean; Homebrew ffmpeg has no libass.
 - **Shows:** kino and c404 live through review → schedule; `chud` (ChudLogic, since 11-04: daily ~10 h from
   ~00:00-02:00 PT, budget segment 3 / short 5 per 8 h, 8-Bit Guy moments ranked up, cam panels `focus = "face"`
-  since 11-07). His 10-18 VOD `kick-132975332` is fetched and transcribed only: its timestamps jump back
-  821.7 s before 7:28, so don't `clippa run` it until fetch is fixed. dsp and blade are config-only tests;
+  since 11-07). His 10-18 VOD `kick-132975332` is fetched and transcribed only: its 821.8 s jump back was
+  remuxed out on 11-26 and it was transcribed again (33833 s, 78,623 words); nothing else run on it yet. dsp and blade are config-only tests;
   `trish` is a placeholder for the 2026-10-27 one-off; trish and blade are off the war room (`[warroom] hide_shows`).
 - **Schedule** (October check-in, 11-02): `stream_budget = { segment = 10, short = 10, compilation = 0 }` per
   8 h, Channel 404 `segment = 9` (6 until the 11-22 check-in; Chud stays off); slots a day: 9 Shorts (09/11/13/15/16/18/19/20/21), 6 segments

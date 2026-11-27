@@ -111,7 +111,10 @@ downloads again, since a marker trusted alone would serve a stale `audio.wav`), 
 the next run instead of downloaded again (`_drop_partial` only ever unlinks `source.ts`, so it
 can't take the kept file), and the item waits for its jump to be fixed. Where neither the rename
 nor the marker can be written the item says the download is still `source.ts` and a later run may
-replace it; a re-refused item's line names the copy it is kept under. A kept `source.mp4` gets the
+replace it; a re-refused item's line names the copy it is kept under and the repair, `clippa archive
+fixup <subject> <item>` ([#446](https://github.com/byvfx/clippa/issues/446)): it remuxes that copy
+in place under the name the next run reads (renamed back to `source.ts` it would be taken for a
+partial), marks and drops the wav like `--fixup`, and refuses while a show is live unless `--force`. A kept `source.mp4` gets the
 same treatment as the other two names: a link or an empty one is not a kept video and is dropped
 before the audio is read, so a bogus name cannot stall the item. A link or an empty file at
 `source.mp4` or `source.refused.ts` is dropped after the download, before the audio is read
@@ -122,7 +125,9 @@ A `--fixup` that rewrites the source marks `audio.wav.stale` before the replace 
 `audio.wav` decoded from the old one, so the transcribe after it reads the repaired file (its
 samples differ: `aresample` stretched across the jump); the marker is the durable half, written
 before anything is replaced, because a fast remux can leave the wav looking current and after a
-repair the two lengths agree, so the timeline check can't tell them apart. A plain `clippa fetch`, and `clippa archive transcribe`'s own download, mark a wav beside a source
+repair the two lengths agree, so the timeline check can't tell them apart. A stream transcribed
+before the check has a `words.jsonl` from the jumping copy, which a plain transcribe keeps as done:
+the `--fixup` that rewrites its source names `clippa transcribe <id> --force`. A plain `clippa fetch`, and `clippa archive transcribe`'s own download, mark a wav beside a source
 they downloaded stale too, since yt-dlp stamps the VOD's `Last-Modified`, older than the wav. `extract_audio` decodes again a marked wav whatever else says, then goes by
 `audio.wav.src`, the stamp each decode writes beside the wav: the source's size and mtime when the decode
 began ([#448](https://github.com/byvfx/clippa/issues/448)). A wav is reused only when the stamp still
