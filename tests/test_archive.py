@@ -371,8 +371,98 @@ def test_a_download_that_transcribes_is_unlinked_as_before(kick_cfg, tmp_path, m
     cost = archive.transcribe_item(kick_cfg, idir, _item(), "L4")
     assert len(runs) == 1 and seen == ["source.ts"]
     assert not (idir / "source.ts").exists() and not (idir / "source.refused.ts").exists()
+    assert not (idir / ".refused").exists()  # the keep marker goes with the download
     assert (idir / "words.jsonl").exists() and (idir / "transcript.json").exists()
     assert cost["duration_s"] == 33011.2
+
+
+def _fails_after_the_guard(monkeypatch, step):
+    """The flac encode or the Modal call failing, as a transient error would, once."""
+    if step == "encode":
+        def run(args, **kw):
+            raise subprocess.CalledProcessError(1, args)
+
+        monkeypatch.setattr(archive.subprocess, "run", run)
+    else:
+        class Worker:
+            class transcribe:
+                @staticmethod
+                def remote(data, suffix, settings):
+                    raise RuntimeError("modal: the container was preempted")
+
+        monkeypatch.setattr(archive.transcribe, "modal_worker", lambda *a: Worker)
+
+
+@pytest.mark.parametrize("step", ["encode", "modal"])
+def test_a_failure_after_the_guard_keeps_the_download_for_the_next_run(
+        kick_cfg, tmp_path, monkeypatch, step):
+    """A download the guard passed used to be unlinked before the flac encode and the Modal call,
+    so a transient failure in either cost the only complete copy (a Kick m3u8 is never refreshed:
+    a dead VOD would stick the item for good). It is kept, marked complete, and the next run
+    reuses it without asking yt-dlp, then drops it once the transcript is written."""
+    idir = tmp_path / "archive" / "s" / "kick-1"
+    idir.mkdir(parents=True)
+    runs, seen = [], []
+    _downloads(monkeypatch, idir, runs, seen, wav_s=33011.2)
+    _transcribes(monkeypatch)
+    _fails_after_the_guard(monkeypatch, step)
+    with pytest.raises((subprocess.CalledProcessError, RuntimeError)):
+        archive.transcribe_item(kick_cfg, idir, _item(), "L4")
+    assert len(runs) == 1 and seen == ["source.ts"]
+    assert (idir / "source.ts").read_bytes() == b"downloaded"  # kept, not unlinked before the encode
+    assert (idir / ".refused").read_text(encoding="utf-8").strip() == archive.KEPT_DOWNLOAD
+    assert not (idir / "words.jsonl").exists()
+
+    def no_download(*a):
+        raise AssertionError("the kept download was fetched again")
+
+    _downloads(monkeypatch, idir, runs, seen, wav_s=33011.2)
+    _transcribes(monkeypatch)
+    monkeypatch.setattr(archive.ytdl, "run", no_download)
+    archive.transcribe_item(kick_cfg, idir, _item(), "L4")
+    assert len(runs) == 1 and seen == ["source.ts", "source.ts"]  # the kept copy read again
+    assert (idir / "words.jsonl").exists() and (idir / "transcript.json").exists()
+    assert not (idir / "source.ts").exists()  # through: the download it was kept for goes
+    assert not (idir / ".refused").exists() and not (idir / "audio.flac").exists()
+
+
+def test_a_kept_download_the_guard_refuses_next_time_stays_where_it_is(kick_cfg, tmp_path, monkeypatch):
+    """A kept download is reused, not trusted: the guard reads it again, and one it refuses this time
+    is reported under the name it is kept as, never dropped or downloaded over."""
+    idir = tmp_path / "archive" / "s" / "kick-1"
+    idir.mkdir(parents=True)
+    runs, seen = [], []
+    _downloads(monkeypatch, idir, runs, seen, wav_s=33011.2)
+    _transcribes(monkeypatch)
+    _fails_after_the_guard(monkeypatch, "modal")
+    with pytest.raises(RuntimeError):
+        archive.transcribe_item(kick_cfg, idir, _item(), "L4")
+    _downloads(monkeypatch, idir, runs, seen)  # this time the lengths disagree
+    with pytest.raises(ClipperError, match=r"audio disagree.*\(kept as source\.ts\)$"):
+        archive.transcribe_item(kick_cfg, idir, _item(), "L4")
+    assert len(runs) == 1
+    assert (idir / "source.ts").read_bytes() == b"downloaded" and (idir / ".refused").is_file()
+
+
+def test_a_keep_marker_that_cannot_be_written_is_one_line_and_the_item_goes_on(
+        kick_cfg, tmp_path, monkeypatch, capsys):
+    """The keep marker is best effort: one the share won't take costs only a re-download after a
+    later failure (as before), so it is a printed line, and a run that gets through still drops the
+    download."""
+    idir = tmp_path / "archive" / "s" / "kick-1"
+    idir.mkdir(parents=True)
+    runs, seen = [], []
+    _downloads(monkeypatch, idir, runs, seen, wav_s=33011.2)
+    _transcribes(monkeypatch)
+
+    def no_write(*a, **kw):  # the marker's own write
+        raise PermissionError(13, "Access is denied")
+
+    monkeypatch.setattr(archive, "open", no_write, raising=False)
+    archive.transcribe_item(kick_cfg, idir, _item(), "L4")
+    out = capsys.readouterr().out
+    assert "couldn't write the refusal marker" in out and "would cost the download" in out
+    assert (idir / "words.jsonl").exists() and not (idir / "source.ts").exists()
 
 
 def test_a_kept_video_is_used_and_never_unlinked(kick_cfg, tmp_path, monkeypatch):

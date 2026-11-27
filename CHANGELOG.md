@@ -12,6 +12,10 @@ Developing#releases.
 
 ### 2026-11
 
+- 11-26: `clippa archive transcribe` keeps a Kick or HEI item's download until its transcript is
+  written, so a flac encode or Modal call that fails no longer costs it: the next run reuses that
+  copy instead of downloading again (a Kick VOD whose playlist has died could otherwise never be
+  transcribed). The download, its wav and its flac now share the disk for the length of the encode.
 - 11-26: every stage now reads media as local files only (#447): cut, Shorts, previews, thumbnails,
   faces, the war room's low-res copies, the archive's flac and the rest pass `-protocol_whitelist file`
   to ffmpeg and ffprobe, so a file that is really a playlist (or a concat list naming an address) fails

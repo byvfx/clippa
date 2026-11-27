@@ -308,6 +308,7 @@ def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[s
     t0 = time.time()
     worker = transcribe.modal_worker(tc, gpu)
     signed_in = False
+    download: Path | None = None  # a kick/hei source.ts, kept until the transcript is written
 
     def call(fn, *args) -> tuple[dict, dict]:  # logged for `clippa modal` and the war room
         with tracked(cfg["paths"]["modal_runs"], "archive", f"{idir.parent.name}/{it['id']}", gpu,
@@ -348,6 +349,9 @@ def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[s
         # rendition. Its audio goes to Modal as flac, as a stream's does. item_source says which
         # copy that is, and whether this run has to fetch it.
         _kept, src, fresh = item_source(idir)
+        # read before anything this run writes: whether the source is a download kept for this
+        # transcript by a run that failed after the guard passed it (_keep_download)
+        ours = fresh or (src == idir / "source.ts" and _kept_for_transcript(idir))
         refused = idir / "source.refused.ts"
         marker = idir / ".refused"
         kept_name = idir / "source.mp4"
@@ -365,10 +369,11 @@ def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[s
             # finished source.ts beside it, and the next run takes that for a partial and
             # unlinks it before downloading its replacement
             _drop_shadowing(idir, kept_name)
-            # #452 review: the flac encode's output too. The fresh download is unlinked before
-            # that encode, so a link there the share won't clear would fail the run with the only
-            # copy gone; dropped (or refused) here, before a download is spent on it. The encode
-            # drops it again, for one planted while this run downloaded
+            # #452 review: the flac encode's output too. A link there the share won't clear
+            # would fail the run after the download; dropped (or refused) here, before a
+            # download is spent on it. The encode drops it again, for one planted while this run
+            # downloaded (the download is kept and marked by then, so that failure costs a rerun,
+            # not the copy)
             _drop_link(idir / "audio.flac", idir.name)
             fmt, referer = ((cfg["archive"]["kick_format"], "https://kick.com/") if it["source"] == "kick"
                             else (cfg["archive"]["hei_audio_format"], hei.SITE + "/"))
@@ -433,7 +438,11 @@ def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[s
             _clear_marker(idir)  # a marker from an earlier rename must not outlive this one
             raise ClipperError(f"{why} (kept as {refused.name})") from None
         if fresh:
-            src.unlink()
+            # A download that passed the guard is kept until its transcript is written, not
+            # unlinked here: the encode, the Modal call or a link planted at audio.flac can still
+            # fail, and a Kick m3u8 is never refreshed, so a re-download may get nothing. The
+            # marker is what tells the next run it is complete (unmarked, it is taken for a partial)
+            _keep_download(idir)
         enc = idir / "audio.flac"
         # #447: a link at audio.flac would be followed and truncated by -y (the unlink below
         # takes only the link), so it goes first; and a cached audio.wav that is really a
@@ -446,6 +455,10 @@ def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[s
         transcribe.forget_stamp(idir)
         out, cost = call(worker.transcribe, enc.read_bytes(), ".flac", settings)
         enc.unlink()
+        # this run's download, or one an earlier run kept for its transcript, goes once that is
+        # written; a kept video, a refused copy, or a source.ts marked for another reason is never
+        # this run's to drop (#444)
+        download = src if ours else None
     else:
         media = odysee("get", {"uri": it["url"]})["streaming_url"]
         out, cost = call(worker.transcribe_url, media, settings)
@@ -454,6 +467,7 @@ def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[s
     meta["transcribed_at"] = datetime.now(UTC).isoformat(timespec="seconds")
     (idir / "meta.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
     transcribe.write(idir, tc, out["segments"], out["dur"], t0, {"modal": cost})
+    _drop_download(idir, download)  # words.jsonl is written: the item is through, the download can go
     if out.get("diarization"):
         transcribe.write_diarization(idir, out["diarization"], cost)
         speakers.apply(idir, item_cfg(cfg, idir))
@@ -580,7 +594,8 @@ def _drop_partial(src: Path) -> None:
 
 def _write_marker(idir: Path, why: str) -> None:
     """Record in the item's folder that the source at source.ts is a refusal kept here (or a
-    finished download this run could not get out of the way): the marker item_source reads so the
+    finished download this run could not get out of the way, or one kept until its transcript is
+    written: _keep_download): the marker item_source reads so the
     next run reuses it rather than taking it for a partial and unlinking it. A link at the name is
     dropped first, never written through: the download is the long part, so one planted since the
     folder was last checked would otherwise take the write outside it. "x" refuses a file already
@@ -745,6 +760,54 @@ def _mark_stale_or_refuse(idir: Path, src: Path) -> None:
                 f"{err} (the download is still {src.name}: it couldn't be marked, so a later run "
                 "may replace it)") from None
         raise
+
+
+KEPT_DOWNLOAD = "a finished download that passed the timeline check, kept until its transcript is written"
+
+
+def _keep_download(idir: Path) -> None:
+    """Record that source.ts is a complete download, once the timeline check has passed it: the
+    flac encode, the Modal call and the link drop at audio.flac come after, and any of them can
+    fail. Unmarked, the next run would take source.ts for a partial and unlink it before fetching
+    again (a Kick m3u8 is never refreshed, so a dead VOD would leave the item stuck for good);
+    marked, item_source reuses it, the guard checks it again and a good one transcribes. The
+    refusal marker is the record, as for a stale mark that failed (_mark_stale_or_refuse): one
+    mechanism item_source already trusts only while source.ts is there. Best effort: a marker that
+    can't be written costs what it always did, a re-download after a later failure, so it is a
+    printed line rather than a failed item."""
+    try:
+        _write_marker(idir, KEPT_DOWNLOAD)
+    except ClipperError as err:
+        print(f"{err}; a failure before its transcript would cost the download", flush=True)
+
+
+def _kept_for_transcript(idir: Path) -> bool:
+    """Whether the refusal marker is _keep_download's: source.ts is a download an earlier run kept
+    only until its transcript, so the run that writes it drops it, as it would its own. Anything
+    else (another reason, a link, a marker the share won't read) says no, and the file stays: a
+    copy left on disk costs space, one dropped by mistake may be the only one there is."""
+    marker = idir / ".refused"
+    try:
+        return not is_link(marker) and marker.read_text(encoding="utf-8").strip() == KEPT_DOWNLOAD
+    except (OSError, ValueError):
+        return False
+
+
+def _drop_download(idir: Path, src: Path | None) -> None:
+    """The download (None: there is none of this run's) goes once the transcript is written (words.jsonl makes the item done, so
+    nothing reads it again). Best effort: a share that won't take it leaves a file nothing reads,
+    which is one printed line, not a failure of a finished item. Only a real file goes, never what
+    a link at the name points at."""
+    if src is None:
+        return
+    try:
+        if is_link(src):
+            remove_link(src)
+        else:
+            src.unlink(missing_ok=True)
+    except OSError as err:
+        print(f"{idir.name}: couldn't remove {src.name} after its transcript: "
+              f"{err.strerror or 'the system refused it'}", flush=True)
 
 
 def kept_video(idir: Path) -> Path | None:
