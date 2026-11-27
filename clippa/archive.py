@@ -51,7 +51,7 @@ from pathlib import Path
 import requests
 
 from . import hei, jsonstate, speakers, transcribe, ytdl
-from .errors import ClipperError
+from .errors import ClipperError, exit_code
 from .media import is_link, link_or_raise, remove_link
 from .modalmon import head_record, tracked
 
@@ -443,14 +443,7 @@ def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[s
             # fail, and a Kick m3u8 is never refreshed, so a re-download may get nothing. The
             # marker is what tells the next run it is complete (unmarked, it is taken for a partial)
             _keep_download(idir)
-        enc = idir / "audio.flac"
-        # #447: a link at audio.flac would be followed and truncated by -y (the unlink below
-        # takes only the link), so it goes first; and a cached audio.wav that is really a
-        # playlist must not send ffmpeg to an url (the timeline check above can't time one).
-        _drop_link(enc, idir.name)
-        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-                        "-protocol_whitelist", "file", "-i", str(wav), "-c:a", "flac",
-                        str(enc)], check=True)
+        enc = _encode_flac(idir, wav)
         wav.unlink()
         transcribe.forget_stamp(idir)
         out, cost = call(worker.transcribe, enc.read_bytes(), ".flac", settings)
@@ -780,6 +773,31 @@ def _keep_download(idir: Path) -> None:
         _write_marker(idir, KEPT_DOWNLOAD)
     except ClipperError as err:
         print(f"{err}; a failure before its transcript would cost the download", flush=True)
+
+
+def _encode_flac(idir: Path, wav: Path) -> Path:
+    """The item's audio as audio.flac, what Modal is sent. A failed encode is a one-line
+    ClipperError naming the stream and ffmpeg's exit, as extract_audio's decode is: the raw
+    CalledProcessError carried the whole command line, the share's paths included, into error.txt
+    and the log. The partial flac it may leave goes (best effort; -y would overwrite it anyway)."""
+    enc = idir / "audio.flac"
+    # #447: a link at audio.flac would be followed and truncated by -y (the unlink after the
+    # Modal call takes only the link), so it goes first; and a cached audio.wav that is really a
+    # playlist must not send ffmpeg to an url (the timeline check can't time one).
+    _drop_link(enc, idir.name)
+    try:
+        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                        "-protocol_whitelist", "file", "-i", str(wav), "-c:a", "flac",
+                        str(enc)], check=True)
+    except subprocess.CalledProcessError as e:
+        try:
+            if not is_link(enc):  # a link planted since the drop is not ours to touch
+                enc.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise ClipperError(f"{idir.name}: ffmpeg couldn't encode its audio as flac "
+                           f"(exit {exit_code(e.returncode)})") from None
+    return enc
 
 
 def _kept_for_transcript(idir: Path) -> bool:

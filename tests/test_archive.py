@@ -379,7 +379,8 @@ def test_a_download_that_transcribes_is_unlinked_as_before(kick_cfg, tmp_path, m
 def _fails_after_the_guard(monkeypatch, step):
     """The flac encode or the Modal call failing, as a transient error would, once."""
     if step == "encode":
-        def run(args, **kw):
+        def run(args, **kw):  # ffmpeg leaves a partial file behind, then fails
+            Path(args[-1]).write_bytes(b"half a flac")
             raise subprocess.CalledProcessError(1, args)
 
         monkeypatch.setattr(archive.subprocess, "run", run)
@@ -406,7 +407,7 @@ def test_a_failure_after_the_guard_keeps_the_download_for_the_next_run(
     _downloads(monkeypatch, idir, runs, seen, wav_s=33011.2)
     _transcribes(monkeypatch)
     _fails_after_the_guard(monkeypatch, step)
-    with pytest.raises((subprocess.CalledProcessError, RuntimeError)):
+    with pytest.raises((ClipperError, RuntimeError)):
         archive.transcribe_item(kick_cfg, idir, _item(), "L4")
     assert len(runs) == 1 and seen == ["source.ts"]
     assert (idir / "source.ts").read_bytes() == b"downloaded"  # kept, not unlinked before the encode
@@ -424,6 +425,25 @@ def test_a_failure_after_the_guard_keeps_the_download_for_the_next_run(
     assert (idir / "words.jsonl").exists() and (idir / "transcript.json").exists()
     assert not (idir / "source.ts").exists()  # through: the download it was kept for goes
     assert not (idir / ".refused").exists() and not (idir / "audio.flac").exists()
+
+
+def test_a_failed_flac_encode_is_one_line_with_no_path(kick_cfg, tmp_path, monkeypatch):
+    """The encode's CalledProcessError used to reach error.txt and the log as it was, with ffmpeg's
+    whole command line (the share's paths) in it. It is one ClipperError naming the stream and the
+    exit, as the decode's is, and the partial flac goes with it."""
+    idir = tmp_path / "archive" / "s" / "kick-1"
+    idir.mkdir(parents=True)
+    runs, seen = [], []
+    _downloads(monkeypatch, idir, runs, seen, wav_s=33011.2)
+    _transcribes(monkeypatch)
+    _fails_after_the_guard(monkeypatch, "encode")
+    with pytest.raises(ClipperError) as err:
+        archive.transcribe_item(kick_cfg, idir, _item(), "L4")
+    msg = str(err.value)
+    assert msg == "kick-1: ffmpeg couldn't encode its audio as flac (exit 1)"
+    assert err.value.__cause__ is None and err.value.__suppress_context__
+    assert not (idir / "audio.flac").exists()
+    assert (idir / "audio.wav").exists()  # kept: its stamp still names the kept download
 
 
 @pytest.mark.parametrize("maker", ["link_or_skip", "junction_or_skip"])
