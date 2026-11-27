@@ -67,13 +67,15 @@ transcribe`) marks a wav beside it stale, since yt-dlp stamps the VOD's Last-Mod
 `--fixup` drops a wav that runs past the container. So re-fetching is not needed and
 a re-transcribe decodes the fixed file: `clippa fetch <url> --fixup` then `clippa transcribe <id> --force`
 when it was transcribed before (the fixup now says so). `kick-132975332` was repaired that way on 11-26.
-Open from the review (not in #444), as stacked PRs (11-26), each based on the one before; retarget the next
-to main as each merges: #450 (#448, the stamp) <- #451 (#449, `media.link_or_raise`: a share that won't stat is
-one line) <- #452 (#447, `-protocol_whitelist file` on every local ffmpeg/ffprobe input, a test's AST scan; the
-recorder's concat is allow-listed until it is tried on its bookworm ffmpeg 5.1) <- the #446 PR (`clippa archive
-fixup <subject> <item>`: remuxes a refused item's kept copy in place under the name the next run reads, drops
-its wav, waits while live unless `--force`; a catalog SPEND card `archive_fixup`; a kept source.mp4 is named,
-not remuxed).
+The follow-ups from #444's review are all merged and deployed (11-26): #450 (#448, the `audio.wav.src` stamp),
+#451 (#449, `media.link_or_raise`: a share that won't stat is one line), #452 (#447, `-protocol_whitelist file`
+on every local ffmpeg/ffprobe input, an AST-scan test; the recorder's concat is allow-listed until it is tried
+on its bookworm ffmpeg 5.1), #453 (#446, `clippa archive fixup <subject> <item>`: remuxes a refused item's
+kept copy in place, waits while live unless `--force`, a SPEND card `archive_fixup`), #455 (a fresh Kick/HEI
+download is kept until its transcript is written and reused after a failed encode or Modal call) and #457 (a
+kept `source.mp4` on a dead link is told to stay in place: no `.ts` will come, it needs a hand repair). Grok
+said three times that a refused replace in `archive fixup` is a traceback; it isn't (`remux_verified` wraps
+the callback's OSError), so don't chase it again.
 
 
 ## User decisions (keep)
@@ -165,14 +167,14 @@ not remuxed).
   Other PRs (wiki, `uv.lock`, `clipper.example.toml`, `streamers.json`) have CI but no review, notes-only ones neither; both merge on
   the user's word. A fork's PR: read the diff by hand, then the user's word.
 
-## State now (2026-11-20)
+## State now (2026-11-26)
 - **Hub on the NAS** since 2026-11-05 (wiki NAS-hub): compose project `clippa-hub` in `~/clippa-hub` (since pass 3, 11-22), containers
   `serve` (war room on 127.0.0.1:8765, on the tailnet as https://clipper.taile415cd.ts.net/; heartbeat
   `streams/.serve/status.json`), `bot` (`streams/.bot/status.json`) and `worker` (cuts with QSV on the iGPU).
   Code changes go out with `bash deploy/hub/deploy.sh` from a main checkout (since 11-25 every deploy script refuses from a
   checkout behind origin/main, `--force` overrides, `--any-branch` on the recorder; `--env PATH` deploys from a worktree of main with `C:\clipper`'s env.local); `clippa services status|restart ...`
-  runs docker compose there (`[serve] hub`). Last deploy 2026-11-22 22:27 PT, after Don's stream: all three at e8f0758 (#389); then serve and the bot again at
-  0e2c797 (#378, with #345's dependency bumps), the worker held back until Don's 11-23 run finishes, then redeployed. **The config and
+  runs docker compose there (`[serve] hub`). Last deploy 2026-11-26 21:49 PT: all three at a1e7cbb (`clippa
+  0.4.0+107.ga1e7cbb`, #457 on top of #452/#453/#455), no restarts, the recorder untouched. **The config and
   all state are on the NAS:** `//192.168.0.155/docker/clipper` (`/data`) holds `clipper.toml` (the one copy;
   `CLIPPER_CONFIG` on the laptop points at it), `schedule.json`, secrets/, backups/, logs/, faces/, voices/,
   news/, weekly/, archive/, layouts/, people.json, fonts/. The laptop's old copies: `backups/laptop-state-2026-11-05/`.
@@ -218,6 +220,15 @@ not remuxed).
 - **OpenRouter budget panel (merged, not deployed, 11-24):** Money page, beside API usage. Reads the clippa key server-side. Changing the limit or disabling the key needs `OPENROUTER_MANAGEMENT_KEY` or `secrets/openrouter_management_secret.txt` (never in the page). Warning percent defaults to 75, saved in `streams/.serve/openrouter.json`. Do not touch production `clipper.toml` for this. Reaches serve only after `bash deploy/hub/deploy.sh` from a main checkout once it is merged.
 
 ## Waiting on the user
+- **Every stage model is on OpenRouter since 2026-11-26** (Anthropic credits ran out; Clippa has no
+  Anthropic-to-OpenRouter failover). The 29 keys in the NAS `clipper.toml` read
+  `openrouter:anthropic/claude-*-5.5`, each tagged `# OpenRouter stopgap 2026-11-26, was claude-...`
+  (five sections added at the end: cast, chat, pick, archive, swarm). Backup:
+  `backups/clipper.toml.before_openrouter_stopgap_2026-11-26`. Switch back once the user tops up
+  Anthropic (restore the backup if nothing else changed, else undo the tagged lines). Stages pick it
+  up on their next run; serve and the bot were restarted on it (11-26 16:17 PT). The real fix is #454.
+- `kick-140303366` has a band-aid `config.toml` (`[shorts] codec = "libx264"`, #429 hit again on
+  v05_t51, 11-26); remove it, and `kick-139915441`'s, once #429 is deployed.
 - Draft: the NAS agent container (`deploy/agent`, OpenCode + OpenRouter) beside `clippa-claude`.
   It comes up dark (`CHECKUP_AT` empty). Phone bridge is still Brandon's call: Option A keeps
   `claude remote-control` on `clippa-claude`; Option B would be a loopback OpenCode server on
