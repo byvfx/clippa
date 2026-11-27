@@ -879,16 +879,30 @@ def _kept_note(idir: Path, src: Path, kept: Path | None) -> str:
     return f" (kept as {src.name}; `clippa archive fixup {idir.parent.name} {idir.name}` repairs it)"
 
 
+def _link_dead(idir: Path) -> bool:
+    """Whether links.json marks this item's link dead. Advice only: an unreadable file says no."""
+    try:
+        return load_links(idir.parent).get(idir.name, {}).get("status") == "dead"
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
 def kept_advice(idir: Path, kept: Path) -> str:
     """What to do with a kept video the timeline refused, which no remux repairs (it is an mp4).
     Never "delete it": it may be the only complete copy (a VOD gone from Kick or HEI can't be
     downloaded again, a dead link is skipped, and a Kick m3u8 is never refreshed), so it is moved
     out of the folder, kept. With a .ts set aside beside it, the fixup repairs that one; otherwise
-    the next run downloads a .ts while the VOD is still up."""
+    the next run downloads a .ts while the VOD is still up. Grok on #453: not when its link is
+    dead, since `transcribe` skips a dead link with no copy set aside, so moving the video out
+    would leave the item with nothing to read. No route is named there: a .ts copied out of the mp4
+    may well come out in order (an mp4 can't hold timestamps that step back), which no remux fixes."""
     aside = _aside_copy(idir)
+    fixup = f"`clippa archive fixup {idir.parent.name} {idir.name}`"
     if aside is not None:
-        return (f"move {kept.name} out of the item folder (keep it) and `clippa archive fixup "
-                f"{idir.parent.name} {idir.name}` repairs the {aside.name} beside it")
+        return f"move {kept.name} out of the item folder (keep it) and {fixup} repairs the {aside.name} beside it"
+    if _link_dead(idir):
+        return (f"its link is dead, so no .ts will be downloaded and an item with nothing set aside is "
+                f"skipped: keep {kept.name} where it is (it is the only copy); it needs a repair by hand")
     return (f"move {kept.name} out of the item folder (keep it: a VOD that is gone can't be downloaded "
             f"again) and the next `clippa archive transcribe` downloads a .ts while the VOD is still up")
 

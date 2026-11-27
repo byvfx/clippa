@@ -172,6 +172,35 @@ def test_what_it_cannot_repair_is_one_line_and_nothing_runs(acfg, monkeypatch, s
         archive.fixup_item(acfg, "s", "kick-1")
 
 
+def test_a_kept_video_on_a_dead_link_is_told_to_stay(acfg, monkeypatch):
+    """Grok on #453: with the link dead no .ts is ever downloaded (transcribe skips a dead link with
+    nothing set aside), so moving the video out would leave the item with nothing to read: the
+    advice keeps it, and never says to move it or that a download will come."""
+    d = idir(acfg)
+    jsonstate.write(d.parent / "links.json", {"kick-1": {"status": "dead"}})
+    (d / "source.mp4").write_bytes(b"kept video")
+    monkeypatch.setattr(archive.subprocess, "run", lambda *a, **kw: pytest.fail("probed"))
+    with pytest.raises(ClipperError) as err:
+        archive.fixup_item(acfg, "s", "kick-1")
+    msg = str(err.value)
+    assert "its link is dead, so no .ts will be downloaded" in msg
+    assert "keep source.mp4 where it is (it is the only copy)" in msg
+    assert "move source.mp4 out" not in msg and "downloads a .ts" not in msg
+    p = catalog.prepare(acfg, "archive_fixup", {"subject": "s", "item": "kick-1"})
+    assert p.kind == "answer" and "its link is dead" in p.text
+    assert (d / "source.mp4").read_bytes() == b"kept video"
+
+
+def test_an_unreadable_links_file_gives_the_usual_advice(acfg, monkeypatch):
+    """The dead-link check is advice only: a links.json it can't read says nothing either way."""
+    d = idir(acfg)
+    (d.parent / "links.json").write_text("not json", encoding="utf-8")
+    (d / "source.mp4").write_bytes(b"kept video")
+    monkeypatch.setattr(archive.subprocess, "run", lambda *a, **kw: pytest.fail("probed"))
+    with pytest.raises(ClipperError, match="the next `clippa archive transcribe` downloads"):
+        archive.fixup_item(acfg, "s", "kick-1")
+
+
 def test_an_unknown_item_is_one_line(acfg):
     with pytest.raises(ClipperError, match=r"s: no item 'nope' in its catalog"):
         archive.fixup_item(acfg, "s", "nope")
