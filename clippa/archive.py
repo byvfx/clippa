@@ -762,7 +762,8 @@ def _mark_stale_or_refuse(idir: Path, src: Path) -> None:
         raise
 
 
-KEPT_DOWNLOAD = "a finished download that passed the timeline check, kept until its transcript is written"
+# _keep_download's reason in the marker: what the file is, not that it passed (each run checks again)
+KEPT_DOWNLOAD = "a finished download, kept until its transcript is written"
 
 
 def _keep_download(idir: Path) -> None:
@@ -794,10 +795,10 @@ def _kept_for_transcript(idir: Path) -> bool:
 
 
 def _drop_download(idir: Path, src: Path | None) -> None:
-    """The download (None: there is none of this run's) goes once the transcript is written (words.jsonl makes the item done, so
-    nothing reads it again). Best effort: a share that won't take it leaves a file nothing reads,
-    which is one printed line, not a failure of a finished item. Only a real file goes, never what
-    a link at the name points at."""
+    """The download (None: none of this run's to drop) goes once the transcript is written:
+    words.jsonl makes the item done, so nothing reads it again. Best effort: a share that won't
+    take it leaves a file nothing reads, which is one printed line, not a failure of a finished
+    item. Only a real file goes, never what a link at the name points at."""
     if src is None:
         return
     try:

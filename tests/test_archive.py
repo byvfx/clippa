@@ -426,6 +426,41 @@ def test_a_failure_after_the_guard_keeps_the_download_for_the_next_run(
     assert not (idir / ".refused").exists() and not (idir / "audio.flac").exists()
 
 
+@pytest.mark.parametrize("maker", ["link_or_skip", "junction_or_skip"])
+def test_a_flac_link_the_share_wont_clear_after_the_guard_keeps_the_download(
+        kick_cfg, tmp_path, monkeypatch, request, maker):
+    """A link planted at audio.flac while the download ran, which the share won't let the encode
+    drop: the run fails after the guard passed the download, and the copy is kept for the next."""
+    make = request.getfixturevalue(maker)
+    idir = tmp_path / "archive" / "s" / "kick-1"
+    idir.mkdir(parents=True)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    runs, seen = [], []
+    _downloads(monkeypatch, idir, runs, seen, wav_s=33011.2)
+    _transcribes(monkeypatch)
+
+    class Done:
+        returncode, stderr = 0, ""
+
+    def ytdl_run(*a):
+        runs.append(a)
+        make(elsewhere, idir / "audio.flac", directory=True)  # planted while it runs
+        (idir / "source.ts").write_bytes(b"downloaded")
+        return Done()
+
+    def denied(path):
+        raise PermissionError(13, "Access is denied")
+
+    monkeypatch.setattr(archive.ytdl, "run", ytdl_run)
+    monkeypatch.setattr(archive, "remove_link", denied)
+    with pytest.raises(ClipperError, match=r"couldn't remove the link at audio\.flac"):
+        archive.transcribe_item(kick_cfg, idir, _item(), "L4")
+    assert len(runs) == 1 and seen == ["source.ts"]  # the guard read it before the encode's drop
+    assert (idir / "source.ts").read_bytes() == b"downloaded"
+    assert (idir / ".refused").read_text(encoding="utf-8").strip() == archive.KEPT_DOWNLOAD
+
+
 def test_a_kept_download_the_guard_refuses_next_time_stays_where_it_is(kick_cfg, tmp_path, monkeypatch):
     """A kept download is reused, not trusted: the guard reads it again, and one it refuses this time
     is reported under the name it is kept as, never dropped or downloaded over."""
