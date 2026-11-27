@@ -365,6 +365,11 @@ def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[s
             # finished source.ts beside it, and the next run takes that for a partial and
             # unlinks it before downloading its replacement
             _drop_shadowing(idir, kept_name)
+            # #452 review: the flac encode's output too. The fresh download is unlinked before
+            # that encode, so a link there the share won't clear would fail the run with the only
+            # copy gone; dropped (or refused) here, before a download is spent on it. The encode
+            # drops it again, for one planted while this run downloaded
+            _drop_link(idir / "audio.flac", idir.name)
             fmt, referer = ((cfg["archive"]["kick_format"], "https://kick.com/") if it["source"] == "kick"
                             else (cfg["archive"]["hei_audio_format"], hei.SITE + "/"))
             m3u8 = hei.fresh_m3u8(cfg["paths"]["hei_cookies"], it) if it["source"] == "hei" else it["m3u8"]

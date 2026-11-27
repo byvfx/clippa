@@ -1179,3 +1179,6 @@ def test_a_link_at_audio_flac_the_share_will_not_drop_stops_before_the_encode(
         archive.transcribe_item(kick_cfg, idir, _item(), "L4")
     assert str(err.value) == "kick-1: couldn't remove the link at audio.flac (Access is denied)"
     assert keep.read_bytes() == b"someone else's"
+    # #452 review: refused before the download, so no fresh copy is fetched only to be unlinked
+    # ahead of an encode that can't run
+    assert runs == []
