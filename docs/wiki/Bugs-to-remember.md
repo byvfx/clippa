@@ -45,6 +45,33 @@ open session).
 (`deploy/mainguard.sh`); `--force` deploys it anyway (`--any-branch` for the recorder, whose `--force` skips the live check). Offline they check the last fetched main
 and say so. ([Claude on the NAS](Claude-on-the-NAS#deploy).)
 
+### A Short that switches layout won't render on the NAS (2026-11-24)
+
+**Symptom.** `shorts` exits 1 on one Short after the ones before it rendered fine.
+`run_shorts.log` has `[h264_qsv] Current frame rate is unsupported`, then `Error while opening
+encoder` and exit status 218. The Short's `shorts/work/<key>.cut.mp4` plays fine. It hit
+`kick-139915441` (v06_t40) and `kick-140303366` (v05_t51); the worker retries the stream and it
+fails the same way until it is out of attempts.
+
+**Cause.** The Short has more than one scene (its layout changes partway). `render` trims each
+stretch and joins them with the `concat` filter, and on ffmpeg 7.1 (the hub image's, Debian 13)
+concat leaves the stream with no frame rate. libx264 doesn't mind, but `h264_qsv` won't open
+without one. The laptop's ffmpeg 8.1 keeps the rate through concat, so the same Short renders
+there, and a one-scene Short has no concat at all. That is why it only showed once Shorts
+rendered on the NAS.
+
+**How to tell.** The failing Short's layouts in `shorts.json` have more than one scene, and the
+log line is the frame-rate one, not a size or bit-rate error.
+
+**Band-aid.** `[shorts] codec = "libx264"` in the stream's own `config.toml`. If the run is out of
+attempts, lower `attempts` in its `run.json` by hand (checkup's `retry` won't: this isn't a
+passing error, [Checkup](Checkup)), and the worker runs it again. `codec` is in every Short's
+signature, so all of that stream's Shorts render again, on the NAS's CPU. Take the line out once the fix is deployed.
+
+**Fix.** [#429](https://github.com/byvfx/clippa/issues/429): `video_graph` in `clippa/shorts.py`
+puts `fps=<[shorts] fps>` right after the concat, with `format=nv12` still last for QSV. The
+graph isn't in the Short's signature, so no Short renders again because of the fix.
+
 ### A long stream's transcribe dies with SIGTERM (2026-11-24)
 
 **Symptom.** `run.json` says `transcribe killed by SIGTERM (-15)` (`exited -15` on a worker from

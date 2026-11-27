@@ -12,6 +12,9 @@ Developing#releases.
 
 ### 2026-11
 
+- 11-27: A Short whose layout changes partway renders on the NAS again. The hub's ffmpeg 7.1
+  dropped the frame rate where the scenes are joined, so the QSV encoder refused the Short ("Current
+  frame rate is unsupported", #429).
 - 11-27: `clippa checkup --fix`'s `retry` never gives an attempt back to a run whose stage was
   killed by a signal (`killed by SIGTERM`, or `exited -15` from an older worker), even when its log
   tail says "timed out" (#423). On the NAS that kill is earlyoom running out of memory, so the same
