@@ -12,6 +12,10 @@ Developing#releases.
 
 ### 2026-11
 
+- 11-27: `clippa checkup --fix`'s `retry` never gives an attempt back to a run whose stage was
+  killed by a signal (`killed by SIGTERM`, or `exited -15` from an older worker), even when its log
+  tail says "timed out" (#423). On the NAS that kill is earlyoom running out of memory, so the same
+  run dies again and a transcribe retry would rerun a paid Modal call.
 - 11-26: `clippa archive transcribe` keeps a Kick or HEI item's download until its transcript is
   written, so a flac encode or Modal call that fails no longer costs it: the next run reuses that
   copy instead of downloading again (a Kick VOD whose playlist has died could otherwise never be

@@ -63,7 +63,7 @@ run (a checkup without `--fix`, like the nightly one, changes nothing).
 
 | Repair | For | What it does |
 |---|---|---|
-| `retry` | a run that failed with no retries left, when its error is a passing one: a rate limit, a dropped connection, a remote server's 5xx (`passing`, whole words) | `retry_after_hours` (3) after the run failed, gives back one attempt in `run.json`; the worker runs it again on its next pass. Never while a worker holds the stream, nor for a run held on a rejected key |
+| `retry` | a run that failed with no retries left, when its error is a passing one: a rate limit, a dropped connection, a remote server's 5xx (`passing`, whole words). Never a stage a signal stopped (`killed by SIGTERM`: on the NAS that's earlyoom running out of memory, and the same run would die again; [Transcribe-on-Modal](Transcribe-on-Modal#a-long-streams-transcribe-is-killed-during-the-upload)), whatever its log tail says | `retry_after_hours` (3) after the run failed, gives back one attempt in `run.json`; the worker runs it again on its next pass. Never while a worker holds the stream, nor for a run held on a rejected key |
 | `tmp` | the housekeeping finding | deletes those temp files |
 
 serve runs `clippa checkup --fix --alert` every `fix_minutes` (60), over the checks that have
