@@ -82,8 +82,9 @@ KILLED_RX = re.compile(r"^\S+ (killed by (SIG\w+|signal \d+) \(-\d+\)|exited -\d
 
 
 def killed(error: str) -> bool:
-    """Did a signal stop the stage? On the NAS that is earlyoom (memory) or a restart: the stage
-    didn't fail on a passing cause, and the same payload would be killed again (#423)."""
+    """Did a signal stop the stage (POSIX: a negative exit code)? On the NAS that is mostly
+    earlyoom, where the same payload dies again and a transcribe retry reruns a paid Modal call
+    (#423); a hand kill is left to a person too. The worker's own retries still run either way."""
     return bool(KILLED_RX.match(error or ""))
 
 
