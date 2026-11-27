@@ -149,6 +149,11 @@ before the audio is read, so a bogus name cannot stall the item. A link or an em
 (`source.refused.ts` also before it, since a download would otherwise be shadowed): one
 planted while yt-dlp runs would otherwise be the name `extract_audio` reads (and the refusal's
 rename cannot replace a link), so the item would stick with both it and its finished `source.ts`.
+A download the check passes is kept until its transcript is written, with the same `.refused`
+marker saying it is complete, so a flac encode or a Modal call that fails after the check leaves a
+copy the next run reuses (and checks again) instead of downloading the VOD again; the run that
+writes the transcript drops it. Source, `audio.wav` and `audio.flac` sit side by side during the
+encode.
 A `--fixup` that rewrites the source marks `audio.wav.stale` before the replace and drops the
 `audio.wav` decoded from the old one, so the transcribe after it reads the repaired file (its
 samples differ: `aresample` stretched across the jump); the marker is the durable half, written

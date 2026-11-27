@@ -12,6 +12,12 @@ Developing#releases.
 
 ### 2026-11
 
+- 11-26: `clippa archive transcribe` keeps a Kick or HEI item's download until its transcript is
+  written, so a flac encode or Modal call that fails no longer costs it: the next run reuses that
+  copy instead of downloading again (a Kick VOD whose playlist has died could otherwise never be
+  transcribed). The download, its wav and its flac now share the disk for the length of the encode.
+  A failed flac encode is now one line in `error.txt` (`ffmpeg couldn't encode its audio as flac
+  (exit N)`), not ffmpeg's whole command line.
 - 11-26: a `clippa fetch --fixup` that rewrites a source already transcribed (one done before #440's
   check) now says its `words.jsonl` has the old timeline's times and names `clippa transcribe <id>
   --force`, since a plain transcribe keeps it as done.
