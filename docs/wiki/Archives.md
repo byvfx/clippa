@@ -48,7 +48,11 @@ timestamps regenerated, free and on this machine, and the next `transcribe` fini
 ([Bugs to remember](Bugs-to-remember)). It waits while a show is live, since it rewrites a whole
 source on the share (`--force` overrides). A kept `source.mp4` can't be remuxed this way: move it out
 of the item folder (keep it, since a VOD that is gone can't be downloaded again) and the next `transcribe`
-downloads a `.ts` that can, or the fixup repairs a `.ts` already set aside beside it. A copy whose
+downloads a `.ts` that can, or the fixup repairs a `.ts` already set aside beside it. When the
+item's link is dead no `.ts` will be downloaded (`transcribe` skips a dead link with nothing set
+aside), so keep the video in place, make `source.refused.ts` from it by hand
+(`ffmpeg -i source.mp4 -c copy -f mpegts source.refused.ts`), then move the video out and run the
+fixup; the message says so. A copy whose
 timestamps are already in order isn't rewritten: the fixup says whether its audio runs past the
 container for another reason or whether `transcribe` can just read it as it is (a download kept for a
 failed stale mark is marked the same way).
