@@ -185,7 +185,10 @@ def reuses_wav(stream_dir: Path, *, trust_mtime: bool = True) -> bool:
     the source again: read-only, and False whenever that can't be told (no wav, no source, a link,
     a share that won't answer), since then a decode is what the next run does or tries."""
     try:
-        if not (stream_dir / "audio.wav").exists():
+        wav = stream_dir / "audio.wav"
+        # #453 review: extract_audio drops a link at audio.wav and decodes, so one is never reused
+        # (exists() would follow it, and a stamp beside it would then vouch for what it names)
+        if is_link(wav) or not wav.exists():
             return False
         src = source_file(stream_dir)
         if is_link(src):
