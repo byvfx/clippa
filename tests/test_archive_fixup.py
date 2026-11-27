@@ -71,6 +71,20 @@ def test_an_in_order_copy_is_refused_and_its_wav_kept(acfg, monkeypatch, capsys)
     assert "finishes it now" not in capsys.readouterr().out
 
 
+def test_an_in_order_copy_behind_an_empty_name_is_judged_by_its_own_wav(acfg, monkeypatch):
+    """Grok on #453: an empty source.mp4 sorts before source.refused.ts in the `source.*` glob, but
+    the next run drops it before it reads; the overrun of the wav stamped for this copy is final."""
+    d = idir(acfg)
+    (d / "source.refused.ts").write_bytes(b"in order")
+    (d / "source.mp4").write_bytes(b"")
+    (d / "audio.wav").write_bytes(b"wav")
+    st = (d / "source.refused.ts").stat()
+    jsonstate.write(d / "audio.wav.src", {"size": st.st_size, "mtime_ns": st.st_mtime_ns})
+    monkeypatch.setattr(archive.subprocess, "run", FakeFf([REPAIRED, REPAIRED], packets=IN_ORDER, wav_s=33900.0))
+    with pytest.raises(ClipperError, match="its audio.wav runs 67.3 s past"):
+        archive.fixup_item(acfg, "s", "kick-1")
+
+
 def test_an_in_order_copy_kept_for_a_failed_stale_mark_is_sent_to_transcribe(acfg, monkeypatch):
     """Grok on #453: `.refused` also marks a finished download whose stale mark couldn't be written;
     that copy is fine, so the fixup says transcribe reads it as it is, not that it can't be fixed."""

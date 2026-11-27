@@ -180,17 +180,19 @@ def _wav_is_for(stream_dir: Path, src: Path, trust_mtime: bool) -> bool:
     return not marker.exists() and bool(stamp if stamp is not None else by_mtime)
 
 
-def reuses_wav(stream_dir: Path, *, trust_mtime: bool = True) -> bool:
+def reuses_wav(stream_dir: Path, *, trust_mtime: bool = True, src: Path | None = None) -> bool:
     """Whether the next extract_audio would read the audio.wav already here rather than decode
     the source again: read-only, and False whenever that can't be told (no wav, no source, a link,
-    a share that won't answer), since then a decode is what the next run does or tries."""
+    a share that won't answer), since then a decode is what the next run does or tries. `src` is
+    the source that run reads, where the caller knows it better than the `source.*` glob (an
+    archive run drops an empty or linked name that sorts first before it reads)."""
     try:
         wav = stream_dir / "audio.wav"
         # #453 review: extract_audio drops a link at audio.wav and decodes, so one is never reused
         # (exists() would follow it, and a stamp beside it would then vouch for what it names)
         if is_link(wav) or not wav.exists():
             return False
-        src = source_file(stream_dir)
+        src = src or source_file(stream_dir)
         if is_link(src):
             return False
         return _wav_is_for(stream_dir, src, trust_mtime)
@@ -316,13 +318,13 @@ def check_audio_timeline(stream_dir: Path) -> None:
         f"transcript would be off after it")
 
 
-def audio_lengths(stream_dir: Path) -> tuple[float, float] | None:
+def audio_lengths(stream_dir: Path, src: Path | None = None) -> tuple[float, float] | None:
     """(audio.wav's length, its source's container length) in seconds, as the timeline guard
     compares them; None when there is nothing to compare: no source, a .wav source (the audio is
     the source), or a wav ffprobe can't time. A source ffprobe can't time is a ClipperError, as it
-    is for the guard."""
+    is for the guard. `src` as for reuses_wav."""
     try:
-        src = source_file(stream_dir)
+        src = src or source_file(stream_dir)
     except ClipperError:  # no source to compare the audio with
         return None
     if src.suffix == ".wav":  # the audio is the source: nothing to compare it with

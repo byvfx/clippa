@@ -890,9 +890,11 @@ def _in_order_note(idir: Path, subject: str, src: Path) -> str:
     decode refused again. Any other wav is decoded again by the next run, which may well finish."""
     head = f"{idir.name}: {src.name}'s timestamps are already in order, so a remux has nothing to take out"
     lengths = None
-    if transcribe.reuses_wav(idir, trust_mtime=False):
+    # src, not the glob: an empty or linked source.mp4 sorts first, and the next run drops it
+    # (_drop_shadowing) before it reads this copy (Grok on #453)
+    if transcribe.reuses_wav(idir, trust_mtime=False, src=src):
         try:
-            lengths = transcribe.audio_lengths(idir)
+            lengths = transcribe.audio_lengths(idir, src)
         except (OSError, ClipperError):  # the guard judges it on the next run
             lengths = None
     if lengths and lengths[0] - lengths[1] > timeline.TOLERANCE_S:
