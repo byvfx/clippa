@@ -894,3 +894,29 @@ def test_a_link_test_the_share_refuses_is_one_line_before_any_decode(tmp_path, m
     assert str(err.value) == f"kick-1: couldn't tell whether {name} is a link (Access is denied)"
     assert str(tmp_path) not in str(err.value)
     assert (d / "audio.wav").read_bytes() == b"wav" and (d / "source.ts").read_bytes() == b"source"
+
+
+def test_reuses_wav_says_yes_for_a_wav_stamped_with_this_source(tmp_path):
+    """The read-only twin of extract_audio's cache rule: a stamp naming this source is reused."""
+    d = stream_dir(tmp_path)
+    st = (d / "source.ts").lstat()
+    stamp(d, st.st_size, st.st_mtime_ns)
+    assert transcribe.reuses_wav(d, trust_mtime=False)
+
+
+@pytest.mark.parametrize("maker", ["link_or_skip", "junction_or_skip"])
+def test_reuses_wav_never_says_yes_for_a_linked_wav(tmp_path, request, maker):
+    """#453 review: extract_audio drops a link at audio.wav and decodes the source, so reuses_wav
+    must say no for one, even with a stamp naming this source beside it (an in-order archive
+    fixup would otherwise call the copy unrepairable from a wav the next run never reads)."""
+    d = stream_dir(tmp_path)
+    (d / "audio.wav").unlink()
+    elsewhere = tmp_path / "elsewhere"
+    if maker == "link_or_skip":
+        elsewhere.write_bytes(b"someone else's wav")
+    else:
+        elsewhere.mkdir()
+    request.getfixturevalue(maker)(elsewhere, d / "audio.wav", directory=maker != "link_or_skip")
+    st = (d / "source.ts").lstat()
+    stamp(d, st.st_size, st.st_mtime_ns)
+    assert not transcribe.reuses_wav(d, trust_mtime=False)

@@ -31,7 +31,8 @@ anything: YouTube's oEmbed endpoint (no key, no quota) and Odysee's resolve. Res
 <subject>/links.json: status alive | restricted (private, embedding off, or blocked) | dead,
 the reason, when it was checked and since when it has had that status. A link that cannot be
 checked (network, rate limit) keeps its last result. Items not checked within
-[archive] link_recheck_days are checked again; `transcribe` skips items whose link is dead.
+[archive] link_recheck_days are checked again; `transcribe` skips items whose link is dead,
+unless a copy is kept in the item's folder (a video, or a source set aside), which it reads.
 """
 
 from __future__ import annotations
@@ -40,6 +41,7 @@ import csv
 import io
 import json
 import logging
+import os
 import re
 import subprocess
 import threading
@@ -50,7 +52,7 @@ from pathlib import Path
 
 import requests
 
-from . import hei, jsonstate, speakers, transcribe, ytdl
+from . import hei, jsonstate, speakers, timeline, transcribe, ytdl
 from .errors import ClipperError, exit_code
 from .media import is_link, link_or_raise, remove_link
 from .modalmon import head_record, tracked
@@ -298,6 +300,40 @@ def call_overhead_s(cfg: dict, subject: str, gpu: str) -> tuple[float, str]:
     return max(over, 0.0), f"{subject}'s last {len(runs)} runs on {gpu}"
 
 
+def _file_id(path: Path) -> tuple[int, int] | None:
+    """(size, mtime_ns) of the file at `path`, or None when the share won't say."""
+    try:
+        st = path.lstat()
+    except OSError:
+        return None
+    return st.st_size, st.st_mtime_ns
+
+
+def _refuse_if_replaced(idir: Path, src: Path, read_from: tuple[int, int] | None) -> None:
+    """Grok on #453: an `archive fixup` of this item can replace its source while this run reads it
+    (the fixup takes no lock this run honours). After the replace the old wav and the new container
+    agree in length, so the timeline check passes on audio of the jumping copy, and the transcript
+    would be done with its times. The source is the same file it was before the audio was read, or
+    nothing is transcribed: the stale marker the fixup wrote makes the next run decode the repaired
+    copy. Checked after the timeline check, as from then on the wav is all that is read. A source
+    gone from its name since is refused the same way (the guard has nothing to compare the wav with
+    then, so it passes it), as extract_audio's own check refuses one. One the share wouldn't time
+    either side is let through, as the decode's own check does."""
+    if read_from is None:
+        return
+    try:
+        st = src.lstat()
+    except FileNotFoundError:
+        raise ClipperError(f"{idir.name}: its {src.name} went away while its audio was read; nothing "
+                           f"transcribed, the next run reads whatever copy is there then") from None
+    except OSError:
+        return
+    if (st.st_size, st.st_mtime_ns) == read_from:
+        return
+    raise ClipperError(f"{idir.name}: its {src.name} was replaced while its audio was read (an "
+                       f"`archive fixup`?); nothing transcribed, the next run reads the new copy")
+
+
 def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[str, ...] = ytdl.AGE) -> dict:
     """One item: words.jsonl and transcript.json in idir; returns the cost record. retry_on: the
     YouTube errors retried signed in (ytdl.AGE; a story adds ytdl.BOT when [story] allows it)."""
@@ -401,6 +437,7 @@ def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[s
         # link at source.refused.ts on a non-fresh run would otherwise meet the refusal's rename
         # (which cannot replace a link) and stick the item with both it and its finished source.ts
         _drop_shadowing_or_mark(idir, src, fresh)
+        read_from = _file_id(src)  # what the audio below comes from (see _refuse_if_replaced)
         # trust_mtime False: a wav here is only ever a failed run's leftover, and one with no stamp
         # beside it (#448) can't say which download it came from, so it is decoded again
         wav = transcribe.extract_audio(idir, trust_mtime=False)
@@ -419,8 +456,7 @@ def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[s
             if not fresh:  # a kept video, or a source already set aside: unchanged
                 # the copy is kept here, so the line says which name it is under (never a path or
                 # a url): the aside file when that is the one read, the download when it is marked
-                where = "" if _kept else f" (kept as {src.name})"
-                raise ClipperError(f"{why}{where}") from None
+                raise ClipperError(f"{why}{_kept_note(idir, src, _kept)}") from None
             try:
                 src.replace(refused)  # renamed, not copied: it is the only complete copy
             except OSError as err:  # a share that won't rename it must not hide the guard's line
@@ -436,7 +472,8 @@ def transcribe_item(cfg: dict, idir: Path, it: dict, gpu: str, retry_on: tuple[s
                         "aside or marked, so a later run may replace it)") from None
                 raise ClipperError(f"{why} (the download is still {src.name}: {reason})") from None
             _clear_marker(idir)  # a marker from an earlier rename must not outlive this one
-            raise ClipperError(f"{why} (kept as {refused.name})") from None
+            raise ClipperError(f"{why}{_kept_note(idir, refused, None)}") from None
+        _refuse_if_replaced(idir, src, read_from)
         if fresh:
             # A download that passed the guard is kept until its transcript is written, not
             # unlinked here: the encode, the Modal call or a link planted at audio.flac can still
@@ -498,7 +535,10 @@ def run_transcribe(cfg: dict, subject: str, limit: int | None, oldest: bool, gpu
     # transcribes it there (item_dir), so it is never paid for again here.
     todo = [it for it in cat.values() if not it.get("dir") and not (d / it["id"] / "words.jsonl").exists()]
     links = load_links(d)
-    dead = {i for i, lk in links.items() if lk["status"] == "dead"}
+    # a dead link is no download, but a copy kept here (a video, or a source set aside and
+    # repaired by `archive fixup`) is read in place: the VOD being gone is when it matters most
+    dead = {i for i, lk in links.items() if lk["status"] == "dead"
+            and not (cat.get(i, {}).get("source") in ("kick", "hei") and any(set_aside(d / i)))}
     if skipped := sum(1 for it in todo if it["id"] in dead):
         print(f"{subject}: {skipped} skipped, source link dead (clippa archive links {subject})")
         todo = [it for it in todo if it["id"] not in dead]
@@ -829,6 +869,147 @@ def _drop_download(idir: Path, src: Path | None) -> None:
               f"{err.strerror or 'the system refused it'}", flush=True)
 
 
+def _kept_note(idir: Path, src: Path, kept: Path | None) -> str:
+    """What a refusal says about the copy it keeps, and how to repair it (#446): never a path or a
+    url (error.txt and the log line carry it), only the file's name and the command, which names
+    the subject and the item. A kept video (source.mp4) can't be remuxed: `kept_advice` says what
+    to do with it."""
+    if kept is not None:
+        return f" (the kept {kept.name}: --fixup can't remux it; {kept_advice(idir, kept)})"
+    return f" (kept as {src.name}; `clippa archive fixup {idir.parent.name} {idir.name}` repairs it)"
+
+
+def kept_advice(idir: Path, kept: Path) -> str:
+    """What to do with a kept video the timeline refused, which no remux repairs (it is an mp4).
+    Never "delete it": it may be the only complete copy (a VOD gone from Kick or HEI can't be
+    downloaded again, a dead link is skipped, and a Kick m3u8 is never refreshed), so it is moved
+    out of the folder, kept. With a .ts set aside beside it, the fixup repairs that one; otherwise
+    the next run downloads a .ts while the VOD is still up."""
+    aside = _aside_copy(idir)
+    if aside is not None:
+        return (f"move {kept.name} out of the item folder (keep it) and `clippa archive fixup "
+                f"{idir.parent.name} {idir.name}` repairs the {aside.name} beside it")
+    return (f"move {kept.name} out of the item folder (keep it: a VOD that is gone can't be downloaded "
+            f"again) and the next `clippa archive transcribe` downloads a .ts while the VOD is still up")
+
+
+def _refuse_while_live(cfg: dict, label: str) -> None:
+    """A repair reads an item's whole source three times and writes it once, on the share the
+    recorder writes to: not while a show is live (AGENTS.md), and not when the recorder's heartbeat
+    can't say. `--force` skips this; a chat's card never passes it."""
+    from . import services
+
+    rec = services.recorder(cfg)
+    if rec.get("error"):
+        raise ClipperError(f"{label}: can't tell whether a show is live (the recorder's heartbeat is "
+                           f"unreadable); --force to repair anyway")
+    if rec["live"]:
+        raise ClipperError(f"{label}: {', '.join(rec['live'])} is live, and a repair reads and rewrites "
+                           f"the whole source on the NAS; run it after the show (or --force)")
+
+
+def fixup_item(cfg: dict, subject: str, item_id: str, force: bool = False) -> float:
+    """`clippa archive fixup <subject> <item>` (#446): the source an item's timeline check refused,
+    remuxed with regenerated timestamps through `timeline.remux_verified` (Kick and HEI items are
+    both mpegts, and a jump is in the VOD itself, so a re-download would only bring it back). The
+    copy it reads is the one the next run would: source.refused.ts, or a source.ts marked
+    `.refused` where the share wouldn't rename it. It is repaired in place under its own name,
+    never renamed back to source.ts (item_source would take an unmarked source.ts for a partial
+    and unlink it); the next `clippa archive transcribe` reads it, the guard passes, and the item
+    finishes. As at a stream's --fixup, the wav decoded from the old copy is marked stale before
+    the replace and dropped after it. A copy already in order is refused, not rewritten (its wav
+    came from the same bytes), and one that changed during the remux (another clippa at work on
+    the item) is not replaced. Returns the jump the remux took out."""
+    d = subject_dir(cfg, subject)
+    cat = load_catalog(d)
+    it = cat.get(item_id)
+    if it is None:
+        raise ClipperError(f"{subject}: no item {item_id!r} in its catalog")
+    if it.get("dir"):  # one of our own streams, transcribed in its stream folder
+        raise ClipperError(f"{item_id}: this item is one of our streams; repair it with "
+                           f"{_stream_fixup(it)}")
+    if not force:
+        _refuse_while_live(cfg, item_id)
+    idir = d / item_id
+    if link_or_raise(idir, item_id, "the item folder"):
+        raise ClipperError(f"{item_id}: the item folder is a link; refusing to repair through it")
+    if not idir.is_dir():
+        raise ClipperError(f"{item_id}: no folder for this item yet; nothing to repair")
+    timeline.sweep(idir)  # a killed earlier remux's temp
+    kept, src, fresh = item_source(idir)
+    if kept is not None:
+        raise ClipperError(f"{item_id}: its source is the kept {kept.name}, which --fixup can't remux; "
+                           f"{kept_advice(idir, kept)}")
+    if fresh:
+        raise ClipperError(f"{item_id}: nothing set aside to repair (no source.refused.ts, and no "
+                           f"source.ts marked refused)")
+    if link_or_raise(src, item_id):
+        raise ClipperError(f"{item_id}: its {src.name} is a link, not a file; refusing to read it")
+    try:
+        before = src.stat()
+    except OSError as e:
+        raise ClipperError(f"{item_id}: couldn't read {src.name} ({e.strerror or 'the system refused it'})") from None
+    replaced = False
+
+    def put_in_place(tmp: Path, path: Path) -> None:
+        nonlocal replaced
+        # another clippa (an `archive transcribe` of this subject) may have moved or replaced the
+        # copy during the remux: what this remux read is no longer the file at that name
+        try:
+            now = path.stat()
+        except FileNotFoundError:
+            now = None
+        if now is None or (now.st_size, now.st_mtime_ns) != (before.st_size, before.st_mtime_ns):
+            raise ClipperError(f"{item_id}: {path.name} changed while it was remuxed (another clippa "
+                               f"working on this item?); nothing replaced, run the fixup again")
+        try:  # before the replace, as at a stream's --fixup: one that can't be written keeps the copy
+            transcribe.mark_stale(idir)
+        except ClipperError as why:
+            raise ClipperError(f"{why}; {path.name} is not replaced") from None
+        os.replace(tmp, path)
+        replaced = True
+        transcribe.drop_wav(idir)
+
+    growth = timeline.remux_verified(src, item_id, put_in_place)
+    if not replaced:
+        raise ClipperError(str(_in_order_note(idir, subject, src)))
+    print(f"{item_id}: `clippa archive transcribe {subject}` finishes it now", flush=True)
+    return growth
+
+
+def _in_order_note(idir: Path, subject: str, src: Path) -> str:
+    """Why a copy whose timestamps are already in order has nothing to repair, and what is next. A
+    `.refused` marker is not only the timeline's: a download whose stale mark or shadow drop failed
+    is marked too, and that copy is fine, so the wav is looked at before anything is said. Only a
+    wav the next run would reuse (its stamp names this copy: an archive item trusts no mtime) and
+    that runs past the container makes the overrun this copy's own; it was decoded from these very
+    bytes, so unlike a stream's in-order --fixup (#448) it stays, since dropping it would only buy a
+    decode refused again. Any other wav is decoded again by the next run, which may well finish."""
+    head = f"{idir.name}: {src.name}'s timestamps are already in order, so a remux has nothing to take out"
+    lengths = None
+    # src, not the glob: an empty or linked source.mp4 sorts first, and the next run drops it
+    # (_drop_shadowing) before it reads this copy (Grok on #453)
+    if transcribe.reuses_wav(idir, trust_mtime=False, src=src):
+        try:
+            lengths = transcribe.audio_lengths(idir, src)
+        except (OSError, ClipperError):  # the guard judges it on the next run
+            lengths = None
+    if lengths and lengths[0] - lengths[1] > timeline.TOLERANCE_S:
+        return (f"{head}; its audio.wav runs {lengths[0] - lengths[1]:.1f} s past the container for "
+                f"another reason, which this repair can't fix")
+    return f"{head}; `clippa archive transcribe {subject}` reads it as it is"
+
+
+def _stream_fixup(it: dict) -> str:
+    """The repair for an item that is one of our streams: its own `fetch --fixup`, which takes a
+    canonical Kick VOD url only (it remuxes an mpegts copy), so any other url is not offered."""
+    from .kick import canonical_vod_url
+
+    if url := canonical_vod_url(it.get("url")):
+        return f"`clippa fetch {url} --fixup`"
+    return "`clippa fetch <its Kick VOD url> --fixup` (a stream from elsewhere has no remux repair)"
+
+
 def kept_video(idir: Path) -> Path | None:
     """The video `archive video` kept for an item, if any (written under another name and
     renamed when complete, so this is never a partial download). Only a real copy counts: a link
@@ -837,6 +1018,25 @@ def kept_video(idir: Path) -> Path | None:
     downloads rather than stalling on a name that will never advance."""
     p = idir / "source.mp4"
     return p if _real_copy(p) else None
+
+
+def set_aside(idir: Path) -> tuple[Path | None, Path | None]:
+    """(the kept video, the copy set aside for a repair), read-only: what item_source would read,
+    without the tidying it does (dropping an empty copy, a marker left with no source), for a
+    preview that must not change the folder. The kept video wins, as there."""
+    kept = kept_video(idir)
+    return (kept, None) if kept is not None else (None, _aside_copy(idir))
+
+
+def _aside_copy(idir: Path) -> Path | None:
+    """The .ts set aside here for a repair, whether or not a kept video wins over it: the refused
+    copy, or a source.ts marked `.refused`."""
+    aside, marker, downloaded = idir / "source.refused.ts", idir / ".refused", idir / "source.ts"
+    if _real_copy(aside):
+        return aside
+    if _real_copy(downloaded) and _there(marker) and not _link(marker):
+        return downloaded
+    return None
 
 
 def item_source(idir: Path) -> tuple[Path | None, Path, bool]:

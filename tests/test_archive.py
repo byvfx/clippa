@@ -169,7 +169,7 @@ def test_a_refused_download_is_kept_aside_not_dropped(kick_cfg, tmp_path, monkey
     runs, seen = [], []
     _downloads(monkeypatch, idir, runs, seen)
     with pytest.raises(ClipperError,
-                       match=r"audio disagree.*\(kept as source\.refused\.ts\)$"):
+                       match=r"audio disagree.*\(kept as source\.refused\.ts; `clippa archive fixup \S+ \S+` repairs it\)$"):
         archive.transcribe_item(kick_cfg, idir, _item(), "L4")
     assert len(runs) == 1 and seen == ["source.ts"]
     assert not (idir / "source.ts").exists() and not (idir / "source.ts.ytdl").exists()
@@ -192,7 +192,7 @@ def test_a_refused_item_keeps_the_numbers_and_no_url(kick_cfg, tmp_path, monkeyp
     with pytest.raises(ClipperError) as err:
         archive.transcribe_item(kick_cfg, idir, _item(), "L4")
     msg = str(err.value)
-    assert "jumps back 821.8 s" in msg and "(kept as source.refused.ts)" in msg
+    assert "jumps back 821.8 s" in msg and "(kept as source.refused.ts; `clippa archive fixup " in msg
     assert "http" not in msg and "clippa fetch" not in msg
     assert (idir / "source.refused.ts").read_bytes() == b"downloaded"
 
@@ -206,7 +206,7 @@ def test_a_jumping_download_with_a_broken_meta_json_is_still_kept_aside(kick_cfg
     (idir / "meta.json").write_text("{", encoding="utf-8")  # a half-written file
     runs, seen = [], []
     _downloads(monkeypatch, idir, runs, seen)
-    with pytest.raises(ClipperError, match=r"audio disagree.*\(kept as source\.refused\.ts\)$") as err:
+    with pytest.raises(ClipperError, match=r"audio disagree.*\(kept as source\.refused\.ts; `clippa archive fixup \S+ \S+` repairs it\)$") as err:
         archive.transcribe_item(kick_cfg, idir, _item(), "L4")
     assert "821.8 s" in str(err.value) and "clippa fetch" not in str(err.value)
     assert len(runs) == 1 and seen == ["source.ts"]
@@ -229,7 +229,7 @@ def test_a_second_run_reuses_the_refused_source_without_downloading(kick_cfg, tm
     with pytest.raises(ClipperError, match=r"audio disagree") as err:
         archive.transcribe_item(kick_cfg, idir, _item(), "L4")
     assert runs == [] and seen == ["source.refused.ts"]  # the name sorts before source.ts
-    assert str(err.value).endswith("(kept as source.refused.ts)")  # the copy is here, and said so
+    assert str(err.value).endswith(f"(kept as source.refused.ts; `clippa archive fixup {idir.parent.name} {idir.name}` repairs it)")  # the copy is here, and said so
     assert (idir / "source.refused.ts").read_bytes() == b"downloaded"
     assert not (idir / "source.ts").exists()
 
@@ -493,7 +493,9 @@ def test_a_kept_download_the_guard_refuses_next_time_stays_where_it_is(kick_cfg,
     with pytest.raises(RuntimeError):
         archive.transcribe_item(kick_cfg, idir, _item(), "L4")
     _downloads(monkeypatch, idir, runs, seen)  # this time the lengths disagree
-    with pytest.raises(ClipperError, match=r"audio disagree.*\(kept as source\.ts\)$"):
+    # #446: a kept download is a marked source.ts, so `archive fixup` repairs it in place
+    with pytest.raises(ClipperError, match=r"audio disagree.*\(kept as source\.ts; "
+                                           r"`clippa archive fixup s kick-1` repairs it\)$"):
         archive.transcribe_item(kick_cfg, idir, _item(), "L4")
     assert len(runs) == 1
     assert (idir / "source.ts").read_bytes() == b"downloaded" and (idir / ".refused").is_file()
@@ -518,6 +520,53 @@ def test_a_keep_marker_that_cannot_be_written_is_one_line_and_the_item_goes_on(
     out = capsys.readouterr().out
     assert "couldn't write the refusal marker" in out and "would cost the download" in out
     assert (idir / "words.jsonl").exists() and not (idir / "source.ts").exists()
+
+
+def test_a_source_a_fixup_replaces_under_the_read_is_not_transcribed(kick_cfg, tmp_path, monkeypatch):
+    """Grok on #453: an `archive fixup` lands between the reused wav and the timeline check, so the
+    old wav and the new container agree and the check passes; the source is not the file the audio
+    came from, so nothing is transcribed and the copy waits for the next run."""
+    idir = tmp_path / "archive" / "s" / "kick-1"
+    idir.mkdir(parents=True)
+    (idir / "source.refused.ts").write_bytes(b"jumping")
+    runs, seen = [], []
+    _downloads(monkeypatch, idir, runs, seen, wav_s=33833.0, container_s=33833.0)
+    _transcribes(monkeypatch)
+    real = archive.transcribe.extract_audio
+
+    def extract_then_fixup(stream_dir, *, trust_mtime=True):
+        wav = real(stream_dir, trust_mtime=trust_mtime)
+        (stream_dir / "source.refused.ts").write_bytes(b"remuxed!")  # the fixup's replace
+        os.utime(stream_dir / "source.refused.ts", ns=(10**18, 10**18))
+        return wav
+
+    monkeypatch.setattr(archive.transcribe, "extract_audio", extract_then_fixup)
+    with pytest.raises(ClipperError, match="was replaced while its audio was read"):
+        archive.transcribe_item(kick_cfg, idir, _item(), "L4")
+    assert not (idir / "words.jsonl").exists() and runs == []
+    assert (idir / "source.refused.ts").read_bytes() == b"remuxed!"
+
+
+def test_a_source_gone_under_the_read_is_not_transcribed(kick_cfg, tmp_path, monkeypatch):
+    """Grok on #453: with the source gone the timeline guard has nothing to compare the reused wav
+    with and passes it, so a vanished source is refused like a replaced one."""
+    idir = tmp_path / "archive" / "s" / "kick-1"
+    idir.mkdir(parents=True)
+    (idir / "source.refused.ts").write_bytes(b"jumping")
+    runs, seen = [], []
+    _downloads(monkeypatch, idir, runs, seen, wav_s=33833.0, container_s=33833.0)
+    _transcribes(monkeypatch)
+    real = archive.transcribe.extract_audio
+
+    def extract_then_remove(stream_dir, *, trust_mtime=True):
+        wav = real(stream_dir, trust_mtime=trust_mtime)
+        (stream_dir / "source.refused.ts").unlink()
+        return wav
+
+    monkeypatch.setattr(archive.transcribe, "extract_audio", extract_then_remove)
+    with pytest.raises(ClipperError, match="went away while its audio was read"):
+        archive.transcribe_item(kick_cfg, idir, _item(), "L4")
+    assert not (idir / "words.jsonl").exists() and runs == []
 
 
 def test_a_kept_video_is_used_and_never_unlinked(kick_cfg, tmp_path, monkeypatch):
@@ -679,7 +728,7 @@ def test_a_link_at_the_refused_name_is_removed_and_the_item_downloads(
     assert (idir / "source.refused.ts").is_symlink()
     runs, seen = [], []
     _downloads(monkeypatch, idir, runs, seen)
-    with pytest.raises(ClipperError, match=r"audio disagree.*\(kept as source\.refused\.ts\)$"):
+    with pytest.raises(ClipperError, match=r"audio disagree.*\(kept as source\.refused\.ts; `clippa archive fixup \S+ \S+` repairs it\)$"):
         archive.transcribe_item(kick_cfg, idir, _item(), "L4")
     assert "kick-1: removed a link at source.refused.ts" in capsys.readouterr().out
     assert len(runs) == 1 and seen == ["source.ts"]
@@ -708,7 +757,7 @@ def test_a_junction_at_the_refused_name_is_removed_and_the_item_downloads(
     assert os.path.isjunction(idir / "source.refused.ts")
     runs, seen = [], []
     _downloads(monkeypatch, idir, runs, seen)
-    with pytest.raises(ClipperError, match=r"audio disagree.*\(kept as source\.refused\.ts\)$"):
+    with pytest.raises(ClipperError, match=r"audio disagree.*\(kept as source\.refused\.ts; `clippa archive fixup \S+ \S+` repairs it\)$"):
         archive.transcribe_item(kick_cfg, idir, _item(), "L4")
     assert "kick-1: removed a link at source.refused.ts" in capsys.readouterr().out
     assert len(runs) == 1 and seen == ["source.ts"]
@@ -928,7 +977,7 @@ def test_a_refused_rename_leaves_a_marker_and_the_next_run_keeps_the_download(
         archive.transcribe_item(kick_cfg, idir, _item(), "L4")
     assert runs == [] and seen == ["source.ts"]  # no download, and nothing dropped
     assert (idir / "source.ts").read_bytes() == b"downloaded"
-    assert str(err.value).endswith("(kept as source.ts)")  # the marked download, and where it is
+    assert str(err.value).endswith(f"(kept as source.ts; `clippa archive fixup {idir.parent.name} {idir.name}` repairs it)")  # the marked download, and where it is
     assert (idir / ".refused").is_file()
 
 
@@ -1043,7 +1092,7 @@ def test_a_marker_beside_a_source_the_share_won_t_stat_is_not_dropped(
     with pytest.raises(ClipperError, match=r"audio disagree") as err:
         archive.transcribe_item(kick_cfg, idir, _item(), "L4")
     assert runs == [] and seen == ["source.ts"]  # nothing downloaded over it, and it was read
-    assert str(err.value).endswith("(kept as source.ts)")
+    assert str(err.value).endswith(f"(kept as source.ts; `clippa archive fixup {idir.parent.name} {idir.name}` repairs it)")
     assert "removed the refusal marker" not in capsys.readouterr().out
     assert (idir / "source.ts").read_bytes() == b"downloaded"
     assert (idir / ".refused").is_file()
@@ -1078,7 +1127,7 @@ def test_a_marker_the_share_won_t_stat_is_still_a_marker(kick_cfg, tmp_path, mon
     assert kept is None and src == idir / "source.ts" and fresh is False
     with pytest.raises(ClipperError, match=r"audio disagree") as err:
         archive.transcribe_item(kick_cfg, idir, _item(), "L4")
-    assert str(err.value).endswith("(kept as source.ts)")
+    assert str(err.value).endswith(f"(kept as source.ts; `clippa archive fixup {idir.parent.name} {idir.name}` repairs it)")
     assert runs == [] and seen == ["source.ts"]  # no download, and the copy was not unlinked
     assert "removed the refusal marker" not in capsys.readouterr().out
     assert (idir / "source.ts").read_bytes() == b"downloaded"
@@ -1168,7 +1217,7 @@ def test_a_link_at_the_marker_is_removed_before_a_refusal_could_write_through_it
     assert (idir / ".refused").is_symlink()
     runs, seen = [], []
     _downloads(monkeypatch, idir, runs, seen)
-    with pytest.raises(ClipperError, match=r"audio disagree.*\(kept as source\.refused\.ts\)$"):
+    with pytest.raises(ClipperError, match=r"audio disagree.*\(kept as source\.refused\.ts; `clippa archive fixup \S+ \S+` repairs it\)$"):
         archive.transcribe_item(kick_cfg, idir, _item(), "L4")
     assert "kick-1: removed a link at .refused" in capsys.readouterr().out
     assert not (idir / ".refused").is_symlink() and not (idir / ".refused").exists()
@@ -1242,7 +1291,7 @@ def test_an_hei_item_keeps_a_refused_download_and_never_fetches_it_again(kick_cf
     _downloads(monkeypatch, idir, runs, seen)
     monkeypatch.setattr(archive.hei, "fresh_m3u8", lambda *a: "https://example.invalid/master.m3u8")
     it = {**_item(), "id": "hei-1", "source": "hei"}
-    with pytest.raises(ClipperError, match=r"\(kept as source\.refused\.ts\)$"):
+    with pytest.raises(ClipperError, match=r"\(kept as source\.refused\.ts; `clippa archive fixup \S+ \S+` repairs it\)$"):
         archive.transcribe_item(kick_cfg, idir, it, "L4")
     assert len(runs) == 1 and seen == ["source.ts"]
     assert (idir / "source.refused.ts").read_bytes() == b"downloaded"
@@ -1254,7 +1303,7 @@ def test_an_hei_item_keeps_a_refused_download_and_never_fetches_it_again(kick_cf
     with pytest.raises(ClipperError, match=r"timeline and its audio disagree") as err:
         archive.transcribe_item(kick_cfg, idir, it, "L4")
     assert runs == [] and seen == ["source.refused.ts"]
-    assert str(err.value).endswith("(kept as source.refused.ts)")  # reused, and it says where
+    assert str(err.value).endswith(f"(kept as source.refused.ts; `clippa archive fixup {idir.parent.name} {idir.name}` repairs it)")  # reused, and it says where
     assert (idir / "source.refused.ts").read_bytes() == b"downloaded"
 
 

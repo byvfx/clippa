@@ -378,6 +378,8 @@ def cmd_archive(cfg: dict, args: argparse.Namespace) -> None:
         from . import archive_index
 
         archive_index.ask(cfg, args.subject, args.question, args.since, args.before, args.limit)
+    elif args.action == "fixup":
+        archive.fixup_item(cfg, args.subject, args.item, args.force)
     else:
         archive.status(cfg, args.subject)
 
@@ -1943,6 +1945,11 @@ def add_extras(sub) -> None:
     r.add_argument("--diarize", action="store_true", help="speaker turns too (default [archive] diarize)")
     r = rsub.add_parser("status", help="items, hours transcribed, errors, cost, link checks")
     add_subject(r, optional=True)
+    r = rsub.add_parser("fixup", help="repair an item whose source's timeline jumps back (#446): remux the "
+                        "copy set aside, so the next `archive transcribe` finishes it")
+    add_subject(r)
+    r.add_argument("item", help="the item's id (its folder under the subject, named in its error)")
+    r.add_argument("--force", action="store_true", help="repair even while a show is live")
     r = rsub.add_parser("check", help="are the source links still up? (no downloads, no cost)")
     add_subject(r)
     add_items(r, "just these items (default: not checked in [archive] link_recheck_days)",

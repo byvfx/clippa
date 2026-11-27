@@ -367,12 +367,30 @@ def _remux_guarded(stream_dir: Path, path: Path, cfg: dict) -> float:
             # The wav beside it was decoded from the old source, and the growth remux_verified
             # returns can be 0.0 after a real rewrite (the lengths agree within tolerance): it
             # goes with the replace, which is the one moment the source is known to have changed.
-            _drop_wav(stream_dir)
+            transcribe.drop_wav(stream_dir)
 
     growth = timeline.remux_verified(path, stream_dir.name, put_in_place)
     if not replaced:
         _drop_overrunning_wav(stream_dir, refuse_busy)
+    else:
+        _name_forced_transcribe(stream_dir)
     return growth
+
+
+def _name_forced_transcribe(stream_dir: Path) -> None:
+    """A transcript from before the repair (one made before #440's check) has the old timeline's
+    times, and a plain transcribe keeps it as done: say what makes it again. The source is already
+    replaced, so a share that won't stat the name (#449) gets the line hedged, never a traceback
+    that would skip the caller's _store_jump."""
+    fix = f"`clippa transcribe {stream_dir.name} --force` makes it again"
+    try:
+        there = (stream_dir / "words.jsonl").exists()
+    except OSError:
+        print(f"{stream_dir.name}: couldn't tell whether words.jsonl is here; if it is, it has the old "
+              f"timeline's times and {fix}")
+        return
+    if there:
+        print(f"{stream_dir.name}: words.jsonl was made from the old timeline; {fix}")
 
 
 def _drop_overrunning_wav(stream_dir: Path, refuse_busy: Callable[[], None]) -> None:
@@ -400,25 +418,11 @@ def _drop_overrunning_wav(stream_dir: Path, refuse_busy: Callable[[], None]) -> 
             transcribe.mark_stale(stream_dir)
             print(f"{stream_dir.name}: audio.wav runs {over:.1f} s past the source's container; "
                   f"dropped, so the next transcribe decodes the source again")
-            _drop_wav(stream_dir)
+            transcribe.drop_wav(stream_dir)
     except (OSError, ClipperError) as e:  # an OSError: a busy check the share wouldn't answer
         why = f"{stream_dir.name}: {e.strerror or 'the system refused it'}" if isinstance(e, OSError) else str(e)
         print(f"{why} (audio.wav runs {over:.1f} s past the container and is left; delete it, or "
               f"--fixup again)")
-
-
-def _drop_wav(stream_dir: Path) -> None:
-    """audio.wav and its stamp gone, under the run lock, after transcribe.mark_stale: a wav the share
-    won't remove is a line, as the marker beside it already says it is stale."""
-    try:
-        (stream_dir / "audio.wav").unlink(missing_ok=True)
-    except OSError as e:  # the source may be replaced already: _store_jump still has to run
-        print(f"{stream_dir.name}: the old audio.wav couldn't be removed "
-              f"({e.strerror or 'the system refused it'}); it is marked stale, so the "
-              f"next transcribe decodes it again")
-    else:
-        transcribe.clear_stale(stream_dir)
-        transcribe.forget_stamp(stream_dir)
 
 
 @contextmanager
