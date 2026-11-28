@@ -237,9 +237,8 @@ the callback's OSError), so don't chase it again.
   127.0.0.1:4096 with no password in the environment and no published port. Do not merge until
   that call, and do not edit production `clipper.toml`. `deploy/claude` stays for the burn-in.
 - v0.4.0 is released (PR #395, tag 11-23 on 7f6f4ed, the user: "can we tag a v0.4.0 tonight?"; Release "Clippa 0.4.0";
-  #259 and #258 step D moved to v0.5.0, the v0.4.0 milestone closed). serve and the bot report `0.4.0` (deployed 11-23
-  07:35 UTC); the worker follows once Don's 11-23 run finishes (a background deploy from `C:\clippa-pr378`, detached at
-  the tag; remove that worktree after). v0.3.0 was PR #372, 11-21. The recorder is at 6ac5d37 (`0.3.0+13`, 11-22): redeploy it
+  #259 and #258 step D moved to v0.5.0, the v0.4.0 milestone closed). The hub has been redeployed from main since (all three
+  at a1e7cbb 11-26; serve and the bot at 85239e6 11-27). v0.3.0 was PR #372, 11-21. The recorder is at 6ac5d37 (`0.3.0+13`, 11-22): redeploy it
   when no show is live. The claude container was deployed 11-20 at bd1369b (#356); the nightly checkup is on (`CHECKUP_AT=08:30`).
 - Clippa chat works on the phone (user, 11-20). `[chat] model` is Haiku (`claude-haiku-5-5`) by default; any provider's model string
   works there, so BYOK is `[chat] model = "openrouter:<vendor>/<model>"` with `OPENROUTER_API_KEY` (wiki Model-providers); the
@@ -254,10 +253,11 @@ the callback's OSError), so don't chase it again.
   `[streams] keep_free_pct = 15` since 11-20 (PR #347, deployed at f70e26b, serve restarted; backup
   `backups/clipper.toml.before_keep_free_pct_2026-11-20`): the daily prune takes streams older than 60 days only while the share has
   less than 15% free, oldest first (48% free now, so nothing goes), and the checkup warns under 15%. The test stream is in `never_prune`.
-- Branches and worktrees (11-20 cleanup, at the user's word): origin keeps only `main` and four unmerged branches on purpose:
-  `archive/instagram-source` (the Instagram-source work, base is main as of #215, rebase before a PR), `story-dig`, `jev-lab`
-  (`C:\clipper-jevlab`) and `ccr-8319354b-axsr9v` (fan-mag, paused for the user's next tweaks). Local `feat/twitch-youtube-fetch`
-  was never pushed and is probably covered by #293: diff against main, then delete. Check `git branch --show-current` before branching.
+- Branches and worktrees (cleaned 11-20 and 11-27, at the user's word): besides `main` and the branches of open PRs, origin keeps
+  four unmerged branches on purpose: `archive/instagram-source` (the Instagram-source work, base is main as of #215, rebase before
+  a PR), `story-dig` (local is 60 commits ahead of origin), `jev-lab` (`C:\clipper-jevlab`) and `ccr-8319354b-axsr9v` (fan-mag,
+  paused for the user's next tweaks). Their worktrees are the only ones besides `C:\clipper`. Delete a branch once its PR merges.
+  Check `git branch --show-current` before branching.
 - The DSP story video is in Kitsu for review (Kino Casino / "2026-11-04 story-dsp-credit-score-590", 3:14).
 - TikTok drafts to post by hand: the 10/25 batch (kick-133940023 v04_t04, v05_t05, v07_t14, v08_t18) would
   need `--resend` once there is room.
