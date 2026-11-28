@@ -214,6 +214,17 @@ class Run:
         return output_found(self.d, stage)
 
 
+REVIEW_STAGES = ("clips_review", "review")  # `clippa review publish`: they need Kitsu
+NO_KITSU = ("no Kitsu ([review] host is empty): the videos stay in the stream folder; "
+            "`clippa review publish <stream>` sends them once Kitsu is set up")
+
+
+def kitsu_on(cfg: dict, stream_dir: Path) -> bool:
+    """Whether this stream's review goes to Kitsu: [review] host is set (#434)."""
+    # a placeholder ("<...>") is a host someone meant to fill in: the stage runs and says so
+    return bool(for_stream(cfg, stream_dir)["review"]["host"])
+
+
 def default_stages(cfg: dict, stream_dir: Path) -> list[str]:
     """A pre-show (one whole video, no chat) skips signals, scoring and Shorts. With the
     fast lane, a scored stream also gets the clips twins of cut, meta, thumbs, review."""
@@ -298,6 +309,14 @@ def run_stream(cfg: dict, stream_dir: Path, config_path: str | None = None,  # n
                 # No picks, or no segment long enough: nothing to describe or review.
                 run.data["stages"][stage] = {"status": "skipped", "note": "nothing was cut"}
                 continue
+            if stage in REVIEW_STAGES and not kitsu_on(cfg, stream_dir):
+                # #434: no Kitsu here, so the run ends with the videos in the stream folder
+                run.data["stages"][stage] = {"status": "skipped", "note": NO_KITSU}
+                run.data["review_off"] = True
+                log.info("%s: %s skipped: %s", name, stage, NO_KITSU)
+                continue
+            if stage in REVIEW_STAGES:  # Kitsu is set up now: this run's review goes there
+                run.data.pop("review_off", None)
             reason = step_aside() if step_aside and stage not in FAST_LANE else None
             if reason:
                 log.info("%s: pausing before %s: %s", name, stage, reason)
@@ -351,7 +370,8 @@ def run_stream(cfg: dict, stream_dir: Path, config_path: str | None = None,  # n
         complete = all(run.done(s) for s in STAGES if s in wanted)
         # A lane that ran to its end clears the count of failed attempts (each lane takes one).
         run.data.update(status="done" if complete else "partial", error="", attempts=0)
-        if "clips_review" in wanted and all(run.done(s) for s in FAST_LANE if s in wanted):
+        if "clips_review" in wanted and all(run.done(s) for s in FAST_LANE if s in wanted) \
+                and not run.data.get("review_off"):
             run.data.setdefault("clips_ready", now_iso())  # when the clips went to review
         if complete:
             run.data["finished"] = now_iso()
@@ -477,9 +497,10 @@ def watch(cfg: dict, config_path: str | None = None, once: bool = False) -> None
             elif run.get("status") == "done":
                 alert(f"clippa worker: {d.name} " + (
                     "had no picks or segments to cut; nothing to review"
-                    if run.get("nothing_cut") else "is in review")
+                    if run.get("nothing_cut") else "is done; no Kitsu, so the videos are in its folder"
+                    if run.get("review_off") else "is in review")
                     + f" ({since_end(d, t)})", level=logging.INFO, kind=None)
-                if not run.get("nothing_cut"):
+                if not run.get("nothing_cut") and not run.get("review_off"):
                     text, show = ready_text(cfg, d, "ready for review")
                     alerts.send(cfg, "ready", text, key=f"ready:{d.name}", title=show, short=d.name)
             elif lane == "fast" and run.get("clips_ready") and cut_videos(d, ("clips",)):

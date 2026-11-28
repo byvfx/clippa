@@ -221,12 +221,14 @@ def doctor_role(roles: list[str]) -> str:
     return picked.pop() if len(picked) == 1 else "all" if picked else "nas"
 
 
-KITSU_NEEDED = "every role but a control station reviews through Kitsu"
+KITSU_NEEDED = "the war room and the bot review through Kitsu"
 
 
 def kitsu_required(roles: list[str]) -> bool:
-    """`clippa doctor` fails without [review] host and the Kitsu token for these roles (#78)."""
-    return roles != ["recorder"] and not control_only(roles)
+    """`clippa doctor` fails without [review] host and the Kitsu token for these roles (#78).
+    Without serve or the bot, no Kitsu is a setup of its own (#434): runs skip the review stages
+    and leave the videos in the stream folder."""
+    return bool({"serve", "bot"} & set(roles))
 
 
 def kitsu_host_error(v: str, required: bool) -> str | None:
@@ -730,9 +732,13 @@ def step_keys(cfg: dict, st: dict, ask: Ask) -> None:  # noqa: C901
     if not rc["host"] or "<" in rc["host"]:
         def url_ok(v: str) -> str | None:
             return kitsu_host_error(v, bool(need_kitsu and ask.interactive))
-        host = ask.text("kitsu", "Kitsu address (review happens there)", "", url_ok).rstrip("/")
+        host = ask.text("kitsu", "Kitsu address (review happens there" + (
+            ")" if need_kitsu else "; Enter for none: the videos stay in the stream folder)"), "", url_ok).rstrip("/")
         if not host and need_kitsu:
             say(f"skipped the Kitsu address; `clippa doctor` fails until [review] host is set ({need_kitsu}); "
+                "`clippa setup --step keys` asks again")
+        elif not host:
+            say("no Kitsu: `clippa run` skips review and leaves the videos in each stream's folder; "
                 "`clippa setup --step keys` asks again")
         if host:
             host = host if host.endswith("/api") else host + "/api"
@@ -740,11 +746,13 @@ def step_keys(cfg: dict, st: dict, ask: Ask) -> None:  # noqa: C901
             say(f"-> clipper.toml: [review] host = {toml_value(host)}")
             cfg = config.load(base(cfg)["_file"])
     have_host = cfg["review"]["host"] and "<" not in cfg["review"]["host"]
-    ensure_env_key(cfg, ask, cfg["review"]["token_env"], "a Kitsu bot token",
-                   "Kitsu -> Bots -> New bot (Supervisor) -> copy its token", check=bool(have_host),
-                   required=need_kitsu,
-                   if_refused=f"If the address is what's wrong, fix [review] host = {cfg['review']['host']} "
-                              f"in {base(cfg)['_file']}." if have_host else "")
+    if have_host or need_kitsu:  # no token to ask for without a Kitsu to use it on (#434)
+        ensure_env_key(
+            cfg, ask, cfg["review"]["token_env"], "a Kitsu bot token",
+            "Kitsu -> Bots -> New bot (Supervisor) -> copy its token", check=bool(have_host),
+            required=need_kitsu,
+            if_refused=f"If the address is what's wrong, fix [review] host = {cfg['review']['host']} "
+                       f"in {base(cfg)['_file']}." if have_host else "")
     if cfg["transcribe"]["backend"] == "modal" and not control_only(roles):
         if (Path.home() / ".modal.toml").exists() and not user_env("MODAL_TOKEN_ID"):
             say("Modal: token in ~/.modal.toml")

@@ -179,6 +179,26 @@ def test_run_passes_a_show_pin_to_its_stages(tmp_path, defaults, monkeypatch):
     assert "--show" not in calls[0]
 
 
+def test_without_kitsu_the_review_stages_are_skipped_and_the_run_is_done(tmp_path, defaults, monkeypatch):
+    """#434: [review] host empty: no review publish, the run ends done with the videos in the
+    folder, and once Kitsu is set up a run that reaches review sends them there."""
+    calls = []
+    monkeypatch.setattr(worker.subprocess, "call", lambda cmd, **kw: calls.append(cmd[3:5]) or 0)
+    monkeypatch.setattr(worker, "keep_awake", lambda on: None)
+    defaults["review"]["host"] = ""
+    assert worker.run_stream(defaults, tmp_path, stages=["signals", "clips_review", "review"], force=True)
+    run = jsonstate.read_or(tmp_path / "run.json", {})
+    assert calls == [["signals", str(tmp_path)]]
+    assert run["stages"]["review"] == {"status": "skipped", "note": worker.NO_KITSU}
+    assert run["stages"]["clips_review"]["status"] == "skipped" and run["review_off"]
+    assert "clips_ready" not in run  # nothing went to review
+    calls.clear()
+    defaults["review"]["host"] = "http://kitsu.test/api"
+    assert worker.run_stream(defaults, tmp_path, stages=["review"], force=True)
+    assert calls == [["review", "publish"]]
+    assert "review_off" not in jsonstate.read_or(tmp_path / "run.json", {})
+
+
 def test_face_framed_shorts_render_again_after_the_face_scan(tmp_path, defaults, monkeypatch):
     """Copilot on #164: the fast lane's Shorts come before `faces`, so a focus = "face"
     panel kept its middle; the slow lane renders them again once faces.json is there."""

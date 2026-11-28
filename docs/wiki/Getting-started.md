@@ -23,9 +23,13 @@ and running the worker and bot unattended.
 ## One stream end to end
 
 ```bash
-clippa fetch <kick vod url>
+clippa fetch <kick vod url>     # or the path of a video file you already have
 clippa run <stream id>
 ```
+
+A video on disk works the same way ([Fetching VODs](Fetching-VODs#a-file-you-already-have)),
+and without Kitsu the run leaves the cut videos in the stream's folder
+([Fetching VODs](Fetching-VODs#without-kitsu)).
 
 `fetch` keeps going past a video segment Kick no longer has (a gap beats no video) but says how
 many it skipped and stores the count as `skipped_fragments` in the stream's `meta.json`: clips

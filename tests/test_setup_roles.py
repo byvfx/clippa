@@ -19,18 +19,37 @@ def test_control_station_keys_only_warn(defaults, monkeypatch):
     monkeypatch.delenv(defaults["review"]["token_env"], raising=False)
     defaults["paths"]["anthropic_key"] = defaults["paths"]["people"].parent / "no_key.txt"
 
-    def levels(role):
+    def levels(role, what=("ANTHROPIC", "Kitsu", "[review] host")):
         return {line[0] for line in doctor.collect(doctor.check_keys, defaults, role)
-                if "ANTHROPIC" in line[2] or "Kitsu" in line[2] or "[review] host" in line[2]}
+                if any(w in line[2] for w in what)}
 
-    assert levels("gpu") == {"FAIL"}
+    assert levels("gpu", ("ANTHROPIC",)) == {"FAIL"}
     assert levels("control") == {"WARN"}
 
 
+def test_no_kitsu_only_fails_the_roles_that_review_through_it(defaults, monkeypatch):
+    # #434: no [review] host is a setup of its own: runs skip review, doctor warns
+    from clippa import doctor
+
+    monkeypatch.delenv(defaults["review"]["token_env"], raising=False)
+    defaults["review"]["host"] = ""
+
+    def kitsu(role):
+        return [(line[0], line[2]) for line in doctor.collect(doctor.check_kitsu_keys, defaults, role, doctor.fail)]
+
+    assert kitsu("gpu") == [("WARN", "[review] host not set: no review; `clippa run` leaves the videos "
+                                     "in the stream folder")]  # and no token line: nothing to use it on
+    assert {lv for lv, _ in kitsu("serve")} == {"FAIL"} and {lv for lv, _ in kitsu("bot")} == {"FAIL"}
+    defaults["review"]["host"] = "<your kitsu>/api"  # a placeholder is a host someone meant to fill in
+    assert {lv for lv, _ in kitsu("gpu")} == {"FAIL"}
+
+
 def test_kitsu_required_where_doctor_fails_without_it():
-    # #78: setup offered Enter to skip Kitsu, then doctor failed every role but control and nas
-    assert setup.kitsu_required(["worker"]) and setup.kitsu_required(["serve", "bot"])
-    assert setup.kitsu_required(["control", "worker"])
+    # #78: setup offered Enter to skip Kitsu, then doctor failed every role but control and nas;
+    # #434: only serve and the bot review through it now
+    assert setup.kitsu_required(["serve", "bot"]) and setup.kitsu_required(["worker", "serve"])
+    assert setup.kitsu_required(["bot"])
+    assert not setup.kitsu_required(["worker"]) and not setup.kitsu_required(["control", "worker"])
     assert not setup.kitsu_required(["control"]) and not setup.kitsu_required(["recorder", "control"])
     assert not setup.kitsu_required(["recorder"])
     assert setup.kitsu_host_error("", required=False) is None
