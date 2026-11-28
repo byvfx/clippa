@@ -35,6 +35,24 @@ A call to an `openrouter:` model reads `error.metadata.limit_source` on a refusa
 
 A key limit or credits stop is a normal stage failure (exit 1), not a rejected key, so the worker retries the run on its usual schedule (`[worker] retry_minutes`, up to `max_attempts`). Adding credits or raising the key limit is what clears it. A stop during `segments` does not leave a partial `segments.json`; see [Pipeline](Pipeline#stages).
 
+## When Anthropic is out of credits
+
+When the Anthropic account's balance runs out, every call to a bare `claude-*` model is refused
+(HTTP 400, "Your credit balance is too low to access the Anthropic API"). `[llm] fallback` says
+what happens then:
+
+| `[llm] fallback` | On a billing refusal | Cost |
+|---|---|---|
+| `""` (the default) | The stage stops with one line, `Anthropic is out of credits (...)`, exit 5. The worker holds the stream without spending its attempts and tries it again every `[worker] retry_minutes`, or at once when a key changes. serve logs one warning and sends one DM for every job it stops (at most one per `[notify] cooldown_hours`). | none |
+| `"openrouter"` | The same call goes to OpenRouter's copy of the model (`claude-haiku-5-5` becomes `openrouter:anthropic/claude-haiku-5.5`), and so does every later Claude call in that process for an hour; then Anthropic is tried again. The first one prints or logs a line saying so. | OpenRouter's price for the same model; needs `OPENROUTER_API_KEY` or `[paths] openrouter_key` |
+
+Only a billing refusal falls back: a rejected key (401), a refused prompt or any other bad request
+does not. A model OpenRouter doesn't list (its public `/models`) isn't sent there either; the stage
+stops with `OutOfCredits` and says so. On the fallback path Claude's server-side refusal fallback
+drops out and the effort becomes OpenRouter's `reasoning.effort`, as for any `openrouter:` model.
+`clippa doctor` says which provider a bare `claude-*` model will use, and fails with the fallback
+on and no OpenRouter key. To move every stage to OpenRouter for good, use the overlay below.
+
 ## Claude through OpenRouter
 
 [`docs/openrouter-claude.toml`](https://github.com/byvfx/clippa/blob/main/docs/openrouter-claude.toml)

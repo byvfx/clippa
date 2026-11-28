@@ -134,7 +134,11 @@ process instead and logs it to `logs/retake.log`.
   same keys share it, at most one per `[notify] cooldown_hours`. The worker takes the stream again
   as soon as a key it reads changes (a fixed `env.local` and a deploy, or a new key file). The
   meta stage, the review checks and retakes pass a rejected key through rather than turning it
-  into a finding or a retry.
+  into a finding or a retry. Exit 5 (`OUT_OF_CREDITS`: Anthropic refused for billing and `[llm]
+  fallback` didn't send the call to OpenRouter, [Model providers](Model-providers#when-anthropic-is-out-of-credits))
+  is held the same way (`out_of_credits` in `run.json`), without spending attempts, and taken again
+  every `retry_minutes` or as soon as a key changes; held streams share one DM per cooldown, and
+  `clippa checkup` lists them.
 - **cut** with `[cut] backend = "nas"` sshes to `[cut] nas_host` and runs a container named
   `clipper-cut-<id>`; a cut killed half way can leave it running: `ssh nas docker rm -f
   clipper-cut-<id>`.

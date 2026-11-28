@@ -97,7 +97,7 @@ def _give_back(cfg: dict, d: Path) -> str:
         if (d / ".run.lock").exists():
             raise ClipperError(f"{d.name}: a worker holds it now; left alone")
         run = jsonstate.load(d / "run.json")
-        if run.get("status") != "failed" or run.get("key_rejected") \
+        if run.get("status") != "failed" or run.get("key_rejected") or run.get("out_of_credits") \
                 or run.get("attempts", 0) < wc["max_attempts"]:
             raise ClipperError(f"{d.name}: no longer failed with no retries left; left alone")
         run["attempts"] = wc["max_attempts"] - 1

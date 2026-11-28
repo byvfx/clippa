@@ -430,6 +430,26 @@ def check_llm_keys(cfg: dict, need=None) -> None:
                  f"set it as a user environment variable, or put the key in {cfg['paths'].get(f'{prov}_key')}")
 
 
+def check_llm_fallback(cfg: dict, need=None) -> None:
+    """[llm] fallback (#454): which provider a bare claude-* model uses, and with the OpenRouter
+    fallback on, its key. Nothing to say when no stage calls Anthropic itself."""
+    from . import llm
+
+    need = need or fail
+    if not llm.uses_bare_claude(cfg):
+        return
+    if cfg["llm"].get("fallback") != "openrouter":
+        ok("keys", "bare claude-* models use Anthropic; a stage stops if it is out of credits "
+                   "([llm] fallback is off)")
+    elif llm.provider_key("openrouter", cfg["paths"]):
+        ok("keys", "bare claude-* models use Anthropic, then OpenRouter when Anthropic is out of "
+                   "credits ([llm] fallback = \"openrouter\")")
+    else:
+        need("keys", "[llm] fallback = \"openrouter\" but OPENROUTER_API_KEY is not set",
+             f"set it as a user environment variable, or put the key in "
+             f"{cfg['paths'].get('openrouter_key')} (or set [llm] fallback = \"\")")
+
+
 def check_llm_prices(cfg: dict) -> None:
     """Every configured model has an [llm] prices entry, else `clippa costs` counts it as $0."""
     from . import llm
@@ -499,6 +519,7 @@ def check_keys(cfg: dict, role: str) -> None:
         else:
             need("keys", "ANTHROPIC_API_KEY not set", "clippa setup --step keys (or set it as a user env var)")
         check_llm_keys(cfg, need)
+        check_llm_fallback(cfg, need)
         check_llm_prices(cfg)
         rc = cfg["review"]
         if rc["host"] and "<" not in rc["host"]:

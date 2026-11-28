@@ -153,6 +153,7 @@ CHOICES = {
     ("scoring", "audience_knowledge"): ("strangers", "fans"),
     ("scoring", "gambling"): ("reject", "commentary"),
     ("agent", "cli"): ("opencode", "claude"),
+    ("llm", "fallback"): ("", "openrouter"),
 }
 # [agent] checkup_effort and audit_effort may be empty (inherit no effort suffix). Every other
 # effort key is a model effort, including "none".

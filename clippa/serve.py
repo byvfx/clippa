@@ -69,7 +69,7 @@ from . import (
     warroom,
 )
 from .config import base
-from .errors import ClipperError
+from .errors import OUT_OF_CREDITS, ClipperError
 
 log = logging.getLogger("clippa.serve")
 
@@ -226,7 +226,17 @@ class Serve:
                       last_exit=proc.returncode, last_line=(lines[-1] if lines else "")[:200])
             if streak:
                 self.count_run(name, ok=not proc.returncode)
-            if proc.returncode:  # #22: a background job failing is worth a DM (once per cooldown)
+            if proc.returncode == OUT_OF_CREDITS:
+                # #454: Anthropic refused for billing. Every job that calls Claude fails the same
+                # way until the balance is topped up, so it is one warning and one shared DM
+                # (per [notify] cooldown_hours), not a failure line per job and run.
+                last = lines[-1].strip() if lines else ""
+                log.warning(f"{name}: Anthropic is out of credits: {last[:300]}")
+                alerts.send(self.cfg, "failure",
+                            f"Anthropic is out of credits: `clippa {' '.join(args)}` and every other Claude "
+                            "call stop until the balance is topped up, or [llm] fallback = \"openrouter\" "
+                            f"is set. {last[:300]}", key="out_of_credits")
+            elif proc.returncode:  # #22: a background job failing is worth a DM (once per cooldown)
                 last = lines[-1].strip() if lines else ""
                 # Keyed on the last line too, verbatim (item keys carry their digits), so a
                 # different item failing the next hour isn't swallowed by this one's cooldown.

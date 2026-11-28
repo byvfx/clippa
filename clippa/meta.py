@@ -21,7 +21,7 @@ from pathlib import Path
 
 from . import jsonstate
 from .config import for_stream
-from .errors import ClipperError, OpenRouterLimit, key_rejected
+from .errors import ClipperError, stops_run
 from .llm import Claude, estimate_lines, preflight, tokens
 from .prompts import Prompts
 from .timefmt import clock, hms
@@ -274,18 +274,18 @@ def generate(stream_dir: Path, mc: dict, assets: list[dict], lines: list[str],
             try:
                 saved["chapters"][k] = f.result()
             except Exception as e:  # noqa: BLE001
-                rejected = rejected or (e if key_rejected(e) or isinstance(e, OpenRouterLimit) else None)
+                rejected = rejected or (e if stops_run(e) else None)
                 errors.append(f"chapters {k}: {type(e).__name__}: {e}")
         if f_meta:
             try:
                 saved["gen"] = f_meta.result()[0]
             except Exception as e:  # noqa: BLE001
-                rejected = rejected or (e if key_rejected(e) or isinstance(e, OpenRouterLimit) else None)
+                rejected = rejected or (e if stops_run(e) else None)
                 errors.append(f"metadata: {type(e).__name__}: {e}")
     ckpt.parent.mkdir(parents=True, exist_ok=True)
     jsonstate.write(ckpt, saved)
     if rejected:
-        raise rejected  # exit KEY_REJECTED, so the stream is held, not retried (#281)
+        raise rejected  # a rejected key or no credits is held (#281, #454); a spending limit stops the run
     if errors:
         raise ClipperError("meta: " + "; ".join(errors)[:600] + f"\n(what worked is kept in {ckpt.name}; "
                          "rerun clippa meta to finish)")

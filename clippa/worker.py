@@ -38,7 +38,7 @@ from pathlib import Path
 
 from . import jsonstate, stages
 from .config import for_stream, show_args, show_of_channel
-from .errors import KEY_REJECTED, ClipperError
+from .errors import KEY_REJECTED, OUT_OF_CREDITS, ClipperError
 from .llm import keys_fingerprint
 from .states import PRESHOW_PREFIX, is_preshow
 from .timefmt import age_s, now_iso
@@ -170,6 +170,7 @@ class Run:
             self.data.setdefault("stages", {})
             self.data.update(worker=self.me, status="running", heartbeat=now_iso(), error="")
             self.data.pop("key_rejected", None)
+            self.data.pop("out_of_credits", None)
             self.data["attempts"] = self.data.get("attempts", 0) + 1
             self.save()
         self._beat = threading.Thread(target=self._heartbeat, daemon=True)
@@ -331,6 +332,13 @@ def run_stream(cfg: dict, stream_dir: Path, config_path: str | None = None,  # n
                     # ran is a change, so the stream is tried again at once.
                     run.data["key_rejected"] = keys_then
                     run.data["attempts"] = max(0, run.data.get("attempts", 1) - 1)
+                elif code == OUT_OF_CREDITS:
+                    # #454: Anthropic refused for billing and nothing fell back. Every attempt
+                    # would be refused the same way until the balance is topped up, so the stream
+                    # is held (pending: every retry_minutes, or at once when a key changes) and
+                    # the attempt given back, as for a rejected key.
+                    run.data["out_of_credits"] = keys_then
+                    run.data["attempts"] = max(0, run.data.get("attempts", 1) - 1)
                 run.save()
                 log.error("%s: %s failed (%s), see %s", name, stage, exit_text(code), log_path)
                 return False
@@ -405,6 +413,13 @@ def pending(cfg: dict) -> list[Path]:
             if keys != "unread" and keys != run["key_rejected"]:
                 out.append(d)  # a key changed (a fixed env.local, a new key file): try now
             continue  # (unreadable just now: stay held, look again next pass)
+        if run.get("status") == "failed" and run.get("out_of_credits"):
+            keys = stream_keys(cfg, d)
+            # a key changed, or it's time to see whether the balance was topped up (#454); the
+            # attempts were given back, so a hold never runs out of them
+            if (keys != "unread" and keys != run["out_of_credits"])                     or age_s(run.get("updated")) >= wc["retry_minutes"] * 60:
+                out.append(d)
+            continue
         if run.get("status") == "failed":
             if run.get("attempts", 0) >= wc["max_attempts"]:
                 continue
@@ -484,6 +499,12 @@ def watch(cfg: dict, config_path: str | None = None, once: bool = False) -> None
                   " deploy/hub/env.local and then deploy.sh; the worker picks it up again by itself)",
                   # streams held by one key set share a DM: at most one per [notify] cooldown_hours
                   kind="failure", key=f"key_rejected:{run['key_rejected']}")
+        elif run.get("status") == "failed" and run.get("out_of_credits"):
+            alert(f"clippa worker: {d.name} stopped, Anthropic is out of credits: {run.get('error', '')[:400]}"
+                  f" (held, tried again every {wc['retry_minutes']} min without spending its attempts: top"
+                  " up the Anthropic balance, or set [llm] fallback = \"openrouter\")",
+                  # every stream held for credits shares one DM, at most one per [notify] cooldown_hours
+                  kind="failure", key="out_of_credits")
         elif run.get("status") == "failed":
             left = wc["max_attempts"] - run.get("attempts", 0)
             alert(f"clippa worker: {d.name} failed: {run.get('error', '')[:600]}"

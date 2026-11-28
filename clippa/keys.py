@@ -163,12 +163,13 @@ def store(cfg: dict) -> Path:
 
 
 def held(cfg: dict) -> list[dict]:
-    """Streams the worker holds because a key was rejected (#281)."""
+    """Streams the worker holds because a key was rejected (#281), or Anthropic is out of credits
+    (#454: its error says so)."""
     out = []
     root: Path = cfg["paths"]["streams"]
     for p in sorted(root.glob("*/run.json")) if root.is_dir() else []:
         run = jsonstate.read_or(p, {})
-        if run.get("status") == "failed" and run.get("key_rejected"):
+        if run.get("status") == "failed" and (run.get("key_rejected") or run.get("out_of_credits")):
             out.append({"stream": p.parent.name, "error": str(run.get("error", ""))[:300],
                         "since": run.get("updated", "")})
     return out

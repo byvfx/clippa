@@ -138,6 +138,11 @@ def check_streams(cfg: dict, now: datetime) -> list[dict]:
                                f"{d.name}: held, an API key was rejected: {run.get('error', '')[:300]}",
                                look="the key in deploy/hub/env.local (then deploy.sh); the worker "
                                     "retries by itself once a key changes", stream=d.name))
+        elif status == "failed" and run.get("out_of_credits"):
+            out.append(finding(f"credits:{d.name}", "streams", BAD,
+                               f"{d.name}: held, Anthropic is out of credits: {run.get('error', '')[:300]}",
+                               look="top up the Anthropic balance, or set [llm] fallback = \"openrouter\"; "
+                                    f"the worker tries again every {wc['retry_minutes']} min", stream=d.name))
         elif status == "failed" and run.get("attempts", 0) >= wc["max_attempts"]:
             out.append(finding(f"failed:{d.name}", "streams", BAD,
                                f"{d.name}: failed with no retries left: {run.get('error', '')[:300]}",
