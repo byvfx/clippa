@@ -217,16 +217,18 @@ the callback's OSError), so don't chase it again.
   analytics` retries Google's passing errors and skips a video still failing (#335, #336); a failed analytics or prune run comes
   back in 30 min, doubling per failure (`RETRY_FAILED_S`, #338). Details: log 11-20.
 - **Model providers (#72, closed 11-09):** production still runs Haiku and Sonnet. Config-7 is being evaluated through the opt-in overlays `docs/config-7-hybrid-segv4.toml` and `docs/config-7-hybrid-segv4-openrouter.toml` (wiki Model-rollout); the defaults stay. Tools: `clippa compare score`, `clippa models test|gold`; OpenRouter key in `secrets/openrouter_secret.txt`.
-- **OpenRouter budget panel (merged, not deployed, 11-24):** Money page, beside API usage. Reads the clippa key server-side. Changing the limit or disabling the key needs `OPENROUTER_MANAGEMENT_KEY` or `secrets/openrouter_management_secret.txt` (never in the page). Warning percent defaults to 75, saved in `streams/.serve/openrouter.json`. Do not touch production `clipper.toml` for this. Reaches serve only after `bash deploy/hub/deploy.sh` from a main checkout once it is merged.
+- **OpenRouter budget panel (on the hub):** Money page, beside API usage. Reads the clippa key server-side. Changing the limit or disabling the key needs `OPENROUTER_MANAGEMENT_KEY` or `secrets/openrouter_management_secret.txt` (never in the page). Warning percent defaults to 75, saved in `streams/.serve/openrouter.json`.
+- **Anthropic out of credits → OpenRouter (#454, PR #463, on the hub since 11-27 at 85239e6):** the NAS
+  `clipper.toml` is back on bare `claude-*` models with `[llm] fallback = "openrouter"`. A billing refusal
+  resends that call through OpenRouter, and the process keeps using OpenRouter for an hour before it tries
+  Anthropic again. With the fallback off, the stage exits 5 (`OutOfCredits`), the worker holds the stream
+  (run.json `out_of_credits`) and the alerts DM says so. The 11-26 stopgap (29 keys on
+  `openrouter:anthropic/...`) was removed 11-27; backups `backups/clipper.toml.before_stopgap_removal_2026-11-27`
+  (with it) and `...before_openrouter_stopgap_2026-11-26` (before it). `[agent] model` was on `openrouter:` before
+  the stopgap and stays. Serve's own jobs may keep the stopgap models until serve next restarts.
 
 ## Waiting on the user
-- **Every stage model is on OpenRouter since 2026-11-26** (Anthropic credits ran out; Clippa has no
-  Anthropic-to-OpenRouter failover). The 29 keys in the NAS `clipper.toml` read
-  `openrouter:anthropic/claude-*-5.5`, each tagged `# OpenRouter stopgap 2026-11-26, was claude-...`
-  (five sections added at the end: cast, chat, pick, archive, swarm). Backup:
-  `backups/clipper.toml.before_openrouter_stopgap_2026-11-26`. Switch back once the user tops up
-  Anthropic by undoing the tagged lines. Don't restore that backup: it predates the 11-27 `[segments] max_s` change. Stages pick it
-  up on their next run; serve and the bot were restarted on it (11-26 16:17 PT). The real fix is #454.
+- Top up Anthropic credits when wanted (since 11-26); until then Claude calls go through OpenRouter. Nothing to change after.
 - `kick-140303366` has a band-aid `config.toml` (`[shorts] codec = "libx264"`, #429 hit again on
   v05_t51, 11-26); remove it, and `kick-139915441`'s, once #429 is deployed.
 - Draft: the NAS agent container (`deploy/agent`, OpenCode + OpenRouter) beside `clippa-claude`.
@@ -284,20 +286,14 @@ the callback's OSError), so don't chase it again.
 - `clippa setup` (#78) phase 1 passed in Windows Sandbox (2026-10-28). Next: the real install on the desktop
   (#46; clone into a short folder like `C:\clipper`, run `deploy\bootstrap.ps1`), then the MacBook as #78's join-mode test (#7 closed into #78, 11-13).
   PR #352 (11-20): setup no longer lets a worker, serve or bot machine skip the Kitsu address and token (doctor failed
-  without them); merged 11-20, reaches the hub with the next deploy.
+  without them); merged 11-20, on the hub.
 - `ANTHROPIC_ADMIN_KEY` for Claude's own usage count on Costs, if wanted.
 
 ## Open work
-- **Hold the hub deploy for the review-fix PR (11-23):** the Cursor agent PRs merged since
-  v0.4.0 (#398 cost estimates, #400 / #414 OpenRouter limits, #415 budget panel) had Grok
-  findings nobody handled, and a review found more. Branch `fix/cursor-pr-review` fixes them
-  (log 2026-11-23 "Review fixes for the Cursor PRs"). Deploy only once it is merged; #388 (the
-  Discord cards) is already on the hub, so its fixes reach the bot with that deploy.
-- **OpenRouter spending limits (not deployed):** a key limit or empty credits stops the model
+- **OpenRouter spending limits (on the hub; the review fixes were PR #420):** a key limit or empty credits stops the model
   call at once (`OpenRouterLimit`); an in-flight budget waits for `Retry-After` (up to two
   minutes a try) and retries; when it can't, only that call fails. A segments run that stops
-  this way does not write a partial `segments.json`. Not on the hub until
-  `deploy/hub/deploy.sh` runs. Production `clipper.toml` was not touched.
+  this way does not write a partial `segments.json`.
 - **OpenRouter Claude overlay (not applied):** `docs/openrouter-claude.toml` is every Claude
   stage model at the same tier and effort, as `openrouter:anthropic/claude-*.5`. No price
   rows: a `--dry-run` reads OpenRouter's public list once per process. Paste into
