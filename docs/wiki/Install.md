@@ -74,8 +74,10 @@ runs `clippa setup`:
 4. **Keys.** Anthropic, the Kitsu address and bot token, Modal (when it transcribes there), the
    Discord bot token (bot role, or `[discord] enabled`). Typed hidden, checked against the
    service, saved as Windows user env vars / in your shell profile / in `secrets/`. Enter skips
-   one, except the Kitsu address and token on every role but a control station: review happens
+   one, except the Kitsu address and token on serve and the bot: the war room and the bot review
    in Kitsu and doctor fails without them, so setup asks again (Ctrl+C stops; it resumes there).
+   Elsewhere Enter at the Kitsu address means no Kitsu: runs leave the videos in the stream
+   folder ([Fetching VODs](Fetching-VODs#without-kitsu)).
 5. **Check.** `clippa doctor` for the chosen roles, then what to run next.
 
 On Linux the bootstrap also installs the fonts covers and captions use, which Windows and macOS

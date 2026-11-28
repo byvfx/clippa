@@ -504,6 +504,26 @@ def check_llm_online(cfg: dict) -> None:
                                            + ("" if name in have else " not listed by the server"))
 
 
+KITSU_ROLES = ("all", "serve", "bot")  # the war room and the bot review through Kitsu
+
+
+def check_kitsu_keys(cfg: dict, role: str, need) -> None:
+    """[review] host and the Kitsu token. An empty host is no Kitsu (#434): runs skip the review
+    stages, so only a role that reviews through it fails without one."""
+    rc = cfg["review"]
+    if not rc["host"] and role not in KITSU_ROLES:
+        warn("keys", "[review] host not set: no review; `clippa run` leaves the videos in the stream folder",
+             "set it to your Kitsu URL + /api to review in Kitsu (clippa setup --step keys)")
+        return
+    if rc["host"] and "<" not in rc["host"]:
+        ok("keys", f"[review] host = {rc['host']}")
+    else:
+        need("keys", "[review] host not set", "clippa setup --step keys, or set it to your Kitsu URL + /api in clipper.toml")
+    have = bool(os.environ.get(rc["token_env"]))
+    (ok if have else need)("keys", f"${rc['token_env']} (Kitsu bot token) " + ("set" if have else "not set"),
+                           "" if have else "Kitsu > Bots > new token; clippa setup --step keys")
+
+
 def check_keys(cfg: dict, role: str) -> None:
     # a control station runs no stage and uses Kitsu in the browser: missing keys only warn there
     need = warn if role == "control" else fail
@@ -521,14 +541,7 @@ def check_keys(cfg: dict, role: str) -> None:
         check_llm_keys(cfg, need)
         check_llm_fallback(cfg, need)
         check_llm_prices(cfg)
-        rc = cfg["review"]
-        if rc["host"] and "<" not in rc["host"]:
-            ok("keys", f"[review] host = {rc['host']}")
-        else:
-            need("keys", "[review] host not set", "clippa setup --step keys, or set it to your Kitsu URL + /api in clipper.toml")
-        (ok if os.environ.get(rc["token_env"]) else need)(
-            "keys", f"${rc['token_env']} (Kitsu bot token) " + ("set" if os.environ.get(rc["token_env"]) else "not set"),
-            "" if os.environ.get(rc["token_env"]) else "Kitsu > Bots > new token; clippa setup --step keys")
+        check_kitsu_keys(cfg, role, need)
     if (cfg["discord"]["enabled"] and role != "control") or role == "bot":
         from .notify import token
         try:

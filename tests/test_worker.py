@@ -179,6 +179,53 @@ def test_run_passes_a_show_pin_to_its_stages(tmp_path, defaults, monkeypatch):
     assert "--show" not in calls[0]
 
 
+def test_without_kitsu_the_review_stages_are_skipped_and_the_run_is_done(tmp_path, defaults, monkeypatch):
+    """#434: [review] host empty: no review publish, the run ends done with the videos in the
+    folder, and once Kitsu is set up a run that reaches review sends them there."""
+    calls = []
+    monkeypatch.setattr(worker.subprocess, "call", lambda cmd, **kw: calls.append(cmd[3:5]) or 0)
+    monkeypatch.setattr(worker, "keep_awake", lambda on: None)
+    defaults["review"]["host"] = ""
+    assert worker.run_stream(defaults, tmp_path, stages=["signals", "clips_review", "review"], force=True)
+    run = jsonstate.read_or(tmp_path / "run.json", {})
+    assert calls == [["signals", str(tmp_path)]]
+    assert run["stages"]["review"] == {"status": "skipped", "note": worker.NO_KITSU}
+    assert run["stages"]["clips_review"]["status"] == "skipped" and run["review_off"]
+    assert "clips_ready" not in run  # nothing went to review
+    calls.clear()
+    assert worker.run_stream(defaults, tmp_path, stages=["clips_review", "review"])  # still no Kitsu
+    assert calls == [] and jsonstate.read_or(tmp_path / "run.json", {})["review_off"]
+    # review: once Kitsu is set up, a plain run sends what was skipped (no --force needed)
+    defaults["review"]["host"] = "http://kitsu.test/api"
+    assert worker.run_stream(defaults, tmp_path, stages=["clips_review", "review"])
+    assert calls == [["review", "publish"], ["review", "publish"]]
+    run = jsonstate.read_or(tmp_path / "run.json", {})
+    assert "review_off" not in run and run["stages"]["review"]["status"] == "done"
+
+
+def test_the_slow_review_ends_the_clips_no_kitsu_skip(tmp_path, defaults, monkeypatch):
+    # #466 review: the slow lane has no clips_review, but its publish sends the clips too
+    monkeypatch.setattr(worker.subprocess, "call", lambda cmd, **kw: 0)
+    monkeypatch.setattr(worker, "keep_awake", lambda on: None)
+    defaults["review"]["host"] = ""
+    assert worker.run_stream(defaults, tmp_path, stages=["clips_review"])  # the fast lane, no Kitsu
+    defaults["review"]["host"] = "http://kitsu.test/api"
+    assert worker.run_stream(defaults, tmp_path, stages=["review"])  # the slow lane, Kitsu now
+    run = jsonstate.read_or(tmp_path / "run.json", {})
+    assert run["stages"]["clips_review"] == {"status": "done", "note": "sent with review"}
+    assert "review_off" not in run
+
+
+def test_a_broken_stream_config_doesnt_stop_the_run_before_review(tmp_path, defaults, monkeypatch):
+    # review: kitsu_on runs in the worker, not a stage child; the stage's own log says what's wrong
+    from clippa import errors
+
+    def broken(cfg, d):
+        raise errors.ClipperError("config.toml: bad")
+    monkeypatch.setattr(worker, "for_stream", broken)
+    assert worker.kitsu_on(defaults, tmp_path)
+
+
 def test_face_framed_shorts_render_again_after_the_face_scan(tmp_path, defaults, monkeypatch):
     """Copilot on #164: the fast lane's Shorts come before `faces`, so a focus = "face"
     panel kept its middle; the slow lane renders them again once faces.json is there."""

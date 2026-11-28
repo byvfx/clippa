@@ -308,6 +308,12 @@ the callback's OSError), so don't chase it again.
   on; that bot change is a draft and is not deployed. Do not set 3000 in production `clipper.toml`
   until the segments prompt that goes with it is in.
 
+- **Local VODs (#434, PR 1 on `feat/local-vod-import`):** `clippa fetch <path>` (`clippa/local.py`) imports one video
+  file as `local-<slug>-<6 hex>` (copy, `--link`, `--move`; `--title`, `--started`, `clippa --show <key>`); the id's
+  hash is the size + first/last MiB, and meta.json's `fingerprint` makes a re-import a no-op. With `[review] host`
+  empty the worker skips `clips_review`/`review` (run.json `review_off`), and doctor warns except on serve/bot
+  (`doctor.KITSU_ROLES`); setup only requires Kitsu for serve and the bot. Next: PR 2 (folders, `--run` with a $/hour
+  prompt from costs.jsonl, `[worker] take_local`), PR 3 (`--chat FILE`). Not tried on a real file yet.
 - **Music and the editor (planned 11-23, build on hold until the user says go):** v0.5.0's key feature is #396 (the music check:
   `[music] strip = off | all | identified`, default handling per span, claims import, a Music list in the item window; step 1 is
   `audioedit.py`, bleeps moved onto it). The editor moved to v0.6.0 as #408: one reusable Descript-style editor for one video,

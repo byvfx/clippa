@@ -36,6 +36,10 @@ checks them. In clipper.toml:
 host = "http://<host>:8090/api"   # the API URL, with /api
 ```
 
+Kitsu is optional on a machine that only runs the pipeline: with `host` empty, runs skip
+review and leave the videos in the stream folder ([Fetching VODs](Fetching-VODs#without-kitsu)).
+The war room and the bot need it.
+
 `clippa doctor` (online) signs in and reports the bot's name. The first `clippa review
 publish` creates the "Clipping" project template and the show's production (named after
 `[meta] show_name`, or `[review] project`) with the task types, statuses and columns Clippa

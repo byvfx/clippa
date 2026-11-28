@@ -174,27 +174,29 @@ def _stream_for_vod(cfg: dict, url: str) -> Path | None:
     return found[0] if found else None
 
 
-def _refuse_link_stream(cfg: dict, d: Path) -> None:
-    """#444: a resolve that succeeds names the folder to fetch into, and `mkdir(exist_ok=True)`
-    takes a link (a symlink, or on Windows a junction) as a folder: yt-dlp's download, the remux's
-    replace and the wav's removal would all happen where it points. A link at that name, or a
-    folder that resolves out of the streams tree, is refused before anything writes into it. The
-    message names the folder only: it is logged, said in a chat and stored in run.json, so it
-    carries no path and no url."""
-    from .media import link_or_raise
+def _fetch_file(cfg: dict, args: argparse.Namespace) -> bool:
+    """#434: `clippa fetch <path>` imports a video already on disk. True when args.url was one."""
+    from . import local
 
-    try:
-        inside = d.resolve().is_relative_to(Path(cfg["paths"]["streams"]).resolve())
-    except (OSError, RuntimeError):  # a share that won't resolve, or a link loop: nothing says it is ours
-        inside = False
-    if link_or_raise(d, d.name, "the stream folder") or not inside:
-        raise ClipperError(f"{d.name}: that stream folder is a link or outside the streams folder; "
-                           f"refusing to fetch into it")
+    # the file flags: a Namespace built elsewhere (a tool, a test) may leave them out
+    link, move, title, started = (getattr(args, k, None) for k in ("link", "move", "title", "started"))
+    if not local.is_path(args.url):
+        if link or move or title or started:
+            raise ClipperError("--link, --move, --title and --started are for a file on disk, not a url")
+        return False
+    if args.fixup or args.no_video or args.no_chat:
+        raise ClipperError("--fixup, --no-video and --no-chat are for urls; a file is imported as it is")
+    local.fetch(cfg, args.url, "link" if link else "move" if move else "copy",
+                title=title or "", started=started or "")
+    return True
 
 
 def cmd_fetch(cfg: dict, args: argparse.Namespace) -> None:
     from . import kick
+    from .media import refuse_link_stream
 
+    if _fetch_file(cfg, args):
+        return
     host = _fetch_host(args.url)
     if args.fixup and host != "kick.com" and not host.endswith(".kick.com"):
         # a url that names no plain hostname is "that url": nothing it holds is read back
@@ -225,7 +227,7 @@ def cmd_fetch(cfg: dict, args: argparse.Namespace) -> None:
         kick.fixup(d, cfg, api_down=True)
         return
     d = cfg["paths"]["streams"] / meta["stream_id"]
-    _refuse_link_stream(cfg, d)  # before mkdir takes a link for a folder and every write goes through it
+    refuse_link_stream(cfg, d)  # before mkdir takes a link for a folder and every write goes through it
     d.mkdir(parents=True, exist_ok=True)
     # a rerun (for the chat, say) keeps what the first download found, as long as that video stays
     old = jsonstate.read(d / "meta.json", {})
@@ -1453,9 +1455,18 @@ def command_list() -> str:
 
 def add_pipeline(sub) -> None:
     """Pipeline: a stream from recording to review, in run order."""
-    p = sub.add_parser("fetch", help="resolve a Kick, Twitch or YouTube VOD url, pull chat and video")
+    p = sub.add_parser("fetch", help="resolve a Kick, Twitch or YouTube VOD url, pull chat and video; "
+                                     "or import a video file already on disk")
     p.add_argument("url", help="the VOD url (kick.com/<channel>/videos/<id>, twitch.tv/videos/<id>, "
-                               "youtube.com/watch?v=<id>)")
+                               "youtube.com/watch?v=<id>), or the path of a video file (#434; "
+                               "`clippa --show <key> fetch <file>` sets its show)")
+    how = p.add_mutually_exclusive_group()
+    how.add_argument("--link", action="store_true", help="a file: hardlink it into the stream folder "
+                                                         "instead of copying (same drive only)")
+    how.add_argument("--move", action="store_true", help="a file: move it into the stream folder")
+    p.add_argument("--title", help="a file: its title (default: the file name)")
+    p.add_argument("--started", metavar="WHEN", help="a file: when it was streamed, e.g. 2026-11-24T20:00 "
+                                                     "(default: the video's own date, else the file's)")
     p.add_argument("--no-video", action="store_true", help="chat and meta only; no video download")
     p.add_argument("--no-chat", action="store_true", help="video and meta only; no chat replay")
     p.add_argument("--fixup", action="store_true",

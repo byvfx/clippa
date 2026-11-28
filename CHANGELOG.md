@@ -12,6 +12,12 @@ Developing#releases.
 
 ### 2026-11
 
+- 11-27: `clippa fetch <path>` takes a video file you already have and makes it a stream
+  (`local-<name>-<hash>`), copied by default or with `--link`/`--move`, and `--title`, `--started`
+  and `clippa --show <key>` set its details (#434). Fetching the same file again does nothing. Without
+  Kitsu (`[review] host` empty), `clippa run` now skips the review stages and finishes with the videos
+  in the stream folder instead of failing (once Kitsu is set up, `clippa run <stream>` sends them to
+  review), and `clippa doctor` warns rather than fails, except on serve and the bot.
 - 11-27: Clippa can fall back to OpenRouter when Anthropic is out of credits: with `[llm] fallback
   = "openrouter"` a refused Claude call goes to OpenRouter's copy of the same model, and so do the
   process's later ones for an hour (#454). Off by default. Either way, a stage stopped by an

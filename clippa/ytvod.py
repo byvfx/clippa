@@ -14,7 +14,7 @@ import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
-from . import jsonstate, ytdl
+from . import jsonstate, media, ytdl
 from .errors import ClipperError
 
 URL = re.compile(r"(?:youtube\.com/(?:watch\?(?:[^#]*&)?v=|live/|shorts/)|youtu\.be/)([\w-]{11})")
@@ -110,6 +110,7 @@ def fetch_chat(stream_dir: Path, meta: dict, cfg: dict) -> Path | None:
 def fetch(cfg: dict, url: str, no_video: bool = False, no_chat: bool = False) -> Path:
     meta = resolve(url, cfg)
     d = cfg["paths"]["streams"] / meta["stream_id"]
+    media.refuse_link_stream(cfg, d)  # #444: before mkdir takes a link for a folder and writes go through it
     d.mkdir(parents=True, exist_ok=True)
     jsonstate.write(d / "meta.json", meta)
     print(f"{meta['stream_id']}: {meta['title']} ({meta['duration_s'] / 3600:.2f} h)")

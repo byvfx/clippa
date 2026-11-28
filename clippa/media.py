@@ -32,6 +32,21 @@ def link_or_raise(p: Path, label: str, what: str = "") -> bool:
                            f"({e.strerror or 'the system refused it'})") from None
 
 
+def refuse_link_stream(cfg: dict, d: Path) -> None:
+    """#444: a fetch names the folder to write into, and `mkdir(exist_ok=True)` takes a link (a
+    symlink, or on Windows a junction) as a folder: a download, a copy or a remux would all happen
+    where it points. A link at that name, or a folder that resolves out of the streams tree, is
+    refused before anything writes into it. The message names the folder only: it is logged, said
+    in a chat and stored in run.json, so it carries no path and no url."""
+    try:
+        inside = d.resolve().is_relative_to(Path(cfg["paths"]["streams"]).resolve())
+    except (OSError, RuntimeError):  # a share that won't resolve, or a link loop: nothing says it is ours
+        inside = False
+    if link_or_raise(d, d.name, "the stream folder") or not inside:
+        raise ClipperError(f"{d.name}: that stream folder is a link or outside the streams folder; "
+                           f"refusing to fetch into it")
+
+
 def remove_link(p: Path) -> None:
     """Remove a link without touching what it names. A junction, and on Windows a symlink to a
     folder, are directories to `unlink`, which refuses them there: `rmdir` drops the link alone and
@@ -86,6 +101,12 @@ def try_duration(path: Path, video: bool = False) -> float | None:
         return float(out.splitlines()[0].split(",")[0])
     except (IndexError, ValueError):
         return None
+
+
+def creation_time(path: Path) -> str:
+    """The container's creation_time tag ("" when it has none), as ffprobe prints it."""
+    out = _probe(path, "format_tags=creation_time").splitlines()
+    return out[0].split(",")[0].strip() if out else ""
 
 
 def duration(path: Path) -> float:
