@@ -18,8 +18,9 @@ import re
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
-from . import jsonstate, media
+from . import config, jsonstate, media
 from .errors import ClipperError
 
 PREFIX = "local-"
@@ -45,27 +46,31 @@ def slug(name: str) -> str:
 
 
 def fingerprint(path: Path) -> str:
-    """sha1 of the file's size and its first and last MiB, as hex."""
+    """sha1 of the file's size and its first and last MiB (all of it up to 2 MiB), as hex."""
     n = path.stat().st_size
     h = hashlib.sha1(str(n).encode())
     with open(path, "rb") as f:
-        h.update(f.read(_EDGE))
-        if n > 2 * _EDGE:
+        if n <= 2 * _EDGE:
+            h.update(f.read())
+        else:
+            h.update(f.read(_EDGE))
             f.seek(n - _EDGE)
             h.update(f.read(_EDGE))
     return h.hexdigest()
 
 
-def started_at(path: Path, given: str = "") -> str:
-    """ISO start time: `given` (a date or a datetime, local time unless it says otherwise), the
-    container's creation_time, or the file's mtime."""
+def started_at(path: Path, given: str = "", tz: str = "") -> str:
+    """ISO start time: `given` (a date or a datetime, in `tz`, the show's [schedule] timezone,
+    unless it says otherwise), the container's creation_time, or the file's mtime."""
     if given:
         try:
             t = datetime.fromisoformat(given)
         except ValueError:
             raise ClipperError(f"--started {given!r}: an ISO date or time, e.g. 2026-11-24 or "
                                f"2026-11-24T20:00") from None
-        return (t if t.tzinfo else t.astimezone()).isoformat()
+        if not t.tzinfo:  # the show's own clock, not this machine's (a NAS container runs in UTC)
+            t = t.replace(tzinfo=ZoneInfo(tz)) if tz else t.astimezone()
+        return t.isoformat()
     tag = media.creation_time(path)
     if tag:
         try:
@@ -108,9 +113,24 @@ def _place(src: Path, dest: Path, how: str, label: str) -> None:
         if how != "move":  # a move stopped half way may be the only copy left: it stays as .part
             part.unlink(missing_ok=True)
         hint = ("; a hardlink needs the file on the same drive as the streams folder, drop --link to copy"
-                if how == "link" else "")
+                if how == "link" else
+                f"; the video is now {label}/{part.name} in the streams folder" if part.exists() else "")
         raise ClipperError(f"{label}: couldn't {how} the video into the stream folder "
                            f"({e.strerror or e}){hint}") from None
+
+
+def _channel(cfg: dict) -> str:
+    """The channel meta.json gets: the pinned show's first (`clippa --show <key>`), so for_stream
+    finds that show from it later, or "local" for the base config. A show with no channel of its
+    own is refused: for_show would hand back the base [kick] channel, which may be another show's."""
+    if not cfg.get("_pinned"):
+        return "local"
+    key = cfg["show"]["key"]
+    channels = config.base(cfg)["shows"][key]["channels"]
+    if not channels:
+        raise ClipperError(f"[shows.{key}] has no channels; add one so its streams can be found as that "
+                           f"show's (it needn't be a real Kick channel)")
+    return channels[0]
 
 
 def fetch(cfg: dict, path: str, how: str = "copy", title: str = "", started: str = "") -> Path:
@@ -128,6 +148,7 @@ def fetch(cfg: dict, path: str, how: str = "copy", title: str = "", started: str
         inside = False
     if inside:  # a stream's own source (or anything of one): importing it would make a second stream
         raise ClipperError(f"{src.name}: already in the streams folder; `clippa run <stream>` runs a stream")
+    channel = _channel(cfg)
     media.size(src)  # a video stream, or ClipperError: Shorts, faces and covers need one
     duration = media.duration(src)
     fp = fingerprint(src)
@@ -138,9 +159,16 @@ def fetch(cfg: dict, path: str, how: str = "copy", title: str = "", started: str
     sid = f"{PREFIX}{slug(src.stem)}-{fp[:6]}"
     d = streams / sid
     media.refuse_link_stream(cfg, d)  # before mkdir takes a link for a folder and writes go through it
+    try:
+        other = jsonstate.read(d / "meta.json", {}).get("fingerprint")
+    except (OSError, ValueError):
+        other = "unreadable"
+    if other:  # find() didn't match it, so it's another file's stream with the same short id
+        raise ClipperError(f"{sid}: that stream is another file's (same name, same short hash); "
+                           f"rename this file and fetch it again")
     d.mkdir(parents=True, exist_ok=True)
     dest = d / f"source{ext}"
-    start = started_at(src, started)  # before the copy: a copy's mtime is now
+    start = started_at(src, started, cfg["schedule"]["timezone"])  # before the copy: a copy's mtime is now
     # A copy that finished before meta.json was written is kept (same size), anything else redone
     if not (dest.exists() and not media.is_link(dest) and dest.stat().st_size == src.stat().st_size):
         _place(src, dest, how, sid)
@@ -149,7 +177,7 @@ def fetch(cfg: dict, path: str, how: str = "copy", title: str = "", started: str
     meta = {
         "stream_id": sid,
         "platform": "local",
-        "channel": (cfg["show"]["channel"] if cfg.get("_pinned") else "") or "local",
+        "channel": channel,
         "title": title or src.stem,
         "started_at": start,
         "duration_s": round(duration, 3),

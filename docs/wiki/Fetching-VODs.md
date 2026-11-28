@@ -28,7 +28,7 @@ clippa run local-kino-night-12-1c32e3
 | `--show <key>` (before `fetch`) | the show it belongs to: its first channel goes in `meta.json`, so every later command uses that show's settings. Without it, the base config applies |
 | `--link` / `--move` | hardlink or move the file into the stream folder instead of copying it. A hardlink needs the same drive as the streams folder |
 | `--title` | the title (default: the file name) |
-| `--started` | when it was streamed, an ISO date or time, local unless it says otherwise (default: the video's own creation date, else the file's) |
+| `--started` | when it was streamed, an ISO date or time, in the show's `[schedule] timezone` unless it says otherwise (default: the video's own creation date, else the file's) |
 
 The id's hash comes from the file's size and its first and last MiB, so fetching the same file
 again, even renamed, says which stream it already is and does nothing. One file at a time for
@@ -38,8 +38,8 @@ now; folders are next (#434). A file already inside the streams folder is refuse
 
 With `[review] host` empty, `clippa run` skips the two review stages (`clips_review`, `review`)
 and finishes with the clips, segments and Shorts in the stream's folder (`clips/`, `segments/`,
-`shorts/`). `run.json` says why they were skipped. `clippa review publish <stream>` sends them to
-Kitsu later, once it's set up. `clippa doctor` warns about the missing host instead of failing,
+`shorts/`). `run.json` says why they were skipped. Once Kitsu is set up, `clippa run <stream>`
+sends them to review; nothing else is redone. `clippa doctor` warns about the missing host instead of failing,
 except for the roles that review through Kitsu (serve and the bot).
 
 ## Which show it belongs to

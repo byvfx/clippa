@@ -77,6 +77,56 @@ def test_the_fingerprint_reads_both_ends_of_a_big_file(tmp_path):
     assert local.fingerprint(a) != local.fingerprint(b)
 
 
+def test_a_small_file_is_hashed_whole(tmp_path):
+    # review: 1-2 MiB files differing only after the first MiB had one fingerprint
+    size = local._EDGE + local._EDGE // 2
+    a, b = tmp_path / "a.mp4", tmp_path / "b.mp4"
+    a.write_bytes(b"\0" * size)
+    b.write_bytes(b"\0" * (size - 1) + b"\1")
+    assert local.fingerprint(a) != local.fingerprint(b)
+
+
+def test_started_is_in_the_shows_timezone(cfg, tmp_path):
+    # review: a NAS container runs in UTC; "20:00" means the show's evening
+    cfg["schedule"]["timezone"] = "America/Los_Angeles"
+    fetch(cfg, video(tmp_path), started="2026-11-24T20:00")
+    (d,) = cfg["paths"]["streams"].iterdir()
+    assert jsonstate.read(d / "meta.json")["started_at"] == "2026-11-24T20:00:00-08:00"
+
+
+def test_another_files_stream_with_the_same_short_id_is_left_alone(cfg, tmp_path):
+    f = video(tmp_path)
+    d = cfg["paths"]["streams"] / f"local-{local.slug(f.stem)}-{local.fingerprint(f)[:6]}"
+    d.mkdir()
+    jsonstate.write(d / "meta.json", {"fingerprint": "someone else's"})
+    with pytest.raises(ClipperError, match="another file's"):
+        fetch(cfg, f)
+    assert jsonstate.read(d / "meta.json") == {"fingerprint": "someone else's"}
+
+
+def test_a_show_without_channels_is_refused(cfg, tmp_path):
+    # review: for_show would hand back the base [kick] channel, which may be another show's
+    pinned = config.pin_show({**cfg, "shows": {"pod": {"channels": [], "overrides": {}}}, "_resolved": {}}, "pod")
+    with pytest.raises(ClipperError, match=r"\[shows.pod\] has no channels"):
+        fetch(pinned, video(tmp_path))
+    assert not list(cfg["paths"]["streams"].iterdir())
+
+
+@pytest.mark.parametrize("maker", ["link_or_skip", "junction_or_skip"])
+def test_youtube_fetch_refuses_a_linked_stream_folder(cfg, tmp_path, monkeypatch, request, maker):
+    link_or_skip = request.getfixturevalue(maker)
+    from clippa import ytvod
+
+    monkeypatch.setattr(ytvod, "resolve", lambda url, c: {"stream_id": "youtube-abc", "title": "t",
+                                                          "duration_s": 1.0})
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    link_or_skip(elsewhere, cfg["paths"]["streams"] / "youtube-abc", directory=True)
+    with pytest.raises(ClipperError, match="is a link or outside"):
+        ytvod.fetch(cfg, "https://www.youtube.com/watch?v=abcdefghijk", no_video=True, no_chat=True)
+    assert not list(elsewhere.iterdir())
+
+
 def test_title_started_and_show_flags(cfg, tmp_path):
     shows = {"kino": {"channels": ["kinocasino", "kino2"], "overrides": {}}}
     pinned = config.pin_show({**cfg, "shows": shows, "_resolved": {}}, "kino")
@@ -132,7 +182,9 @@ def test_what_a_file_refuses(cfg, tmp_path):
     assert not list(cfg["paths"]["streams"].iterdir())
 
 
-def test_a_link_at_the_stream_folder_is_refused(cfg, tmp_path, link_or_skip):
+@pytest.mark.parametrize("maker", ["link_or_skip", "junction_or_skip"])
+def test_a_link_at_the_stream_folder_is_refused(cfg, tmp_path, request, maker):
+    link_or_skip = request.getfixturevalue(maker)
     f = video(tmp_path)
     sid = f"local-{local.slug(f.stem)}-{local.fingerprint(f)[:6]}"
     elsewhere = tmp_path / "elsewhere"

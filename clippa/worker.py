@@ -216,13 +216,16 @@ class Run:
 
 REVIEW_STAGES = ("clips_review", "review")  # `clippa review publish`: they need Kitsu
 NO_KITSU = ("no Kitsu ([review] host is empty): the videos stay in the stream folder; "
-            "`clippa review publish <stream>` sends them once Kitsu is set up")
+            "once Kitsu is set up, `clippa run <stream>` sends them to review")
 
 
 def kitsu_on(cfg: dict, stream_dir: Path) -> bool:
     """Whether this stream's review goes to Kitsu: [review] host is set (#434)."""
     # a placeholder ("<...>") is a host someone meant to fill in: the stage runs and says so
-    return bool(for_stream(cfg, stream_dir)["review"]["host"])
+    try:
+        return bool(for_stream(cfg, stream_dir)["review"]["host"])
+    except (ClipperError, OSError, ValueError):  # a broken stream config.toml: the stage's log says why
+        return True
 
 
 def default_stages(cfg: dict, stream_dir: Path) -> list[str]:
@@ -301,6 +304,9 @@ def run_stream(cfg: dict, stream_dir: Path, config_path: str | None = None,  # n
             rerun = again and stage == "shorts" and i > order.index("faces")
             if rerun and ("faces" not in ran or not run.done("shorts")):
                 continue  # the scan didn't run now, or there are no Shorts to frame yet
+            if run.data["stages"].get(stage, {}).get("note") == NO_KITSU and kitsu_on(cfg, stream_dir):
+                run.data["stages"].pop(stage)  # skipped for no Kitsu, which is set up now: review it
+                run.data.pop("review_off", None)
             if not force and not rerun and run.done(stage):
                 run.data["stages"].setdefault(stage, {"status": "done", "note": "output found"})
                 continue

@@ -193,10 +193,24 @@ def test_without_kitsu_the_review_stages_are_skipped_and_the_run_is_done(tmp_pat
     assert run["stages"]["clips_review"]["status"] == "skipped" and run["review_off"]
     assert "clips_ready" not in run  # nothing went to review
     calls.clear()
+    assert worker.run_stream(defaults, tmp_path, stages=["clips_review", "review"])  # still no Kitsu
+    assert calls == [] and jsonstate.read_or(tmp_path / "run.json", {})["review_off"]
+    # review: once Kitsu is set up, a plain run sends what was skipped (no --force needed)
     defaults["review"]["host"] = "http://kitsu.test/api"
-    assert worker.run_stream(defaults, tmp_path, stages=["review"], force=True)
-    assert calls == [["review", "publish"]]
-    assert "review_off" not in jsonstate.read_or(tmp_path / "run.json", {})
+    assert worker.run_stream(defaults, tmp_path, stages=["clips_review", "review"])
+    assert calls == [["review", "publish"], ["review", "publish"]]
+    run = jsonstate.read_or(tmp_path / "run.json", {})
+    assert "review_off" not in run and run["stages"]["review"]["status"] == "done"
+
+
+def test_a_broken_stream_config_doesnt_stop_the_run_before_review(tmp_path, defaults, monkeypatch):
+    # review: kitsu_on runs in the worker, not a stage child; the stage's own log says what's wrong
+    from clippa import errors
+
+    def broken(cfg, d):
+        raise errors.ClipperError("config.toml: bad")
+    monkeypatch.setattr(worker, "for_stream", broken)
+    assert worker.kitsu_on(defaults, tmp_path)
 
 
 def test_face_framed_shorts_render_again_after_the_face_scan(tmp_path, defaults, monkeypatch):
