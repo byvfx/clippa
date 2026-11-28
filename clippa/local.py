@@ -7,8 +7,10 @@ that show's first channel, so every later command finds it); without it the base
 
 The id is the file name's slug plus a short hash of the file's size and its first and last MiB:
 quick on a share where reading a whole 10 GB file is not. A second import of the same file, under
-any name, finds the stream it made before (meta.json's fingerprint) and does nothing. meta.json is
-written last, so a stream folder without one is an import that didn't finish, and is resumed.
+any name, finds the stream it made before (meta.json's fingerprint) and does nothing, or puts the
+video back when that stream's is gone (deleted, pruned). meta.json is written last, so a stream
+folder without one is an import that didn't finish: fetching the file again finishes it, and after
+a --move that stopped there, so does fetching the folder's own source.<ext>.
 """
 from __future__ import annotations
 
@@ -148,48 +150,80 @@ def fetch(cfg: dict, path: str, how: str = "copy", title: str = "", started: str
     if ext not in VIDEO_EXTS:
         raise ClipperError(f"{src.name}: not a video file clippa takes ({', '.join(VIDEO_EXTS)})")
     streams = Path(cfg["paths"]["streams"])
-    try:
-        inside = src.resolve().is_relative_to(streams.resolve())
-    except (OSError, RuntimeError):  # a share that won't resolve: it can't be compared, so not refused
-        inside = False
-    if inside:  # a stream's own source (or anything of one): importing it would make a second stream
-        raise ClipperError(f"{src.name}: already in the streams folder; `clippa run <stream>` runs a stream")
+    resume = _unfinished(streams, src)  # this is a stopped import's own source: finish that one
     channel = _channel(cfg)
     media.size(src)  # a video stream, or ClipperError: Shorts, faces and covers need one
     duration = media.duration(src)
     fp = fingerprint(src)
-    old = find(streams, fp)
-    if old:
+    old = None if resume else find(streams, fp)
+    if old and _has_source(old):
         print(f"{old.name}: already imported; `clippa run {old.name}` runs it")
         return old
-    sid = f"{PREFIX}{slug(src.stem)}-{fp[:6]}"
-    d = streams / sid
+    d = resume or old or _new_folder(streams, src, fp)
+    sid = d.name
     media.refuse_link_stream(cfg, d)  # before mkdir takes a link for a folder and writes go through it
-    try:
-        other = jsonstate.read(d / "meta.json", {}).get("fingerprint")
-    except (OSError, ValueError):
-        other = "unreadable"
-    if other:  # find() didn't match it, so it's another file's stream with the same short id
-        raise ClipperError(f"{sid}: that stream is another file's (same name, same short hash); "
-                           f"rename this file and fetch it again")
     d.mkdir(parents=True, exist_ok=True)
     dest = d / f"source{ext}"
     start = started_at(src, started, cfg["schedule"]["timezone"])  # before the copy: a copy's mtime is now
-    # A copy that finished before meta.json was written is kept (same size), anything else redone
-    if not (dest.exists() and not media.is_link(dest) and dest.stat().st_size == src.stat().st_size):
-        _place(src, dest, how, sid)
-    elif how == "move":  # (src is outside the streams folder: never the stream's own source)
-        src.unlink()
+    if not resume:
+        # A copy that finished before meta.json was written is kept if it is this file's bytes
+        if not (dest.exists() and not media.is_link(dest) and fingerprint(dest) == fp):
+            _place(src, dest, how, sid)
+        elif how == "move":  # (src is outside the streams folder: never the stream's own source)
+            src.unlink()
+    if old:  # its video was gone (deleted, or pruned): back now, and its meta.json stays as it was
+        print(f"{sid}: video restored; `clippa run {sid}` runs it")
+        return d
     meta = {
         "stream_id": sid,
         "platform": "local",
         "channel": channel,
-        "title": title or src.stem,
+        "title": title or (sid if resume else src.stem),  # a resumed import's own name is gone
         "started_at": start,
         "duration_s": round(duration, 3),
-        "source": src.name,  # the name only: meta.json is read into messages and the war room
+        "source": "" if resume else src.name,  # the name only: meta.json reaches messages and the war room
         "fingerprint": fp,
     }
     jsonstate.write(d / "meta.json", meta)
     print(f"{sid}: {meta['title']} ({duration / 3600:.2f} h); `clippa run {sid}` runs it")
+    return d
+
+
+def _has_source(d: Path) -> bool:
+    try:
+        media.source_file(d)
+        return True
+    except ClipperError:
+        return False
+
+
+def _unfinished(streams: Path, src: Path) -> Path | None:
+    """The stream folder when `src` is a stopped import's own `source.*` (a local stream with no
+    meta.json yet: a --move killed between the rename and meta.json), so fetching it finishes that
+    import. Anything else inside the streams folder is refused: importing it would make a second
+    stream of a video that is already one."""
+    try:
+        inside = src.resolve().is_relative_to(streams.resolve())
+    except (OSError, RuntimeError):  # a share that won't resolve: it can't be compared, so not refused
+        return None
+    if not inside:
+        return None
+    d = src.parent
+    if (src.stem == "source" and d.name.startswith(PREFIX) and d.parent.resolve() == streams.resolve()
+            and not (d / "meta.json").exists()):
+        return d
+    raise ClipperError(f"{src.name}: already in the streams folder; `clippa run <stream>` runs a stream")
+
+
+def _new_folder(streams: Path, src: Path, fp: str) -> Path:
+    """streams/local-<slug>-<6 hex> for a file no stream has yet, refused when it is another
+    file's stream (find() didn't match it, so the same short id is someone else's)."""
+    d = streams / f"{PREFIX}{slug(src.stem)}-{fp[:6]}"
+    try:
+        other = jsonstate.read(d / "meta.json", {}).get("fingerprint")
+    except (OSError, ValueError):
+        other = "unreadable"
+    if other:
+        raise ClipperError(f"{d.name}: that stream is another file's (same name, same short hash); "
+                           f"rename this file and fetch it again")
     return d

@@ -189,6 +189,42 @@ def test_a_file_in_the_streams_folder_is_refused(cfg, tmp_path):
     assert (d / "source.mkv").exists() and list(cfg["paths"]["streams"].iterdir()) == [d]
 
 
+def test_a_move_stopped_before_meta_is_finished_from_the_folders_source(cfg, tmp_path):
+    # #466 review: the original is gone after the rename, so the folder's own source is the way back
+    f = video(tmp_path)
+    fetch(cfg, f, move=True)
+    (d,) = cfg["paths"]["streams"].iterdir()
+    (d / "meta.json").unlink()  # killed between the rename and meta.json
+    fetch(cfg, d / "source.mkv")
+    meta = jsonstate.read(d / "meta.json")
+    assert meta["stream_id"] == d.name and meta["fingerprint"] == local.fingerprint(d / "source.mkv")
+    assert (d / "source.mkv").exists() and list(cfg["paths"]["streams"].iterdir()) == [d]
+
+
+def test_fetching_again_puts_back_a_streams_missing_video(cfg, tmp_path, capsys):
+    # #466 review: "already imported" for a stream whose video was deleted or pruned left it unrunnable
+    f = video(tmp_path)
+    fetch(cfg, f)
+    (d,) = cfg["paths"]["streams"].iterdir()
+    jsonstate.write(d / "meta.json", {**jsonstate.read(d / "meta.json"), "title": "kept"})
+    (d / "source.mkv").unlink()
+    capsys.readouterr()
+    fetch(cfg, f)
+    assert (d / "source.mkv").read_bytes() == f.read_bytes() and "video restored" in capsys.readouterr().out
+    assert jsonstate.read(d / "meta.json")["title"] == "kept"  # its meta.json is left as it was
+
+
+def test_a_leftover_source_of_the_same_size_but_other_bytes_is_replaced(cfg, tmp_path):
+    # #466 review: same size was taken for same file, and --move then deleted the new one
+    f = video(tmp_path, data=b"x" * 5000)
+    fetch(cfg, f)
+    (d,) = cfg["paths"]["streams"].iterdir()
+    (d / "meta.json").unlink()
+    (d / "source.mkv").write_bytes(b"y" * 5000)  # an earlier, different file's bytes at the same size
+    fetch(cfg, f, move=True)
+    assert (d / "source.mkv").read_bytes() == b"x" * 5000 and not f.exists()
+
+
 def test_what_a_file_refuses(cfg, tmp_path):
     with pytest.raises(ClipperError, match="not a video file"):
         fetch(cfg, video(tmp_path, "notes.txt"))

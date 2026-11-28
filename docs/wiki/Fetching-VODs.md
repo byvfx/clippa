@@ -31,8 +31,11 @@ clippa run local-kino-night-12-1c32e3
 | `--started` | when it was streamed, an ISO date or time, in the show's `[schedule] timezone` unless it says otherwise (default: the video's own creation date, else the file's) |
 
 The id's hash comes from the file's size and its first and last MiB, so fetching the same file
-again, even renamed, says which stream it already is and does nothing. One file at a time for
-now; folders are next (#434). A file already inside the streams folder is refused.
+again, even renamed, says which stream it already is and does nothing, or puts the video back if
+that stream's was deleted or pruned. One file at a time for now; folders are next (#434). A file
+already inside the streams folder is refused, except a stopped import's own `source.<ext>`: if a
+`--move` was interrupted before the stream was finished (no `meta.json` in its folder), fetching
+that file finishes it.
 
 ## Without Kitsu
 
