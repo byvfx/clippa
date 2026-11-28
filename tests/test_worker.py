@@ -203,6 +203,19 @@ def test_without_kitsu_the_review_stages_are_skipped_and_the_run_is_done(tmp_pat
     assert "review_off" not in run and run["stages"]["review"]["status"] == "done"
 
 
+def test_the_slow_review_ends_the_clips_no_kitsu_skip(tmp_path, defaults, monkeypatch):
+    # #466 review: the slow lane has no clips_review, but its publish sends the clips too
+    monkeypatch.setattr(worker.subprocess, "call", lambda cmd, **kw: 0)
+    monkeypatch.setattr(worker, "keep_awake", lambda on: None)
+    defaults["review"]["host"] = ""
+    assert worker.run_stream(defaults, tmp_path, stages=["clips_review"])  # the fast lane, no Kitsu
+    defaults["review"]["host"] = "http://kitsu.test/api"
+    assert worker.run_stream(defaults, tmp_path, stages=["review"])  # the slow lane, Kitsu now
+    run = jsonstate.read_or(tmp_path / "run.json", {})
+    assert run["stages"]["clips_review"] == {"status": "done", "note": "sent with review"}
+    assert "review_off" not in run
+
+
 def test_a_broken_stream_config_doesnt_stop_the_run_before_review(tmp_path, defaults, monkeypatch):
     # review: kitsu_on runs in the worker, not a stage child; the stage's own log says what's wrong
     from clippa import errors

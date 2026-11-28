@@ -368,6 +368,10 @@ def run_stream(cfg: dict, stream_dir: Path, config_path: str | None = None,  # n
                 log.error("%s: %s failed (%s), see %s", name, stage, exit_text(code), log_path)
                 return False
             st["status"] = "done"
+            clips = run.data["stages"].get("clips_review", {})
+            if stage == "review" and clips.get("note") == NO_KITSU:
+                # the slow lane's publish sends every kind, the clips too: their no-Kitsu skip is over
+                run.data["stages"]["clips_review"] = {"status": "done", "note": "sent with review"}
             log.info("%s: %s done in %ds", name, stage, st["seconds"])
             run.save()
             ran.add(stage)

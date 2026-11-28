@@ -165,6 +165,9 @@ def fetch(cfg: dict, path: str, how: str = "copy", title: str = "", started: str
     d.mkdir(parents=True, exist_ok=True)
     dest = d / f"source{ext}"
     start = started_at(src, started, cfg["schedule"]["timezone"])  # before the copy: a copy's mtime is now
+    if old:  # a link left as its source, under any extension, would still be the one source_file finds
+        for p in sorted(d.glob("source.*")):
+            media.drop_output_link(p, sid)
     if not resume:
         # A copy that finished before meta.json was written is kept if it is this file's bytes
         if not (dest.exists() and not media.is_link(dest) and fingerprint(dest) == fp):
@@ -190,9 +193,10 @@ def fetch(cfg: dict, path: str, how: str = "copy", title: str = "", started: str
 
 
 def _has_source(d: Path) -> bool:
+    """The stream's video is there, as a file of its own: a link in its place is no source (the
+    import puts the video back, dropping the link first, since ffmpeg would write through it)."""
     try:
-        media.source_file(d)
-        return True
+        return not media.link_or_raise(media.source_file(d), d.name)
     except ClipperError:
         return False
 

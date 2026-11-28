@@ -214,6 +214,19 @@ def test_fetching_again_puts_back_a_streams_missing_video(cfg, tmp_path, capsys)
     assert jsonstate.read(d / "meta.json")["title"] == "kept"  # its meta.json is left as it was
 
 
+def test_a_linked_source_is_no_source_and_fetching_again_replaces_it(cfg, tmp_path, link_or_skip):
+    # #466 review: "already imported" kept a link where the video was, which ffmpeg -y writes through
+    f = video(tmp_path)
+    fetch(cfg, f)
+    (d,) = cfg["paths"]["streams"].iterdir()
+    other = video(tmp_path, "other.bin", b"o" * 10)
+    (d / "source.mkv").unlink()
+    link_or_skip(other, d / "source.mkv")
+    fetch(cfg, f)
+    assert not media.is_link(d / "source.mkv") and (d / "source.mkv").read_bytes() == f.read_bytes()
+    assert other.read_bytes() == b"o" * 10  # what the link named is untouched
+
+
 def test_a_leftover_source_of_the_same_size_but_other_bytes_is_replaced(cfg, tmp_path):
     # #466 review: same size was taken for same file, and --move then deleted the new one
     f = video(tmp_path, data=b"x" * 5000)
