@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0   # the whole history, to tell whether the tag is on main
-      - uses: astral-sh/setup-uv@v10.3.3
+      - uses: astral-sh/setup-uv@v10.4.0
       - name: The tag, the code and the changelog agree, and the tag is on main
         run: |
           version="${GITHUB_REF_NAME#v}"
