@@ -12,6 +12,11 @@ Developing#releases.
 
 ### 2026-11
 
+- 11-27: Clippa can fall back to OpenRouter when Anthropic is out of credits: with `[llm] fallback
+  = "openrouter"` a refused Claude call goes to OpenRouter's copy of the same model, and so do the
+  process's later ones for an hour (#454). Off by default. Either way, a stage stopped by an
+  empty Anthropic balance now says `Anthropic is out of credits`, and the worker holds the stream
+  instead of spending its three attempts, then tries it again every `retry_minutes`.
 - 11-27: A Short whose layout changes partway renders on the NAS again. The hub's ffmpeg 7.1
   dropped the frame rate where the scenes are joined, so the QSV encoder refused the Short ("Current
   frame rate is unsupported", #429).

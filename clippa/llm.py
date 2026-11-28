@@ -29,6 +29,11 @@ What differs per provider:
   up to the same six attempts as the other retries, then raises OpenRouterLimit.
 - images: Claude content blocks ({"type": "image", "source": {"type": "base64", ...}}) are
   converted to image_url data URLs.
+- Anthropic out of credits (#454): a billing refusal (HTTP 402, or a 400/403 that says the
+  credit balance is too low) raises OutOfCredits, unless [llm] fallback = "openrouter": then
+  the same call goes to OpenRouter's copy of the model (claude-haiku-5-5 ->
+  openrouter:anthropic/claude-haiku-5.5), and so does every later Claude call in the process
+  for an hour, when Anthropic is tried again.
 Prices are [llm] prices ($ per 1M input/output tokens, by model string), for cost lines only;
 OpenRouter reports what each call cost, and that wins over the table. When a call omits that
 cost, and for a dry-run, an openrouter: model uses OpenRouter's published list (one fetch per
@@ -37,6 +42,7 @@ process, including a failed fetch).
 from __future__ import annotations
 
 import json
+import logging
 import math
 import os
 import re
@@ -45,7 +51,9 @@ import time
 from pathlib import Path
 from typing import Any
 
-from .errors import ClipperError, KeyRejected, OpenRouterLimit
+from .errors import ClipperError, KeyRejected, OpenRouterLimit, OutOfCredits
+
+log = logging.getLogger(__name__)
 
 PROVIDERS = {  # prefix -> (base URL, key env var)
     "openai": ("https://api.openai.com/v1", "OPENAI_API_KEY"),
@@ -214,6 +222,55 @@ def split(model: str) -> tuple[str, str]:
     if name and (prefix in PROVIDERS or prefix == "anthropic"):
         return prefix, name
     return "anthropic", model
+
+
+# ---------- Anthropic out of credits (#454) ----------
+
+_CLAUDE_NAME = re.compile(r"(claude-[a-z]+-\d+)-(\d+)(?:-\d{8})?")
+_BILLING = re.compile(r"credit balance|billing", re.I)
+_RECHECK_S = 3600  # how long a billing refusal sends Claude calls to OpenRouter before Anthropic is tried again
+_CREDITS = {"out_at": 0.0, "said": False}  # this process's: when Anthropic last refused for billing
+_CREDITS_LOCK = threading.Lock()
+
+
+def openrouter_name(model: str) -> str | None:
+    """OpenRouter's id for an Anthropic model: claude-haiku-5-5 (or a dated
+    claude-haiku-5-5-20260601) -> anthropic/claude-haiku-5.5. None when the name has another
+    shape, or OpenRouter's published list doesn't have it (a list that couldn't be fetched is
+    no answer, so the id is tried: a wrong one is OpenRouter's own one-line error)."""
+    if split(model)[0] != "anthropic":
+        return None
+    m = _CLAUDE_NAME.fullmatch(split(model)[1])
+    if not m:
+        return None
+    name = f"anthropic/{m[1]}.{m[2]}"
+    listed = openrouter_prices()
+    return name if not listed or name in listed else None
+
+
+def billing_refusal(e: BaseException) -> bool:
+    """Whether an Anthropic SDK error is the account's billing: a 402, or a 400 or 403 whose
+    message names the credit balance or billing ("Your credit balance is too low to access the
+    Anthropic API"). A rejected key (401), a refusal or any other bad request is not."""
+    if not type(e).__module__.startswith("anthropic"):
+        return False
+    status = getattr(e, "status_code", None)
+    if status == 402:
+        return True
+    return status in (400, 403) and bool(_BILLING.search(str(getattr(e, "message", "") or e)))
+
+
+def _note_credits(text: str) -> None:
+    """Say once per fallback period that Claude calls are going elsewhere: logged where logging is set
+    up (serve, the bot, the worker), printed otherwise (a stage)."""
+    with _CREDITS_LOCK:
+        if _CREDITS["said"]:
+            return
+        _CREDITS["said"] = True
+    if logging.getLogger().handlers:
+        log.warning("%s", text)
+    else:
+        print(text, flush=True)
 
 
 def is_llm(key: str, value: Any) -> bool:
@@ -444,6 +501,44 @@ class LLM:
                                                max_retries=4, default_headers=headers)
         return self._client
 
+    def _route(self, model: str) -> str:
+        """The model a call goes to: OpenRouter's copy of a Claude model while Anthropic is out
+        of credits in this process and [llm] fallback = "openrouter", else `model`. An hour
+        after the refusal Anthropic is tried again (a balance topped up while serve ran)."""
+        if split(model)[0] != "anthropic" or self.lc.get("fallback") != "openrouter":
+            return model
+        out_at = _CREDITS["out_at"]
+        if not out_at:
+            return model
+        if time.monotonic() - out_at >= _RECHECK_S:
+            _CREDITS["said"] = False  # a refusal from here on is a new fallback, worth its own line
+            return model
+        alt = openrouter_name(model)
+        return f"openrouter:{alt}" if alt else model
+
+    def _fallback_for(self, e: Exception, model: str) -> str | None:
+        """After an Anthropic error: the OpenRouter model to send the same call to, or None
+        when the error is not a billing refusal (the caller re-raises it). A billing refusal
+        with no way to fall back raises OutOfCredits, one line saying why."""
+        if not billing_refusal(e):
+            return None
+        detail = " ".join(str(getattr(e, "message", "") or e).split())[:200]
+        alt = openrouter_name(model) if self.lc.get("fallback") == "openrouter" else None
+        if alt is None:
+            why = ("[llm] fallback is off" if self.lc.get("fallback") != "openrouter"
+                   else f"OpenRouter doesn't list {model}")
+            raise OutOfCredits(f"Anthropic is out of credits ({model}, HTTP {e.status_code}; {why}): "
+                               f"{detail}") from None
+        if not provider_key("openrouter", self.paths):
+            raise OutOfCredits(f"Anthropic is out of credits ({model}, HTTP {e.status_code}) and "
+                               "[llm] fallback = \"openrouter\" has no OPENROUTER_API_KEY "
+                               "(or [paths] openrouter_key) to use") from None
+        with _CREDITS_LOCK:
+            _CREDITS["out_at"] = time.monotonic()
+        _note_credits(f"Anthropic is out of credits: Claude calls go through OpenRouter "
+                      f"(openrouter:{alt} for {model}) for the next hour ([llm] fallback)")
+        return f"openrouter:{alt}"
+
     def _account(self, model: str, tokens_in: int, tokens_out: int,
                  usd: float | None = None) -> dict:
         """Add a call to the cost and the ledger. usd: what the provider says it cost
@@ -466,8 +561,21 @@ class LLM:
         """Structured-output call. Returns (parsed JSON or None on refusal, meta).
         stream=True for long inputs/outputs, so the request can't hit an HTTP timeout.
         fallback: Claude's server-side refusal fallback (ignored elsewhere)."""
+        model = self._route(model)
         if split(model)[0] != "anthropic":
             return self._compat_json(model, system, user, schema, effort, 64000 if stream else 16000)
+        import anthropic
+
+        try:
+            return self._claude_json(model, system, user, schema, effort, fallback, stream)
+        except anthropic.APIStatusError as e:
+            alt = self._fallback_for(e, model)
+            if alt is None:
+                raise
+        return self.json_call(alt, system, user, schema, effort, fallback, stream)
+
+    def _claude_json(self, model: str, system: str, user: str | list[dict], schema: dict,
+                     effort: str, fallback: bool, stream: bool) -> tuple[dict | None, dict]:
         kwargs = {
             "model": split(model)[1], "max_tokens": 64000 if stream else 16000, "system": system,
             "messages": [{"role": "user", "content": user}],
@@ -500,15 +608,24 @@ class LLM:
         codereview): thinking_tokens in place of [llm] thinking_max_tokens, and timeout_s in
         place of [llm] timeout_s, after which the call fails rather than being sent again
         (each try of a long thinking call is paid for)."""
+        model = self._route(model)
         if split(model)[0] != "anthropic":
             data, meta = self._compat(model, self._messages(system, user), effort, max_tokens,
                                       thinking_tokens=thinking_tokens, timeout_s=timeout_s)
             if meta.get("refusal") is not None:
                 return "", meta
             return (data["choices"][0]["message"].get("content") or "").strip(), meta
-        resp = self.client.messages.create(
-            model=split(model)[1], max_tokens=max_tokens, system=system,
-            output_config={"effort": claude_effort(effort)}, messages=[{"role": "user", "content": user}])
+        import anthropic
+
+        try:
+            resp = self.client.messages.create(
+                model=split(model)[1], max_tokens=max_tokens, system=system,
+                output_config={"effort": claude_effort(effort)}, messages=[{"role": "user", "content": user}])
+        except anthropic.APIStatusError as e:
+            alt = self._fallback_for(e, model)
+            if alt is None:
+                raise
+            return self.text_call(alt, system, user, effort, max_tokens, thinking_tokens, timeout_s)
         meta = self._claude_meta(model, resp)
         if resp.stop_reason == "refusal":
             return "", meta
@@ -519,16 +636,26 @@ class LLM:
         """A JSON object without a schema (one too large for a structured-output grammar):
         the prompt describes the fields (and asks for JSON only) and the caller checks
         them. None on refusal."""
+        model = self._route(model)
         if split(model)[0] != "anthropic":
             data, meta = self._compat(model, self._messages(system, user), effort, max_tokens,
                                       {"type": "json_object"})
             if meta.get("refusal") is not None:
                 return None, meta
             return parse_json(data["choices"][0]["message"].get("content") or ""), meta
-        with self.client.messages.stream(
-                model=split(model)[1], max_tokens=max_tokens, system=system,
-                output_config={"effort": claude_effort(effort)}, messages=[{"role": "user", "content": user}]) as st:
-            resp = st.get_final_message()
+        import anthropic
+
+        try:
+            with self.client.messages.stream(
+                    model=split(model)[1], max_tokens=max_tokens, system=system,
+                    output_config={"effort": claude_effort(effort)},
+                    messages=[{"role": "user", "content": user}]) as st:
+                resp = st.get_final_message()
+        except anthropic.APIStatusError as e:
+            alt = self._fallback_for(e, model)
+            if alt is None:
+                raise
+            return self.json_text(alt, system, user, effort, max_tokens)
         meta = self._claude_meta(model, resp)
         if resp.stop_reason == "refusal":
             return None, meta
@@ -544,6 +671,7 @@ class LLM:
         last one the user's. tools: [{"name", "description", "input_schema"}]. Returns
         ({"text": what it said, "tool": {"name", "input"} or None}, meta); a refusal is
         {"text": "", "tool": None} with meta["refusal"]."""
+        model = self._route(model)
         if split(model)[0] != "anthropic":
             fns = [{"type": "function", "function": {"name": t["name"], "description": t["description"],
                                                      "parameters": t["input_schema"]}} for t in tools]
@@ -563,9 +691,17 @@ class LLM:
                     tool = {"name": fn["name"], "input": args}
                     break
             return {"text": (msg.get("content") or "").strip(), "tool": tool}, meta
-        resp = self.client.messages.create(
-            model=split(model)[1], max_tokens=max_tokens, system=system, messages=messages,
-            tools=tools, tool_choice={"type": "auto"}, output_config={"effort": claude_effort(effort)})
+        import anthropic
+
+        try:
+            resp = self.client.messages.create(
+                model=split(model)[1], max_tokens=max_tokens, system=system, messages=messages,
+                tools=tools, tool_choice={"type": "auto"}, output_config={"effort": claude_effort(effort)})
+        except anthropic.APIStatusError as e:
+            alt = self._fallback_for(e, model)
+            if alt is None:
+                raise
+            return self.tool_call(alt, system, messages, tools, effort, max_tokens)
         meta = self._claude_meta(model, resp)
         if resp.stop_reason == "refusal":
             meta["refusal"] = getattr(resp.stop_details, "category", None)
@@ -579,7 +715,9 @@ class LLM:
 
     def preflight(self, model: str) -> None:
         """One tiny call so account problems (auth, workspace, credits, a wrong URL) stop the
-        run with one clear line instead of 60 identical failures."""
+        run with one clear line instead of 60 identical failures. Anthropic out of credits is
+        OutOfCredits, or (with [llm] fallback) the same check against OpenRouter."""
+        model = self._route(model)
         if split(model)[0] != "anthropic":
             try:
                 self._compat(model, [{"role": "user", "content": "Say OK."}], "", 256, length_ok=True)
@@ -594,8 +732,14 @@ class LLM:
         except anthropic.AuthenticationError as e:
             raise KeyRejected(f"Claude API rejected the key (ANTHROPIC_API_KEY or [paths] anthropic_key)"
                               f" ({e.status_code}): {e.message}") from None
-        except (anthropic.PermissionDeniedError, anthropic.BadRequestError) as e:
-            raise ClipperError(f"Claude API unavailable ({e.status_code}): {e.message}") from None
+        except anthropic.APIStatusError as e:
+            alt = self._fallback_for(e, model)
+            if alt is not None:
+                self.preflight(alt)
+                return
+            if isinstance(e, (anthropic.PermissionDeniedError, anthropic.BadRequestError)):
+                raise ClipperError(f"Claude API unavailable ({e.status_code}): {e.message}") from None
+            raise
 
     # ---------- Claude ----------
 

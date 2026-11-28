@@ -10,7 +10,7 @@ from pathlib import Path
 
 from .. import jsonstate
 from ..config import for_stream
-from ..errors import ClipperError, OpenRouterLimit
+from ..errors import ClipperError, stops_run
 from ..llm import Claude, estimate_lines, preflight, tokens
 from ..meta import duration, load_assets
 from ..prompts import Prompts
@@ -219,8 +219,8 @@ def estimate(cfg: dict, tc: dict, todo: list[dict], style: str) -> list[str]:
 def pick_all(todo: list[dict], safe, workers: int, keep) -> list[str]:
     """safe(x) -> (key, entry or None) for each of `todo` on `workers` threads; keep(key, entry)
     as each finishes, in the order they finish. Returns the keys whose entry was None. An
-    OpenRouterLimit from one is raised only after every pick that did finish is kept: those
-    were paid for (#75)."""
+    OpenRouterLimit (or another run-wide stop: errors.stops_run) from one is raised only after
+    every pick that did finish is kept: those were paid for (#75)."""
     failed, limit = [], None
     with ThreadPoolExecutor(workers) as pool:
         futs = [pool.submit(safe, x) for x in todo]
@@ -229,7 +229,9 @@ def pick_all(todo: list[dict], safe, workers: int, keep) -> list[str]:
                 continue
             try:
                 key, entry = fut.result()
-            except OpenRouterLimit as e:
+            except Exception as e:  # only a run-wide stop gets here (safe catches the rest)
+                if not stops_run(e):
+                    raise
                 if limit is None:  # the rest would be refused too: don't start them
                     limit = e
                     for other in futs:
@@ -320,9 +322,9 @@ def run(stream_dir: Path, cfg: dict, ids: list[str] | None = None, force: bool =
         def safe(x: dict) -> tuple[str, dict | None]:
             try:
                 return one(x)
-            except OpenRouterLimit:
-                raise  # the rest of the covers would be refused the same way
-            except Exception as e:  # noqa: BLE001  # #75: one bad grab can't cost the others' picks
+            except Exception as e:  # #75: one bad grab can't cost the others' picks
+                if stops_run(e):  # a spending limit, a rejected key, no credits (#454)
+                    raise  # the rest of the covers would be refused the same way
                 print(f"{x['id']:<22} failed: {type(e).__name__}: {e}", flush=True)
                 return asset_key(x), None
 

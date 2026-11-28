@@ -56,6 +56,26 @@ class OpenRouterLimit(ClipperError):
         self.limit_source = limit_source
 
 
+OUT_OF_CREDITS = 5  # the exit status of a stage Anthropic refused for billing, with no fallback (#454)
+
+
+class OutOfCredits(ClipperError):
+    """Anthropic refused a call for billing (the credit balance is too low) and `[llm] fallback`
+    didn't send it elsewhere. Retrying at once would be refused the same way, so the worker holds
+    the stream (worker.pending) without spending its attempts, and tries again every
+    [worker] retry_minutes or as soon as a key changes."""
+
+    def __init__(self, message: str):
+        super().__init__(message, status=OUT_OF_CREDITS)
+
+
+def stops_run(e: BaseException) -> bool:
+    """An error the rest of a run would meet on every call: a rejected key, an OpenRouter
+    spending limit, or Anthropic out of credits. A stage that turns one item's failure into a
+    finding or a retry passes these through instead, so the run stops with the right exit."""
+    return key_rejected(e) or isinstance(e, (OpenRouterLimit, OutOfCredits))
+
+
 def key_rejected(e: BaseException) -> bool:
     """A refused key: KeyRejected, or the Anthropic SDK's AuthenticationError from a call past
     the preflight. A handler that turns errors into findings or a retry passes these through,
