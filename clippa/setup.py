@@ -738,6 +738,10 @@ def step_keys(cfg: dict, st: dict, ask: Ask) -> None:  # noqa: C901
             say(f"skipped the Kitsu address; `clippa doctor` fails until [review] host is set ({need_kitsu}); "
                 "`clippa setup --step keys` asks again")
         elif not host:
+            if rc["host"]:  # the starter's placeholder: left, it would run review against "<...>"
+                toml_set(base(cfg)["_file"], "review", "host", "")
+                say('-> clipper.toml: [review] host = ""')
+                cfg = config.load(base(cfg)["_file"])
             say("no Kitsu: `clippa run` skips review and leaves the videos in each stream's folder; "
                 "`clippa setup --step keys` asks again")
         if host:

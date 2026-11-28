@@ -94,27 +94,29 @@ def find(streams: Path, fp: str) -> Path | None:
 
 
 def _place(src: Path, dest: Path, how: str, label: str) -> None:
-    """src at dest: copied (through dest.part, so a stopped copy is never taken for the source),
-    hardlinked, or moved."""
+    """src at dest: copied or hardlinked through dest.part (so a stopped copy is never taken for
+    the source), or moved straight onto dest. A move on one drive is a single rename, so there is
+    never half a file; across drives shutil.move removes the original only once the copy is whole,
+    so a stopped one leaves the original and a short dest that the next fetch redoes."""
     part = dest.with_name(dest.name + ".part")
     media.drop_output_link(part, label)  # a link there would send the copy where it points
     media.drop_output_link(dest, label)
     try:
+        if how == "move":
+            shutil.move(src, dest)
+            return
         if how == "link":
             part.unlink(missing_ok=True)
             os.link(src, part)
-        elif how == "move":
-            shutil.move(src, part)
         else:
             print(f"{label}: copying {src.stat().st_size / 1e9:.1f} GB", flush=True)
             shutil.copyfile(src, part)
         os.replace(part, dest)
     except OSError as e:
-        if how != "move":  # a move stopped half way may be the only copy left: it stays as .part
+        if how != "move":
             part.unlink(missing_ok=True)
         hint = ("; a hardlink needs the file on the same drive as the streams folder, drop --link to copy"
-                if how == "link" else
-                f"; the video is now {label}/{part.name} in the streams folder" if part.exists() else "")
+                if how == "link" else "")
         raise ClipperError(f"{label}: couldn't {how} the video into the stream folder "
                            f"({e.strerror or e}){hint}") from None
 
@@ -138,6 +140,10 @@ def fetch(cfg: dict, path: str, how: str = "copy", title: str = "", started: str
     src = Path(path)
     if src.is_dir():
         raise ClipperError(f"{src.name}: a folder; give one video file for now (folders: #434)")
+    if how == "move" and media.link_or_raise(src, src.name, "the file"):
+        # a rename moves the link itself, whose (relative) target then resolves from the stream folder
+        raise ClipperError(f"{src.name}: a link; --move would move the link, not the video. Drop "
+                           f"--move to copy it, or move the file it points to")
     ext = src.suffix.lower()
     if ext not in VIDEO_EXTS:
         raise ClipperError(f"{src.name}: not a video file clippa takes ({', '.join(VIDEO_EXTS)})")

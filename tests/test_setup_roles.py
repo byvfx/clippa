@@ -59,6 +59,21 @@ def test_kitsu_required_where_doctor_fails_without_it():
     assert "a URL" in setup.kitsu_host_error("http://", required=True)  # no host: was saved as http:/api
 
 
+def test_enter_for_no_kitsu_clears_the_starters_placeholder(defaults, tmp_path, monkeypatch):
+    # #466 review: the prompt shows for a "<...>" host too; Enter left it, so review ran against it
+    toml = tmp_path / "clipper.toml"
+    toml.write_text('[review]\nhost = "<your kitsu>/api"\n', encoding="utf-8")
+    monkeypatch.delenv("CLIPPER_REVIEW_HOST", raising=False)
+    cfg = setup.config.load(toml, use_local=False)
+    assert cfg["review"]["host"] == "<your kitsu>/api"
+    cfg["paths"] = defaults["paths"]
+    asked = []
+    monkeypatch.setattr(setup, "ensure_env_key", lambda *a, **k: asked.append(a[2]))
+    setup.step_keys(cfg, {"roles": ["worker"]}, setup.Ask({}))  # not interactive: Enter
+    assert 'host = ""' in toml.read_text(encoding="utf-8")
+    assert cfg["review"]["token_env"] not in asked  # no Kitsu, no token to ask for
+
+
 def test_required_key_asks_again_instead_of_skipping(monkeypatch, capsys):
     ask = setup.Ask({})
     ask.interactive = True

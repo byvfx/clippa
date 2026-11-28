@@ -1,6 +1,7 @@
 """#434: `clippa fetch <path>`, a video already on disk as a stream (clippa/local.py)."""
 import argparse
 import os
+from pathlib import Path
 
 import pytest
 
@@ -149,6 +150,24 @@ def test_move_and_link(cfg, tmp_path):
     fetch(cfg, g, link=True)
     linked = next(p for p in cfg["paths"]["streams"].iterdir() if p != d) / "source.mp4"
     assert g.exists() and os.path.samefile(g, linked)
+
+
+def test_move_refuses_a_link(cfg, tmp_path, link_or_skip):
+    # #466 review: a rename moves the link itself, and its relative target breaks in the stream folder
+    real = video(tmp_path, "real.mkv")
+    link_or_skip(real, tmp_path / "vods" / "show.mkv")
+    with pytest.raises(ClipperError, match="--move would move the link"):
+        fetch(cfg, tmp_path / "vods" / "show.mkv", move=True)
+    assert real.exists() and not list(cfg["paths"]["streams"].iterdir())
+
+
+def test_move_goes_straight_onto_the_source(cfg, tmp_path, monkeypatch):
+    # #466 review: no .part to strand; a move is one rename on one drive
+    moved = []
+    real_move = local.shutil.move
+    monkeypatch.setattr(local.shutil, "move", lambda s, d: moved.append(Path(d).name) or real_move(s, d))
+    fetch(cfg, video(tmp_path), move=True)
+    assert moved == ["source.mkv"]
 
 
 def test_a_finished_copy_without_meta_is_kept(cfg, tmp_path, monkeypatch):
